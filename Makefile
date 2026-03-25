@@ -40,8 +40,8 @@ install: build
 	docker compose exec app composer install
 	docker compose exec app php artisan key:generate
 	docker compose exec app php artisan migrate --seed
-	docker compose exec app pnpm install
-	docker compose exec app pnpm run build
+	docker compose exec app npm install
+	docker compose exec app npm run build
 	@echo ""
 	@echo "  Setup complete. Open http://localhost:8080"
 	@echo ""

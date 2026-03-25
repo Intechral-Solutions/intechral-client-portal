@@ -35,10 +35,9 @@ RUN pecl install redis && docker-php-ext-enable redis
 # Composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-# Node.js 22 LTS + PNPM
+# Node.js 22 LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g pnpm \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

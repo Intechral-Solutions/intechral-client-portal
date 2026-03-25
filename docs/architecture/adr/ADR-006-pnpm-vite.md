@@ -1,7 +1,7 @@
-# ADR-006: Use PNPM as JavaScript Package Manager with Vite
+# ADR-006: Use npm as JavaScript Package Manager with Vite
 
 **Date:** 2024-03-24
-**Status:** Accepted
+**Status:** Accepted (updated 2026-03-24)
 
 ## Context
 
@@ -9,21 +9,19 @@ The project needs a JavaScript package manager and frontend build tool for Tailw
 
 ## Decision
 
-Use **PNPM** as the package manager and **Vite** as the build tool (Laravel's default since Laravel 9).
+Use **npm** as the package manager and **Vite** as the build tool (Laravel's default since Laravel 9).
 
 ## Rationale
 
-- PNPM is significantly faster than npm due to its content-addressable store and hard-linking strategy
-- PNPM's strict dependency resolution prevents phantom dependencies
+- npm ships with Node.js — no additional global install required in the Docker image or on developer machines
 - Vite provides near-instant HMR (hot module replacement) in development
-- Vite's `@vitejs/plugin-react` and other plugins are compatible with the Tailwind v4 Vite plugin
+- The Tailwind CSS v4 Vite plugin (`@tailwindcss/vite`) works natively with npm
 - Laravel ships with `vite.config.js` and `@laravel/vite-plugin` out of the box
-- PNPM is installable on the Docker image alongside Node.js 22 LTS
+- `package-lock.json` provides deterministic installs without an additional lockfile format
 
 ## Consequences
 
-- `pnpm-lock.yaml` is committed (not `package-lock.json`)
+- `package-lock.json` is committed (not `pnpm-lock.yaml`)
 - `node_modules/` is excluded from git
-- `npm` commands in any documentation should be replaced with `pnpm`
-- Docker image installs Node.js 22 LTS + PNPM globally
+- Docker image installs Node.js 22 LTS; npm is included automatically
 - cPanel deployment uses the Vite production build output (`public/build/`) — no Node.js required on the server
