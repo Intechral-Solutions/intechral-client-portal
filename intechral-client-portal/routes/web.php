@@ -1,43 +1,43 @@
 <?php
 
+use App\Http\Controllers\Auth\InvitationController;
+use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
-// Root redirects authenticated users to the dashboard, guests to login.
-// Auth routes (login, register, password reset) are registered by Fortify (EPIC-002).
-// Dashboard and module routes are registered per epic as they are built.
+// Root redirect
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
         : redirect()->route('login');
 });
 
-// Temporary login stub — replaced by Laravel Fortify in EPIC-002.
-Route::get('/login', function () {
-    return view('auth.login');
-})->middleware('guest')->name('login');
+// Fortify owns: GET/POST /login, POST /logout, GET/POST /forgot-password,
+//               GET/POST /reset-password, GET/POST /two-factor-challenge,
+//               GET/POST /confirm-password, GET/POST /user/profile-information,
+//               GET/POST /user/password, GET/POST /user/two-factor-*
 
-Route::post('/login', function (\Illuminate\Http\Request $request) {
-    $credentials = $request->validate([
-        'email'    => ['required', 'email'],
-        'password' => ['required'],
-    ]);
+// Invitation-based registration (replaces Fortify registration)
+Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.show');
+Route::post('/invitation/{token}', [InvitationController::class, 'register'])->name('invitation.register');
 
-    if (\Illuminate\Support\Facades\Auth::attempt($credentials, $request->boolean('remember'))) {
-        $request->session()->regenerate();
-        return redirect()->intended(route('dashboard'));
-    }
+// SSO (Socialite)
+Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('sso.redirect');
+Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('sso.callback');
 
-    return back()->withErrors(['email' => 'These credentials do not match our records.'])->onlyInput('email');
-})->middleware('guest');
+// Operator: send invitation
+Route::middleware(['auth', 'can:users.invite'])->group(function () {
+    Route::post('/invitations', [InvitationController::class, 'store'])->name('invitations.store');
+});
 
-Route::post('/logout', function (\Illuminate\Http\Request $request) {
-    \Illuminate\Support\Facades\Auth::logout();
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
-    return redirect()->route('login');
-})->middleware('auth')->name('logout');
-
-// Placeholder dashboard — replaced with a real implementation in EPIC-002.
+// Dashboard
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware('auth')->name('dashboard');
+
+// Profile
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::delete('/profile/sessions', [ProfileController::class, 'destroyOtherSessions'])->name('profile.sessions.destroy');
+    Route::delete('/profile/social/{provider}', [ProfileController::class, 'unlinkSocial'])->name('profile.social.unlink');
+});
