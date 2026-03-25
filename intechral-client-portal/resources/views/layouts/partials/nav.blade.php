@@ -15,25 +15,25 @@
                 @auth
                 <div class="hidden md:flex items-center gap-1">
                     @can('tickets.view')
-                    <a href="{{ route('tickets.index') }}"
+                    <a href="{{ Route::has('tickets.index') ? route('tickets.index') : '#' }}"
                        class="rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-surface hover:text-primary transition-colors">
                         Tickets
                     </a>
                     @endcan
                     @can('projects.view')
-                    <a href="{{ route('projects.index') }}"
+                    <a href="{{ Route::has('projects.index') ? route('projects.index') : '#' }}"
                        class="rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-surface hover:text-primary transition-colors">
                         Projects
                     </a>
                     @endcan
                     @can('billing.view')
-                    <a href="{{ route('billing.index') }}"
+                    <a href="{{ Route::has('billing.index') ? route('billing.index') : '#' }}"
                        class="rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-surface hover:text-primary transition-colors">
                         Billing
                     </a>
                     @endcan
                     @can('crm.view')
-                    <a href="{{ route('crm.index') }}"
+                    <a href="{{ Route::has('crm.index') ? route('crm.index') : '#' }}"
                        class="rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-surface hover:text-primary transition-colors">
                         CRM
                     </a>
@@ -83,9 +83,9 @@
                         x-transition
                         class="absolute right-0 mt-1 w-48 rounded-lg border border-base bg-elevated py-1 shadow-theme-lg"
                     >
-                        <a href="{{ route('profile.show') }}" class="block px-4 py-2 text-sm text-secondary hover:bg-surface hover:text-primary">Profile</a>
+                        <a href="{{ Route::has('profile.show') ? route('profile.show') : '#' }}" class="block px-4 py-2 text-sm text-secondary hover:bg-surface hover:text-primary">Profile</a>
                         @can('settings.view')
-                        <a href="{{ route('settings.index') }}" class="block px-4 py-2 text-sm text-secondary hover:bg-surface hover:text-primary">Settings</a>
+                        <a href="{{ Route::has('settings.index') ? route('settings.index') : '#' }}" class="block px-4 py-2 text-sm text-secondary hover:bg-surface hover:text-primary">Settings</a>
                         @endcan
                         <div class="my-1 border-t border-subtle"></div>
                         <form method="POST" action="{{ route('logout') }}">

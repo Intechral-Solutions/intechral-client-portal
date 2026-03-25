@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php --version)",
+      "Bash(composer --version)",
+      "Bash(docker --version)",
+      "Bash(git --version)",
+      "Bash(npm --version)",
+      "Bash(unzip -l archive/IntechralPortal.zip)",
+      "Bash(docker compose:*)",
+      "Bash(docker run:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 create-project laravel/laravel . --no-interaction)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 composer require laravel/fortify laravel/socialite spatie/laravel-permission spatie/laravel-activitylog spatie/laravel-medialibrary stripe/stripe-php barryvdh/laravel-dompdf --no-interaction)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 composer require --dev pestphp/pest pestphp/pest-plugin-laravel laravel/pint --no-interaction)"
+    ]
+  }
+}
