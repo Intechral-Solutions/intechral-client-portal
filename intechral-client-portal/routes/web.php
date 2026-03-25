@@ -4,7 +4,16 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Operator\TicketBulkController;
+use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyController;
+use App\Http\Controllers\Operator\TicketReportController;
+use App\Http\Controllers\Operator\TicketController as OperatorTicketController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectBoardController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectMilestoneController;
+use App\Http\Controllers\ProjectTaskController;
+use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
 // Root redirect
@@ -48,6 +57,39 @@ Route::middleware(['auth', 'can:roles.view'])->prefix('admin')->name('roles.')->
         ->name('destroy');
 });
 
+// Ticket attachment download (auth only — policy check inside controller)
+Route::middleware('auth')
+    ->get('/attachments/{attachment}/download', [TicketController::class, 'downloadAttachment'])
+    ->name('tickets.attachment.download');
+
+// Tickets (user-facing) — literal routes before wildcard {ticket}
+Route::middleware(['auth', 'can:tickets.create'])->group(function () {
+    Route::get('/tickets/create', [TicketController::class, 'create'])->name('tickets.create');
+    Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+});
+
+Route::middleware(['auth', 'can:tickets.view'])->group(function () {
+    Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+    Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
+});
+
+// Ticket replies (authenticated users can reply to their own tickets)
+Route::middleware('auth')
+    ->post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])
+    ->name('tickets.replies.store');
+
+// Operator ticket management — literal routes before wildcard {ticket}
+Route::middleware(['auth', 'can:tickets.assign'])->prefix('operator')->name('operator.tickets.')->group(function () {
+    Route::get('/tickets', [OperatorTicketController::class, 'index'])->name('index');
+    Route::post('/tickets/bulk', [TicketBulkController::class, 'update'])->name('bulk');
+    Route::get('/tickets/reports', [TicketReportController::class, 'index'])->name('reports');
+    Route::get('/tickets/reports/export', [TicketReportController::class, 'export'])->name('export');
+    Route::get('/tickets/{ticket}', [OperatorTicketController::class, 'show'])->name('show');
+    Route::put('/tickets/{ticket}/status', [OperatorTicketController::class, 'updateStatus'])->name('status');
+    Route::put('/tickets/{ticket}/assign', [OperatorTicketController::class, 'assign'])->name('assign');
+    Route::post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])->name('replies.store');
+});
+
 // Admin: user management
 Route::middleware(['auth', 'can:users.view'])->prefix('admin')->name('users.')->group(function () {
     Route::get('/users', [UserController::class, 'index'])->name('index');
@@ -56,6 +98,44 @@ Route::middleware(['auth', 'can:users.view'])->prefix('admin')->name('users.')->
     Route::put('/users/{user}/roles', [UserController::class, 'updateRoles'])
         ->middleware('can:users.manage')
         ->name('roles.update');
+});
+
+// Projects
+Route::middleware('auth')->prefix('projects')->name('projects.')->group(function () {
+    Route::get('/', [ProjectController::class, 'index'])->name('index');
+
+    // Literal routes before wildcard {project}
+    Route::middleware('can:projects.manage')->group(function () {
+        Route::get('/create', [ProjectController::class, 'create'])->name('create');
+        Route::post('/', [ProjectController::class, 'store'])->name('store');
+    });
+
+    Route::get('/{project}', [ProjectController::class, 'show'])->name('show');
+    Route::get('/{project}/board', [ProjectBoardController::class, 'show'])->name('board');
+
+    Route::middleware('can:projects.manage')->group(function () {
+        Route::get('/{project}/edit', [ProjectController::class, 'edit'])->name('edit');
+        Route::put('/{project}', [ProjectController::class, 'update'])->name('update');
+        Route::delete('/{project}', [ProjectController::class, 'destroy'])->name('destroy');
+        Route::put('/{project}/members', [ProjectController::class, 'syncMembers'])->name('members.sync');
+    });
+
+    // Tasks (nested under project)
+    Route::post('/{project}/tasks', [ProjectTaskController::class, 'store'])->name('tasks.store');
+    Route::get('/{project}/tasks/{task}', [ProjectTaskController::class, 'show'])->name('tasks.show');
+    Route::put('/{project}/tasks/{task}', [ProjectTaskController::class, 'update'])->name('tasks.update');
+    Route::delete('/{project}/tasks/{task}', [ProjectTaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::put('/{project}/tasks/{task}/move', [ProjectTaskController::class, 'move'])->name('tasks.move');
+    Route::post('/{project}/tasks/{task}/comments', [ProjectTaskController::class, 'addComment'])->name('tasks.comments.store');
+    Route::put('/{project}/tasks/{task}/checklist/{item}/toggle', [ProjectTaskController::class, 'toggleChecklistItem'])->name('tasks.checklist.toggle');
+
+    // Milestones
+    Route::get('/{project}/milestones', [ProjectMilestoneController::class, 'index'])->name('milestones.index');
+    Route::middleware('can:projects.manage')->group(function () {
+        Route::post('/{project}/milestones', [ProjectMilestoneController::class, 'store'])->name('milestones.store');
+        Route::put('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'update'])->name('milestones.update');
+        Route::delete('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'destroy'])->name('milestones.destroy');
+    });
 });
 
 // Dashboard
