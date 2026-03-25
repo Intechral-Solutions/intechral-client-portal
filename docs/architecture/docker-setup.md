@@ -21,54 +21,62 @@ Client Portal/
 │   ├── nginx/                 ← Nginx virtual host config
 │   └── mysql/                 ← MariaDB my.cnf
 ├── docker-compose.yml
-├── Makefile
+├── package.json               ← Root npm scripts for dev environment
 └── docs/
 ```
 
 ## Quick Start
+
+**Requirements:** Docker Desktop, Node.js
 
 ```bash
 # 1. Clone repository
 git clone <repo-url>
 cd "Client Portal"
 
-# 2. Copy environment file
-cp intechral-client-portal/.env.example intechral-client-portal/.env
+# 2. First-time setup (builds Docker image, installs deps, migrates, seeds)
+npm run setup
+```
 
-# 3. First-time setup (builds images, installs deps, migrates, seeds)
-make install
+That's it. `npm run setup` handles everything. Open `http://localhost:8080`.
 
-# OR step by step:
-docker compose up -d
-docker compose exec app composer install
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --seed
-docker compose exec app pnpm install
-docker compose exec app pnpm run dev
+## Dev Scripts
+
+All commands are npm scripts defined in the root `package.json`:
+
+```bash
+npm run setup    # First-time setup (build + install + migrate + seed)
+npm run up       # Start containers
+npm run down     # Stop containers
+npm run restart  # Stop and restart
+npm run build    # Rebuild Docker images (no cache)
+npm run dev      # Start Vite HMR dev server
+npm run fresh    # Reset database and re-seed
+npm run test     # Run Pest test suite
+npm run lint     # Run Laravel Pint
+npm run shell    # Open bash in the app container
+npm run logs     # Tail container logs
 ```
 
 ## Frontend Tooling
 
-Frontend assets are managed with **PNPM** and bundled with **Vite**:
+Frontend assets are bundled with **Vite** via npm scripts inside the container:
 
 ```bash
-# Install JS dependencies
-docker compose exec app pnpm install
-
-# Dev mode (HMR via Vite)
-docker compose exec app pnpm run dev
+# Dev mode with HMR
+npm run dev
 
 # Production build
-docker compose exec app pnpm run build
+docker compose exec app npm run build
 ```
 
 ## Services Detail
 
 ### PHP-FPM (`app`)
 - Custom Dockerfile at `.docker/php/Dockerfile`
-- PHP 8.3 with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `opcache`
+- PHP 8.3 with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `opcache`, `exif`
 - Composer 2.7 installed globally
-- Node.js 22 LTS + PNPM installed globally
+- Node.js 22 LTS + npm installed
 - Working directory: `/var/www/app`
 
 ### Nginx (`nginx`)
@@ -91,33 +99,15 @@ docker compose exec app pnpm run build
 - Web UI on `http://localhost:8025`
 - All outgoing mail in dev is caught here
 
-## Useful Commands
+## Useful Raw Docker Commands
 
 ```bash
-# Run artisan commands
+# Run any artisan command
 docker compose exec app php artisan <command>
 
-# Run all tests
-docker compose exec app php artisan test
-
-# Run Pest with coverage
+# Run Pest with coverage report
 docker compose exec app ./vendor/bin/pest --coverage
 
-# Open a shell in the app container
-docker compose exec app bash
-
-# View logs
-docker compose logs -f app
-
-# Reset database
-docker compose exec app php artisan migrate:fresh --seed
-
-# Stop all services
-docker compose down
-
-# Stop and remove volumes (destroys database data)
+# Stop and remove volumes (destroys all database data)
 docker compose down -v
-
-# Or use the Makefile shortcuts:
-make up / make down / make test / make shell / make fresh
 ```
