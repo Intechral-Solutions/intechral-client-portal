@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+/* ============================================================
+   Design Tokens — Light Theme (default)
+   Switch to dark by adding data-theme="dark" to <html>
+   ============================================================ */
+@theme {
+    /* Typography */
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+
+    /* Brand palette */
+    --color-brand-50:  #eef2ff;
+    --color-brand-100: #e0e7ff;
+    --color-brand-200: #c7d2fe;
+    --color-brand-300: #a5b4fc;
+    --color-brand-400: #818cf8;
+    --color-brand-500: #6366f1;
+    --color-brand-600: #4f46e5;
+    --color-brand-700: #4338ca;
+    --color-brand-800: #3730a3;
+    --color-brand-900: #312e81;
+    --color-brand-950: #1e1b4b;
+}
+
+/* ── Light theme (default) ────────────────────────────────── */
+:root,
+[data-theme="light"] {
+    --bg-base:       theme(colors.white);
+    --bg-surface:    theme(colors.gray.50);
+    --bg-elevated:   theme(colors.white);
+    --bg-overlay:    rgba(0, 0, 0, 0.5);
+
+    --border-subtle: theme(colors.gray.200);
+    --border-base:   theme(colors.gray.300);
+
+    --text-primary:  theme(colors.gray.900);
+    --text-secondary:theme(colors.gray.600);
+    --text-muted:    theme(colors.gray.400);
+    --text-inverse:  theme(colors.white);
+
+    --accent:        theme(colors.brand.600);
+    --accent-hover:  theme(colors.brand.700);
+    --accent-text:   theme(colors.white);
+
+    --danger:        theme(colors.red.600);
+    --success:       theme(colors.green.600);
+    --warning:       theme(colors.amber.500);
+    --info:          theme(colors.blue.600);
+
+    --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg:     0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* ── Dark theme ───────────────────────────────────────────── */
+[data-theme="dark"] {
+    --bg-base:       theme(colors.gray.950);
+    --bg-surface:    theme(colors.gray.900);
+    --bg-elevated:   theme(colors.gray.800);
+    --bg-overlay:    rgba(0, 0, 0, 0.7);
+
+    --border-subtle: theme(colors.gray.800);
+    --border-base:   theme(colors.gray.700);
+
+    --text-primary:  theme(colors.gray.50);
+    --text-secondary:theme(colors.gray.400);
+    --text-muted:    theme(colors.gray.600);
+    --text-inverse:  theme(colors.gray.900);
+
+    --accent:        theme(colors.brand.500);
+    --accent-hover:  theme(colors.brand.400);
+    --accent-text:   theme(colors.white);
+
+    --danger:        theme(colors.red.400);
+    --success:       theme(colors.green.400);
+    --warning:       theme(colors.amber.400);
+    --info:          theme(colors.blue.400);
+
+    --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg:     0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* ── Base element defaults ────────────────────────────────── */
+html {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+/* ── Semantic utility layer ───────────────────────────────── */
+@layer utilities {
+    .bg-base     { background-color: var(--bg-base); }
+    .bg-surface  { background-color: var(--bg-surface); }
+    .bg-elevated { background-color: var(--bg-elevated); }
+    .border-subtle { border-color: var(--border-subtle); }
+    .border-base   { border-color: var(--border-base); }
+    .text-primary  { color: var(--text-primary); }
+    .text-secondary{ color: var(--text-secondary); }
+    .text-muted    { color: var(--text-muted); }
+    .text-inverse  { color: var(--text-inverse); }
+    .btn-accent {
+        background-color: var(--accent);
+        color: var(--accent-text);
+        &:hover { background-color: var(--accent-hover); }
+    }
+    .shadow-theme-sm { box-shadow: var(--shadow-sm); }
+    .shadow-theme-md { box-shadow: var(--shadow-md); }
+    .shadow-theme-lg { box-shadow: var(--shadow-lg); }
+}

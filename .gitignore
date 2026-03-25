@@ -1,0 +1,38 @@
+# ============================================================
+# Intechral Client Portal — .gitignore
+# ============================================================
+
+# ── Laravel application ────────────────────────────────────
+intechral-client-portal/vendor/
+intechral-client-portal/node_modules/
+intechral-client-portal/.env
+intechral-client-portal/.env.backup
+intechral-client-portal/.env.production
+intechral-client-portal/storage/logs/*
+intechral-client-portal/storage/framework/cache/*
+intechral-client-portal/storage/framework/sessions/*
+intechral-client-portal/storage/framework/views/*
+intechral-client-portal/bootstrap/cache/*.php
+intechral-client-portal/public/hot
+intechral-client-portal/public/storage
+intechral-client-portal/public/build/
+
+# ── Docker / dev environment ───────────────────────────────
+.docker/data/
+docker-compose.override.yml
+
+# ── OS & editor artifacts ──────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/settings.json
+*.code-workspace
+
+# ── Archive (keep directory, not contents) ─────────────────
+archive/
+
+# ── Test artefacts ─────────────────────────────────────────
+intechral-client-portal/.phpunit.cache/
+intechral-client-portal/coverage/
