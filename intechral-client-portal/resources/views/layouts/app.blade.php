@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? config('app.name') }}</title>
+    <title>{{ $title ?? config('app.name') }} &mdash; {{ config('app.name') }}</title>
     <meta name="description" content="{{ $description ?? '' }}">
 
     <!-- Fonts -->
@@ -24,7 +24,7 @@
 
     {{-- Main content --}}
     <main id="main-content" class="flex-1">
-        {{ $slot }}
+        @yield('content')
     </main>
 
     {{-- Footer --}}
