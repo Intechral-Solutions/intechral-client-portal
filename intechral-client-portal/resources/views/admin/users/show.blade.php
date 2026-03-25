@@ -1,0 +1,148 @@
+@extends('layouts.app', ['title' => $user->name])
+
+@section('content')
+<div class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-8">
+
+    {{-- Header --}}
+    <div>
+        <a href="{{ route('users.index') }}"
+           class="mb-4 inline-flex items-center gap-1 text-sm transition-colors hover:underline"
+           style="color: var(--text-secondary);">
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+            </svg>
+            Back to Users
+        </a>
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $user->name }}</h1>
+                <p class="mt-0.5 text-sm" style="color: var(--text-secondary);">{{ $user->email }}</p>
+            </div>
+        </div>
+    </div>
+
+    {{-- Flash / errors --}}
+    @if (session('status'))
+    <div class="rounded-lg border px-4 py-3 text-sm"
+         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
+         role="alert">
+        {{ session('status') }}
+    </div>
+    @endif
+    @if ($errors->any())
+    <div class="rounded-lg border px-4 py-3 text-sm"
+         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
+         role="alert">
+        {{ $errors->first() }}
+    </div>
+    @endif
+
+    <div class="grid gap-8 lg:grid-cols-3">
+
+        {{-- Left column: details --}}
+        <div class="space-y-8 lg:col-span-2">
+
+            {{-- Account info --}}
+            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
+                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Account</h2>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt style="color: var(--text-secondary);">Member since</dt>
+                        <dd style="color: var(--text-primary);">{{ $user->created_at->format('d M Y') }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt style="color: var(--text-secondary);">2FA</dt>
+                        <dd>
+                            @if ($user->two_factor_confirmed_at)
+                            <span class="text-xs font-medium" style="color: var(--text-success);">Enabled</span>
+                            @else
+                            <span class="text-xs font-medium" style="color: var(--text-secondary);">Disabled</span>
+                            @endif
+                        </dd>
+                    </div>
+                    @if ($user->invitation)
+                    <div class="flex justify-between gap-4">
+                        <dt style="color: var(--text-secondary);">Invited by</dt>
+                        <dd style="color: var(--text-primary);">
+                            {{ $user->invitation->invitedBy?->name ?? '—' }}
+                        </dd>
+                    </div>
+                    @endif
+                    @if ($user->socialAccounts->isNotEmpty())
+                    <div class="flex justify-between gap-4">
+                        <dt style="color: var(--text-secondary);">SSO providers</dt>
+                        <dd class="flex gap-1 flex-wrap">
+                            @foreach ($user->socialAccounts as $account)
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                                  style="background-color: var(--surface-elevated); color: var(--text-secondary);">
+                                {{ $account->provider }}
+                            </span>
+                            @endforeach
+                        </dd>
+                    </div>
+                    @endif
+                </dl>
+            </section>
+
+            {{-- Activity log --}}
+            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
+                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Recent Activity</h2>
+                @if ($activity->isEmpty())
+                <p class="text-sm" style="color: var(--text-secondary);">No activity recorded.</p>
+                @else
+                <ol class="space-y-3">
+                    @foreach ($activity as $log)
+                    <li class="flex items-start justify-between gap-4 text-sm">
+                        <div>
+                            <span style="color: var(--text-primary);">{{ $log->description }}</span>
+                            @if ($log->properties->isNotEmpty())
+                            <p class="text-xs mt-0.5 font-mono" style="color: var(--text-secondary);">
+                                {{ $log->properties->except('ip')->toJson() }}
+                            </p>
+                            @endif
+                        </div>
+                        <time class="shrink-0 text-xs" style="color: var(--text-secondary);"
+                              datetime="{{ $log->created_at->toIso8601String() }}">
+                            {{ $log->created_at->diffForHumans() }}
+                        </time>
+                    </li>
+                    @endforeach
+                </ol>
+                @endif
+            </section>
+
+        </div>
+
+        {{-- Right column: roles --}}
+        @can('users.manage')
+        <aside>
+            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
+                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Roles</h2>
+                <form method="POST" action="{{ route('users.roles.update', $user) }}">
+                    @csrf
+                    @method('PUT')
+                    <div class="space-y-2 mb-4">
+                        @foreach ($allRoles as $role)
+                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface"
+                               style="border-color: var(--border-base);">
+                            <input type="checkbox" name="roles[]" value="{{ $role->name }}"
+                                   {{ $user->hasRole($role->name) ? 'checked' : '' }}
+                                   class="h-4 w-4 rounded accent-accent">
+                            <span style="color: var(--text-primary);">{{ $role->name }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                    <button type="submit"
+                            class="w-full rounded-lg py-2 text-sm font-medium transition-colors"
+                            style="background-color: var(--accent); color: #fff;">
+                        Update Roles
+                    </button>
+                </form>
+            </section>
+        </aside>
+        @endcan
+
+    </div>
+
+</div>
+@endsection

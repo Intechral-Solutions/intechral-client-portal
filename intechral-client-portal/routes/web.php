@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\ProfileController;
@@ -28,6 +30,32 @@ Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback']
 // Operator: send invitation
 Route::middleware(['auth', 'can:users.invite'])->group(function () {
     Route::post('/invitations', [InvitationController::class, 'store'])->name('invitations.store');
+});
+
+// Admin: role management
+Route::middleware(['auth', 'can:roles.view'])->prefix('admin')->name('roles.')->group(function () {
+    Route::get('/roles', [RoleController::class, 'index'])->name('index');
+
+    Route::middleware('can:roles.manage')->group(function () {
+        Route::get('/roles/create', [RoleController::class, 'create'])->name('create');
+        Route::post('/roles', [RoleController::class, 'store'])->name('store');
+        Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('edit');
+        Route::put('/roles/{role}', [RoleController::class, 'update'])->name('update');
+    });
+
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])
+        ->middleware('can:roles.admin')
+        ->name('destroy');
+});
+
+// Admin: user management
+Route::middleware(['auth', 'can:users.view'])->prefix('admin')->name('users.')->group(function () {
+    Route::get('/users', [UserController::class, 'index'])->name('index');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('show');
+
+    Route::put('/users/{user}/roles', [UserController::class, 'updateRoles'])
+        ->middleware('can:users.manage')
+        ->name('roles.update');
 });
 
 // Dashboard
