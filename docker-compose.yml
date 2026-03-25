@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: .docker/php/Dockerfile
     container_name: portal_app
+    user: root
     restart: unless-stopped
     volumes:
       - ./intechral-client-portal:/var/www/app
@@ -92,6 +93,7 @@ services:
       context: .
       dockerfile: .docker/php/Dockerfile
     container_name: portal_queue
+    user: root
     restart: unless-stopped
     command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
     volumes:
