@@ -13,6 +13,6 @@
         "lint": "docker compose exec app ./vendor/bin/pint",
         "shell": "docker compose exec app bash",
         "logs": "docker compose logs -f",
-        "dev": "docker compose exec app npm run dev"
+        "dev": "docker compose up -d && docker compose exec app npm install && docker compose exec app npm run dev"
     }
 }
