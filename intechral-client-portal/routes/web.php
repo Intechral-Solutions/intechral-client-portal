@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Operator\TimeReportController;
+use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\SocialiteController;
@@ -173,6 +175,24 @@ Route::middleware('auth')->prefix('my')->name('billing.client.invoices.')->group
 Route::middleware('auth')->prefix('billing')->name('billing.invoices.')->group(function () {
     Route::get('/invoices/{invoice}/pay', [InvoicePaymentController::class, 'show'])->name('pay');
     Route::post('/invoices/{invoice}/pay/intent', [InvoicePaymentController::class, 'intent'])->name('pay.intent');
+});
+
+// Time tracking — user (log own time, timer)
+Route::middleware(['auth', 'can:time.log'])->prefix('time')->name('time.')->group(function () {
+    Route::get('/', [TimeEntryController::class, 'index'])->name('index');
+    Route::post('/', [TimeEntryController::class, 'store'])->name('store');
+    Route::put('/{entry}', [TimeEntryController::class, 'update'])->name('update');
+    Route::delete('/{entry}', [TimeEntryController::class, 'destroy'])->name('destroy');
+
+    // Timer (JSON endpoints)
+    Route::post('/timer/start', [TimeEntryController::class, 'timerStart'])->name('timer.start');
+    Route::post('/timer/{entry}/stop', [TimeEntryController::class, 'timerStop'])->name('timer.stop');
+});
+
+// Time tracking — operator reports & export (literal before wildcard)
+Route::middleware(['auth', 'can:time.view_all'])->prefix('operator/time')->name('operator.time.')->group(function () {
+    Route::get('/export', [TimeReportController::class, 'export'])->name('export');
+    Route::get('/', [TimeReportController::class, 'index'])->name('index');
 });
 
 // Dashboard
