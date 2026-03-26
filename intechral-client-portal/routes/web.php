@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\CmsController;
 use App\Http\Controllers\Crm\CompanyController;
 use App\Http\Controllers\Crm\ContactController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
+use App\Http\Controllers\Operator\CmsPageController;
 use App\Http\Controllers\Operator\TimeReportController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\Admin\UserController;
@@ -228,6 +230,24 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     Route::post('/{organization}/members', [OrganizationMemberController::class, 'store'])->name('members.store');
     Route::put('/{organization}/members/{user}/role', [OrganizationMemberController::class, 'updateRole'])->name('members.role');
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
+});
+
+// CMS — operator page management (literal routes before {page} wildcard)
+Route::middleware(['auth', 'can:cms.edit'])->prefix('operator/cms')->name('operator.cms.')->group(function () {
+    Route::get('/', [CmsPageController::class, 'index'])->name('index');
+    Route::get('/create', [CmsPageController::class, 'create'])->name('create');
+    Route::post('/', [CmsPageController::class, 'store'])->name('store');
+    Route::get('/{page}/edit', [CmsPageController::class, 'edit'])->name('edit');
+    Route::put('/{page}', [CmsPageController::class, 'update'])->name('update');
+    Route::post('/{page}/publish', [CmsPageController::class, 'publish'])->name('publish');
+    Route::post('/{page}/unpublish', [CmsPageController::class, 'unpublish'])->name('unpublish');
+    Route::delete('/{page}', [CmsPageController::class, 'destroy'])->name('destroy');
+});
+
+// CMS — public page viewer (any authenticated user with cms.view)
+Route::middleware(['auth', 'can:cms.view'])->prefix('pages')->name('cms.')->group(function () {
+    Route::get('/', [CmsController::class, 'index'])->name('index');
+    Route::get('/{slug}', [CmsController::class, 'show'])->name('show');
 });
 
 // Dashboard
