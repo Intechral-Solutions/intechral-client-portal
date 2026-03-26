@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Crm\CompanyController;
+use App\Http\Controllers\Crm\ContactController;
+use App\Http\Controllers\Organization\OrganizationController;
+use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\Operator\TimeReportController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\Admin\UserController;
@@ -193,6 +197,37 @@ Route::middleware(['auth', 'can:time.log'])->prefix('time')->name('time.')->grou
 Route::middleware(['auth', 'can:time.view_all'])->prefix('operator/time')->name('operator.time.')->group(function () {
     Route::get('/export', [TimeReportController::class, 'export'])->name('export');
     Route::get('/', [TimeReportController::class, 'index'])->name('index');
+});
+
+// CRM — company + contact management (operators with crm.manage)
+Route::middleware(['auth', 'can:crm.manage'])->prefix('crm')->name('crm.')->group(function () {
+    // Companies (literal routes before {company} wildcard)
+    Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
+    Route::get('/companies/create', [CompanyController::class, 'create'])->name('companies.create');
+    Route::post('/companies', [CompanyController::class, 'store'])->name('companies.store');
+    Route::get('/companies/{company}', [CompanyController::class, 'show'])->name('companies.show');
+    Route::get('/companies/{company}/edit', [CompanyController::class, 'edit'])->name('companies.edit');
+    Route::put('/companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
+    Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
+    Route::post('/companies/{company}/promote', [CompanyController::class, 'promote'])->name('companies.promote');
+
+    // Contacts (literal routes before {contact} wildcard)
+    Route::get('/contacts', [ContactController::class, 'index'])->name('contacts.index');
+    Route::get('/contacts/create', [ContactController::class, 'create'])->name('contacts.create');
+    Route::post('/contacts', [ContactController::class, 'store'])->name('contacts.store');
+    Route::get('/contacts/{contact}', [ContactController::class, 'show'])->name('contacts.show');
+    Route::get('/contacts/{contact}/edit', [ContactController::class, 'edit'])->name('contacts.edit');
+    Route::put('/contacts/{contact}', [ContactController::class, 'update'])->name('contacts.update');
+    Route::delete('/contacts/{contact}', [ContactController::class, 'destroy'])->name('contacts.destroy');
+});
+
+// Organizations (operators only)
+Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('organizations.')->group(function () {
+    Route::get('/', [OrganizationController::class, 'index'])->name('index');
+    Route::get('/{organization}', [OrganizationController::class, 'show'])->name('show');
+    Route::post('/{organization}/members', [OrganizationMemberController::class, 'store'])->name('members.store');
+    Route::put('/{organization}/members/{user}/role', [OrganizationMemberController::class, 'updateRole'])->name('members.role');
+    Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
 });
 
 // Dashboard
