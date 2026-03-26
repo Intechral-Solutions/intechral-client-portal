@@ -32,28 +32,50 @@
 /* ── Light theme (default) ────────────────────────────────── */
 :root,
 [data-theme="light"] {
+    /* Backgrounds */
     --bg-base:       theme(colors.white);
     --bg-surface:    theme(colors.gray.50);
     --bg-elevated:   theme(colors.white);
     --bg-overlay:    rgba(0, 0, 0, 0.5);
 
-    --border-subtle: theme(colors.gray.200);
-    --border-base:   theme(colors.gray.300);
+    /* Surface aliases used in component styles */
+    --surface-card:    theme(colors.white);
+    --surface-input:   theme(colors.gray.50);
+    --surface-success: theme(colors.green.50);
+    --surface-danger:  theme(colors.red.50);
+    --surface-warning: theme(colors.amber.50);
+    --surface-info:    theme(colors.blue.50);
 
-    --text-primary:  theme(colors.gray.900);
-    --text-secondary:theme(colors.gray.600);
-    --text-muted:    theme(colors.gray.400);
-    --text-inverse:  theme(colors.white);
+    /* Borders */
+    --border-subtle:  theme(colors.gray.200);
+    --border-base:    theme(colors.gray.300);
+    --border-success: theme(colors.green.200);
+    --border-danger:  theme(colors.red.200);
+    --border-warning: theme(colors.amber.200);
+    --border-info:    theme(colors.blue.200);
 
+    /* Text */
+    --text-primary:   theme(colors.gray.900);
+    --text-secondary: theme(colors.gray.600);
+    --text-muted:     theme(colors.gray.400);
+    --text-inverse:   theme(colors.white);
+    --text-success:   theme(colors.green.700);
+    --text-danger:    theme(colors.red.700);
+    --text-warning:   theme(colors.amber.700);
+    --text-info:      theme(colors.blue.700);
+
+    /* Accent */
     --accent:        theme(colors.brand.600);
     --accent-hover:  theme(colors.brand.700);
     --accent-text:   theme(colors.white);
 
+    /* Semantic aliases */
     --danger:        theme(colors.red.600);
     --success:       theme(colors.green.600);
     --warning:       theme(colors.amber.500);
     --info:          theme(colors.blue.600);
 
+    /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg:     0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -61,28 +83,50 @@
 
 /* ── Dark theme ───────────────────────────────────────────── */
 [data-theme="dark"] {
+    /* Backgrounds */
     --bg-base:       theme(colors.gray.950);
     --bg-surface:    theme(colors.gray.900);
     --bg-elevated:   theme(colors.gray.800);
     --bg-overlay:    rgba(0, 0, 0, 0.7);
 
-    --border-subtle: theme(colors.gray.800);
-    --border-base:   theme(colors.gray.700);
+    /* Surface aliases */
+    --surface-card:    theme(colors.gray.800);
+    --surface-input:   theme(colors.gray.900);
+    --surface-success: theme(colors.green.950);
+    --surface-danger:  theme(colors.red.950);
+    --surface-warning: theme(colors.amber.950);
+    --surface-info:    theme(colors.blue.950);
 
-    --text-primary:  theme(colors.gray.50);
-    --text-secondary:theme(colors.gray.400);
-    --text-muted:    theme(colors.gray.600);
-    --text-inverse:  theme(colors.gray.900);
+    /* Borders */
+    --border-subtle:  theme(colors.gray.800);
+    --border-base:    theme(colors.gray.700);
+    --border-success: theme(colors.green.800);
+    --border-danger:  theme(colors.red.800);
+    --border-warning: theme(colors.amber.800);
+    --border-info:    theme(colors.blue.800);
 
+    /* Text */
+    --text-primary:   theme(colors.gray.50);
+    --text-secondary: theme(colors.gray.400);
+    --text-muted:     theme(colors.gray.600);
+    --text-inverse:   theme(colors.gray.900);
+    --text-success:   theme(colors.green.400);
+    --text-danger:    theme(colors.red.400);
+    --text-warning:   theme(colors.amber.400);
+    --text-info:      theme(colors.blue.400);
+
+    /* Accent */
     --accent:        theme(colors.brand.500);
     --accent-hover:  theme(colors.brand.400);
     --accent-text:   theme(colors.white);
 
+    /* Semantic aliases */
     --danger:        theme(colors.red.400);
     --success:       theme(colors.green.400);
     --warning:       theme(colors.amber.400);
     --info:          theme(colors.blue.400);
 
+    /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
     --shadow-lg:     0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
@@ -103,9 +147,9 @@ body {
 
 /* ── Semantic utility layer ───────────────────────────────── */
 @layer utilities {
-    .bg-base     { background-color: var(--bg-base); }
-    .bg-surface  { background-color: var(--bg-surface); }
-    .bg-elevated { background-color: var(--bg-elevated); }
+    .bg-base       { background-color: var(--bg-base); }
+    .bg-surface    { background-color: var(--bg-surface); }
+    .bg-elevated   { background-color: var(--bg-elevated); }
     .border-subtle { border-color: var(--border-subtle); }
     .border-base   { border-color: var(--border-base); }
     .text-primary  { color: var(--text-primary); }

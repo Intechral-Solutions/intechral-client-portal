@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\CmsController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Crm\CompanyController;
 use App\Http\Controllers\Crm\ContactController;
 use App\Http\Controllers\Organization\OrganizationController;
@@ -251,9 +252,7 @@ Route::middleware(['auth', 'can:cms.view'])->prefix('pages')->name('cms.')->grou
 });
 
 // Dashboard
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware('auth')->name('dashboard');
+Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
 // Profile
 Route::middleware('auth')->group(function () {
