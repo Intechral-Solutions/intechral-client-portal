@@ -4,6 +4,10 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Billing\ClientInvoiceController;
+use App\Http\Controllers\Billing\InvoiceController;
+use App\Http\Controllers\Billing\InvoicePaymentController;
+use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Controllers\Operator\TicketBulkController;
 use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyController;
 use App\Http\Controllers\Operator\TicketReportController;
@@ -136,6 +140,39 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
         Route::put('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'update'])->name('milestones.update');
         Route::delete('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'destroy'])->name('milestones.destroy');
     });
+});
+
+// Stripe webhook (no auth, no CSRF — verified by Stripe signature)
+Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class])
+    ->name('webhooks.stripe');
+
+// Billing — operator invoice management (literal routes before {invoice} wildcard)
+Route::middleware(['auth', 'can:billing.manage'])->prefix('billing')->name('billing.invoices.')->group(function () {
+    // Literal routes before {invoice} wildcard
+    Route::get('/invoices', [InvoiceController::class, 'index'])->name('index');
+    Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('create');
+    Route::post('/invoices', [InvoiceController::class, 'store'])->name('store');
+
+    // Wildcard routes
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('show');
+    Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->name('edit');
+    Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('update');
+    Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('send');
+    Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('payment.record');
+    Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('destroy');
+});
+
+// Billing — client invoice views (any authenticated user can see their own invoices)
+Route::middleware('auth')->prefix('my')->name('billing.client.invoices.')->group(function () {
+    Route::get('/invoices', [ClientInvoiceController::class, 'index'])->name('index');
+    Route::get('/invoices/{invoice}', [ClientInvoiceController::class, 'show'])->name('show');
+});
+
+// Billing — Stripe payment flow
+Route::middleware('auth')->prefix('billing')->name('billing.invoices.')->group(function () {
+    Route::get('/invoices/{invoice}/pay', [InvoicePaymentController::class, 'show'])->name('pay');
+    Route::post('/invoices/{invoice}/pay/intent', [InvoicePaymentController::class, 'intent'])->name('pay.intent');
 });
 
 // Dashboard

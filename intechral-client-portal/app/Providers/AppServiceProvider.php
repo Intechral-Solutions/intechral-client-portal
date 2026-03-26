@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Invoice;
 use App\Models\Project;
 use App\Models\Ticket;
+use App\Policies\InvoicePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TicketPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -20,5 +22,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
     }
 }
