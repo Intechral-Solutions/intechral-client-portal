@@ -142,6 +142,16 @@
                 </dl>
             </div>
 
+            {{-- Time tracking --}}
+            @can('time.log')
+            <x-time-tracker
+                context-type="task"
+                :context-id="$task->id"
+                :context-label="$task->title"
+                :context-url="route('projects.tasks.show', [$project, $task])"
+            />
+            @endcan
+
             @can('manage', $project)
             <div class="rounded-xl border p-5"
                  style="background-color: var(--surface-card); border-color: var(--border-base);">

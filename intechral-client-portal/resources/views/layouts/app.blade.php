@@ -33,6 +33,9 @@
     {{-- Navigation --}}
     @include('layouts.partials.nav')
 
+    {{-- Active timer overlay (shown when ≥1 timer is running) --}}
+    @include('layouts.partials.timer-overlay')
+
     {{-- Main content --}}
     <main id="main-content" class="flex-1">
         @yield('content')

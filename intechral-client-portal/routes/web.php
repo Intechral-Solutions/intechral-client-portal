@@ -190,12 +190,29 @@ Route::middleware('auth')->prefix('billing')->name('billing.invoices.')->group(f
 Route::middleware(['auth', 'can:time.log'])->prefix('time')->name('time.')->group(function () {
     Route::get('/', [TimeEntryController::class, 'index'])->name('index');
     Route::post('/', [TimeEntryController::class, 'store'])->name('store');
-    Route::put('/{entry}', [TimeEntryController::class, 'update'])->name('update');
-    Route::delete('/{entry}', [TimeEntryController::class, 'destroy'])->name('destroy');
 
-    // Timer (JSON endpoints)
+    // Literal routes must come before wildcards ─────────────────────────────
+
+    // Allocation chart view (sub-tab of Time)
+    Route::get('/allocation', [TimeEntryController::class, 'allocationView'])->name('allocation');
+
+    // JSON: active timers for the global overlay
+    Route::get('/timers/active', [TimeEntryController::class, 'activeTimersJson'])->name('timers.active');
+
+    // JSON: context-aware options for the cascading timer-start selector
+    Route::get('/context-options', [TimeEntryController::class, 'contextOptions'])->name('context.options');
+
+    // Timer start/stop
     Route::post('/timer/start', [TimeEntryController::class, 'timerStart'])->name('timer.start');
     Route::post('/timer/{entry}/stop', [TimeEntryController::class, 'timerStop'])->name('timer.stop');
+    Route::patch('/timer/{entry}/description', [TimeEntryController::class, 'updateTimerDescription'])->name('timer.description');
+
+    // Block allocation adjustment (from allocation chart drag)
+    Route::patch('/blocks/{block}/allocation', [TimeEntryController::class, 'updateBlockAllocation'])->name('blocks.allocation');
+
+    // Wildcard entry routes ─────────────────────────────────────────────────
+    Route::put('/{entry}', [TimeEntryController::class, 'update'])->name('update');
+    Route::delete('/{entry}', [TimeEntryController::class, 'destroy'])->name('destroy');
 });
 
 // Time tracking — operator reports & export (literal before wildcard)

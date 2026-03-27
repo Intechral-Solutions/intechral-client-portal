@@ -30,7 +30,26 @@
       "Bash(xargs grep:*)",
       "Bash(find /home/tennyson/development/intechral-solutions -name *.php -path */migrations/*time*)",
       "Read(///wsl.localhost/Debian/home/tennyson/**)",
-      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/projects/**)"
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/projects/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/layouts/**)",
+      "Bash(find /home/tennyson/development/intechral-solutions -name *.php -path */migrations/*)",
+      "Read(//c/Users/tenny/**)",
+      "Bash(wslpath -u \"\\\\\\\\wsl.localhost\\\\Debian\\\\home\\\\tennyson\\\\development\\\\intechral-solutions\")",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/app/Services/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/projects/tasks/**)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(wsl -d Debian -- bash -c \"cd /home/tennyson/development/intechral-solutions/intechral-client-portal && npm run build 2>&1 | tail -30\")",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)"
+    ],
+    "additionalDirectories": [
+      "\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\views\\time",
+      "\\\\wsl.localhost\\Debian\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\views\\time",
+      "\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\app\\Http\\Controllers",
+      "\\\\wsl.localhost\\Debian\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\app\\Http\\Controllers",
+      "\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\js",
+      "\\\\wsl.localhost\\Debian\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\js"
     ]
   }
 }

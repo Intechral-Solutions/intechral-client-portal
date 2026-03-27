@@ -175,6 +175,16 @@
             </div>
             @endif
 
+            {{-- Time tracking --}}
+            @can('time.log')
+            <x-time-tracker
+                context-type="ticket"
+                :context-id="$ticket->id"
+                :context-label="$ticket->ticket_number"
+                :context-url="route('tickets.show', $ticket)"
+            />
+            @endcan
+
         </aside>
 
     </div>

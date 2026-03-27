@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TimeEntry extends Model
 {
@@ -14,6 +15,7 @@ class TimeEntry extends Model
         'user_id',
         'project_id',
         'task_id',
+        'ticket_id',
         'invoice_id',
         'date',
         'duration_minutes',
@@ -21,6 +23,7 @@ class TimeEntry extends Model
         'billable',
         'billed',
         'timer_started_at',
+        'stopped_at',
     ];
 
     protected $casts = [
@@ -28,6 +31,7 @@ class TimeEntry extends Model
         'billable'         => 'boolean',
         'billed'           => 'boolean',
         'timer_started_at' => 'datetime',
+        'stopped_at'       => 'datetime',
     ];
 
     // ── Relationships ────────────────────────────────────────
@@ -47,9 +51,19 @@ class TimeEntry extends Model
         return $this->belongsTo(Task::class, 'task_id');
     }
 
+    public function ticket(): BelongsTo
+    {
+        return $this->belongsTo(Ticket::class);
+    }
+
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(TimeEntryBlock::class);
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -97,6 +111,11 @@ class TimeEntry extends Model
         return $query->where('project_id', $projectId);
     }
 
+    public function scopeForTicket($query, int $ticketId)
+    {
+        return $query->where('ticket_id', $ticketId);
+    }
+
     public function scopeBetweenDates($query, string $from, string $to)
     {
         return $query->whereBetween('date', [$from, $to]);
@@ -105,5 +124,17 @@ class TimeEntry extends Model
     public function scopeBillable($query)
     {
         return $query->where('billable', true)->where('billed', false);
+    }
+
+    /**
+     * Entries that were running at any point during the given window.
+     * Only matches finalized (stopped) entries; running timers are handled separately.
+     */
+    public function scopeRunningDuring($query, \Carbon\Carbon $from, \Carbon\Carbon $to)
+    {
+        return $query
+            ->whereNotNull('stopped_at')
+            ->where('timer_started_at', '<=', $to)
+            ->where('stopped_at', '>=', $from);
     }
 }
