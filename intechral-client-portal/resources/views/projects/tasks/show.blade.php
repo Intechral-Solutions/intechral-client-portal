@@ -116,7 +116,7 @@
                 <dl class="space-y-3 text-sm">
                     <div>
                         <dt class="font-medium" style="color: var(--text-muted);">Status</dt>
-                        <dd class="mt-0.5" style="color: var(--text-primary);">{{ $task->column->name }}</dd>
+                        <dd class="mt-0.5" style="color: var(--text-primary);">{{ $task->effectiveStatus() }}</dd>
                     </div>
                     <div>
                         <dt class="font-medium" style="color: var(--text-muted);">Priority</dt>

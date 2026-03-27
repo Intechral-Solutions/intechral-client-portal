@@ -91,6 +91,37 @@
         </div>
     </form>
 
+    {{-- Company Management --}}
+    @if ($allCompanies->isNotEmpty())
+    <div class="mt-8 rounded-xl border p-6"
+         style="background-color: var(--surface-card); border-color: var(--border-base);">
+        <h2 class="mb-1 text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Linked Companies</h2>
+        <p class="mb-4 text-xs" style="color: var(--text-secondary);">Organization members of linked companies will have visibility of this project.</p>
+
+        <form method="POST" action="{{ route('projects.companies.sync', $project) }}">
+            @csrf
+            @method('PUT')
+
+            <div class="space-y-2 mb-4">
+                @foreach ($allCompanies as $company)
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="companies[]" value="{{ $company->id }}"
+                           {{ in_array($company->id, $linkedCompanies) ? 'checked' : '' }}
+                           class="rounded border"
+                           style="accent-color: var(--accent);">
+                    <span class="text-sm" style="color: var(--text-primary);">{{ $company->name }}</span>
+                </label>
+                @endforeach
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                        style="background-color: var(--accent); color: #fff;">Update Companies</button>
+            </div>
+        </form>
+    </div>
+    @endif
+
     {{-- Member Management --}}
     <div class="mt-8 rounded-xl border p-6"
          style="background-color: var(--surface-card); border-color: var(--border-base);">

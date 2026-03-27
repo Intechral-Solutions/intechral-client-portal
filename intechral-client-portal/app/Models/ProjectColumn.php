@@ -19,6 +19,6 @@ class ProjectColumn extends Model
 
     public function tasks(): HasMany
     {
-        return $this->hasMany(ProjectTask::class, 'column_id')->orderBy('position');
+        return $this->hasMany(Task::class, 'column_id')->orderBy('position');
     }
 }

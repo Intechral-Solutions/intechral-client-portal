@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
-use App\Models\ProjectTask;
+use App\Models\Task;
 use App\Services\ProjectService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -14,7 +14,7 @@ class ProjectTaskController extends Controller
 {
     public function __construct(private ProjectService $service) {}
 
-    public function show(Project $project, ProjectTask $task): View
+    public function show(Project $project, Task $task): View
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -38,19 +38,20 @@ class ProjectTaskController extends Controller
             'due_date'     => 'nullable|date',
         ]);
 
-        $position = ProjectTask::where('column_id', $data['column_id'])->max('position') + 1;
+        $position = Task::where('column_id', $data['column_id'])->max('position') + 1;
 
         $project->tasks()->create([
             ...$data,
             'project_id' => $project->id,
             'created_by' => auth()->id(),
             'position'   => $position,
+            'status'     => 'todo',
         ]);
 
         return back()->with('success', 'Task created.');
     }
 
-    public function update(Request $request, Project $project, ProjectTask $task): RedirectResponse
+    public function update(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -69,7 +70,7 @@ class ProjectTaskController extends Controller
         return back()->with('success', 'Task updated.');
     }
 
-    public function destroy(Project $project, ProjectTask $task): RedirectResponse
+    public function destroy(Project $project, Task $task): RedirectResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -79,7 +80,7 @@ class ProjectTaskController extends Controller
         return back()->with('success', 'Task deleted.');
     }
 
-    public function move(Request $request, Project $project, ProjectTask $task): JsonResponse
+    public function move(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -94,7 +95,7 @@ class ProjectTaskController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function addComment(Request $request, Project $project, ProjectTask $task): RedirectResponse
+    public function addComment(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -109,7 +110,7 @@ class ProjectTaskController extends Controller
         return back()->with('success', 'Comment added.');
     }
 
-    public function toggleChecklistItem(Request $request, Project $project, ProjectTask $task, int $item): JsonResponse
+    public function toggleChecklistItem(Request $request, Project $project, Task $task, int $item): JsonResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\CrmCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,7 @@ class Ticket extends Model
     protected $fillable = [
         'ticket_number',
         'user_id',
+        'company_id',
         'assignee_id',
         'title',
         'description',
@@ -38,9 +40,19 @@ class Ticket extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(CrmCompany::class, 'company_id');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'ticket_id');
     }
 
     public function replies(): HasMany

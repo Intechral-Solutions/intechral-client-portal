@@ -44,7 +44,7 @@ class TimeEntry extends Model
 
     public function task(): BelongsTo
     {
-        return $this->belongsTo(ProjectTask::class, 'task_id');
+        return $this->belongsTo(Task::class, 'task_id');
     }
 
     public function invoice(): BelongsTo

@@ -22,7 +22,7 @@ class ProjectMilestone extends Model
 
     public function tasks(): HasMany
     {
-        return $this->hasMany(ProjectTask::class, 'milestone_id');
+        return $this->hasMany(Task::class, 'milestone_id');
     }
 
     public function completionPercentage(): int

@@ -2,7 +2,7 @@
 
 use App\Models\Project;
 use App\Models\ProjectColumn;
-use App\Models\ProjectTask;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectService;
 

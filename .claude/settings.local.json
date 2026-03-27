@@ -11,7 +11,26 @@
       "Bash(docker run:*)",
       "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 create-project laravel/laravel . --no-interaction)",
       "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 composer require laravel/fortify laravel/socialite spatie/laravel-permission spatie/laravel-activitylog spatie/laravel-medialibrary stripe/stripe-php barryvdh/laravel-dompdf --no-interaction)",
-      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 composer require --dev pestphp/pest pestphp/pest-plugin-laravel laravel/pint --no-interaction)"
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"e:/Projects/Intechral Solutions/Client Portal/intechral-client-portal://app\" -w //app composer:2.7 composer require --dev pestphp/pest pestphp/pest-plugin-laravel laravel/pint --no-interaction)",
+      "Read(//mnt/c/**)",
+      "Read(///wsl.localhost/Debian/home/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/database/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/operator/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/app/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/app/Http/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/routes/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/app/Http/Controllers/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/intechral-client-portal/resources/views/time/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/time/**)",
+      "Bash(xargs grep:*)",
+      "Bash(find /home/tennyson/development/intechral-solutions -name *.php -path */migrations/*time*)",
+      "Read(///wsl.localhost/Debian/home/tennyson/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/projects/**)"
     ]
   }
 }

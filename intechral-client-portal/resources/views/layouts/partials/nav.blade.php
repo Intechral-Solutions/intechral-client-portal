@@ -38,6 +38,8 @@
                     <a href="{{ route('projects.index') }}" class="{{ $navLink('projects.*') }}">Projects</a>
                     @endcan
 
+                    <a href="{{ route('tasks.index') }}" class="{{ $navLink('tasks.*') }}">Tasks</a>
+
                     @can('time.log')
                     <a href="{{ route('time.index') }}" class="{{ $navLink('time.*') }}">Time</a>
                     @endcan
@@ -233,6 +235,11 @@
                 Projects
             </a>
             @endcan
+
+            <a href="{{ route('tasks.index') }}"
+               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('tasks.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
+                Tasks
+            </a>
 
             @can('time.log')
             <a href="{{ route('time.index') }}"

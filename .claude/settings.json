@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl -d Debian mkdir -p /home/tennyson/development/intechral-solutions/intechral-client-portal/resources/views/tasks)",
+      "Bash(wsl -d Debian rm /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTask.php /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTaskChecklistItem.php /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTaskComment.php /home/tennyson/development/intechral-solutions/intechral-client-portal/database/factories/ProjectTaskFactory.php)",
+      "Bash(wsl -d Debian --exec bash -c \"rm /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTask.php /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTaskChecklistItem.php /home/tennyson/development/intechral-solutions/intechral-client-portal/app/Models/ProjectTaskComment.php /home/tennyson/development/intechral-solutions/intechral-client-portal/database/factories/ProjectTaskFactory.php && echo deleted\")",
+      "Bash(find /home/tennyson/development/intechral-solutions -type f \\\\\\(-name *time* -o -name *track* -o -name *timer* -o -name *log*time* \\\\\\) -not -path */node_modules/* -not -path */vendor/*)",
+      "Read(///wsl.localhost/Debian/home/tennyson/**)",
+      "Read(///wsl.localhost/Debian/home/tennyson/development/intechral-solutions/**)"
+    ],
+    "additionalDirectories": [
+      "\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\views"
+    ]
+  }
+}

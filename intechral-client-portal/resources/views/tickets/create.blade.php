@@ -72,6 +72,26 @@
             @error('description')<p class="mt-1.5 text-xs" style="color: var(--text-danger);">{{ $message }}</p>@enderror
         </div>
 
+        {{-- Company (shown when user belongs to multiple organizations) --}}
+        @if ($companies->isNotEmpty())
+        <div>
+            <label for="company_id" class="block text-sm font-medium mb-1.5" style="color: var(--text-primary);">
+                Company <span style="color: var(--text-danger);">*</span>
+            </label>
+            <select id="company_id" name="company_id" required
+                    class="block w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                    style="background-color: var(--surface-input); border-color: {{ $errors->has('company_id') ? 'var(--border-danger)' : 'var(--border-base)' }}; color: var(--text-primary);">
+                <option value="">Select company&hellip;</option>
+                @foreach ($companies as $company)
+                <option value="{{ $company->id }}" {{ old('company_id') == $company->id ? 'selected' : '' }}>{{ $company->name }}</option>
+                @endforeach
+            </select>
+            @error('company_id')<p class="mt-1.5 text-xs" style="color: var(--text-danger);">{{ $message }}</p>@enderror
+        </div>
+        @elseif ($autoCompanyId)
+        <input type="hidden" name="company_id" value="{{ $autoCompanyId }}">
+        @endif
+
         {{-- Attachments --}}
         <div>
             <label class="block text-sm font-medium mb-1.5" style="color: var(--text-primary);">Attachments</label>

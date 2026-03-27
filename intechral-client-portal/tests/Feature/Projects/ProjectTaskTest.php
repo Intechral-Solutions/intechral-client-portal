@@ -2,7 +2,7 @@
 
 use App\Models\Project;
 use App\Models\ProjectColumn;
-use App\Models\ProjectTask;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectService;
 
@@ -25,7 +25,7 @@ it('allows project members to create tasks', function () {
         'priority'  => 'medium',
     ])->assertRedirect();
 
-    expect(ProjectTask::where('title', 'First Task')->exists())->toBeTrue();
+    expect(Task::where('title', 'First Task')->exists())->toBeTrue();
 });
 
 it('forbids non-members from creating tasks', function () {
@@ -165,7 +165,7 @@ it('deletes a task', function () {
     $this->actingAs($operator)->delete(route('projects.tasks.destroy', [$project, $task]))
         ->assertRedirect();
 
-    expect(ProjectTask::find($task->id))->toBeNull();
+    expect(Task::find($task->id))->toBeNull();
 });
 
 // ── Task position re-ordering ─────────────────────────────────────────────────

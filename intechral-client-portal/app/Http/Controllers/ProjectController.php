@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CrmCompany;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectService;
@@ -17,9 +18,22 @@ class ProjectController extends Controller
     {
         $user = auth()->user();
 
-        $projects = $user->can('projects.admin')
-            ? Project::with('creator')->latest()->paginate(20)
-            : $user->projects()->with('creator')->latest()->paginate(20);
+        if ($user->can('projects.admin')) {
+            $projects = Project::with('creator')->latest()->paginate(20);
+        } elseif ($user->can('projects.view_org')) {
+            $companyIds = $user->orgCompanyIds();
+            $projects = Project::where(function ($q) use ($user, $companyIds) {
+                    $q->whereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                    if (! empty($companyIds)) {
+                        $q->orWhereHas('companies', fn ($c) => $c->whereIn('crm_companies.id', $companyIds));
+                    }
+                })
+                ->with('creator')
+                ->latest()
+                ->paginate(20);
+        } else {
+            $projects = $user->projects()->with('creator')->latest()->paginate(20);
+        }
 
         return view('projects.index', compact('projects'));
     }
@@ -28,9 +42,10 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
-        $members = User::orderBy('name')->get(['id', 'name', 'email']);
+        $members   = User::orderBy('name')->get(['id', 'name', 'email']);
+        $companies = CrmCompany::orderBy('name')->get(['id', 'name']);
 
-        return view('projects.create', compact('members'));
+        return view('projects.create', compact('members', 'companies'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,12 +62,18 @@ class ProjectController extends Controller
             'members'     => 'nullable|array',
             'members.*.user_id' => 'required|exists:users,id',
             'members.*.role'    => 'required|in:member,manager',
+            'companies'   => 'nullable|array',
+            'companies.*' => 'exists:crm_companies,id',
         ]);
 
         $project = $this->service->create(auth()->user(), $data);
 
         if (! empty($data['members'])) {
             $this->service->syncMembers($project, $data['members']);
+        }
+
+        if (! empty($data['companies'])) {
+            $project->companies()->sync($data['companies']);
         }
 
         return redirect()->route('projects.board', $project)
@@ -70,10 +91,12 @@ class ProjectController extends Controller
     {
         $this->authorize('manage', $project);
 
-        $allMembers = User::orderBy('name')->get(['id', 'name', 'email']);
+        $allMembers     = User::orderBy('name')->get(['id', 'name', 'email']);
         $currentMembers = $project->members()->get(['users.id', 'name', 'email', 'project_members.role as pivot_role']);
+        $allCompanies   = CrmCompany::orderBy('name')->get(['id', 'name']);
+        $linkedCompanies = $project->companies()->pluck('crm_companies.id')->toArray();
 
-        return view('projects.edit', compact('project', 'allMembers', 'currentMembers'));
+        return view('projects.edit', compact('project', 'allMembers', 'currentMembers', 'allCompanies', 'linkedCompanies'));
     }
 
     public function update(Request $request, Project $project): RedirectResponse
@@ -119,5 +142,20 @@ class ProjectController extends Controller
 
         return redirect()->route('projects.edit', $project)
             ->with('success', 'Members updated.');
+    }
+
+    public function syncCompanies(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('manage', $project);
+
+        $data = $request->validate([
+            'companies'   => 'present|array',
+            'companies.*' => 'exists:crm_companies,id',
+        ]);
+
+        $project->companies()->sync($data['companies']);
+
+        return redirect()->route('projects.edit', $project)
+            ->with('success', 'Companies updated.');
     }
 }

@@ -79,4 +79,22 @@ class User extends Authenticatable
             ->withPivot('role')
             ->withTimestamps();
     }
+
+    /**
+     * IDs of all CRM companies reachable via this user's organizations.
+     * Used for view_org permission scoping.
+     *
+     * @return int[]
+     */
+    public function orgCompanyIds(): array
+    {
+        return $this->organizations()
+            ->with('company')
+            ->get()
+            ->pluck('company.id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+    }
 }

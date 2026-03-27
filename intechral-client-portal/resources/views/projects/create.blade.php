@@ -78,6 +78,27 @@
             </div>
         </div>
 
+        {{-- Companies --}}
+        @if ($companies->isNotEmpty())
+        <div class="rounded-xl border p-6 space-y-4"
+             style="background-color: var(--surface-card); border-color: var(--border-base);">
+            <h2 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Linked Companies</h2>
+            <p class="text-xs" style="color: var(--text-secondary);">Associate this project with one or more client companies to grant their organization members visibility.</p>
+
+            <div id="companies-container" class="space-y-2">
+                @foreach ($companies as $company)
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="companies[]" value="{{ $company->id }}"
+                           {{ in_array($company->id, old('companies', [])) ? 'checked' : '' }}
+                           class="rounded border"
+                           style="accent-color: var(--accent);">
+                    <span class="text-sm" style="color: var(--text-primary);">{{ $company->name }}</span>
+                </label>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         {{-- Members --}}
         <div class="rounded-xl border p-6 space-y-4"
              style="background-color: var(--surface-card); border-color: var(--border-base);">

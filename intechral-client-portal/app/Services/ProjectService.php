@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Project;
 use App\Models\ProjectColumn;
-use App\Models\ProjectTask;
+use App\Models\Task;
 use App\Models\User;
 
 class ProjectService
@@ -56,15 +56,15 @@ class ProjectService
         ]);
     }
 
-    public function moveTask(ProjectTask $task, int $targetColumnId, int $position): void
+    public function moveTask(Task $task, int $targetColumnId, int $position): void
     {
         // Re-order tasks in source column to close the gap
-        ProjectTask::where('column_id', $task->column_id)
+        Task::where('column_id', $task->column_id)
             ->where('position', '>', $task->position)
             ->decrement('position');
 
         // Make room in target column
-        ProjectTask::where('column_id', $targetColumnId)
+        Task::where('column_id', $targetColumnId)
             ->where('position', '>=', $position)
             ->increment('position');
 

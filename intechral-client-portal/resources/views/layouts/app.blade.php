@@ -28,7 +28,7 @@
 
     @stack('head')
 </head>
-<body class="min-h-screen antialiased" style="background-color: var(--bg-base); color: var(--text-primary);">
+<body class="min-h-screen flex flex-col antialiased" style="background-color: var(--bg-base); color: var(--text-primary);">
 
     {{-- Navigation --}}
     @include('layouts.partials.nav')

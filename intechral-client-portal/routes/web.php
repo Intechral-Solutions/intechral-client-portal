@@ -26,6 +26,7 @@ use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\ProjectTaskController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
@@ -131,6 +132,7 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
         Route::put('/{project}', [ProjectController::class, 'update'])->name('update');
         Route::delete('/{project}', [ProjectController::class, 'destroy'])->name('destroy');
         Route::put('/{project}/members', [ProjectController::class, 'syncMembers'])->name('members.sync');
+        Route::put('/{project}/companies', [ProjectController::class, 'syncCompanies'])->name('companies.sync');
     });
 
     // Tasks (nested under project)
@@ -249,6 +251,12 @@ Route::middleware(['auth', 'can:cms.edit'])->prefix('operator/cms')->name('opera
 Route::middleware(['auth', 'can:cms.view'])->prefix('pages')->name('cms.')->group(function () {
     Route::get('/', [CmsController::class, 'index'])->name('index');
     Route::get('/{slug}', [CmsController::class, 'show'])->name('show');
+});
+
+// Tasks — unified task list (my tasks + org tasks)
+Route::middleware('auth')->prefix('tasks')->name('tasks.')->group(function () {
+    Route::get('/', [TaskController::class, 'index'])->name('index');
+    Route::post('/', [TaskController::class, 'store'])->name('store');
 });
 
 // Dashboard
