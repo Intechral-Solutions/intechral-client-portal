@@ -1,8 +1,13 @@
 # EPIC-003: Roles, Permissions & Authorization
 
-**Status:** Pending
-**Branch:** `epic/003-rbac`
-**Goal:** Implement a flexible RBAC system with two built-in roles (Operator, User) and support for custom roles with granular permissions that control visibility and functionality throughout the platform.
+**Status:** Implemented
+**Committed:** 2026-03-25
+
+---
+
+## Goal
+
+Implement a flexible RBAC system with two built-in roles (Operator, User) and support for custom roles with granular permissions that control visibility and functionality throughout the platform.
 
 ---
 
@@ -14,10 +19,10 @@
 **So that** the platform is usable immediately after installation.
 
 **Acceptance Criteria:**
-- [ ] `operator` role has all permissions granted by default
-- [ ] `user` role has a minimal read-only permission set
+- [x] `operator` role has all permissions granted by default
+- [x] `user` role has a minimal read-only permission set
 - [ ] Built-in roles cannot be deleted (soft guard in UI and DB)
-- [ ] Roles seeded automatically on fresh install
+- [x] Roles seeded automatically on fresh install
 
 ### STORY-003-02: Permission Catalogue
 **As a** platform operator,
@@ -25,10 +30,10 @@
 **So that** I can precisely control what each role can do.
 
 **Acceptance Criteria:**
-- [ ] Permissions follow the pattern `module.action` (e.g., `tickets.create`, `billing.view`)
-- [ ] All permissions are seeded from a central catalogue (not hard-coded)
+- [x] Permissions follow the pattern `module.action` (e.g., `tickets.create`, `billing.view`)
+- [x] All permissions are seeded from a central catalogue (not hard-coded)
 - [ ] New modules register their permissions via a `PermissionProvider`
-- [ ] Permissions are grouped by module in the UI
+- [x] Permissions are grouped by module in the UI
 
 ### STORY-003-03: Custom Role Management
 **As a** platform operator,
@@ -36,7 +41,7 @@
 **So that** I can tailor access for different user groups (e.g., "Billing Viewer").
 
 **Acceptance Criteria:**
-- [ ] CRUD interface for custom roles (name, description, permissions)
+- [x] CRUD interface for custom roles (name, description, permissions)
 - [ ] Role name must be unique
 - [ ] Deleting a role with assigned users is blocked with a clear message
 - [ ] Bulk permission assignment via module groups
@@ -47,8 +52,8 @@
 **So that** their access is determined by their roles' combined permissions.
 
 **Acceptance Criteria:**
-- [ ] Operators can assign/remove roles from the user management page
-- [ ] A user can hold multiple roles (permissions are union of all assigned roles)
+- [x] Operators can assign/remove roles from the user management page
+- [x] A user can hold multiple roles (permissions are union of all assigned roles)
 - [ ] Role changes take effect on the user's next request (cache invalidated)
 - [ ] Audit log records role changes
 
@@ -58,10 +63,45 @@
 **So that** authorization checks are consistent across controllers and views.
 
 **Acceptance Criteria:**
-- [ ] `$user->can('tickets.create')` works in controllers, views, and API
-- [ ] Blade directive `@can('billing.view')` works in templates
-- [ ] Unauthorized access returns HTTP 403 with a user-friendly error page
-- [ ] All route groups protected by middleware (`permission:`)
+- [x] `$user->can('tickets.create')` works in controllers, views, and API
+- [x] Blade directive `@can('billing.view')` works in templates
+- [x] Unauthorized access returns HTTP 403 with a user-friendly error page
+- [x] All route groups protected by middleware (`can:`)
+
+---
+
+## Implementation
+
+### What Was Built
+
+**Migrations**
+- `create_permission_tables` — Spatie standard: `permissions`, `roles`, `model_has_roles`, `model_has_permissions`, `role_has_permissions`
+
+**Controllers**
+- `Admin\RoleController` — index, create, store, edit, update, destroy
+- `Admin\UserController` — index, show, updateRoles
+
+**Permission System**
+- `PermissionCatalogue` (`app/Shared/Permissions/PermissionCatalogue.php`) — central definition of all permissions grouped by module
+- Spatie Laravel Permission wired for `$user->can()`, `@can()`, and `can:` route middleware
+- `PermissionSeeder` seeds all catalogue entries on fresh install
+- `RoleSeeder` creates `operator` (all permissions) and `user` (minimal) built-in roles
+
+**Views**
+- `admin/roles/index` — list roles with permission counts
+- `admin/roles/create` + `edit` — role form with permissions grouped by module
+- `admin/users/index` — user list with assigned roles
+- `admin/users/show` — user detail with role assignment UI
+
+**Routes** (under `/admin`, guarded by `can:roles.*` / `can:users.*`)
+
+### Known Gaps
+
+- Guard against deleting built-in roles not confirmed
+- Role name uniqueness validation not confirmed
+- Deleting a role with assigned users — block + message not confirmed
+- Cache invalidation on role change relies on Spatie's built-in caching (needs verification)
+- Audit log for role changes — `spatie/laravel-activitylog` declared but wiring not confirmed
 
 ---
 

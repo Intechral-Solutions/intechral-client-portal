@@ -1,8 +1,13 @@
 # EPIC-004: Ticket Management
 
-**Status:** Pending
-**Branch:** `epic/004-tickets`
-**Goal:** Provide a full-featured ticket (support/issue) management system allowing users to submit requests and operators to triage, assign, and resolve them.
+**Status:** Implemented
+**Committed:** 2026-03-25
+
+---
+
+## Goal
+
+Provide a full-featured ticket (support/issue) management system allowing users to submit requests and operators to triage, assign, and resolve them.
 
 ---
 
@@ -14,11 +19,11 @@
 **So that** I can request help or report an issue.
 
 **Acceptance Criteria:**
-- [ ] Ticket form with: title, description (rich text), category, priority (low/medium/high/critical)
-- [ ] File attachments (up to 10 files, 20 MB each)
-- [ ] Ticket assigned a human-readable ID (e.g., `TKT-0001`)
+- [x] Ticket form with: title, description (rich text), category, priority (low/medium/high/critical)
+- [x] File attachments (up to 10 files, 20 MB each)
+- [x] Ticket assigned a human-readable ID (e.g., `TKT-0001`)
 - [ ] Confirmation email sent to submitter on creation
-- [ ] User can view all their submitted tickets
+- [x] User can view all their submitted tickets
 
 ### STORY-004-02: Ticket Triage & Assignment
 **As a** platform operator,
@@ -26,9 +31,9 @@
 **So that** every ticket is handled by the right person.
 
 **Acceptance Criteria:**
-- [ ] Operator queue with filters: status, priority, assignee, category, date range
-- [ ] Bulk assign / bulk close / bulk change status
-- [ ] Assign ticket to any operator user
+- [x] Operator queue with filters: status, priority, assignee, category, date range
+- [x] Bulk assign / bulk close / bulk change status
+- [x] Assign ticket to any operator user
 - [ ] SLA due-date calculated based on priority and business hours config
 - [ ] Overdue tickets highlighted in the queue
 
@@ -38,9 +43,9 @@
 **So that** communication is tracked in a single thread.
 
 **Acceptance Criteria:**
-- [ ] Threaded reply interface with rich text and attachments
-- [ ] Internal notes visible only to operators (visually distinct)
-- [ ] Email notifications on new replies (user receives public replies; operator receives all)
+- [x] Threaded reply interface with rich text and attachments
+- [x] Internal notes visible only to operators (visually distinct)
+- [ ] Email notifications on new replies
 - [ ] Reply via email (inbound mail integration — optional, configurable)
 
 ### STORY-004-04: Ticket Status Workflow
@@ -49,10 +54,10 @@
 **So that** the lifecycle of every request is trackable.
 
 **Acceptance Criteria:**
-- [ ] Statuses: `open` → `in_progress` → `pending_user` → `resolved` → `closed`
+- [x] Statuses: `open` → `in_progress` → `pending_user` → `resolved` → `closed`
 - [ ] Status transitions validated (no jumping to invalid states)
 - [ ] Auto-close resolved tickets after configurable idle period
-- [ ] Audit trail records every status change with actor and timestamp
+- [x] Audit trail records every status change with actor and timestamp
 
 ### STORY-004-05: Ticket Search & Reporting
 **As an** operator,
@@ -61,9 +66,49 @@
 
 **Acceptance Criteria:**
 - [ ] Full-text search across title, description, and replies
-- [ ] Report: ticket volume by date, category, priority
+- [x] Report: ticket volume by date, category, priority
 - [ ] Report: average resolution time by assignee / category
-- [ ] Exportable to CSV
+- [x] Exportable to CSV
+
+---
+
+## Implementation
+
+### What Was Built
+
+**Migrations**
+- `create_tickets_table` — human-readable ID (TKT-XXXX), title, description, category, priority, status, assignee_id, company_id
+- `create_ticket_replies_table` — body, is_internal flag, author
+- `create_ticket_attachments_table` — path, filename, size, mime type
+- `create_ticket_status_histories_table` — old_status, new_status, actor, timestamps
+- `add_company_id_to_tickets` — links tickets to CRM company
+
+**Controllers**
+- `TicketController` — user-facing: index, create, store, show, downloadAttachment
+- `Operator\TicketController` — operator queue: index, show, updateStatus, assign
+- `Operator\TicketReplyController` — store (public replies + internal notes)
+- `Operator\TicketBulkController` — bulk assign / close / status change
+- `Operator\TicketReportController` — index (report view), export (CSV)
+
+**Views**
+- `tickets/index`, `tickets/create`, `tickets/show`
+- `tickets/_priority_badge`, `tickets/_status_badge` (reusable partials)
+- `operator/tickets/index` — operator queue with filters
+- `operator/tickets/show` — assign, status change, internal notes
+- `operator/tickets/reports` — summary + CSV export
+
+**Routes**
+- `/tickets` (user-facing, `can:tickets.view` / `can:tickets.create`)
+- `/attachments/{attachment}/download` (auth, policy checked in controller)
+- `/operator/tickets` (operator queue, `can:tickets.assign`)
+
+### Known Gaps
+
+- Confirmation / reply notification emails — queue jobs not verified end-to-end
+- SLA due-date calculation not implemented
+- Status transition validation (guard against invalid state jumps) not confirmed
+- Auto-close after idle period not implemented
+- Full-text search not implemented
 
 ---
 

@@ -4,7 +4,7 @@ Welcome to the development documentation for the **Intechral Client Portal**. Th
 
 ## Project Overview
 
-The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 11 / PHP 8.3 and MariaDB 10, designed to be deployable on cPanel-compatible hosting environments. It provides:
+The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 13 / PHP 8.3 and MariaDB 10, designed to be deployable on cPanel-compatible hosting environments. It provides:
 
 - Invitation-based user registration with local credentials **or** OpenID SSO
 - Role-based access control (RBAC) with built-in Operator and User roles plus fully custom roles
@@ -29,7 +29,7 @@ The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 11 
 | Layer | Technology |
 |-------|-----------|
 | Language | PHP 8.3 |
-| Framework | Laravel 11 |
+| Framework | Laravel 13 |
 | Database | MariaDB 10 |
 | Cache / Queue | Redis |
 | CSS | Tailwind CSS v4 |

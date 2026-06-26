@@ -43,6 +43,14 @@
 | token_expires_at | timestamp nullable | |
 | created_at / updated_at | timestamps | |
 
+### `password_histories`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | bigint PK | |
+| user_id | bigint FK users | |
+| password | varchar(255) | Previous hashed password |
+| created_at | timestamp | |
+
 ## RBAC Tables (Spatie)
 Standard Spatie tables: `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions`.
 
@@ -52,71 +60,59 @@ Standard Spatie tables: `roles`, `permissions`, `model_has_roles`, `model_has_pe
 | Column | Type | Notes |
 |--------|------|-------|
 | id | bigint PK | |
-| company_id | bigint FK companies | 1:1 — the CRM company this org represents |
+| company_id | bigint FK crm_companies | 1:1 — the CRM company this org represents |
 | name | varchar(255) | Copied from company for denormalization |
 | slug | varchar(255) unique | URL-safe identifier |
 | settings | json nullable | Org-level configuration |
 | created_at / updated_at | timestamps | |
 | deleted_at | timestamp nullable | Soft delete |
 
-### `organization_users`
-Pivot: `user_id` + `organization_id`. A user belongs to at most one organization.
+### `organization_members`
+Pivot: `user_id` + `organization_id` + `role` (varchar — simple string, e.g. `org_admin`, `org_member`). A user belongs to at most one organization.
 
-### `organization_roles`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | bigint PK | |
-| organization_id | bigint FK organizations | Scoped to this org |
-| name | varchar(255) | e.g., `org_admin`, `org_member`, custom |
-| permissions | json | Array of org-scoped permission strings |
-| is_system | boolean | true for `org_admin` / `org_member` (undeletable) |
-| created_at / updated_at | timestamps | |
+> **Note:** A separate `organization_roles` table is planned but not yet built. Org role management is currently handled via the `role` column on `organization_members`.
 
-### `organization_role_users`
-Pivot: `user_id` + `organization_role_id` + `organization_id`.
+> **Data scoping:** All resource tables (`tickets`, `projects`, `invoices`, `time_entries`) include an `organization_id` nullable FK. Platform operators see all records; organization members see only their org's records via an Eloquent global scope (`OrganizationScope`).
 
-> **Data scoping:** All resource tables (`tickets`, `projects`, `invoices`, `time_entries`) include an `organization_id` nullable FK. Platform operators see all records; organization members see only their org's records via an Eloquent global scope.
-
-## Module Tables (sketched — detailed in epic docs)
+## Module Tables
 
 ### Tickets Module
-- `tickets` — core ticket record
-- `ticket_replies` — threaded replies
-- `ticket_attachments` — file uploads
-- `ticket_categories` — configurable categories
+- `tickets` — id, title, description, category, priority, status, assignee_id, company_id, organization_id
+- `ticket_replies` — ticket_id, user_id, body, is_internal
+- `ticket_attachments` — ticket_id, reply_id nullable, path, filename, size, mime_type
+- `ticket_status_histories` — ticket_id, user_id, old_status, new_status
 
 ### Projects Module
-- `projects` — project record
-- `project_members` — user-project assignments
-- `tasks` — task cards
-- `task_comments` — comments on tasks
-- `task_attachments` — file uploads
-- `milestones` — project milestones
+- `projects` — id, name, description, status, budget, start_date, target_date, organization_id
+- `project_members` — project_id, user_id pivot
+- `project_columns` — project_id, name, position (configurable Kanban columns)
+- `tasks` — id, project_id, column_id, milestone_id nullable, title, description, assignee_id, due_date, priority, labels
+- `task_checklist_items` — task_id, label, completed
+- `task_comments` — task_id, user_id, body
+- `project_milestones` — project_id, name, due_date
+- `project_company` — project_id, company_id pivot (org-owned projects)
+- `task_dependencies` — task_id, depends_on_task_id pivot
 
 ### Billing Module
-- `invoices` — invoice header (includes `organization_id`)
-- `invoice_items` — line items
-- `payments` — payment records (includes Stripe `payment_intent_id`)
-- `tax_rates` — configurable tax rates
+- `invoices` — id, client_id, organization_id, number, status, due_date, notes, subtotal, tax, total
+- `invoice_items` — invoice_id, description, qty, unit_price, tax_rate, line_total
+- `invoice_payments` — invoice_id, amount, date, method, reference, stripe_payment_intent_id
 
 ### Time Tracking Module
-- `time_entries` — individual time log entries
+- `time_entries` — id, user_id, project_id, task_id nullable, ticket_id nullable, date, duration, description, billable, invoiced, stopped_at
+- `time_entry_blocks` — id, time_entry_id, started_at, ended_at, allocation_weight (for multi-timer block allocation)
 
 ### CRM Module
-- `companies` — client companies
-- `contacts` — individual contacts
-- `crm_notes` — notes / activity log
+- `crm_companies` — id, name, industry, website, phone, address, notes, status, deleted_at
+- `crm_contacts` — id, company_id nullable, first_name, last_name, email, phone, title, notes
 
 ### CMS Module
-- `cms_pages` — content pages
-- `cms_blocks` — content blocks
-- `cms_revisions` — revision history
-- `media` — media library
+- `cms_pages` — id, slug, title, content, status (draft/published), published_at, meta fields
 
 ## Design Decisions
 
-1. **Soft deletes everywhere** — `deleted_at` column on all user-facing models. Nothing is permanently destroyed.
-2. **Audit trail** — An `activity_log` table (via Spatie Activity Log) records all significant model events.
-3. **ULIDs for public-facing IDs** — Where records are exposed in URLs, ULIDs are used instead of auto-increment integers to prevent enumeration.
-4. **Encrypted sensitive data** — OAuth tokens, 2FA secrets stored with Laravel's `encrypted` cast.
-5. **Foreign key constraints** — All FK relationships enforced at DB level (MariaDB InnoDB).
+1. **Soft deletes** — `deleted_at` on all user-facing models. Nothing is permanently destroyed.
+2. **Audit trail** — `activity_log` table (via Spatie Activity Log) records significant model events.
+3. **Encrypted sensitive data** — OAuth tokens and 2FA secrets stored with Laravel's `encrypted` cast.
+4. **Foreign key constraints** — All FK relationships enforced at the DB level (MariaDB InnoDB).
+5. **Organization scoping** — `organization_id` on all resource tables; `OrganizationScope` global scope enforces tenant isolation automatically.

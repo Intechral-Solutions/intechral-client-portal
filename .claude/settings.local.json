@@ -41,7 +41,8 @@
       "Bash(npm run:*)",
       "Bash(wsl -d Debian -- bash -c \"cd /home/tennyson/development/intechral-solutions/intechral-client-portal && npm run build 2>&1 | tail -30\")",
       "Bash(docker ps:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(python3 *)"
     ],
     "additionalDirectories": [
       "\\home\\tennyson\\development\\intechral-solutions\\intechral-client-portal\\resources\\views\\time",

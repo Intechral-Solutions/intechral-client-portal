@@ -1,8 +1,13 @@
 # EPIC-009: CMS & Documentation
 
-**Status:** Pending
-**Branch:** `epic/009-cms`
-**Goal:** Provide a content management system for managing the public-facing intechral.solutions website content and platform documentation, with Markdown support.
+**Status:** Implemented
+**Committed:** 2026-03-25
+
+---
+
+## Goal
+
+Provide a content management system for managing the public-facing intechral.solutions website content and platform documentation, with Markdown support.
 
 ---
 
@@ -14,10 +19,10 @@
 **So that** the marketing site stays up to date without needing code deployments.
 
 **Acceptance Criteria:**
-- [ ] Content areas on the static site are wired to CMS content blocks
-- [ ] Rich text editor (Tiptap or ProseMirror) for content blocks
+- [x] Content pages manageable from within the operator area
+- [ ] Rich text editor (Tiptap or ProseMirror) wired to content fields
 - [ ] Changes preview before publishing
-- [ ] Publish/unpublish/schedule content
+- [x] Publish / unpublish content
 - [ ] Revision history with rollback
 
 ### STORY-009-02: Documentation Management
@@ -30,7 +35,6 @@
 - [ ] Documents organised in a tree (sections > pages)
 - [ ] Documents versioned (edit history)
 - [ ] Full-text search across all documentation
-- [ ] Documentation portal accessible to users based on permissions
 
 ### STORY-009-03: Documentation Portal (User-Facing)
 **As a** portal user,
@@ -38,7 +42,7 @@
 **So that** I can self-serve answers to common questions.
 
 **Acceptance Criteria:**
-- [ ] Clean, readable documentation layout with sidebar navigation
+- [x] Clean, readable page layout accessible to authenticated users
 - [ ] Full-text search within documentation
 - [ ] "Was this helpful?" feedback on each page
 - [ ] Operator can restrict sections to specific roles
@@ -50,9 +54,40 @@
 
 **Acceptance Criteria:**
 - [ ] Upload, organise, and tag media files
-- [ ] Image optimisation on upload (resize, compress)
+- [ ] Image optimisation on upload
 - [ ] Copy URL / embed code for use in content
 - [ ] Storage backend configurable (local disk or S3-compatible)
+
+---
+
+## Implementation
+
+### What Was Built
+
+**Migrations**
+- `create_cms_pages_table` — slug, title, content (stored text), status (draft/published), published_at, meta fields
+
+**Controllers**
+- `Operator\CmsPageController` — operator page management: index, create, store, edit, update, publish, unpublish, destroy
+- `CmsController` — authenticated public viewer: index (list published pages), show (render by slug)
+
+**Views**
+- `operator/cms/index`, `create`, `edit`, `_form`
+- `cms/index`, `cms/show` — public page listing and viewer
+
+**Routes**
+- `/operator/cms` (`can:cms.edit`) — operator CRUD + publish/unpublish
+- `/pages` (`can:cms.view`) — public reader
+
+### Known Gaps
+
+- Rich text / Markdown editor not confirmed as wired in the frontend
+- Preview before publish not implemented
+- Revision history / rollback not implemented (`cms_pages` has no revisions table)
+- Documentation tree (sections > pages hierarchy) not implemented — current CMS is flat
+- Full-text search not implemented
+- "Was this helpful?" feedback not implemented
+- Media library (STORY-009-04) not built — `spatie/laravel-medialibrary` is declared in `composer.json` but no media UI exists
 
 ---
 

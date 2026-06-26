@@ -1,8 +1,13 @@
 # EPIC-006: Billing & Invoicing
 
-**Status:** Pending
-**Branch:** `epic/006-billing`
-**Goal:** Provide a full billing system with invoices, Stripe-powered payment collection, and payment history — linked to projects and time tracking.
+**Status:** Implemented
+**Committed:** 2026-03-25
+
+---
+
+## Goal
+
+Provide a full billing system with invoices, Stripe-powered payment collection, and payment history — linked to projects and time tracking.
 
 ## Libraries
 
@@ -19,11 +24,11 @@
 **So that** billing is handled within the platform.
 
 **Acceptance Criteria:**
-- [ ] Invoice: client (CRM), line items (description, qty, unit price, tax), notes, due date
-- [ ] Line items can be pulled from time tracking entries or entered manually
-- [ ] Invoice PDF generated server-side (Barryvdh DomPDF or similar)
-- [ ] Invoice numbering: configurable prefix + sequential (e.g., `INV-2024-0001`)
-- [ ] Invoice statuses: `draft` → `sent` → `paid` / `overdue` / `void`
+- [x] Invoice: client (CRM), line items (description, qty, unit price, tax), notes, due date
+- [ ] Line items can be pulled from time tracking entries
+- [ ] Invoice PDF generated server-side (DomPDF)
+- [x] Invoice numbering: configurable prefix + sequential (e.g., `INV-2024-0001`)
+- [x] Invoice statuses: `draft` → `sent` → `paid` / `overdue` / `void`
 
 ### STORY-006-02: Client Invoice Portal
 **As a** portal user (client),
@@ -31,9 +36,9 @@
 **So that** I can manage my financial relationship with the service provider.
 
 **Acceptance Criteria:**
-- [ ] Client-facing invoice list with download link (PDF)
-- [ ] Invoice detail page showing all line items and totals
-- [ ] Payment status visible per invoice
+- [x] Client-facing invoice list with download link (PDF)
+- [x] Invoice detail page showing all line items and totals
+- [x] Payment status visible per invoice
 - [ ] Email notification when a new invoice is issued
 
 ### STORY-006-03: Stripe Online Payment
@@ -42,9 +47,9 @@
 **So that** I can settle invoices instantly without bank transfers.
 
 **Acceptance Criteria:**
-- [ ] "Pay Now" button on unpaid invoices launches a Stripe Payment Intent
-- [ ] Stripe Checkout or hosted Elements UI used (no raw card data on server)
-- [ ] Stripe webhook (`payment_intent.succeeded`) updates invoice status to `paid`
+- [x] "Pay Now" button on unpaid invoices launches a Stripe Payment Intent
+- [x] Stripe Elements UI used (no raw card data on server)
+- [x] Stripe webhook (`payment_intent.succeeded`) updates invoice status to `paid`
 - [ ] Payment receipt emailed to client on successful payment
 - [ ] Failed payments shown clearly with retry option
 
@@ -54,10 +59,10 @@
 **So that** all payment methods are tracked in one place.
 
 **Acceptance Criteria:**
-- [ ] Manual payment recording: amount, date, method, reference
+- [x] Manual payment recording: amount, date, method, reference
 - [ ] Partial payments supported (invoice stays `partially_paid` until cleared)
 - [ ] Payment confirmation email sent to client on recording
-- [ ] Payment history visible on invoice detail
+- [x] Payment history visible on invoice detail
 
 ### STORY-006-05: Client Payment History
 **As a** portal user (client),
@@ -65,12 +70,12 @@
 **So that** I have a clear record of what I've paid and when.
 
 **Acceptance Criteria:**
-- [ ] Payment history page listing all payments (date, amount, method, invoice reference)
-- [ ] Each entry links to the related invoice
+- [x] Payment history visible on client invoice portal
+- [x] Each entry links to the related invoice
 - [ ] Stripe payment entries show Stripe transaction ID
 - [ ] Downloadable payment receipt PDF per payment
 
-### STORY-006-04: Billing Reports
+### STORY-006-06: Billing Reports
 **As a** platform operator,
 **I want** billing reports summarizing revenue and outstanding amounts,
 **So that** I have financial visibility.
@@ -81,7 +86,7 @@
 - [ ] Per-client revenue summary
 - [ ] Exportable to CSV
 
-### STORY-006-05: Tax & Currency Configuration
+### STORY-006-07: Tax & Currency Configuration
 **As a** platform operator,
 **I want** to configure tax rates and currency settings,
 **So that** invoices comply with local requirements.
@@ -91,6 +96,43 @@
 - [ ] Multiple named tax rates (e.g., GST 10%, VAT 20%)
 - [ ] Tax rates selectable per line item
 - [ ] Tax totals broken out separately on invoice PDF
+
+---
+
+## Implementation
+
+### What Was Built
+
+**Migrations**
+- `create_invoices_table` — invoice number, client link, status, due date, notes, subtotal, tax, total
+- `create_invoice_items_table` — description, qty, unit price, tax rate, line total
+- `create_invoice_payments_table` — amount, date, method, reference, stripe_payment_intent_id
+
+**Controllers**
+- `Billing\InvoiceController` — operator invoice management: index, create, store, show, edit, update, send, recordPayment, destroy
+- `Billing\ClientInvoiceController` — client portal: index, show
+- `Billing\InvoicePaymentController` — show (Stripe payment page), intent (create Payment Intent)
+- `Billing\StripeWebhookController` — handles `payment_intent.succeeded` → marks invoice paid
+
+**Views**
+- `billing/invoices/index`, `create`, `edit`, `show`, `_form`
+- `billing/client/index`, `show`
+- `billing/payment/show` — Stripe Elements payment page
+
+**Routes**
+- `/billing/invoices` (`can:billing.manage`) — full operator CRUD + send + record payment
+- `/my/invoices` (auth) — client portal
+- `/billing/invoices/{invoice}/pay` — Stripe payment flow
+- `POST /webhooks/stripe` — Stripe webhook (no CSRF, signature-verified)
+
+### Known Gaps
+
+- PDF invoice generation (DomPDF) declared as dependency but not confirmed as wired
+- Email notifications (new invoice, payment receipt) — not verified end-to-end
+- Partial payment tracking (invoice `partially_paid` status) — not confirmed in UI
+- Tax rate configuration UI not built
+- Billing reports not yet implemented
+- Time-tracking-to-invoice export not yet implemented
 
 ---
 

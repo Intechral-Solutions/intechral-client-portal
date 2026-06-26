@@ -1,22 +1,30 @@
 # API Documentation
 
-The Intechral Client Portal exposes an internal REST API used by frontend components and potentially by third-party integrations.
+> **Status:** Not yet implemented.
+>
+> The Intechral Client Portal is currently a fully server-rendered Blade application. There is no REST API layer at this time. A handful of JSON endpoints exist for internal UI use (timer state, cascading selectors, Stripe payment intents) but they are not versioned, not documented here, and not intended for external consumption.
+>
+> A formal REST API is planned for a future epic. The design notes below reflect the intended architecture when that work begins.
 
-## Authentication
+---
 
-API requests are authenticated via **Laravel Sanctum** (token-based). Tokens are issued after successful login.
+## Planned Design
+
+### Authentication
+
+API requests will be authenticated via **Laravel Sanctum** (token-based). Tokens will be issued after successful login.
 
 ```
 Authorization: Bearer {token}
 ```
 
-## Versioning
+### Versioning
 
-API routes are prefixed with `/api/v1/`. Breaking changes will introduce a new version prefix.
+API routes will be prefixed with `/api/v1/`. Breaking changes will introduce a new version prefix.
 
-## Response Format
+### Response Format
 
-All API responses follow a consistent envelope:
+All API responses will follow a consistent envelope:
 
 ```json
 {
@@ -36,9 +44,7 @@ Errors:
 }
 ```
 
-## Modules
-
-Documentation for each module's API will be added as epics are completed:
+### Planned Module Coverage
 
 - [ ] Auth API (EPIC-002)
 - [ ] Users & Roles API (EPIC-003)

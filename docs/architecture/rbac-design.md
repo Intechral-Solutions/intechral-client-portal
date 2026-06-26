@@ -159,10 +159,10 @@ org.admin             ← all of the above
 
 ### Organization Tables
 
-- `organizations` — linked 1:1 with a CRM company
-- `organization_users` — `user_id`, `organization_id`, pivot
-- `organization_roles` — org-scoped roles (`org_admin`, `org_member`, custom)
-- `organization_role_users` — assignment of org roles to users within an org
+- `organizations` — linked 1:1 with a CRM company (`crm_companies`)
+- `organization_members` — `user_id`, `organization_id`, `role` (varchar). A user belongs to at most one organization.
+
+> **Note:** A full org-role table system (`organization_roles`, `organization_role_users`) is planned but not yet built. Currently, the org role is stored as a simple string column on `organization_members` (e.g. `org_admin`, `org_member`). Full org-role CRUD management is a known gap in EPIC-008.
 
 ### Authorization Check Order
 

@@ -23,7 +23,7 @@ Operator                          System                          Invitee
 
 ## Local Registration
 
-1. User clicks invitation link: `GET /register?token={signed_token}`
+1. User clicks invitation link: `GET /invitation/{token}`
 2. System validates token (not expired, not used)
 3. Registration form displayed with email pre-filled and read-only
 4. User submits: name, password, password confirmation
