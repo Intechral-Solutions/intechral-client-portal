@@ -13,6 +13,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-007](./EPIC-007-time-tracking.md) | Time Tracking | **Implemented** |
 | [EPIC-008](./EPIC-008-crm.md) | CRM | **Implemented** |
 | [EPIC-009](./EPIC-009-cms.md) | CMS & Documentation | **Implemented** |
+| [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) | MariaDB Test Parity | **Implemented** |
 
 ## Epic Lifecycle
 
@@ -26,6 +27,6 @@ Pending → In Progress → Implemented → Verified → Done
 
 ## Notes
 
-All 9 epics reached **Implemented** status by 2026-03-27. The next phase is formal verification: checking each acceptance criterion, writing test coverage, and closing known gaps documented in each epic file.
+All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. The next phase is formal hardening: closing product-level gaps documented in each epic file.
 
 Major milestone records are tracked in [docs/progress/](../progress/).
