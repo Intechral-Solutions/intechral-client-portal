@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CrmCompany;
 use App\Models\Project;
 use App\Models\User;
+use App\Rules\AccessibleCrmCompany;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ class ProjectController extends Controller
             'members.*.user_id' => 'required|exists:users,id',
             'members.*.role'    => 'required|in:member,manager',
             'companies'   => 'nullable|array',
-            'companies.*' => 'exists:crm_companies,id',
+            'companies.*' => [new AccessibleCrmCompany],
         ]);
 
         $project = $this->service->create(auth()->user(), $data);
@@ -150,7 +151,7 @@ class ProjectController extends Controller
 
         $data = $request->validate([
             'companies'   => 'present|array',
-            'companies.*' => 'exists:crm_companies,id',
+            'companies.*' => [new AccessibleCrmCompany],
         ]);
 
         $project->companies()->sync($data['companies']);

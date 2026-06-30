@@ -5,14 +5,16 @@ namespace App\Shared\Scopes;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Global Eloquent scope that filters records by the authenticated user's
- * organization. Platform operators (role: 'operator') bypass this scope
- * and can see all records across all organizations.
+ * Scope models that have a direct organization_id foreign key to all
+ * organizations joined by the authenticated user. Platform operators bypass
+ * tenant filtering and retain cross-organization visibility.
  *
- * Apply this scope to any model that should be organization-scoped:
+ * Only apply this scope to models whose tables contain organization_id:
  *
  *   protected static function booted(): void
  *   {
@@ -29,14 +31,20 @@ class OrganizationScope implements Scope
 
         $user = Auth::user();
 
-        // Operators see everything — bypass the scope
         if ($user->hasRole('operator')) {
             return;
         }
 
-        // Organization members see only their org's data
-        if ($user->organization_id) {
-            $builder->where($model->getTable().'.organization_id', $user->organization_id);
-        }
+        $builder->whereIn(
+            $model->qualifyColumn('organization_id'),
+            self::membershipOrganizationIds($user->getKey()),
+        );
+    }
+
+    public static function membershipOrganizationIds(int $userId): QueryBuilder
+    {
+        return DB::table('organization_members')
+            ->select('organization_id')
+            ->where('user_id', $userId);
     }
 }

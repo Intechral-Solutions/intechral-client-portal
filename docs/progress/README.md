@@ -84,13 +84,26 @@ docker compose exec db mariadb -u root -proot -e "
 docker compose exec app ./vendor/bin/pest
 ```
 
-### Remaining gaps (Epic 10B candidates)
+### Remaining hardening gaps
 
-- `OrganizationScope` reads `$user->organization_id` which does not exist on the `users` table — org data filtering silently does nothing for non-operators
 - `TimeEntryService::update()` does not enforce the `billed` lock on time entries
 - Invoice and ticket number generation race condition under concurrency
 - `autoCloseResolved()` and `markOverdue()` are not registered as scheduled commands
 - Time-to-invoice export workflow is incomplete (`time_entries.invoice_id` is never populated)
 - No GitHub Actions CI pipeline
+
+---
+
+## Milestone 3 — Tenant Scoping Correctness (Epic 10B)
+
+**Date:** 2026-06-30
+
+Tenant isolation now follows the implemented many-to-many organization membership schema. CRM companies use direct membership scoping, contacts scope through their company, and organizations scope through the membership pivot. Operators retain cross-tenant access, multi-org users see all joined organizations, and users without memberships receive an empty tenant view.
+
+The milestone also closes request-validation bypasses that allowed guessed company IDs to be submitted when creating contacts, tickets, or linking projects. MariaDB-backed regression coverage exercises model queries, route binding, member management, and adjacent ticket/project/billing behavior.
+
+Final result: **233/233 tests passing, 561 assertions** against `intechral_client_portal_testing`.
+
+See [EPIC-010B](../epics/EPIC-010B-tenant-scoping.md) for the tenant-scoping matrix and verification details.
 
 <!-- Add future milestones below -->

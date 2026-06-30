@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Shared\Scopes\OrganizationThroughCompanyScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,11 @@ class CrmContact extends Model
         'notes',
         'created_by',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new OrganizationThroughCompanyScope);
+    }
 
     // ── Relationships ──────────────────────────────────────
 

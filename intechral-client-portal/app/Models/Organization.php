@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Shared\Scopes\OrganizationMembershipScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,11 @@ class Organization extends Model
         'slug',
         'owner_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new OrganizationMembershipScope);
+    }
 
     // ── Relationships ──────────────────────────────────────
 
