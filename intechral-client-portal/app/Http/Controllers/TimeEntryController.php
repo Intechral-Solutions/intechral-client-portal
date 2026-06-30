@@ -70,7 +70,7 @@ class TimeEntryController extends Controller
 
     public function update(Request $request, TimeEntry $entry): RedirectResponse
     {
-        abort_unless($entry->user_id === auth()->id() && ! $entry->billed, 403);
+        abort_unless($entry->user_id === auth()->id(), 403);
 
         $request->validate([
             'date' => 'required|date|before_or_equal:today',
@@ -92,9 +92,9 @@ class TimeEntryController extends Controller
 
     public function destroy(TimeEntry $entry): RedirectResponse
     {
-        abort_unless($entry->user_id === auth()->id() && ! $entry->billed, 403);
+        abort_unless($entry->user_id === auth()->id(), 403);
 
-        $entry->delete();
+        $this->service->delete($entry);
 
         return back()->with('success', 'Entry deleted.');
     }
@@ -140,11 +140,11 @@ class TimeEntryController extends Controller
 
     public function updateTimerDescription(Request $request, TimeEntry $entry): JsonResponse
     {
-        abort_unless($entry->user_id === auth()->id() && $entry->isRunning(), 403);
+        abort_unless($entry->user_id === auth()->id(), 403);
 
         $request->validate(['description' => 'nullable|string|max:500']);
 
-        $entry->update(['description' => $request->description]);
+        $this->service->updateTimerDescription($entry, $request->description);
 
         return response()->json(['ok' => true]);
     }
@@ -226,28 +226,9 @@ class TimeEntryController extends Controller
     {
         abort_unless($block->timeEntry->user_id === auth()->id(), 403);
 
-        $request->validate(['allocation_pct' => 'required|numeric|min:0|max:100']);
+        $data = $request->validate(['allocation_pct' => 'required|numeric|min:0|max:100']);
 
-        $newPct = (float) $request->allocation_pct;
-        $remainder = 100.0 - $newPct;
-
-        $siblings = TimeEntryBlock::where('user_id', auth()->id())
-            ->where('block_date', $block->block_date)
-            ->where('block_number', $block->block_number)
-            ->where('id', '!=', $block->id)
-            ->get();
-
-        $siblingTotal = $siblings->sum('allocation_pct');
-
-        foreach ($siblings as $sibling) {
-            $adjusted = $siblingTotal > 0
-                ? round(($sibling->allocation_pct / $siblingTotal) * $remainder, 2)
-                : round($remainder / max(1, $siblings->count()), 2);
-
-            $sibling->update(['allocation_pct' => $adjusted, 'is_overridden' => true]);
-        }
-
-        $block->update(['allocation_pct' => $newPct, 'is_overridden' => true]);
+        $this->service->updateBlockAllocation($block, (float) $data['allocation_pct']);
 
         return response()->json(['ok' => true]);
     }

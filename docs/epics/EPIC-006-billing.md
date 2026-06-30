@@ -125,6 +125,11 @@ Provide a full billing system with invoices, Stripe-powered payment collection, 
 - `/billing/invoices/{invoice}/pay` — Stripe payment flow
 - `POST /webhooks/stripe` — Stripe webhook (no CSRF, signature-verified)
 
+**Time-entry billing boundary**
+
+- Time entries already marked `billed` or linked through `invoice_id` are immutable through ordinary time-entry mutation paths (see [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md)).
+- The workflow that selects billable time and attaches it to a new invoice remains unimplemented.
+
 ### Known Gaps
 
 - PDF invoice generation (DomPDF) declared as dependency but not confirmed as wired

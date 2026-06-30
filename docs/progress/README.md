@@ -86,7 +86,6 @@ docker compose exec app ./vendor/bin/pest
 
 ### Remaining hardening gaps
 
-- `TimeEntryService::update()` does not enforce the `billed` lock on time entries
 - Invoice and ticket number generation race condition under concurrency
 - `autoCloseResolved()` and `markOverdue()` are not registered as scheduled commands
 - Time-to-invoice export workflow is incomplete (`time_entries.invoice_id` is never populated)
@@ -119,5 +118,20 @@ Timer state is now canonicalized as running only when `timer_started_at` is non-
 Local entry 10 was stopped through `TimeEntryService` without deletion: 136,824 minutes were retained and 9,123 allocation blocks finalized. The canonical active-timer count is now zero. See [EPIC-007](../epics/EPIC-007-time-tracking.md#canonical-timer-state-2026-06-30) for invariants and the repair command.
 
 Final result: **237/237 Pest tests passing (586 assertions)** and **180/180 files passing Pint**.
+
+---
+
+## Milestone 5 — Billed Time-Entry Locking (Epic 10C)
+
+**Date:** 2026-06-30
+**Branch:** `hardening/epic-10c-billed-time-entry-locking`
+
+Time entries are now immutable when either the legacy `billed` flag is true or `invoice_id` is populated. The lock is centralized on the model and enforced by transactional service methods that reload and row-lock current database state, preventing stale-model bypasses.
+
+Update, deletion, timer description, timer stop, and allocation changes all share the same boundary. Allocation also protects locked sibling entries from indirect mutation during slot redistribution. Locked entries remain visible to their owners and in operator reports, while operators receive no ordinary mutation bypass.
+
+Regression coverage exercises billed and invoice-linked states, visibility, legacy inconsistent timers, allocation targets and siblings, operator routes, and persisted-state concurrency protection. See [EPIC-010C](../epics/EPIC-010C-billed-time-entry-locking.md) for the full lock and mutation matrices.
+
+Final result: **247/247 Pest tests passing (636 assertions)** and **181/181 files passing Pint**.
 
 <!-- Add future milestones below -->

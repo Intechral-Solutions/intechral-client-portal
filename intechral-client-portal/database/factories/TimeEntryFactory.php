@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Invoice;
 use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -43,5 +44,13 @@ class TimeEntryFactory extends Factory
     public function billed(): static
     {
         return $this->state(['billed' => true]);
+    }
+
+    public function invoiced(): static
+    {
+        return $this->state([
+            'invoice_id' => Invoice::factory(),
+            'billed' => false,
+        ]);
     }
 }
