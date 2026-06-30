@@ -15,11 +15,11 @@ class CrmService
     public function createCompany(User $creator, array $data): CrmCompany
     {
         return CrmCompany::create([
-            'name'       => $data['name'],
-            'website'    => $data['website'] ?? null,
-            'phone'      => $data['phone'] ?? null,
-            'address'    => $data['address'] ?? null,
-            'notes'      => $data['notes'] ?? null,
+            'name' => $data['name'],
+            'website' => $data['website'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'address' => $data['address'] ?? null,
+            'notes' => $data['notes'] ?? null,
             'created_by' => $creator->id,
         ]);
     }
@@ -27,11 +27,11 @@ class CrmService
     public function updateCompany(CrmCompany $company, array $data): CrmCompany
     {
         $company->update([
-            'name'    => $data['name']    ?? $company->name,
+            'name' => $data['name'] ?? $company->name,
             'website' => $data['website'] ?? $company->website,
-            'phone'   => $data['phone']   ?? $company->phone,
+            'phone' => $data['phone'] ?? $company->phone,
             'address' => $data['address'] ?? $company->address,
-            'notes'   => $data['notes']   ?? $company->notes,
+            'notes' => $data['notes'] ?? $company->notes,
         ]);
 
         return $company->fresh();
@@ -48,13 +48,13 @@ class CrmService
     {
         return CrmContact::create([
             'crm_company_id' => $data['crm_company_id'] ?? null,
-            'first_name'     => $data['first_name'],
-            'last_name'      => $data['last_name'],
-            'email'          => $data['email'] ?? null,
-            'phone'          => $data['phone'] ?? null,
-            'job_title'      => $data['job_title'] ?? null,
-            'notes'          => $data['notes'] ?? null,
-            'created_by'     => $creator->id,
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'job_title' => $data['job_title'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $creator->id,
         ]);
     }
 
@@ -62,12 +62,12 @@ class CrmService
     {
         $contact->update([
             'crm_company_id' => array_key_exists('crm_company_id', $data) ? $data['crm_company_id'] : $contact->crm_company_id,
-            'first_name'     => $data['first_name'] ?? $contact->first_name,
-            'last_name'      => $data['last_name']  ?? $contact->last_name,
-            'email'          => $data['email']      ?? $contact->email,
-            'phone'          => $data['phone']      ?? $contact->phone,
-            'job_title'      => $data['job_title']  ?? $contact->job_title,
-            'notes'          => $data['notes']      ?? $contact->notes,
+            'first_name' => $data['first_name'] ?? $contact->first_name,
+            'last_name' => $data['last_name'] ?? $contact->last_name,
+            'email' => $data['email'] ?? $contact->email,
+            'phone' => $data['phone'] ?? $contact->phone,
+            'job_title' => $data['job_title'] ?? $contact->job_title,
+            'notes' => $data['notes'] ?? $contact->notes,
         ]);
 
         return $contact->fresh();
@@ -91,8 +91,8 @@ class CrmService
         }
 
         $org = Organization::create([
-            'name'     => $company->name,
-            'slug'     => $this->uniqueSlug($company->name),
+            'name' => $company->name,
+            'slug' => $this->uniqueSlug($company->name),
             'owner_id' => $owner->id,
         ]);
 
@@ -125,7 +125,7 @@ class CrmService
     {
         $base = Str::slug($name);
         $slug = $base;
-        $i    = 2;
+        $i = 2;
 
         while (Organization::where('slug', $slug)->exists()) {
             $slug = "{$base}-{$i}";

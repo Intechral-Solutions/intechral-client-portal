@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Project;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Services\ProjectService;
@@ -53,10 +52,10 @@ it('logs a manual time entry', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('time.store'), [
-        'date'        => today()->format('Y-m-d'),
-        'hours'       => '2.5',
+        'date' => today()->format('Y-m-d'),
+        'hours' => '2.5',
         'description' => 'Working on feature X',
-        'billable'    => '1',
+        'billable' => '1',
     ])->assertRedirect();
 
     $entry = TimeEntry::where('user_id', $user->id)->first();
@@ -71,7 +70,7 @@ it('converts decimal hours to minutes correctly', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('time.store'), [
-        'date'  => today()->format('Y-m-d'),
+        'date' => today()->format('Y-m-d'),
         'hours' => '1.25',
     ])->assertRedirect();
 
@@ -83,7 +82,7 @@ it('validates date cannot be in the future', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('time.store'), [
-        'date'  => today()->addDay()->format('Y-m-d'),
+        'date' => today()->addDay()->format('Y-m-d'),
         'hours' => '1',
     ])->assertSessionHasErrors('date');
 });
@@ -93,7 +92,7 @@ it('validates hours is required and positive', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('time.store'), [
-        'date'  => today()->format('Y-m-d'),
+        'date' => today()->format('Y-m-d'),
         'hours' => '-1',
     ])->assertSessionHasErrors('hours');
 });
@@ -101,15 +100,15 @@ it('validates hours is required and positive', function () {
 it('links a time entry to a project', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project  = app(ProjectService::class)->create($operator, ['name' => 'Time Test Project']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Time Test Project']);
 
     $user = User::factory()->create();
     $user->assignRole('user');
     $project->members()->attach($user->id, ['role' => 'member']);
 
     $this->actingAs($user)->post(route('time.store'), [
-        'date'       => today()->format('Y-m-d'),
-        'hours'      => '3',
+        'date' => today()->format('Y-m-d'),
+        'hours' => '3',
         'project_id' => $project->id,
     ])->assertRedirect();
 
@@ -130,7 +129,7 @@ it('allows a user to delete their own unbilled entry', function () {
 });
 
 it('returns 403 when deleting another user\'s entry', function () {
-    $user  = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $other = User::factory()->create();
     $other->assignRole('user');
@@ -182,7 +181,7 @@ it('stops a timer and records elapsed minutes', function () {
     $user->assignRole('user');
 
     $entry = TimeEntry::factory()->running()->create([
-        'user_id'          => $user->id,
+        'user_id' => $user->id,
         'duration_minutes' => 0,
         'timer_started_at' => now()->subMinutes(30),
     ]);
@@ -197,7 +196,7 @@ it('stops a timer and records elapsed minutes', function () {
 });
 
 it('returns 403 stopping another user\'s timer', function () {
-    $user  = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $other = User::factory()->create();
     $other->assignRole('user');

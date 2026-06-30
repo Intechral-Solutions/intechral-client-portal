@@ -38,7 +38,7 @@ class SocialiteController extends Controller
             $socialUser = Socialite::driver($provider)->user();
         } catch (\Exception) {
             return redirect()->route('login')
-                ->withErrors(['email' => 'Authentication via ' . ucfirst($provider) . ' failed. Please try again.']);
+                ->withErrors(['email' => 'Authentication via '.ucfirst($provider).' failed. Please try again.']);
         }
 
         // Already linked account — log in directly
@@ -50,6 +50,7 @@ class SocialiteController extends Controller
         if ($socialAccount) {
             $this->updateToken($socialAccount, $socialUser);
             Auth::login($socialAccount->user, remember: true);
+
             return redirect()->intended(route('dashboard'));
         }
 
@@ -66,12 +67,13 @@ class SocialiteController extends Controller
         if ($user) {
             $this->linkAccount($user, $provider, $socialUser);
             Auth::login($user, remember: true);
+
             return redirect()->intended(route('dashboard'));
         }
 
         // No user found and no invitation — reject
         return redirect()->route('login')
-            ->withErrors(['email' => 'No account found for that ' . ucfirst($provider) . ' address. Please use an invitation link to register.']);
+            ->withErrors(['email' => 'No account found for that '.ucfirst($provider).' address. Please use an invitation link to register.']);
     }
 
     private function registerViaSso(string $provider, $socialUser, string $invitationToken)
@@ -84,13 +86,13 @@ class SocialiteController extends Controller
 
         if (strtolower($socialUser->getEmail()) !== strtolower($invitation->email)) {
             return redirect()->route('invitation.show', $invitationToken)
-                ->withErrors(['email' => 'The ' . ucfirst($provider) . ' account email does not match your invitation email (' . $invitation->email . ').']);
+                ->withErrors(['email' => 'The '.ucfirst($provider).' account email does not match your invitation email ('.$invitation->email.').']);
         }
 
         $user = User::create([
-            'name'       => $socialUser->getName(),
-            'email'      => $invitation->email,
-            'password'   => null,
+            'name' => $socialUser->getName(),
+            'email' => $invitation->email,
+            'password' => null,
             'invited_by' => $invitation->invited_by,
         ]);
 
@@ -99,6 +101,7 @@ class SocialiteController extends Controller
         $this->service->accept($invitation, $user);
 
         Auth::login($user, remember: true);
+
         return redirect()->route('dashboard');
     }
 
@@ -107,9 +110,9 @@ class SocialiteController extends Controller
         SocialAccount::updateOrCreate(
             ['provider' => $provider, 'provider_id' => $socialUser->getId()],
             [
-                'user_id'          => $user->id,
-                'token'            => $socialUser->token,
-                'refresh_token'    => $socialUser->refreshToken,
+                'user_id' => $user->id,
+                'token' => $socialUser->token,
+                'refresh_token' => $socialUser->refreshToken,
                 'token_expires_at' => isset($socialUser->expiresIn)
                     ? now()->addSeconds($socialUser->expiresIn)
                     : null,
@@ -120,8 +123,8 @@ class SocialiteController extends Controller
     private function updateToken(SocialAccount $account, $socialUser): void
     {
         $account->update([
-            'token'            => $socialUser->token,
-            'refresh_token'    => $socialUser->refreshToken,
+            'token' => $socialUser->token,
+            'refresh_token' => $socialUser->refreshToken,
             'token_expires_at' => isset($socialUser->expiresIn)
                 ? now()->addSeconds($socialUser->expiresIn)
                 : null,

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\ProjectColumn;
 use App\Models\Task;
 use App\Models\User;
 
@@ -21,13 +20,13 @@ class ProjectService
     public function create(User $creator, array $data): Project
     {
         $project = Project::create([
-            'name'        => $data['name'],
+            'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'created_by'  => $creator->id,
-            'start_date'  => $data['start_date'] ?? null,
+            'created_by' => $creator->id,
+            'start_date' => $data['start_date'] ?? null,
             'target_date' => $data['target_date'] ?? null,
-            'status'      => $data['status'] ?? 'active',
-            'budget'      => $data['budget'] ?? null,
+            'status' => $data['status'] ?? 'active',
+            'budget' => $data['budget'] ?? null,
         ]);
 
         // Seed default columns
@@ -70,7 +69,7 @@ class ProjectService
 
         $task->update([
             'column_id' => $targetColumnId,
-            'position'  => $position,
+            'position' => $position,
         ]);
     }
 }

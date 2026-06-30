@@ -14,13 +14,13 @@ class CrmContactFactory extends Factory
     {
         return [
             'crm_company_id' => null,
-            'first_name'     => $this->faker->firstName(),
-            'last_name'      => $this->faker->lastName(),
-            'email'          => $this->faker->optional()->safeEmail(),
-            'phone'          => $this->faker->optional()->phoneNumber(),
-            'job_title'      => $this->faker->optional()->jobTitle(),
-            'notes'          => null,
-            'created_by'     => User::factory(),
+            'first_name' => $this->faker->firstName(),
+            'last_name' => $this->faker->lastName(),
+            'email' => $this->faker->optional()->safeEmail(),
+            'phone' => $this->faker->optional()->phoneNumber(),
+            'job_title' => $this->faker->optional()->jobTitle(),
+            'notes' => null,
+            'created_by' => User::factory(),
         ];
     }
 }

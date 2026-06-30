@@ -1,8 +1,9 @@
 <?php
 
 use App\Models\User;
-use Spatie\Permission\Models\Role;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -186,7 +187,7 @@ it('logs activity when a role is created', function () {
 
     $role = Role::findByName('logged-role');
     expect(
-        \Spatie\Activitylog\Models\Activity::forSubject($role)
+        Activity::forSubject($role)
             ->where('description', 'created role')
             ->exists()
     )->toBeTrue();
@@ -201,7 +202,7 @@ it('logs activity when a role is deleted', function () {
         ->delete(route('roles.destroy', $role));
 
     expect(
-        \Spatie\Activitylog\Models\Activity::where('description', 'deleted role "doomed-role"')
+        Activity::where('description', 'deleted role "doomed-role"')
             ->exists()
     )->toBeTrue();
 });

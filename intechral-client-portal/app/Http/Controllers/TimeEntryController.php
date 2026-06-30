@@ -25,9 +25,9 @@ class TimeEntryController extends Controller
         $entries = TimeEntry::forUser($user->id)
             ->with(['project', 'task', 'ticket'])
             ->when($request->project_id, fn ($q, $id) => $q->where('project_id', $id))
-            ->when($request->ticket_id,  fn ($q, $id) => $q->where('ticket_id', $id))
+            ->when($request->ticket_id, fn ($q, $id) => $q->where('ticket_id', $id))
             ->when($request->from, fn ($q, $d) => $q->where('date', '>=', $d))
-            ->when($request->to,   fn ($q, $d) => $q->where('date', '<=', $d))
+            ->when($request->to, fn ($q, $d) => $q->where('date', '<=', $d))
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(25)
@@ -42,7 +42,7 @@ class TimeEntryController extends Controller
         $totalMinutes = TimeEntry::forUser($user->id)
             ->whereNull('timer_started_at')
             ->when($request->from, fn ($q, $d) => $q->where('date', '>=', $d))
-            ->when($request->to,   fn ($q, $d) => $q->where('date', '<=', $d))
+            ->when($request->to, fn ($q, $d) => $q->where('date', '<=', $d))
             ->sum('duration_minutes');
 
         return view('time.index', compact('entries', 'projects', 'activeTimers', 'totalMinutes'));
@@ -51,13 +51,13 @@ class TimeEntryController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'date'        => 'required|date|before_or_equal:today',
-            'hours'       => 'required|numeric|min:0.25|max:24',
-            'project_id'  => 'nullable|exists:projects,id',
-            'task_id'     => 'nullable|exists:tasks,id',
-            'ticket_id'   => 'nullable|exists:tickets,id',
+            'date' => 'required|date|before_or_equal:today',
+            'hours' => 'required|numeric|min:0.25|max:24',
+            'project_id' => 'nullable|exists:projects,id',
+            'task_id' => 'nullable|exists:tasks,id',
+            'ticket_id' => 'nullable|exists:tickets,id',
             'description' => 'nullable|string|max:500',
-            'billable'    => 'nullable|boolean',
+            'billable' => 'nullable|boolean',
         ]);
 
         $this->service->log(auth()->user(), [
@@ -73,13 +73,13 @@ class TimeEntryController extends Controller
         abort_unless($entry->user_id === auth()->id() && ! $entry->billed, 403);
 
         $request->validate([
-            'date'        => 'required|date|before_or_equal:today',
-            'hours'       => 'required|numeric|min:0.25|max:24',
-            'project_id'  => 'nullable|exists:projects,id',
-            'task_id'     => 'nullable|exists:tasks,id',
-            'ticket_id'   => 'nullable|exists:tickets,id',
+            'date' => 'required|date|before_or_equal:today',
+            'hours' => 'required|numeric|min:0.25|max:24',
+            'project_id' => 'nullable|exists:projects,id',
+            'task_id' => 'nullable|exists:tasks,id',
+            'ticket_id' => 'nullable|exists:tickets,id',
             'description' => 'nullable|string|max:500',
-            'billable'    => 'nullable|boolean',
+            'billable' => 'nullable|boolean',
         ]);
 
         $this->service->update($entry, [
@@ -104,11 +104,11 @@ class TimeEntryController extends Controller
     public function timerStart(Request $request): JsonResponse
     {
         $request->validate([
-            'project_id'  => 'nullable|exists:projects,id',
-            'task_id'     => 'nullable|exists:tasks,id',
-            'ticket_id'   => 'nullable|exists:tickets,id',
+            'project_id' => 'nullable|exists:projects,id',
+            'task_id' => 'nullable|exists:tasks,id',
+            'ticket_id' => 'nullable|exists:tickets,id',
             'description' => 'nullable|string|max:500',
-            'billable'    => 'nullable|boolean',
+            'billable' => 'nullable|boolean',
         ]);
 
         $entry = $this->service->startTimer(
@@ -119,10 +119,10 @@ class TimeEntryController extends Controller
         $entry->load(['project', 'task', 'ticket']);
 
         return response()->json([
-            'id'          => $entry->id,
-            'started_at'  => $entry->timer_started_at->toISOString(),
+            'id' => $entry->id,
+            'started_at' => $entry->timer_started_at->toISOString(),
             'description' => $entry->description,
-            'context'     => $this->buildContextPayload($entry),
+            'context' => $this->buildContextPayload($entry),
         ]);
     }
 
@@ -134,7 +134,7 @@ class TimeEntryController extends Controller
 
         return response()->json([
             'duration_minutes' => $entry->duration_minutes,
-            'duration_human'   => $entry->durationForHumans(),
+            'duration_human' => $entry->durationForHumans(),
         ]);
     }
 
@@ -157,10 +157,10 @@ class TimeEntryController extends Controller
 
         return response()->json(
             $timers->map(fn ($e) => [
-                'id'          => $e->id,
-                'started_at'  => $e->timer_started_at->toISOString(),
+                'id' => $e->id,
+                'started_at' => $e->timer_started_at->toISOString(),
                 'description' => $e->description,
-                'context'     => $this->buildContextPayload($e),
+                'context' => $this->buildContextPayload($e),
             ])
         );
     }
@@ -173,33 +173,32 @@ class TimeEntryController extends Controller
         $type = $request->input('type');
 
         $options = match ($type) {
-            'project' => Project::where(fn ($q) =>
-                            $q->whereHas('members', fn ($m) => $m->where('user_id', $user->id))
-                              ->orWhere('created_by', $user->id)
-                        )
-                        ->where('status', 'active')
-                        ->orderBy('name')
-                        ->get(['id', 'name'])
-                        ->map(fn ($p) => ['id' => $p->id, 'label' => $p->name]),
+            'project' => Project::where(fn ($q) => $q->whereHas('members', fn ($m) => $m->where('user_id', $user->id))
+                ->orWhere('created_by', $user->id)
+            )
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($p) => ['id' => $p->id, 'label' => $p->name]),
 
-            'task'    => Task::where('assignee_id', $user->id)
-                        ->whereNotIn('status', ['done'])
-                        ->orderBy('title')
-                        ->limit(50)
-                        ->get(['id', 'title'])
-                        ->map(fn ($t) => ['id' => $t->id, 'label' => $t->title]),
+            'task' => Task::where('assignee_id', $user->id)
+                ->whereNotIn('status', ['done'])
+                ->orderBy('title')
+                ->limit(50)
+                ->get(['id', 'title'])
+                ->map(fn ($t) => ['id' => $t->id, 'label' => $t->title]),
 
-            'ticket'  => Ticket::where('assignee_id', $user->id)
-                        ->whereIn('status', ['open', 'in_progress'])
-                        ->orderBy('ticket_number')
-                        ->limit(50)
-                        ->get(['id', 'ticket_number', 'title'])
-                        ->map(fn ($t) => [
-                            'id'    => $t->id,
-                            'label' => $t->ticket_number . ' — ' . Str::limit($t->title, 40),
-                        ]),
+            'ticket' => Ticket::where('assignee_id', $user->id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->orderBy('ticket_number')
+                ->limit(50)
+                ->get(['id', 'ticket_number', 'title'])
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'label' => $t->ticket_number.' — '.Str::limit($t->title, 40),
+                ]),
 
-            default   => collect(),
+            default => collect(),
         };
 
         return response()->json($options->values());
@@ -209,8 +208,8 @@ class TimeEntryController extends Controller
 
     public function allocationView(Request $request): View
     {
-        $user  = auth()->user();
-        $date  = $request->input('date', today()->toDateString());
+        $user = auth()->user();
+        $date = $request->input('date', today()->toDateString());
 
         $blocks = TimeEntryBlock::where('user_id', $user->id)
             ->where('block_date', $date)
@@ -229,10 +228,10 @@ class TimeEntryController extends Controller
 
         $request->validate(['allocation_pct' => 'required|numeric|min:0|max:100']);
 
-        $newPct    = (float) $request->allocation_pct;
+        $newPct = (float) $request->allocation_pct;
         $remainder = 100.0 - $newPct;
 
-        $siblings     = TimeEntryBlock::where('user_id', auth()->id())
+        $siblings = TimeEntryBlock::where('user_id', auth()->id())
             ->where('block_date', $block->block_date)
             ->where('block_number', $block->block_number)
             ->where('id', '!=', $block->id)
@@ -259,17 +258,17 @@ class TimeEntryController extends Controller
     {
         if ($entry->ticket_id && $entry->ticket) {
             return [
-                'type'  => 'Ticket',
-                'label' => $entry->ticket->ticket_number . ' — ' . Str::limit($entry->ticket->title, 40),
-                'url'   => route('tickets.show', $entry->ticket),
+                'type' => 'Ticket',
+                'label' => $entry->ticket->ticket_number.' — '.Str::limit($entry->ticket->title, 40),
+                'url' => route('tickets.show', $entry->ticket),
             ];
         }
 
         if ($entry->task_id && $entry->task) {
             return [
-                'type'  => 'Task',
+                'type' => 'Task',
                 'label' => Str::limit($entry->task->title, 50),
-                'url'   => $entry->task->project_id
+                'url' => $entry->task->project_id
                     ? route('projects.tasks.show', [$entry->task->project_id, $entry->task])
                     : null,
             ];
@@ -277,9 +276,9 @@ class TimeEntryController extends Controller
 
         if ($entry->project_id && $entry->project) {
             return [
-                'type'  => 'Project',
+                'type' => 'Project',
                 'label' => $entry->project->name,
-                'url'   => route('projects.board', $entry->project),
+                'url' => route('projects.board', $entry->project),
             ];
         }
 

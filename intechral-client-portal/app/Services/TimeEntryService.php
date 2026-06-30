@@ -24,15 +24,15 @@ class TimeEntryService
             : (int) $data['duration_minutes'];
 
         return TimeEntry::create([
-            'user_id'          => $user->id,
-            'project_id'       => $data['project_id'] ?? null,
-            'task_id'          => $data['task_id'] ?? null,
-            'ticket_id'        => $data['ticket_id'] ?? null,
-            'date'             => $data['date'],
+            'user_id' => $user->id,
+            'project_id' => $data['project_id'] ?? null,
+            'task_id' => $data['task_id'] ?? null,
+            'ticket_id' => $data['ticket_id'] ?? null,
+            'date' => $data['date'],
             'duration_minutes' => $minutes,
-            'description'      => $data['description'] ?? null,
-            'billable'         => $data['billable'] ?? true,
-            'billed'           => false,
+            'description' => $data['description'] ?? null,
+            'billable' => $data['billable'] ?? true,
+            'billed' => false,
             'timer_started_at' => null,
         ]);
     }
@@ -47,13 +47,13 @@ class TimeEntryService
             : ($data['duration_minutes'] ?? $entry->duration_minutes);
 
         $entry->update([
-            'project_id'       => $data['project_id'] ?? $entry->project_id,
-            'task_id'          => $data['task_id'] ?? $entry->task_id,
-            'ticket_id'        => $data['ticket_id'] ?? $entry->ticket_id,
-            'date'             => $data['date'] ?? $entry->date,
+            'project_id' => $data['project_id'] ?? $entry->project_id,
+            'task_id' => $data['task_id'] ?? $entry->task_id,
+            'ticket_id' => $data['ticket_id'] ?? $entry->ticket_id,
+            'date' => $data['date'] ?? $entry->date,
             'duration_minutes' => $minutes,
-            'description'      => $data['description'] ?? $entry->description,
-            'billable'         => $data['billable'] ?? $entry->billable,
+            'description' => $data['description'] ?? $entry->description,
+            'billable' => $data['billable'] ?? $entry->billable,
         ]);
 
         return $entry->fresh();
@@ -66,15 +66,15 @@ class TimeEntryService
     public function startTimer(User $user, array $data = []): TimeEntry
     {
         return TimeEntry::create([
-            'user_id'          => $user->id,
-            'project_id'       => $data['project_id'] ?? null,
-            'task_id'          => $data['task_id'] ?? null,
-            'ticket_id'        => $data['ticket_id'] ?? null,
-            'date'             => today()->toDateString(),
+            'user_id' => $user->id,
+            'project_id' => $data['project_id'] ?? null,
+            'task_id' => $data['task_id'] ?? null,
+            'ticket_id' => $data['ticket_id'] ?? null,
+            'date' => today()->toDateString(),
             'duration_minutes' => 0,
-            'description'      => $data['description'] ?? null,
-            'billable'         => $data['billable'] ?? true,
-            'billed'           => false,
+            'description' => $data['description'] ?? null,
+            'billable' => $data['billable'] ?? true,
+            'billed' => false,
             'timer_started_at' => now(),
         ]);
     }
@@ -92,11 +92,11 @@ class TimeEntryService
 
         $startedAt = $entry->timer_started_at->copy(); // capture before nulling
         $stoppedAt = now();
-        $elapsed   = (int) $startedAt->diffInMinutes($stoppedAt);
+        $elapsed = (int) $startedAt->diffInMinutes($stoppedAt);
 
         $entry->update([
             'duration_minutes' => $entry->duration_minutes + $elapsed,
-            'stopped_at'       => $stoppedAt,
+            'stopped_at' => $stoppedAt,
             'timer_started_at' => null,
         ]);
 
@@ -162,7 +162,7 @@ class TimeEntryService
     public function exportCsv(array $filters = []): string
     {
         $headers = ['Date', 'User', 'Project', 'Task', 'Ticket', 'Description', 'Hours', 'Billable', 'Billed'];
-        $csv = implode(',', $headers) . "\n";
+        $csv = implode(',', $headers)."\n";
 
         $query = TimeEntry::with(['user:id,name', 'project:id,name', 'task:id,title', 'ticket:id,ticket_number'])
             ->whereNull('timer_started_at')
@@ -174,15 +174,15 @@ class TimeEntryService
         foreach ($query->get() as $entry) {
             $csv .= implode(',', [
                 $entry->date->format('Y-m-d'),
-                '"' . ($entry->user->name ?? '') . '"',
-                '"' . ($entry->project->name ?? '') . '"',
-                '"' . ($entry->task->title ?? '') . '"',
-                '"' . ($entry->ticket->ticket_number ?? '') . '"',
-                '"' . str_replace('"', '""', $entry->description ?? '') . '"',
+                '"'.($entry->user->name ?? '').'"',
+                '"'.($entry->project->name ?? '').'"',
+                '"'.($entry->task->title ?? '').'"',
+                '"'.($entry->ticket->ticket_number ?? '').'"',
+                '"'.str_replace('"', '""', $entry->description ?? '').'"',
                 number_format($entry->durationDecimal(), 2),
                 $entry->billable ? 'Yes' : 'No',
-                $entry->billed   ? 'Yes' : 'No',
-            ]) . "\n";
+                $entry->billed ? 'Yes' : 'No',
+            ])."\n";
         }
 
         return $csv;
@@ -203,29 +203,30 @@ class TimeEntryService
 
         // Snap to 15-minute block boundaries.
         $blockStart = $startedAt->copy()->floorUnit('minute', 15);
-        $blockEnd   = $stoppedAt->copy()->floorUnit('minute', 15);
+        $blockEnd = $stoppedAt->copy()->floorUnit('minute', 15);
 
         $current = $blockStart->copy();
 
         while ($current->lte($blockEnd)) {
-            $slotEnd     = $current->copy()->addMinutes(15);
-            $blockDate   = $current->toDateString();
+            $slotEnd = $current->copy()->addMinutes(15);
+            $blockDate = $current->toDateString();
             $blockNumber = (int) ($current->copy()->startOfDay()->diffInMinutes($current) / 15);
 
             $mySeconds = $this->secondsInWindow($startedAt, $stoppedAt, $current, $slotEnd);
 
             if ($mySeconds <= 0) {
                 $current->addMinutes(15);
+
                 continue;
             }
 
             // Find other finalized entries for this user that ran during this slot.
-            $concurrent        = TimeEntry::where('user_id', $entry->user_id)
+            $concurrent = TimeEntry::where('user_id', $entry->user_id)
                 ->where('id', '!=', $entry->id)
                 ->runningDuring($current, $slotEnd)
                 ->get();
 
-            $totalSeconds      = $mySeconds;
+            $totalSeconds = $mySeconds;
             $concurrentSeconds = [];
 
             foreach ($concurrent as $other) {
@@ -234,7 +235,7 @@ class TimeEntryService
                 // (Their exact timer_started_at was nulled when they stopped; this is the best we have
                 //  for historical entries. New entries stopped via this service will store exact times.)
                 $otherStart = $other->stopped_at->copy()->subMinutes($other->duration_minutes);
-                $secs       = $this->secondsInWindow($otherStart, $other->stopped_at, $current, $slotEnd);
+                $secs = $this->secondsInWindow($otherStart, $other->stopped_at, $current, $slotEnd);
                 $concurrentSeconds[$other->id] = $secs;
                 $totalSeconds += $secs;
             }
@@ -259,7 +260,7 @@ class TimeEntryService
     private function secondsInWindow(Carbon $entryStart, Carbon $entryEnd, Carbon $windowStart, Carbon $windowEnd): int
     {
         $overlapStart = $entryStart->max($windowStart);
-        $overlapEnd   = $entryEnd->min($windowEnd);
+        $overlapEnd = $entryEnd->min($windowEnd);
 
         return max(0, (int) $overlapStart->diffInSeconds($overlapEnd, false));
     }
@@ -281,24 +282,36 @@ class TimeEntryService
         TimeEntryBlock::updateOrCreate(
             [
                 'time_entry_id' => $entryId,
-                'block_date'    => $blockDate,
-                'block_number'  => $blockNumber,
+                'block_date' => $blockDate,
+                'block_number' => $blockNumber,
             ],
             [
-                'user_id'        => $userId,
+                'user_id' => $userId,
                 'allocation_pct' => $pct,
-                'is_overridden'  => false,
+                'is_overridden' => false,
             ]
         );
     }
 
     private function applyFilters($query, array $filters): void
     {
-        if (! empty($filters['user_id']))    $query->where('user_id', $filters['user_id']);
-        if (! empty($filters['project_id'])) $query->where('project_id', $filters['project_id']);
-        if (! empty($filters['from']))       $query->where('date', '>=', $filters['from']);
-        if (! empty($filters['to']))         $query->where('date', '<=', $filters['to']);
-        if (isset($filters['billable']))     $query->where('billable', $filters['billable']);
-        if (isset($filters['billed']))       $query->where('billed', $filters['billed']);
+        if (! empty($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+        if (! empty($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+        if (! empty($filters['from'])) {
+            $query->where('date', '>=', $filters['from']);
+        }
+        if (! empty($filters['to'])) {
+            $query->where('date', '<=', $filters['to']);
+        }
+        if (isset($filters['billable'])) {
+            $query->where('billable', $filters['billable']);
+        }
+        if (isset($filters['billed'])) {
+            $query->where('billed', $filters['billed']);
+        }
     }
 }

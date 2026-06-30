@@ -26,7 +26,7 @@ class TicketCreatedNotification extends Notification implements ShouldQueue
             ->greeting("Hello {$notifiable->name},")
             ->line("Your support ticket **{$this->ticket->ticket_number}** has been received.")
             ->line("**Subject:** {$this->ticket->title}")
-            ->line("**Priority:** " . ucfirst($this->ticket->priority))
+            ->line('**Priority:** '.ucfirst($this->ticket->priority))
             ->action('View Ticket', url("/tickets/{$this->ticket->id}"))
             ->line("We'll get back to you as soon as possible.");
     }

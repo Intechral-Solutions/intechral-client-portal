@@ -20,9 +20,8 @@ class InvoiceController extends Controller
         $this->authorize('viewAny', Invoice::class);
 
         $invoices = Invoice::with(['client', 'project'])
-            ->when($request->search, fn ($q, $s) =>
-                $q->where('invoice_number', 'like', "%{$s}%")
-                  ->orWhereHas('client', fn ($u) => $u->where('name', 'like', "%{$s}%"))
+            ->when($request->search, fn ($q, $s) => $q->where('invoice_number', 'like', "%{$s}%")
+                ->orWhereHas('client', fn ($u) => $u->where('name', 'like', "%{$s}%"))
             )
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->latest()
@@ -36,7 +35,7 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
-        $clients  = User::orderBy('name')->get(['id', 'name', 'email']);
+        $clients = User::orderBy('name')->get(['id', 'name', 'email']);
         $projects = Project::whereIn('status', ['active', 'on_hold'])->orderBy('name')->get(['id', 'name']);
 
         return view('billing.invoices.create', compact('clients', 'projects'));
@@ -47,17 +46,17 @@ class InvoiceController extends Controller
         $this->authorize('create', Invoice::class);
 
         $data = $request->validate([
-            'client_id'    => 'required|exists:users,id',
-            'project_id'   => 'nullable|exists:projects,id',
-            'issued_at'    => 'required|date',
-            'due_at'       => 'required|date|after_or_equal:issued_at',
-            'tax_rate'     => 'nullable|numeric|min:0|max:100',
-            'currency'     => 'in:USD,CAD,EUR,GBP',
-            'notes'        => 'nullable|string|max:2000',
-            'items'        => 'required|array|min:1',
+            'client_id' => 'required|exists:users,id',
+            'project_id' => 'nullable|exists:projects,id',
+            'issued_at' => 'required|date',
+            'due_at' => 'required|date|after_or_equal:issued_at',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'currency' => 'in:USD,CAD,EUR,GBP',
+            'notes' => 'nullable|string|max:2000',
+            'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:255',
-            'items.*.quantity'    => 'required|numeric|min:0.01',
-            'items.*.unit_price'  => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
         ]);
 
         $invoice = $this->service->create(auth()->user(), $data);
@@ -79,7 +78,7 @@ class InvoiceController extends Controller
     {
         $this->authorize('update', $invoice);
 
-        $clients  = User::orderBy('name')->get(['id', 'name', 'email']);
+        $clients = User::orderBy('name')->get(['id', 'name', 'email']);
         $projects = Project::whereIn('status', ['active', 'on_hold'])->orderBy('name')->get(['id', 'name']);
         $invoice->load('items');
 
@@ -91,17 +90,17 @@ class InvoiceController extends Controller
         $this->authorize('update', $invoice);
 
         $data = $request->validate([
-            'client_id'    => 'required|exists:users,id',
-            'project_id'   => 'nullable|exists:projects,id',
-            'issued_at'    => 'required|date',
-            'due_at'       => 'required|date|after_or_equal:issued_at',
-            'tax_rate'     => 'nullable|numeric|min:0|max:100',
-            'currency'     => 'in:USD,CAD,EUR,GBP',
-            'notes'        => 'nullable|string|max:2000',
-            'items'        => 'required|array|min:1',
+            'client_id' => 'required|exists:users,id',
+            'project_id' => 'nullable|exists:projects,id',
+            'issued_at' => 'required|date',
+            'due_at' => 'required|date|after_or_equal:issued_at',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'currency' => 'in:USD,CAD,EUR,GBP',
+            'notes' => 'nullable|string|max:2000',
+            'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:255',
-            'items.*.quantity'    => 'required|numeric|min:0.01',
-            'items.*.unit_price'  => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
         ]);
 
         $this->service->update($invoice, $data);
@@ -126,7 +125,7 @@ class InvoiceController extends Controller
 
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01',
-            'notes'  => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $this->service->recordManualPayment($invoice, (float) $data['amount'], $data['notes'] ?? '');

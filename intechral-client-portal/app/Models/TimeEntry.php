@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,11 +28,11 @@ class TimeEntry extends Model
     ];
 
     protected $casts = [
-        'date'             => 'date',
-        'billable'         => 'boolean',
-        'billed'           => 'boolean',
+        'date' => 'date',
+        'billable' => 'boolean',
+        'billed' => 'boolean',
         'timer_started_at' => 'datetime',
-        'stopped_at'       => 'datetime',
+        'stopped_at' => 'datetime',
     ];
 
     // ── Relationships ────────────────────────────────────────
@@ -89,8 +90,13 @@ class TimeEntry extends Model
         $h = intdiv($minutes, 60);
         $m = $minutes % 60;
 
-        if ($h === 0) return "{$m}m";
-        if ($m === 0) return "{$h}h";
+        if ($h === 0) {
+            return "{$m}m";
+        }
+        if ($m === 0) {
+            return "{$h}h";
+        }
+
         return "{$h}h {$m}m";
     }
 
@@ -130,7 +136,7 @@ class TimeEntry extends Model
      * Entries that were running at any point during the given window.
      * Only matches finalized (stopped) entries; running timers are handled separately.
      */
-    public function scopeRunningDuring($query, \Carbon\Carbon $from, \Carbon\Carbon $to)
+    public function scopeRunningDuring($query, Carbon $from, Carbon $to)
     {
         return $query
             ->whereNotNull('stopped_at')

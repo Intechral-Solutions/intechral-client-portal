@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
@@ -46,8 +45,8 @@ class ResetUserPassword implements ResetsUserPasswords
     private function storeHistory(User $user): void
     {
         PasswordHistory::create([
-            'user_id'    => $user->id,
-            'password'   => $user->password,
+            'user_id' => $user->id,
+            'password' => $user->password,
             'created_at' => now(),
         ]);
 

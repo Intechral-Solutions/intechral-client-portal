@@ -13,8 +13,8 @@ class TaskController extends Controller
     public function index(Request $request): View
     {
         /** @var User $user */
-        $user       = auth()->user();
-        $view       = $request->get('view', 'mine');
+        $user = auth()->user();
+        $view = $request->get('view', 'mine');
         $companyIds = $user->can('tasks.view_org') ? $user->orgCompanyIds() : [];
 
         $query = Task::with(['assignee', 'project', 'ticket', 'column'])
@@ -24,16 +24,13 @@ class TaskController extends Controller
 
                 // "org" tab / view_org — also show tasks in the org's projects/tickets
                 if ($view === 'org' && ! empty($companyIds)) {
-                    $q->orWhereHas('project', fn ($p) =>
-                        $p->whereHas('companies', fn ($c) =>
-                            $c->whereIn('crm_companies.id', $companyIds)
-                        )
-                    )->orWhereHas('ticket', fn ($t) =>
-                        $t->whereIn('company_id', $companyIds)
+                    $q->orWhereHas('project', fn ($p) => $p->whereHas('companies', fn ($c) => $c->whereIn('crm_companies.id', $companyIds)
+                    )
+                    )->orWhereHas('ticket', fn ($t) => $t->whereIn('company_id', $companyIds)
                     );
                 }
             })
-            ->orderByRaw("CASE WHEN due_date IS NULL THEN 1 ELSE 0 END")
+            ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
             ->orderBy('due_date')
             ->orderByDesc('created_at');
 
@@ -45,12 +42,12 @@ class TaskController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'title'       => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'assignee_id' => 'nullable|exists:users,id',
-            'priority'    => 'required|in:low,medium,high,critical',
-            'due_date'    => 'nullable|date',
-            'status'      => 'required|in:todo,in_progress,done',
+            'priority' => 'required|in:low,medium,high,critical',
+            'due_date' => 'nullable|date',
+            'status' => 'required|in:todo,in_progress,done',
         ]);
 
         Task::create([

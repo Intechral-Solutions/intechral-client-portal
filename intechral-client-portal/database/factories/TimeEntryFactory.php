@@ -13,15 +13,15 @@ class TimeEntryFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id'          => User::factory(),
-            'project_id'       => null,
-            'task_id'          => null,
-            'invoice_id'       => null,
-            'date'             => $this->faker->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),
+            'user_id' => User::factory(),
+            'project_id' => null,
+            'task_id' => null,
+            'invoice_id' => null,
+            'date' => $this->faker->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),
             'duration_minutes' => $this->faker->numberBetween(15, 480),
-            'description'      => $this->faker->sentence(6),
-            'billable'         => true,
-            'billed'           => false,
+            'description' => $this->faker->sentence(6),
+            'billable' => true,
+            'billed' => false,
             'timer_started_at' => null,
         ];
     }

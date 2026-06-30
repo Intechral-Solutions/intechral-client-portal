@@ -39,7 +39,7 @@ it('shows all tickets on the operator queue', function () {
 it('filters the queue by status', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     Ticket::factory()->for($user, 'user')->create(['title' => 'Open One', 'status' => 'open']);
     Ticket::factory()->for($user, 'user')->create(['title' => 'Closed One', 'status' => 'closed']);
@@ -54,7 +54,7 @@ it('filters the queue by status', function () {
 it('filters the queue by priority', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     Ticket::factory()->for($user, 'user')->create(['title' => 'Critical One', 'priority' => 'critical']);
     Ticket::factory()->for($user, 'user')->create(['title' => 'Low One', 'priority' => 'low']);
@@ -69,7 +69,7 @@ it('filters the queue by priority', function () {
 it('filters the queue by assignee', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
     $assignee = User::factory()->create();
     $assignee->assignRole('operator');
 
@@ -86,8 +86,8 @@ it('filters the queue by assignee', function () {
 it('shows operator ticket detail page', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
-    $ticket   = Ticket::factory()->open()->for($user, 'user')->create(['title' => 'Detailed Ticket']);
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->open()->for($user, 'user')->create(['title' => 'Detailed Ticket']);
 
     $this->actingAs($operator)
         ->get(route('operator.tickets.show', $ticket))
@@ -101,7 +101,7 @@ it('allows operator to assign a ticket', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
     $assignee = User::factory()->create();
-    $ticket   = Ticket::factory()->open()->for(User::factory()->create(), 'user')->create();
+    $ticket = Ticket::factory()->open()->for(User::factory()->create(), 'user')->create();
 
     $this->actingAs($operator)
         ->put(route('operator.tickets.assign', $ticket), ['assignee_id' => $assignee->id])
@@ -115,7 +115,7 @@ it('allows operator to unassign a ticket', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
     $assignee = User::factory()->create();
-    $ticket   = Ticket::factory()->for(User::factory()->create(), 'user')->assignedTo($assignee)->create();
+    $ticket = Ticket::factory()->for(User::factory()->create(), 'user')->assignedTo($assignee)->create();
 
     $this->actingAs($operator)
         ->put(route('operator.tickets.assign', $ticket), ['assignee_id' => ''])
@@ -130,15 +130,15 @@ it('bulk-assigns tickets to an operator', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
     $assignee = User::factory()->create();
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     $t1 = Ticket::factory()->open()->for($user, 'user')->create();
     $t2 = Ticket::factory()->open()->for($user, 'user')->create();
 
     $this->actingAs($operator)
         ->post(route('operator.tickets.bulk'), [
-            'ticket_ids'  => [$t1->id, $t2->id],
-            'action'      => 'assign',
+            'ticket_ids' => [$t1->id, $t2->id],
+            'action' => 'assign',
             'assignee_id' => $assignee->id,
         ])
         ->assertRedirect()
@@ -151,7 +151,7 @@ it('bulk-assigns tickets to an operator', function () {
 it('bulk-closes tickets', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     $t1 = Ticket::factory()->resolved()->for($user, 'user')->create();
     $t2 = Ticket::factory()->resolved()->for($user, 'user')->create();
@@ -159,7 +159,7 @@ it('bulk-closes tickets', function () {
     $this->actingAs($operator)
         ->post(route('operator.tickets.bulk'), [
             'ticket_ids' => [$t1->id, $t2->id],
-            'action'     => 'close',
+            'action' => 'close',
         ])
         ->assertRedirect();
 
@@ -181,7 +181,7 @@ it('validates ticket_ids are required for bulk action', function () {
 it('searches tickets by title in operator queue', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     Ticket::factory()->for($user, 'user')->create(['title' => 'Unique Search Term Alpha']);
     Ticket::factory()->for($user, 'user')->create(['title' => 'Another Ticket Beta']);
@@ -196,7 +196,7 @@ it('searches tickets by title in operator queue', function () {
 it('searches tickets by ticket number', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $user     = User::factory()->create();
+    $user = User::factory()->create();
 
     Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-1234', 'title' => 'Number Ticket']);
     Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-9999', 'title' => 'Other Ticket']);

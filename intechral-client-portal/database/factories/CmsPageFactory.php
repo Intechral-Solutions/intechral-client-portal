@@ -16,20 +16,20 @@ class CmsPageFactory extends Factory
         $title = $this->faker->sentence(3);
 
         return [
-            'slug'         => Str::slug($title) . '-' . $this->faker->unique()->numberBetween(1, 99999),
-            'title'        => $title,
-            'body'         => $this->faker->paragraphs(3, true),
-            'status'       => 'draft',
+            'slug' => Str::slug($title).'-'.$this->faker->unique()->numberBetween(1, 99999),
+            'title' => $title,
+            'body' => $this->faker->paragraphs(3, true),
+            'status' => 'draft',
             'published_at' => null,
-            'created_by'   => User::factory(),
-            'updated_by'   => null,
+            'created_by' => User::factory(),
+            'updated_by' => null,
         ];
     }
 
     public function published(): static
     {
         return $this->state(fn () => [
-            'status'       => 'published',
+            'status' => 'published',
             'published_at' => now(),
         ]);
     }

@@ -36,11 +36,12 @@ class TicketAttachment extends Model
     {
         $bytes = $this->size;
         if ($bytes >= 1_048_576) {
-            return round($bytes / 1_048_576, 1) . ' MB';
+            return round($bytes / 1_048_576, 1).' MB';
         }
         if ($bytes >= 1024) {
-            return round($bytes / 1024, 1) . ' KB';
+            return round($bytes / 1024, 1).' KB';
         }
-        return $bytes . ' B';
+
+        return $bytes.' B';
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -164,7 +165,7 @@ it('logs activity when user roles are updated', function () {
         ->put(route('users.roles.update', $target), ['roles' => ['user']]);
 
     expect(
-        \Spatie\Activitylog\Models\Activity::forSubject($target)
+        Activity::forSubject($target)
             ->where('description', 'updated user roles')
             ->exists()
     )->toBeTrue();
@@ -181,7 +182,7 @@ it('does not log activity when roles are unchanged', function () {
         ->put(route('users.roles.update', $target), ['roles' => ['user']]);
 
     expect(
-        \Spatie\Activitylog\Models\Activity::forSubject($target)
+        Activity::forSubject($target)
             ->where('description', 'updated user roles')
             ->exists()
     )->toBeFalse();

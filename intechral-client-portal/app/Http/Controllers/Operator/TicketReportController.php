@@ -5,14 +5,13 @@ namespace App\Http\Controllers\Operator;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class TicketReportController extends Controller
 {
     public function index(Request $request)
     {
         $from = $request->date('date_from', 'Y-m-d') ?? now()->subDays(30)->startOfDay();
-        $to   = $request->date('date_to', 'Y-m-d') ?? now()->endOfDay();
+        $to = $request->date('date_to', 'Y-m-d') ?? now()->endOfDay();
 
         // Volume by day
         $volumeByDay = Ticket::whereBetween('created_at', [$from, $to])
@@ -58,17 +57,17 @@ class TicketReportController extends Controller
     public function export(Request $request)
     {
         $from = $request->date('date_from', 'Y-m-d') ?? now()->subDays(30)->startOfDay();
-        $to   = $request->date('date_to', 'Y-m-d') ?? now()->endOfDay();
+        $to = $request->date('date_to', 'Y-m-d') ?? now()->endOfDay();
 
         $tickets = Ticket::with('user', 'assignee')
             ->whereBetween('created_at', [$from, $to])
             ->orderByDesc('created_at')
             ->get();
 
-        $filename = 'tickets-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'tickets-'.now()->format('Y-m-d').'.csv';
 
         $headers = [
-            'Content-Type'        => 'text/csv',
+            'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 

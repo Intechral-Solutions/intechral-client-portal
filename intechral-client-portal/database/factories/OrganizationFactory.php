@@ -16,8 +16,8 @@ class OrganizationFactory extends Factory
         $name = $this->faker->company();
 
         return [
-            'name'     => $name,
-            'slug'     => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1, 99999),
+            'name' => $name,
+            'slug' => Str::slug($name).'-'.$this->faker->unique()->numberBetween(1, 99999),
             'owner_id' => User::factory(),
         ];
     }

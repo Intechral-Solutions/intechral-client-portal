@@ -23,18 +23,18 @@ class InvoiceService
         return DB::transaction(function () use ($creator, $data) {
             $invoice = Invoice::create([
                 'invoice_number' => $this->nextInvoiceNumber(),
-                'client_id'      => $data['client_id'],
-                'created_by'     => $creator->id,
-                'project_id'     => $data['project_id'] ?? null,
-                'issued_at'      => $data['issued_at'],
-                'due_at'         => $data['due_at'],
-                'tax_rate'       => $data['tax_rate'] ?? 0,
-                'currency'       => $data['currency'] ?? 'USD',
-                'notes'          => $data['notes'] ?? null,
-                'status'         => 'draft',
-                'subtotal'       => 0,
-                'tax_amount'     => 0,
-                'total'          => 0,
+                'client_id' => $data['client_id'],
+                'created_by' => $creator->id,
+                'project_id' => $data['project_id'] ?? null,
+                'issued_at' => $data['issued_at'],
+                'due_at' => $data['due_at'],
+                'tax_rate' => $data['tax_rate'] ?? 0,
+                'currency' => $data['currency'] ?? 'USD',
+                'notes' => $data['notes'] ?? null,
+                'status' => 'draft',
+                'subtotal' => 0,
+                'tax_amount' => 0,
+                'total' => 0,
             ]);
 
             foreach ($data['items'] ?? [] as $i => $item) {
@@ -54,13 +54,13 @@ class InvoiceService
     {
         return DB::transaction(function () use ($invoice, $data) {
             $invoice->update([
-                'client_id'  => $data['client_id'] ?? $invoice->client_id,
+                'client_id' => $data['client_id'] ?? $invoice->client_id,
                 'project_id' => $data['project_id'] ?? $invoice->project_id,
-                'issued_at'  => $data['issued_at'] ?? $invoice->issued_at,
-                'due_at'     => $data['due_at'] ?? $invoice->due_at,
-                'tax_rate'   => $data['tax_rate'] ?? $invoice->tax_rate,
-                'currency'   => $data['currency'] ?? $invoice->currency,
-                'notes'      => $data['notes'] ?? $invoice->notes,
+                'issued_at' => $data['issued_at'] ?? $invoice->issued_at,
+                'due_at' => $data['due_at'] ?? $invoice->due_at,
+                'tax_rate' => $data['tax_rate'] ?? $invoice->tax_rate,
+                'currency' => $data['currency'] ?? $invoice->currency,
+                'notes' => $data['notes'] ?? $invoice->notes,
             ]);
 
             if (isset($data['items'])) {
@@ -84,7 +84,7 @@ class InvoiceService
         abort_unless($invoice->status === 'draft', 422, 'Only draft invoices can be sent.');
 
         $invoice->update([
-            'status'  => 'sent',
+            'status' => 'sent',
             'sent_at' => now(),
         ]);
     }
@@ -99,6 +99,7 @@ class InvoiceService
         if ($invoice->stripe_payment_intent_id) {
             // Retrieve existing intent in case user re-visits payment page
             $intent = $this->stripe->retrievePaymentIntent($invoice->stripe_payment_intent_id);
+
             return $intent->client_secret;
         }
 
@@ -106,7 +107,7 @@ class InvoiceService
             amount: (int) round((float) $invoice->total * 100), // convert to cents
             currency: strtolower($invoice->currency),
             metadata: [
-                'invoice_id'     => $invoice->id,
+                'invoice_id' => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
             ],
         );
@@ -122,20 +123,22 @@ class InvoiceService
     public function handlePaymentSucceeded(string $paymentIntentId, array $chargeData): void
     {
         $invoice = Invoice::where('stripe_payment_intent_id', $paymentIntentId)->first();
-        if (! $invoice || $invoice->isPaid()) return;
+        if (! $invoice || $invoice->isPaid()) {
+            return;
+        }
 
         InvoicePayment::create([
-            'invoice_id'               => $invoice->id,
-            'amount'                   => $chargeData['amount'] / 100,
-            'currency'                 => strtoupper($chargeData['currency']),
+            'invoice_id' => $invoice->id,
+            'amount' => $chargeData['amount'] / 100,
+            'currency' => strtoupper($chargeData['currency']),
             'stripe_payment_intent_id' => $paymentIntentId,
-            'stripe_charge_id'         => $chargeData['charge_id'] ?? null,
-            'method'                   => 'stripe',
-            'paid_at'                  => now(),
+            'stripe_charge_id' => $chargeData['charge_id'] ?? null,
+            'method' => 'stripe',
+            'paid_at' => now(),
         ]);
 
         $invoice->update([
-            'status'  => 'paid',
+            'status' => 'paid',
             'paid_at' => now(),
         ]);
     }
@@ -147,11 +150,11 @@ class InvoiceService
     {
         $payment = InvoicePayment::create([
             'invoice_id' => $invoice->id,
-            'amount'     => $amount,
-            'currency'   => $invoice->currency,
-            'method'     => 'manual',
-            'notes'      => $notes,
-            'paid_at'    => now(),
+            'amount' => $amount,
+            'currency' => $invoice->currency,
+            'method' => 'manual',
+            'notes' => $notes,
+            'paid_at' => now(),
         ]);
 
         if ((float) $invoice->total <= $invoice->amountPaidSoFar()) {
@@ -179,28 +182,29 @@ class InvoiceService
 
         return $invoice->items()->create([
             'description' => $item['description'],
-            'quantity'    => $item['quantity'],
-            'unit_price'  => $item['unit_price'],
-            'amount'      => $amount,
-            'position'    => $position,
+            'quantity' => $item['quantity'],
+            'unit_price' => $item['unit_price'],
+            'amount' => $amount,
+            'position' => $position,
         ]);
     }
 
     private function recalculate(Invoice $invoice): void
     {
-        $subtotal   = (float) $invoice->items()->sum('amount');
-        $taxAmount  = round($subtotal * ((float) $invoice->tax_rate / 100), 2);
+        $subtotal = (float) $invoice->items()->sum('amount');
+        $taxAmount = round($subtotal * ((float) $invoice->tax_rate / 100), 2);
 
         $invoice->update([
-            'subtotal'   => $subtotal,
+            'subtotal' => $subtotal,
             'tax_amount' => $taxAmount,
-            'total'      => round($subtotal + $taxAmount, 2),
+            'total' => round($subtotal + $taxAmount, 2),
         ]);
     }
 
     private function nextInvoiceNumber(): string
     {
         $last = Invoice::max('id') ?? 0;
-        return 'INV-' . str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+
+        return 'INV-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
     }
 }

@@ -18,9 +18,9 @@ class TimeEntryBlock extends Model
     ];
 
     protected $casts = [
-        'block_date'     => 'date',
+        'block_date' => 'date',
         'allocation_pct' => 'decimal:2',
-        'is_overridden'  => 'boolean',
+        'is_overridden' => 'boolean',
     ];
 
     // ── Relationships ────────────────────────────────────────

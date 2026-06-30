@@ -18,8 +18,8 @@ class DevSeeder extends Seeder
         $operator = User::firstOrCreate(
             ['email' => 'operator@intechral.test'],
             [
-                'name'              => 'Dev Operator',
-                'password'          => Hash::make('password'),
+                'name' => 'Dev Operator',
+                'password' => Hash::make('password'),
                 'email_verified_at' => now(),
             ]
         );
@@ -29,8 +29,8 @@ class DevSeeder extends Seeder
         $user = User::firstOrCreate(
             ['email' => 'user@intechral.test'],
             [
-                'name'              => 'Dev User',
-                'password'          => Hash::make('password'),
+                'name' => 'Dev User',
+                'password' => Hash::make('password'),
                 'email_verified_at' => now(),
             ]
         );

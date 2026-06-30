@@ -22,14 +22,14 @@ class DashboardController extends Controller
         $openTicketCount = $user->can('tickets.assign')
             ? Ticket::whereNotIn('status', ['closed', 'resolved'])->count()
             : Ticket::where('user_id', $user->id)
-                    ->whereNotIn('status', ['closed', 'resolved'])->count();
+                ->whereNotIn('status', ['closed', 'resolved'])->count();
 
         // ── Project stats ─────────────────────────────────────
         $activeProjectCount = $user->can('projects.manage')
             ? Project::where('status', 'active')->count()
             : Project::where('status', 'active')
-                     ->whereHas('members', fn ($q) => $q->where('user_id', $user->id))
-                     ->count();
+                ->whereHas('members', fn ($q) => $q->where('user_id', $user->id))
+                ->count();
 
         // ── Time stats (current user) ─────────────────────────
         $timeThisMonth = TimeEntry::where('user_id', $user->id)
@@ -48,27 +48,27 @@ class DashboardController extends Controller
         $outstandingInvoiceCount = $user->can('billing.manage')
             ? Invoice::whereIn('status', ['sent', 'overdue'])->count()
             : Invoice::where('client_id', $user->id)
-                     ->whereIn('status', ['sent', 'overdue'])->count();
+                ->whereIn('status', ['sent', 'overdue'])->count();
 
         // ── Recent tickets ────────────────────────────────────
         $recentTickets = $user->can('tickets.assign')
             ? Ticket::with('user:id,name')
-                    ->whereNotIn('status', ['closed', 'resolved'])
-                    ->latest()
-                    ->limit(6)
-                    ->get()
+                ->whereNotIn('status', ['closed', 'resolved'])
+                ->latest()
+                ->limit(6)
+                ->get()
             : Ticket::where('user_id', $user->id)
-                    ->latest()
-                    ->limit(6)
-                    ->get();
+                ->latest()
+                ->limit(6)
+                ->get();
 
         // ── Operator-only CRM stats ───────────────────────────
         $crmStats = null;
         if ($user->can('crm.manage')) {
             $crmStats = [
                 'companies' => CrmCompany::count(),
-                'contacts'  => CrmContact::count(),
-                'orgs'      => Organization::count(),
+                'contacts' => CrmContact::count(),
+                'orgs' => Organization::count(),
             ];
         }
 

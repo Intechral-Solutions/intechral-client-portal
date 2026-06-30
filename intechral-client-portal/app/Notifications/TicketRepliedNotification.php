@@ -8,13 +8,14 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 
 class TicketRepliedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(
-        public readonly Ticket      $ticket,
+        public readonly Ticket $ticket,
         public readonly TicketReply $reply,
     ) {}
 
@@ -25,7 +26,7 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $preview = \Illuminate\Support\Str::limit($this->reply->body, 200);
+        $preview = Str::limit($this->reply->body, 200);
 
         return (new MailMessage)
             ->subject("[{$this->ticket->ticket_number}] New reply: {$this->ticket->title}")

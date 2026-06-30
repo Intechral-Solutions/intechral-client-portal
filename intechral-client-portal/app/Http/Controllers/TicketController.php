@@ -18,15 +18,15 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         /** @var User $user */
-        $user       = auth()->user();
+        $user = auth()->user();
         $companyIds = $user->can('tickets.view_org') ? $user->orgCompanyIds() : [];
 
         $tickets = Ticket::where(function ($q) use ($user, $companyIds) {
-                $q->forUser($user);
-                if (! empty($companyIds)) {
-                    $q->orWhereIn('company_id', $companyIds);
-                }
-            })
+            $q->forUser($user);
+            if (! empty($companyIds)) {
+                $q->orWhereIn('company_id', $companyIds);
+            }
+        })
             ->when($request->filled('search'), fn ($q) => $q->search($request->search))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->orderByDesc('created_at')
@@ -39,16 +39,16 @@ class TicketController extends Controller
     public function create()
     {
         /** @var User $user */
-        $user        = auth()->user();
-        $companyIds  = $user->orgCompanyIds();
-        $companies   = count($companyIds) > 1
+        $user = auth()->user();
+        $companyIds = $user->orgCompanyIds();
+        $companies = count($companyIds) > 1
             ? CrmCompany::whereIn('id', $companyIds)->orderBy('name')->get(['id', 'name'])
             : collect();
         $autoCompanyId = count($companyIds) === 1 ? $companyIds[0] : null;
 
         return view('tickets.create', [
-            'categories'    => self::CATEGORIES,
-            'companies'     => $companies,
+            'categories' => self::CATEGORIES,
+            'companies' => $companies,
             'autoCompanyId' => $autoCompanyId,
         ]);
     }
@@ -56,12 +56,12 @@ class TicketController extends Controller
     public function store(Request $request, TicketService $service)
     {
         $validated = $request->validate([
-            'title'         => ['required', 'string', 'max:255'],
-            'description'   => ['required', 'string'],
-            'category'      => ['required', 'string', 'in:' . implode(',', self::CATEGORIES)],
-            'priority'      => ['required', 'in:low,medium,high,critical'],
-            'company_id'    => ['nullable', new AccessibleCrmCompany],
-            'attachments'   => ['nullable', 'array', 'max:10'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'category' => ['required', 'string', 'in:'.implode(',', self::CATEGORIES)],
+            'priority' => ['required', 'in:low,medium,high,critical'],
+            'company_id' => ['nullable', new AccessibleCrmCompany],
+            'attachments' => ['nullable', 'array', 'max:10'],
             'attachments.*' => ['file', 'max:20480'], // 20 MB each
         ]);
 

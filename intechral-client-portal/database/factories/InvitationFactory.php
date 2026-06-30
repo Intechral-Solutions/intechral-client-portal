@@ -14,10 +14,10 @@ class InvitationFactory extends Factory
     public function definition(): array
     {
         return [
-            'email'      => fake()->unique()->safeEmail(),
-            'token'      => Str::random(64),
+            'email' => fake()->unique()->safeEmail(),
+            'token' => Str::random(64),
             'invited_by' => null,
-            'status'     => 'pending',
+            'status' => 'pending',
             'expires_at' => now()->addHours(48),
         ];
     }

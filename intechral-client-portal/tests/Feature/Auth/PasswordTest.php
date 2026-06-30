@@ -19,9 +19,9 @@ test('password can be reset with valid token', function () {
     $token = Password::broker()->createToken($user);
 
     $this->post('/reset-password', [
-        'token'                 => $token,
-        'email'                 => $user->email,
-        'password'              => 'NewStr0ng!Pass99',
+        'token' => $token,
+        'email' => $user->email,
+        'password' => 'NewStr0ng!Pass99',
         'password_confirmation' => 'NewStr0ng!Pass99',
     ])->assertRedirect('/login');
 
@@ -32,14 +32,14 @@ test('cannot reuse last 5 passwords on update', function () {
     $user = User::factory()->create(['password' => Hash::make('Str0ng!Password1')]);
 
     PasswordHistory::create([
-        'user_id'    => $user->id,
-        'password'   => $user->password,
+        'user_id' => $user->id,
+        'password' => $user->password,
         'created_at' => now(),
     ]);
 
     $this->actingAs($user)->put('/user/password', [
-        'current_password'      => 'Str0ng!Password1',
-        'password'              => 'Str0ng!Password1',
+        'current_password' => 'Str0ng!Password1',
+        'password' => 'Str0ng!Password1',
         'password_confirmation' => 'Str0ng!Password1',
     ])->assertSessionHasErrorsIn('updatePassword', 'password');
 });
@@ -48,8 +48,8 @@ test('password change requires current password', function () {
     $user = User::factory()->create(['password' => Hash::make('Str0ng!Password1')]);
 
     $this->actingAs($user)->put('/user/password', [
-        'current_password'      => 'wrongcurrent',
-        'password'              => 'NewStr0ng!Pass99',
+        'current_password' => 'wrongcurrent',
+        'password' => 'NewStr0ng!Pass99',
         'password_confirmation' => 'NewStr0ng!Pass99',
     ])->assertSessionHasErrorsIn('updatePassword', 'current_password');
 });

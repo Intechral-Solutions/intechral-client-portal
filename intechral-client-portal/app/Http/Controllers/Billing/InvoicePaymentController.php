@@ -23,9 +23,9 @@ class InvoicePaymentController extends Controller
         $clientSecret = $this->service->createPaymentIntent($invoice);
 
         return view('billing.payment.show', [
-            'invoice'      => $invoice,
+            'invoice' => $invoice,
             'clientSecret' => $clientSecret,
-            'stripeKey'    => config('services.stripe.key'),
+            'stripeKey' => config('services.stripe.key'),
         ]);
     }
 

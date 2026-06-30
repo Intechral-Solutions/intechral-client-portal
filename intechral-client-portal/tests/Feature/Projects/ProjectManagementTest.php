@@ -1,8 +1,6 @@
 <?php
 
 use App\Models\Project;
-use App\Models\ProjectColumn;
-use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectService;
 
@@ -50,7 +48,7 @@ it('creates a project with default columns', function () {
     $operator->assignRole('operator');
 
     $this->actingAs($operator)->post(route('projects.store'), [
-        'name'   => 'Test Project Alpha',
+        'name' => 'Test Project Alpha',
         'status' => 'active',
     ])->assertRedirect();
 
@@ -84,8 +82,8 @@ it('validates target_date must be after start_date', function () {
     $operator->assignRole('operator');
 
     $this->actingAs($operator)->post(route('projects.store'), [
-        'name'        => 'Date Test',
-        'start_date'  => '2026-06-01',
+        'name' => 'Date Test',
+        'start_date' => '2026-06-01',
         'target_date' => '2026-05-01',
     ])->assertSessionHasErrors('target_date');
 });
@@ -134,7 +132,7 @@ it('allows the project manager to edit the project', function () {
     $project = app(ProjectService::class)->create($operator, ['name' => 'Original Name']);
 
     $this->actingAs($operator)->put(route('projects.update', $project), [
-        'name'   => 'Updated Name',
+        'name' => 'Updated Name',
         'status' => 'on_hold',
     ])->assertRedirect();
 
@@ -152,7 +150,7 @@ it('forbids regular members from editing project details', function () {
     $project->members()->attach($member->id, ['role' => 'member']);
 
     $this->actingAs($member)->put(route('projects.update', $project), [
-        'name'   => 'Hacked Name',
+        'name' => 'Hacked Name',
         'status' => 'active',
     ])->assertForbidden();
 });
@@ -225,7 +223,7 @@ it('shows only the projects the user is a member of (non-admin)', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $visible   = app(ProjectService::class)->create($operator, ['name' => 'Visible']);
+    $visible = app(ProjectService::class)->create($operator, ['name' => 'Visible']);
     $invisible = app(ProjectService::class)->create($operator, ['name' => 'Invisible']);
 
     $member = User::factory()->create();

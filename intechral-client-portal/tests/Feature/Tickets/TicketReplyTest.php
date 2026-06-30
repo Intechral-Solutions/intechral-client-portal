@@ -14,7 +14,7 @@ beforeEach(function () {
 });
 
 it('allows a user to reply to their own ticket', function () {
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $ticket = Ticket::factory()->open()->for($user, 'user')->create();
 
@@ -29,11 +29,11 @@ it('allows a user to reply to their own ticket', function () {
 });
 
 it('notifies the ticket owner when an operator posts a public reply', function () {
-    $owner    = User::factory()->create();
+    $owner = User::factory()->create();
     $owner->assignRole('user');
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $ticket   = Ticket::factory()->open()->for($owner, 'user')->create();
+    $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
 
     $this->actingAs($operator)
         ->post(route('tickets.replies.store', $ticket), ['body' => 'We are looking into this.'])
@@ -43,15 +43,15 @@ it('notifies the ticket owner when an operator posts a public reply', function (
 });
 
 it('does not notify the owner for internal notes', function () {
-    $owner    = User::factory()->create();
+    $owner = User::factory()->create();
     $owner->assignRole('user');
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $ticket   = Ticket::factory()->open()->for($owner, 'user')->create();
+    $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
 
     $this->actingAs($operator)
         ->post(route('tickets.replies.store', $ticket), [
-            'body'        => 'Internal note only.',
+            'body' => 'Internal note only.',
             'is_internal' => '1',
         ])
         ->assertRedirect();
@@ -60,15 +60,15 @@ it('does not notify the owner for internal notes', function () {
 });
 
 it('does not show internal notes to the ticket owner on the show page', function () {
-    $owner    = User::factory()->create();
+    $owner = User::factory()->create();
     $owner->assignRole('user');
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $ticket   = Ticket::factory()->open()->for($owner, 'user')->create();
+    $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
 
     $ticket->replies()->create([
-        'user_id'     => $operator->id,
-        'body'        => 'SECRET_INTERNAL_NOTE',
+        'user_id' => $operator->id,
+        'body' => 'SECRET_INTERNAL_NOTE',
         'is_internal' => true,
     ]);
 
@@ -79,15 +79,15 @@ it('does not show internal notes to the ticket owner on the show page', function
 });
 
 it('shows internal notes to operators on the show page', function () {
-    $owner    = User::factory()->create();
+    $owner = User::factory()->create();
     $owner->assignRole('user');
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $ticket   = Ticket::factory()->open()->for($owner, 'user')->create();
+    $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
 
     $ticket->replies()->create([
-        'user_id'     => $operator->id,
-        'body'        => 'SECRET_INTERNAL_NOTE',
+        'user_id' => $operator->id,
+        'body' => 'SECRET_INTERNAL_NOTE',
         'is_internal' => true,
     ]);
 
@@ -98,14 +98,14 @@ it('shows internal notes to operators on the show page', function () {
 });
 
 it('accepts attachments on replies', function () {
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $ticket = Ticket::factory()->open()->for($user, 'user')->create();
-    $file   = UploadedFile::fake()->create('reply-doc.pdf', 256, 'application/pdf');
+    $file = UploadedFile::fake()->create('reply-doc.pdf', 256, 'application/pdf');
 
     $this->actingAs($user)
         ->post(route('tickets.replies.store', $ticket), [
-            'body'        => 'See attached.',
+            'body' => 'See attached.',
             'attachments' => [$file],
         ]);
 
@@ -115,7 +115,7 @@ it('accepts attachments on replies', function () {
 });
 
 it('validates reply body is required', function () {
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $ticket = Ticket::factory()->open()->for($user, 'user')->create();
 

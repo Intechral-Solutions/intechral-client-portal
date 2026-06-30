@@ -18,7 +18,7 @@ class StripeWebhookController extends Controller
 
     public function handle(Request $request): Response
     {
-        $payload   = $request->getContent();
+        $payload = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature', '');
 
         try {
@@ -29,7 +29,7 @@ class StripeWebhookController extends Controller
 
         match ($event->type) {
             'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($event->data->object),
-            default                    => null,
+            default => null,
         };
 
         return response('OK', 200);
@@ -40,8 +40,8 @@ class StripeWebhookController extends Controller
         $this->invoiceService->handlePaymentSucceeded(
             paymentIntentId: $paymentIntent->id,
             chargeData: [
-                'amount'    => $paymentIntent->amount_received,
-                'currency'  => $paymentIntent->currency,
+                'amount' => $paymentIntent->amount_received,
+                'currency' => $paymentIntent->currency,
                 'charge_id' => $paymentIntent->latest_charge,
             ],
         );

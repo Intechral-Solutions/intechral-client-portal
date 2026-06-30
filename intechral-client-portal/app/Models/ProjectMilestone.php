@@ -28,7 +28,9 @@ class ProjectMilestone extends Model
     public function completionPercentage(): int
     {
         $total = $this->tasks()->count();
-        if ($total === 0) return 0;
+        if ($total === 0) {
+            return 0;
+        }
 
         $done = $this->tasks()
             ->whereHas('column', fn ($q) => $q->where('is_done_column', true))

@@ -17,7 +17,7 @@ class OrganizationMemberController extends Controller
     {
         $data = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'role'    => 'required|in:admin,member',
+            'role' => 'required|in:admin,member',
         ]);
 
         $user = User::findOrFail($data['user_id']);

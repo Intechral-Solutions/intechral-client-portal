@@ -23,8 +23,7 @@ class OrganizationController extends Controller
     {
         $organization->load(['owner', 'company', 'members']);
 
-        $availableUsers = User::whereDoesntHave('organizations', fn ($q) =>
-            $q->where('organizations.id', $organization->id)
+        $availableUsers = User::whereDoesntHave('organizations', fn ($q) => $q->where('organizations.id', $organization->id)
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         return view('organizations.show', compact('organization', 'availableUsers'));

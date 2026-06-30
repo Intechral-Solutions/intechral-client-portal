@@ -105,9 +105,9 @@ it('operator can update ticket status via the queue', function () {
 // ── Auto-close ───────────────────────────────────────────────────────────────
 
 it('auto-closes resolved tickets idle for more than 72 hours', function () {
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
     $ticket = Ticket::factory()->for($user, 'user')->create([
-        'status'      => 'resolved',
+        'status' => 'resolved',
         'resolved_at' => now()->subHours(73),
     ]);
 
@@ -118,9 +118,9 @@ it('auto-closes resolved tickets idle for more than 72 hours', function () {
 });
 
 it('does not auto-close tickets resolved within the idle window', function () {
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
     $ticket = Ticket::factory()->for($user, 'user')->create([
-        'status'      => 'resolved',
+        'status' => 'resolved',
         'resolved_at' => now()->subHours(10),
     ]);
 
@@ -139,8 +139,8 @@ it('marks a ticket as overdue when sla_due_at is in the past', function () {
 
 it('does not mark a resolved ticket as overdue even if sla has passed', function () {
     $ticket = Ticket::factory()->for(User::factory()->create(), 'user')->create([
-        'status'      => 'resolved',
-        'sla_due_at'  => now()->subHours(5),
+        'status' => 'resolved',
+        'sla_due_at' => now()->subHours(5),
         'resolved_at' => now()->subHour(),
     ]);
     expect($ticket->isOverdue())->toBeFalse();
