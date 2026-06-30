@@ -113,9 +113,12 @@ Provide a simple but effective CRM for managing client companies and contacts â€
 - `organizations/index`, `show`
 
 **Multi-Tenant Data Isolation**
-- `OrganizationScope` global scope applied to Ticket, Project, Invoice, TimeEntry
+- `OrganizationScope` applied to `CrmCompany`, the table with the direct tenant key
+- `Organization` scoped through `organization_members`
+- `CrmContact` scoped indirectly through its company
+- Tickets and projects use their existing ownership/company/project-member access paths
 - Platform operators bypass the scope and see all data
-- `organization_id` nullable FK on all resource tables
+- Multi-organization membership is supported
 
 **Routes**
 - `/crm/companies` + `/crm/contacts` (`can:crm.manage`)

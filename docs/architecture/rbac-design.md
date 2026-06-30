@@ -117,59 +117,65 @@ Route::middleware(['auth', 'permission:tickets.view'])->group(function () {
 });
 ```
 
-## Organization-Scoped Roles
+## Organization Membership and Scoped Permissions
 
-When a CRM company is promoted to an **Organization**, its users gain a second layer of authorization: **organizational roles**. These are separate from platform roles and only govern access within the organization's own data.
+When a CRM company is promoted to an **Organization**, membership adds a tenant-visibility boundary alongside platform permissions. A user may join multiple organizations.
 
 ### Two-Layer Authorization Model
 
 ```
-Platform Layer (Spatie roles)         Organization Layer (org_roles)
-─────────────────────────────         ──────────────────────────────
-operator  → all platform perms        org_admin  → all org perms
-user      → minimal platform perms    org_member → view + create within org
-custom    → any platform perms        custom     → any org-scoped perms
+Platform layer (Spatie)              Organization membership pivot
+───────────────────────              ─────────────────────────────
+operator → all platform permissions  admin  → organization admin marker
+user     → default permissions       member → regular member marker
+custom   → assigned permissions      one user may have many memberships
 ```
 
 ### Data Scoping
 
-All modules scope queries by `organization_id` for organization members:
+Tenant-aware models follow their real schema path:
 
 ```php
-// In a base scope applied to Ticket, Project, Invoice, TimeEntry, etc.:
-if ($user->organization_id && !$user->hasRole('operator')) {
-    $query->where('organization_id', $user->organization_id);
-}
+// Direct tenant key: CrmCompany
+$query->whereIn('organization_id', $user->organizations()->select('organizations.id'));
+
+// Indirect paths:
+// Organization -> organization_members
+// CrmContact   -> company.organization_id
 ```
+
+Operators bypass these scopes. A non-operator with no memberships receives an empty tenant view. Tickets, projects, invoices, and time entries have no `organization_id` column and continue to use ownership, company/project membership, invoice-client, and policy logic instead of the direct scope.
 
 ### Organization Permissions
 
-Org-scoped permissions follow the pattern `org.{module}.{action}`:
+Platform permissions decide whether an action is available; organization membership narrows which tenant records can satisfy it. Current tenant-related permissions are:
 
 ```
-org.tickets.view
-org.tickets.create
-org.projects.view
-org.billing.view
-org.time.log
-org.invite            ← invite users to the org
-org.manage_roles      ← manage org-level roles
-org.admin             ← all of the above
+tickets.view_org
+projects.view_org
+tasks.view_org
+billing.view_org
+time.view_org
+org.invite
+org.manage_roles
+org.admin
 ```
+
+The built-in `user` role receives the `*.view_org` permissions. The `org.*` permissions exist in the catalogue, but organization-admin self-service routes are not yet implemented; current member management is under `crm.manage`.
 
 ### Organization Tables
 
-- `organizations` — linked 1:1 with a CRM company (`crm_companies`)
-- `organization_members` — `user_id`, `organization_id`, `role` (varchar). A user belongs to at most one organization.
+- `organizations` — owned by a user; linked from `crm_companies.organization_id`
+- `organization_members` — unique `user_id` + `organization_id`, with `admin` or `member`; users may join multiple organizations
 
-> **Note:** A full org-role table system (`organization_roles`, `organization_role_users`) is planned but not yet built. Currently, the org role is stored as a simple string column on `organization_members` (e.g. `org_admin`, `org_member`). Full org-role CRUD management is a known gap in EPIC-008.
+> **Note:** A full org-role table system is not built. The current role is the simple enum on `organization_members`.
 
 ### Authorization Check Order
 
 1. Is the user an `operator`? → Full access everywhere.
 2. Does the user have the required **platform** permission? → Check passes or fails.
-3. For org-scoped data, is the record's `organization_id` the user's org? → Gate passes or 403.
-4. Does the user have the required **org** permission? → Check passes or fails.
+3. For tenant-scoped data, is the record reachable through one of the user's memberships? → Visible or hidden/404.
+4. Apply the model policy or ownership rule for the requested action.
 
 ## Seeding
 
@@ -177,4 +183,4 @@ Permissions are seeded from `database/seeders/PermissionSeeder.php`, which reads
 
 Built-in roles are seeded in `database/seeders/RoleSeeder.php` and called from `DatabaseSeeder.php`.
 
-Default organization roles (`org_admin`, `org_member`) are seeded in `database/seeders/OrganizationRoleSeeder.php`.
+Organization membership roles are stored on the pivot and are not seeded as Spatie roles.

@@ -2,6 +2,7 @@
 
 **Date:** 2024-03-24
 **Status:** Accepted
+**Amended:** 2026-06-30 by EPIC-010B to match the implemented schema
 
 ## Context
 
@@ -14,41 +15,37 @@ This requires a lightweight multi-tenancy layer without a full multi-tenant fram
 
 ## Decision
 
-Implement **organization scoping** using a `organization_id` foreign key on all resource tables, enforced through **Eloquent global scopes** on each model. Organization-level roles are stored in a separate `organization_roles` table, distinct from platform roles (Spatie).
+Implement lightweight organization scoping in the shared database using the relationship actually present for each resource. `crm_companies.organization_id` is the direct tenant key; organizations scope through `organization_members`; contacts scope through their CRM company. Models without `organization_id` use ownership, project/company membership, invoice-client, or policy logic and must not receive the direct-column global scope.
 
 ## Architecture
 
 ```
 users
-  └── organization_id (FK → organizations)
+  └── organization_members (many-to-many)
 
 organizations
-  └── company_id (FK → companies, 1:1)
+  ├── owner_id (FK → users)
+  └── organization_members.role (admin/member)
 
-organization_roles (org-scoped, separate from Spatie roles)
-  └── organization_id
-  └── name, permissions (JSON)
+crm_companies
+  └── organization_id (nullable FK → organizations)
 
-organization_role_users
-  └── user_id, organization_role_id, organization_id
-
-tickets / projects / invoices / time_entries
-  └── organization_id (nullable — platform-operator-only records have null)
+crm_contacts
+  └── crm_company_id (nullable FK → crm_companies)
 ```
 
 ## Global Scope Implementation
 
-Each scoped model (Ticket, Project, Invoice, TimeEntry) applies `OrganizationScope`:
+Only a model with a direct `organization_id` column applies `OrganizationScope`:
 
 ```php
 class OrganizationScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $user = Auth::user();
-        if ($user && $user->organization_id && !$user->hasRole('operator')) {
-            $builder->where($model->getTable().'.organization_id', $user->organization_id);
-        }
+        // Operators bypass tenant filtering.
+        // Other users match every organization_members row they own.
+        $builder->whereIn('organization_id', $membershipOrganizationIds);
     }
 }
 ```
@@ -56,14 +53,14 @@ class OrganizationScope implements Scope
 ## Rationale
 
 - Shared database, single schema — simpler than row-level security or schema-per-tenant
-- Global scopes ensure data isolation without modifying every query manually
+- Global scopes protect tenant-aware model queries and implicit route binding
 - Platform operators bypass scoping (they see everything)
-- Organization admins manage their own user base independently of platform operators
+- Multi-organization membership is supported by the pivot rather than a user column
 - Avoids heavy multi-tenant packages (Tenancy for Laravel) which are overkill for this use case
 
 ## Consequences
 
-- All new resource tables must include `organization_id` (nullable for operator-only records)
-- Seeds must set `organization_id` on test fixtures
-- The `WithoutOrganizationScope` trait must be used in admin operations that query across orgs
-- Reporting for platform operators must explicitly remove the scope
+- New tenant-aware models must document whether scoping is direct, relational, or policy-based
+- A direct scope may only be registered on a table that actually contains `organization_id`
+- Non-operators with no memberships must receive an empty tenant view, never an unfiltered query
+- Cross-tenant identifiers accepted from requests must be validated through scoped Eloquent queries

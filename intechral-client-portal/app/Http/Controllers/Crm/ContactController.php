@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Crm;
 use App\Http\Controllers\Controller;
 use App\Models\CrmCompany;
 use App\Models\CrmContact;
+use App\Rules\AccessibleCrmCompany;
 use App\Services\CrmService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class ContactController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'crm_company_id' => 'nullable|exists:crm_companies,id',
+            'crm_company_id' => ['nullable', new AccessibleCrmCompany],
             'first_name'     => 'required|string|max:100',
             'last_name'      => 'required|string|max:100',
             'email'          => 'nullable|email|max:255',
@@ -75,7 +76,7 @@ class ContactController extends Controller
     public function update(Request $request, CrmContact $contact): RedirectResponse
     {
         $data = $request->validate([
-            'crm_company_id' => 'nullable|exists:crm_companies,id',
+            'crm_company_id' => ['nullable', new AccessibleCrmCompany],
             'first_name'     => 'required|string|max:100',
             'last_name'      => 'required|string|max:100',
             'email'          => 'nullable|email|max:255',

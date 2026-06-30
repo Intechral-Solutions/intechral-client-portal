@@ -60,41 +60,39 @@ Standard Spatie tables: `roles`, `permissions`, `model_has_roles`, `model_has_pe
 | Column | Type | Notes |
 |--------|------|-------|
 | id | bigint PK | |
-| company_id | bigint FK crm_companies | 1:1 — the CRM company this org represents |
-| name | varchar(255) | Copied from company for denormalization |
+| name | varchar(255) | Copied from the CRM company when promoted |
 | slug | varchar(255) unique | URL-safe identifier |
-| settings | json nullable | Org-level configuration |
+| owner_id | bigint FK users | User who owns the organization |
 | created_at / updated_at | timestamps | |
-| deleted_at | timestamp nullable | Soft delete |
 
 ### `organization_members`
-Pivot: `user_id` + `organization_id` + `role` (varchar — simple string, e.g. `org_admin`, `org_member`). A user belongs to at most one organization.
+Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is unique; a user may belong to multiple organizations.
 
 > **Note:** A separate `organization_roles` table is planned but not yet built. Org role management is currently handled via the `role` column on `organization_members`.
 
-> **Data scoping:** All resource tables (`tickets`, `projects`, `invoices`, `time_entries`) include an `organization_id` nullable FK. Platform operators see all records; organization members see only their org's records via an Eloquent global scope (`OrganizationScope`).
+> **Data scoping:** `crm_companies.organization_id` is the direct tenant key. Organizations are scoped through `organization_members`, and CRM contacts are scoped through their company. Tickets, projects, invoices, and time entries do not contain `organization_id`; they retain their existing ownership, company/project membership, client, and policy boundaries. Platform operators bypass tenant scopes.
 
 ## Module Tables
 
 ### Tickets Module
-- `tickets` — id, title, description, category, priority, status, assignee_id, company_id, organization_id
+- `tickets` — id, user_id, company_id nullable, ticket_number, title, description, category, priority, status, assignee_id
 - `ticket_replies` — ticket_id, user_id, body, is_internal
 - `ticket_attachments` — ticket_id, reply_id nullable, path, filename, size, mime_type
 - `ticket_status_histories` — ticket_id, user_id, old_status, new_status
 
 ### Projects Module
-- `projects` — id, name, description, status, budget, start_date, target_date, organization_id
+- `projects` — id, client_id nullable, name, description, status, budget, start_date, target_date, created_by
 - `project_members` — project_id, user_id pivot
 - `project_columns` — project_id, name, position (configurable Kanban columns)
 - `tasks` — id, project_id, column_id, milestone_id nullable, title, description, assignee_id, due_date, priority, labels
 - `task_checklist_items` — task_id, label, completed
 - `task_comments` — task_id, user_id, body
 - `project_milestones` — project_id, name, due_date
-- `project_company` — project_id, company_id pivot (org-owned projects)
+- `project_company` — project_id, crm_company_id pivot (company-linked projects)
 - `task_dependencies` — task_id, depends_on_task_id pivot
 
 ### Billing Module
-- `invoices` — id, client_id, organization_id, number, status, due_date, notes, subtotal, tax, total
+- `invoices` — id, client_id, project_id nullable, invoice_number, status, issued_at, due_at, notes, subtotal, tax, total
 - `invoice_items` — invoice_id, description, qty, unit_price, tax_rate, line_total
 - `invoice_payments` — invoice_id, amount, date, method, reference, stripe_payment_intent_id
 
@@ -103,8 +101,8 @@ Pivot: `user_id` + `organization_id` + `role` (varchar — simple string, e.g. `
 - `time_entry_blocks` — id, time_entry_id, started_at, ended_at, allocation_weight (for multi-timer block allocation)
 
 ### CRM Module
-- `crm_companies` — id, name, industry, website, phone, address, notes, status, deleted_at
-- `crm_contacts` — id, company_id nullable, first_name, last_name, email, phone, title, notes
+- `crm_companies` — id, organization_id nullable, created_by, name, website, phone, address, notes
+- `crm_contacts` — id, crm_company_id nullable, created_by, first_name, last_name, email, phone, job_title, notes
 
 ### CMS Module
 - `cms_pages` — id, slug, title, content, status (draft/published), published_at, meta fields
@@ -115,4 +113,4 @@ Pivot: `user_id` + `organization_id` + `role` (varchar — simple string, e.g. `
 2. **Audit trail** — `activity_log` table (via Spatie Activity Log) records significant model events.
 3. **Encrypted sensitive data** — OAuth tokens and 2FA secrets stored with Laravel's `encrypted` cast.
 4. **Foreign key constraints** — All FK relationships enforced at the DB level (MariaDB InnoDB).
-5. **Organization scoping** — `organization_id` on all resource tables; `OrganizationScope` global scope enforces tenant isolation automatically.
+5. **Organization scoping** — scopes follow the actual relationship path: direct company tenant key, organization membership pivot, or contact-to-company. Models without `organization_id` are never given the direct-column scope.

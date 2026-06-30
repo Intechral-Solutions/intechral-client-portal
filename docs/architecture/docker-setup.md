@@ -99,6 +99,61 @@ docker compose exec app npm run build
 - Web UI on `http://localhost:8025`
 - All outgoing mail in dev is caught here
 
+## Running the Test Suite
+
+Tests run inside the `app` container against a dedicated MariaDB test database (`intechral_client_portal_testing`). SQLite is intentionally not used — the application relies on MariaDB-specific schema behavior (foreign-key drops during table renames) that SQLite cannot support.
+
+### Test database setup
+
+**Fresh Docker setup (new volume):** The test database is created automatically. `init-testing.sql` is mounted into `/docker-entrypoint-initdb.d/` and MariaDB runs it on first start.
+
+**Existing Docker setup:** Create the test database once if it doesn't already exist:
+
+```bash
+docker compose exec db mariadb -u root -proot -e "
+  CREATE DATABASE IF NOT EXISTS \`intechral_client_portal_testing\`
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  GRANT ALL PRIVILEGES ON \`intechral_client_portal_testing\`.* TO 'portal'@'%';
+  FLUSH PRIVILEGES;
+"
+```
+
+### Running Pest
+
+```bash
+# Run the full suite (recommended — same command used by npm run test)
+docker compose exec app ./vendor/bin/pest
+
+# Run a single test file
+docker compose exec app ./vendor/bin/pest tests/Feature/Tickets/TicketSubmissionTest.php
+
+# Run tests matching a name pattern
+docker compose exec app ./vendor/bin/pest --filter "ticket"
+
+# Run with coverage report
+docker compose exec app ./vendor/bin/pest --coverage
+```
+
+### How `RefreshDatabase` works with MariaDB
+
+Each feature test uses `RefreshDatabase`. On every test, Pest drops and recreates the schema against `intechral_client_portal_testing` only — the dev database (`portal`) is never touched.
+
+A safety guard in `tests/TestCase.php` reads the active `DB_DATABASE` at boot time and throws a `RuntimeException` if the name does not contain `"testing"`. This prevents accidental data loss if `phpunit.xml` or `.env.testing` is misconfigured.
+
+### Test configuration
+
+Test environment variables live in `phpunit.xml`. Key settings:
+
+| Variable | Value | Why |
+|---|---|---|
+| `DB_CONNECTION` | `mysql` | MariaDB via the mysql driver (matches `.env.example`) |
+| `DB_HOST` | `db` | Docker service hostname |
+| `DB_DATABASE` | `intechral_client_portal_testing` | Dedicated test database |
+| `CACHE_STORE` | `array` | In-memory, no Redis required |
+| `SESSION_DRIVER` | `array` | In-memory |
+| `QUEUE_CONNECTION` | `sync` | Jobs run inline, no worker required |
+| `MAIL_MAILER` | `array` | Emails captured in array, no SMTP required |
+
 ## Useful Raw Docker Commands
 
 ```bash
@@ -108,6 +163,10 @@ docker compose exec app php artisan <command>
 # Run Pest with coverage report
 docker compose exec app ./vendor/bin/pest --coverage
 
-# Stop and remove volumes (destroys all database data)
+# Recreate test database from scratch
+docker compose exec db mariadb -u root -proot -e "DROP DATABASE IF EXISTS \`intechral_client_portal_testing\`;"
+docker compose exec db mariadb -u root -proot < .docker/mysql/init-testing.sql
+
+# Stop and remove volumes (destroys all database data — requires test DB recreation)
 docker compose down -v
 ```

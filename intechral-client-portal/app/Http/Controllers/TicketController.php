@@ -6,6 +6,7 @@ use App\Models\CrmCompany;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
+use App\Rules\AccessibleCrmCompany;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -59,7 +60,7 @@ class TicketController extends Controller
             'description'   => ['required', 'string'],
             'category'      => ['required', 'string', 'in:' . implode(',', self::CATEGORIES)],
             'priority'      => ['required', 'in:low,medium,high,critical'],
-            'company_id'    => ['nullable', 'exists:crm_companies,id'],
+            'company_id'    => ['nullable', new AccessibleCrmCompany],
             'attachments'   => ['nullable', 'array', 'max:10'],
             'attachments.*' => ['file', 'max:20480'], // 20 MB each
         ]);

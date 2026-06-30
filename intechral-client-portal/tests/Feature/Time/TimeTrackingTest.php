@@ -163,18 +163,18 @@ it('starts a timer and returns started_at', function () {
     expect(TimeEntry::where('user_id', $user->id)->whereNotNull('timer_started_at')->exists())->toBeTrue();
 });
 
-it('starting a second timer stops the first', function () {
+it('allows multiple concurrent timers per user', function () {
+    // startTimer() was updated (2026-03-27) to support the multi-timer block system.
+    // Starting a second timer no longer stops the first — both run concurrently.
     $user = User::factory()->create();
     $user->assignRole('user');
 
     app(TimeEntryService::class)->startTimer($user, ['description' => 'First']);
     app(TimeEntryService::class)->startTimer($user, ['description' => 'Second']);
 
-    // Only one running timer
-    expect(TimeEntry::where('user_id', $user->id)->whereNotNull('timer_started_at')->count())->toBe(1);
-    // First entry should now have duration > 0 and be stopped
-    $first = TimeEntry::where('user_id', $user->id)->where('description', 'First')->first();
-    expect($first->timer_started_at)->toBeNull();
+    $running = TimeEntry::where('user_id', $user->id)->whereNotNull('timer_started_at')->get();
+    expect($running)->toHaveCount(2);
+    expect($running->pluck('description')->all())->toContain('First', 'Second');
 });
 
 it('stops a timer and records elapsed minutes', function () {
