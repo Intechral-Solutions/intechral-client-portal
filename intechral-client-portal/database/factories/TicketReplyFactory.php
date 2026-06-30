@@ -14,9 +14,9 @@ class TicketReplyFactory extends Factory
     public function definition(): array
     {
         return [
-            'ticket_id'   => Ticket::factory(),
-            'user_id'     => User::factory(),
-            'body'        => $this->faker->paragraph(),
+            'ticket_id' => Ticket::factory(),
+            'user_id' => User::factory(),
+            'body' => $this->faker->paragraph(),
             'is_internal' => false,
         ];
     }

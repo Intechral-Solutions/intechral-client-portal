@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
 use App\Services\ProjectService;
@@ -39,10 +38,10 @@ it('returns 403 for non-members viewing milestones', function () {
 it('allows project managers to create milestones', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project  = app(ProjectService::class)->create($operator, ['name' => 'Milestone Create Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Milestone Create Test']);
 
     $this->actingAs($operator)->post(route('projects.milestones.store', $project), [
-        'name'     => 'v1.0 Launch',
+        'name' => 'v1.0 Launch',
         'due_date' => '2026-06-30',
     ])->assertRedirect();
 
@@ -52,14 +51,14 @@ it('allows project managers to create milestones', function () {
 it('forbids regular members from creating milestones', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project  = app(ProjectService::class)->create($operator, ['name' => 'Milestone Access Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Milestone Access Test']);
 
     $member = User::factory()->create();
     $member->assignRole('user');
     $project->members()->attach($member->id, ['role' => 'member']);
 
     $this->actingAs($member)->post(route('projects.milestones.store', $project), [
-        'name'     => 'Unauthorized Milestone',
+        'name' => 'Unauthorized Milestone',
         'due_date' => '2026-07-01',
     ])->assertForbidden();
 });
@@ -67,7 +66,7 @@ it('forbids regular members from creating milestones', function () {
 it('validates required fields when creating a milestone', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project  = app(ProjectService::class)->create($operator, ['name' => 'Validation Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Validation Test']);
 
     $this->actingAs($operator)->post(route('projects.milestones.store', $project), [
         // missing name and due_date
@@ -77,13 +76,13 @@ it('validates required fields when creating a milestone', function () {
 // ── Updating milestones ───────────────────────────────────────────────────────
 
 it('allows project managers to update milestones', function () {
-    $operator  = User::factory()->create();
+    $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project   = app(ProjectService::class)->create($operator, ['name' => 'Milestone Update Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Milestone Update Test']);
     $milestone = $project->milestones()->create(['name' => 'Beta', 'due_date' => '2026-05-01']);
 
     $this->actingAs($operator)->put(route('projects.milestones.update', [$project, $milestone]), [
-        'name'     => 'Beta Release',
+        'name' => 'Beta Release',
         'due_date' => '2026-05-15',
     ])->assertRedirect();
 
@@ -94,9 +93,9 @@ it('allows project managers to update milestones', function () {
 // ── Deleting milestones ───────────────────────────────────────────────────────
 
 it('allows project managers to delete milestones', function () {
-    $operator  = User::factory()->create();
+    $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project   = app(ProjectService::class)->create($operator, ['name' => 'Milestone Delete Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Milestone Delete Test']);
     $milestone = $project->milestones()->create(['name' => 'Delete Me', 'due_date' => '2026-04-01']);
 
     $this->actingAs($operator)->delete(route('projects.milestones.destroy', [$project, $milestone]))
@@ -106,10 +105,10 @@ it('allows project managers to delete milestones', function () {
 });
 
 it('returns 404 if milestone does not belong to the project', function () {
-    $operator  = User::factory()->create();
+    $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project1  = app(ProjectService::class)->create($operator, ['name' => 'P1']);
-    $project2  = app(ProjectService::class)->create($operator, ['name' => 'P2']);
+    $project1 = app(ProjectService::class)->create($operator, ['name' => 'P1']);
+    $project2 = app(ProjectService::class)->create($operator, ['name' => 'P2']);
     $milestone = $project2->milestones()->create(['name' => 'P2 Milestone', 'due_date' => '2026-04-01']);
 
     $this->actingAs($operator)->delete(route('projects.milestones.destroy', [$project1, $milestone]))
@@ -119,12 +118,12 @@ it('returns 404 if milestone does not belong to the project', function () {
 // ── Milestone completion ──────────────────────────────────────────────────────
 
 it('calculates milestone completion percentage correctly', function () {
-    $operator  = User::factory()->create();
+    $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $project   = app(ProjectService::class)->create($operator, ['name' => 'Completion Test']);
+    $project = app(ProjectService::class)->create($operator, ['name' => 'Completion Test']);
     $milestone = $project->milestones()->create(['name' => 'M1', 'due_date' => '2026-06-01']);
 
-    $doneColumn    = $project->columns()->where('is_done_column', true)->first();
+    $doneColumn = $project->columns()->where('is_done_column', true)->first();
     $notDoneColumn = $project->columns()->where('is_done_column', false)->first();
 
     // Create 3 tasks: 2 done, 1 not

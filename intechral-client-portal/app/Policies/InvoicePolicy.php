@@ -16,7 +16,10 @@ class InvoicePolicy
     /** Operators (billing.manage) see any; clients (billing.view) see their own only */
     public function view(User $user, Invoice $invoice): bool
     {
-        if ($user->can('billing.manage')) return true;
+        if ($user->can('billing.manage')) {
+            return true;
+        }
+
         return $user->can('billing.view') && $invoice->client_id === $user->id;
     }
 
@@ -27,7 +30,10 @@ class InvoicePolicy
 
     public function update(User $user, Invoice $invoice): bool
     {
-        if (! $user->can('billing.manage')) return false;
+        if (! $user->can('billing.manage')) {
+            return false;
+        }
+
         return $invoice->status === 'draft';
     }
 

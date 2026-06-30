@@ -26,9 +26,9 @@ class InvitationNotification extends Notification implements ShouldQueue
         $expiresIn = '48 hours';
 
         return (new MailMessage)
-            ->subject("You've been invited to " . config('app.name'))
-            ->greeting("Hello!")
-            ->line("{$inviterName} has invited you to join " . config('app.name') . '.')
+            ->subject("You've been invited to ".config('app.name'))
+            ->greeting('Hello!')
+            ->line("{$inviterName} has invited you to join ".config('app.name').'.')
             ->action('Accept Invitation', $url)
             ->line("This invitation expires in {$expiresIn}. If you did not expect this invitation, you may ignore this email.");
     }

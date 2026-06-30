@@ -12,9 +12,9 @@ class TicketReplyController extends Controller
     public function store(Request $request, Ticket $ticket, TicketService $service)
     {
         $validated = $request->validate([
-            'body'          => ['required', 'string'],
-            'is_internal'   => ['boolean'],
-            'attachments'   => ['nullable', 'array', 'max:10'],
+            'body' => ['required', 'string'],
+            'is_internal' => ['boolean'],
+            'attachments' => ['nullable', 'array', 'max:10'],
             'attachments.*' => ['file', 'max:20480'],
         ]);
 

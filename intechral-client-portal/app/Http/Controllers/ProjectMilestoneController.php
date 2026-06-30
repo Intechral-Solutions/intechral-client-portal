@@ -26,9 +26,9 @@ class ProjectMilestoneController extends Controller
         $this->authorize('manage', $project);
 
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'due_date'    => 'required|date',
+            'due_date' => 'required|date',
         ]);
 
         $project->milestones()->create($data);
@@ -43,9 +43,9 @@ class ProjectMilestoneController extends Controller
         abort_unless($milestone->project_id === $project->id, 404);
 
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'due_date'    => 'required|date',
+            'due_date' => 'required|date',
         ]);
 
         $milestone->update($data);

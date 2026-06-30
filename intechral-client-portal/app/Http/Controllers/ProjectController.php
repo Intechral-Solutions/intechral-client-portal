@@ -24,11 +24,11 @@ class ProjectController extends Controller
         } elseif ($user->can('projects.view_org')) {
             $companyIds = $user->orgCompanyIds();
             $projects = Project::where(function ($q) use ($user, $companyIds) {
-                    $q->whereHas('members', fn ($m) => $m->where('users.id', $user->id));
-                    if (! empty($companyIds)) {
-                        $q->orWhereHas('companies', fn ($c) => $c->whereIn('crm_companies.id', $companyIds));
-                    }
-                })
+                $q->whereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                if (! empty($companyIds)) {
+                    $q->orWhereHas('companies', fn ($c) => $c->whereIn('crm_companies.id', $companyIds));
+                }
+            })
                 ->with('creator')
                 ->latest()
                 ->paginate(20);
@@ -43,7 +43,7 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
-        $members   = User::orderBy('name')->get(['id', 'name', 'email']);
+        $members = User::orderBy('name')->get(['id', 'name', 'email']);
         $companies = CrmCompany::orderBy('name')->get(['id', 'name']);
 
         return view('projects.create', compact('members', 'companies'));
@@ -54,16 +54,16 @@ class ProjectController extends Controller
         $this->authorize('create', Project::class);
 
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_date'  => 'nullable|date',
+            'start_date' => 'nullable|date',
             'target_date' => 'nullable|date|after_or_equal:start_date',
-            'status'      => 'in:active,on_hold,completed,archived',
-            'budget'      => 'nullable|numeric|min:0',
-            'members'     => 'nullable|array',
+            'status' => 'in:active,on_hold,completed,archived',
+            'budget' => 'nullable|numeric|min:0',
+            'members' => 'nullable|array',
             'members.*.user_id' => 'required|exists:users,id',
-            'members.*.role'    => 'required|in:member,manager',
-            'companies'   => 'nullable|array',
+            'members.*.role' => 'required|in:member,manager',
+            'companies' => 'nullable|array',
             'companies.*' => [new AccessibleCrmCompany],
         ]);
 
@@ -92,9 +92,9 @@ class ProjectController extends Controller
     {
         $this->authorize('manage', $project);
 
-        $allMembers     = User::orderBy('name')->get(['id', 'name', 'email']);
+        $allMembers = User::orderBy('name')->get(['id', 'name', 'email']);
         $currentMembers = $project->members()->get(['users.id', 'name', 'email', 'project_members.role as pivot_role']);
-        $allCompanies   = CrmCompany::orderBy('name')->get(['id', 'name']);
+        $allCompanies = CrmCompany::orderBy('name')->get(['id', 'name']);
         $linkedCompanies = $project->companies()->pluck('crm_companies.id')->toArray();
 
         return view('projects.edit', compact('project', 'allMembers', 'currentMembers', 'allCompanies', 'linkedCompanies'));
@@ -105,12 +105,12 @@ class ProjectController extends Controller
         $this->authorize('manage', $project);
 
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_date'  => 'nullable|date',
+            'start_date' => 'nullable|date',
             'target_date' => 'nullable|date|after_or_equal:start_date',
-            'status'      => 'required|in:active,on_hold,completed,archived',
-            'budget'      => 'nullable|numeric|min:0',
+            'status' => 'required|in:active,on_hold,completed,archived',
+            'budget' => 'nullable|numeric|min:0',
         ]);
 
         $project->update($data);
@@ -134,9 +134,9 @@ class ProjectController extends Controller
         $this->authorize('manage', $project);
 
         $data = $request->validate([
-            'members'           => 'present|array',
+            'members' => 'present|array',
             'members.*.user_id' => 'required|exists:users,id',
-            'members.*.role'    => 'required|in:member,manager',
+            'members.*.role' => 'required|in:member,manager',
         ]);
 
         $this->service->syncMembers($project, $data['members']);
@@ -150,7 +150,7 @@ class ProjectController extends Controller
         $this->authorize('manage', $project);
 
         $data = $request->validate([
-            'companies'   => 'present|array',
+            'companies' => 'present|array',
             'companies.*' => [new AccessibleCrmCompany],
         ]);
 

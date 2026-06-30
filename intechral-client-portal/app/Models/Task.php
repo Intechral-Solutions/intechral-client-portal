@@ -33,7 +33,8 @@ class Task extends Model
         'due_date' => 'date',
     ];
 
-    public const STATUSES   = ['todo', 'in_progress', 'done'];
+    public const STATUSES = ['todo', 'in_progress', 'done'];
+
     public const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
     // ── Relationships ────────────────────────────────────────
@@ -127,8 +128,8 @@ class Task extends Model
 
         return match ($this->status) {
             'in_progress' => 'In Progress',
-            'done'        => 'Done',
-            default       => 'To Do',
+            'done' => 'Done',
+            default => 'To Do',
         };
     }
 }

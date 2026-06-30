@@ -37,9 +37,9 @@ it('creates a company', function () {
     $operator->assignRole('operator');
 
     $this->actingAs($operator)->post(route('crm.companies.store'), [
-        'name'    => 'Acme Corp',
+        'name' => 'Acme Corp',
         'website' => 'https://acme.com',
-        'phone'   => '555-1234',
+        'phone' => '555-1234',
     ])->assertRedirect();
 
     expect(CrmCompany::where('name', 'Acme Corp')->exists())->toBeTrue();
@@ -59,7 +59,7 @@ it('validates company website must be a url', function () {
     $operator->assignRole('operator');
 
     $this->actingAs($operator)->post(route('crm.companies.store'), [
-        'name'    => 'Bad URL Co',
+        'name' => 'Bad URL Co',
         'website' => 'not-a-url',
     ])->assertSessionHasErrors('website');
 });
@@ -71,7 +71,7 @@ it('updates a company', function () {
     $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
 
     $this->actingAs($operator)->put(route('crm.companies.update', $company), [
-        'name'  => 'Updated Name',
+        'name' => 'Updated Name',
         'phone' => '999-0000',
     ])->assertRedirect();
 
@@ -104,8 +104,8 @@ it('creates a contact', function () {
 
     $this->actingAs($operator)->post(route('crm.contacts.store'), [
         'first_name' => 'Jane',
-        'last_name'  => 'Doe',
-        'email'      => 'jane@example.com',
+        'last_name' => 'Doe',
+        'email' => 'jane@example.com',
     ])->assertRedirect();
 
     expect(CrmContact::where('email', 'jane@example.com')->exists())->toBeTrue();
@@ -117,7 +117,7 @@ it('validates contact first and last name are required', function () {
 
     $this->actingAs($operator)->post(route('crm.contacts.store'), [
         'first_name' => '',
-        'last_name'  => '',
+        'last_name' => '',
     ])->assertSessionHasErrors(['first_name', 'last_name']);
 });
 
@@ -128,8 +128,8 @@ it('links a contact to a company', function () {
     $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
 
     $this->actingAs($operator)->post(route('crm.contacts.store'), [
-        'first_name'     => 'John',
-        'last_name'      => 'Smith',
+        'first_name' => 'John',
+        'last_name' => 'Smith',
         'crm_company_id' => $company->id,
     ])->assertRedirect();
 
@@ -145,8 +145,8 @@ it('updates a contact', function () {
 
     $this->actingAs($operator)->put(route('crm.contacts.update', $contact), [
         'first_name' => 'Updated',
-        'last_name'  => 'Contact',
-        'email'      => 'updated@example.com',
+        'last_name' => 'Contact',
+        'email' => 'updated@example.com',
     ])->assertRedirect();
 
     expect($contact->fresh()->first_name)->toBe('Updated');
@@ -206,13 +206,13 @@ it('adds a member to an organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org  = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['owner_id' => $operator->id]);
     $user = User::factory()->create();
     $user->assignRole('user');
 
     $this->actingAs($operator)->post(route('organizations.members.store', $org), [
         'user_id' => $user->id,
-        'role'    => 'member',
+        'role' => 'member',
     ])->assertRedirect();
 
     expect($org->hasMember($user))->toBeTrue();
@@ -222,7 +222,7 @@ it('removes a member from an organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org  = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['owner_id' => $operator->id]);
     $user = User::factory()->create();
 
     $org->members()->attach($user->id, ['role' => 'member']);
@@ -236,7 +236,7 @@ it('updates a member role', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org  = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['owner_id' => $operator->id]);
     $user = User::factory()->create();
 
     $org->members()->attach($user->id, ['role' => 'member']);
@@ -253,7 +253,7 @@ it('returns 404 removing a user who is not a member', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org  = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['owner_id' => $operator->id]);
     $user = User::factory()->create();
 
     $this->actingAs($operator)->delete(route('organizations.members.destroy', [$org, $user]))->assertNotFound();
@@ -265,7 +265,7 @@ it('generates a unique slug on promotion', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $service  = app(CrmService::class);
+    $service = app(CrmService::class);
 
     $company1 = CrmCompany::factory()->create(['created_by' => $operator->id, 'name' => 'Same Name']);
     $company2 = CrmCompany::factory()->create(['created_by' => $operator->id, 'name' => 'Same Name']);

@@ -22,8 +22,8 @@ class ContactController extends Controller
         $contacts = CrmContact::with('company')
             ->when($search, fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             }))
             ->orderBy('last_name')
             ->orderBy('first_name')
@@ -35,8 +35,8 @@ class ContactController extends Controller
 
     public function create(Request $request): View
     {
-        $companies  = CrmCompany::orderBy('name')->get(['id', 'name']);
-        $companyId  = $request->get('company_id');
+        $companies = CrmCompany::orderBy('name')->get(['id', 'name']);
+        $companyId = $request->get('company_id');
 
         return view('crm.contacts.create', compact('companies', 'companyId'));
     }
@@ -45,12 +45,12 @@ class ContactController extends Controller
     {
         $data = $request->validate([
             'crm_company_id' => ['nullable', new AccessibleCrmCompany],
-            'first_name'     => 'required|string|max:100',
-            'last_name'      => 'required|string|max:100',
-            'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:30',
-            'job_title'      => 'nullable|string|max:100',
-            'notes'          => 'nullable|string|max:5000',
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:30',
+            'job_title' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $contact = $this->service->createContact($request->user(), $data);
@@ -77,12 +77,12 @@ class ContactController extends Controller
     {
         $data = $request->validate([
             'crm_company_id' => ['nullable', new AccessibleCrmCompany],
-            'first_name'     => 'required|string|max:100',
-            'last_name'      => 'required|string|max:100',
-            'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:30',
-            'job_title'      => 'nullable|string|max:100',
-            'notes'          => 'nullable|string|max:5000',
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:30',
+            'job_title' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $this->service->updateContact($contact, $data);

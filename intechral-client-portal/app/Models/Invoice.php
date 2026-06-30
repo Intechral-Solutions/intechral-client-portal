@@ -31,14 +31,14 @@ class Invoice extends Model
     ];
 
     protected $casts = [
-        'issued_at'  => 'date',
-        'due_at'     => 'date',
-        'paid_at'    => 'datetime',
-        'sent_at'    => 'datetime',
-        'subtotal'   => 'decimal:2',
-        'tax_rate'   => 'decimal:2',
+        'issued_at' => 'date',
+        'due_at' => 'date',
+        'paid_at' => 'datetime',
+        'sent_at' => 'datetime',
+        'subtotal' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
-        'total'      => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     public const STATUSES = ['draft', 'sent', 'paid', 'overdue', 'cancelled'];

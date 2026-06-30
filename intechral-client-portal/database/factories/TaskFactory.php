@@ -15,18 +15,18 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'project_id'   => Project::factory(),
-            'column_id'    => ProjectColumn::factory(),
-            'ticket_id'    => null,
+            'project_id' => Project::factory(),
+            'column_id' => ProjectColumn::factory(),
+            'ticket_id' => null,
             'milestone_id' => null,
-            'assignee_id'  => null,
-            'created_by'   => User::factory(),
-            'title'        => $this->faker->sentence(5),
-            'description'  => $this->faker->optional()->paragraph(),
-            'due_date'     => $this->faker->optional()->dateTimeBetween('now', '+30 days'),
-            'priority'     => $this->faker->randomElement(['low', 'medium', 'high', 'critical']),
-            'position'     => $this->faker->numberBetween(0, 100),
-            'status'       => 'todo',
+            'assignee_id' => null,
+            'created_by' => User::factory(),
+            'title' => $this->faker->sentence(5),
+            'description' => $this->faker->optional()->paragraph(),
+            'due_date' => $this->faker->optional()->dateTimeBetween('now', '+30 days'),
+            'priority' => $this->faker->randomElement(['low', 'medium', 'high', 'critical']),
+            'position' => $this->faker->numberBetween(0, 100),
+            'status' => 'todo',
         ];
     }
 

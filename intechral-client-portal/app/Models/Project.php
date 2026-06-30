@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\CrmCompany;
 
 class Project extends Model
 {
@@ -25,9 +24,9 @@ class Project extends Model
     ];
 
     protected $casts = [
-        'start_date'  => 'date',
+        'start_date' => 'date',
         'target_date' => 'date',
-        'budget'      => 'decimal:2',
+        'budget' => 'decimal:2',
     ];
 
     public const STATUSES = ['active', 'on_hold', 'completed', 'archived'];
@@ -77,7 +76,9 @@ class Project extends Model
     public function completionPercentage(): int
     {
         $total = $this->tasks()->count();
-        if ($total === 0) return 0;
+        if ($total === 0) {
+            return 0;
+        }
 
         $done = $this->tasks()
             ->whereHas('column', fn ($q) => $q->where('is_done_column', true))

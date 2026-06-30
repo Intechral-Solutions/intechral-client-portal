@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Stripe\Event;
 use Stripe\PaymentIntent;
 use Stripe\Stripe;
 use Stripe\Webhook;
@@ -16,10 +17,10 @@ class StripeService
     public function createPaymentIntent(int $amount, string $currency, array $metadata = []): PaymentIntent
     {
         return PaymentIntent::create([
-            'amount'               => $amount,
-            'currency'             => $currency,
+            'amount' => $amount,
+            'currency' => $currency,
             'automatic_payment_methods' => ['enabled' => true],
-            'metadata'             => $metadata,
+            'metadata' => $metadata,
         ]);
     }
 
@@ -32,7 +33,7 @@ class StripeService
      * Verify and parse an incoming Stripe webhook payload.
      * Returns the Event object or throws a SignatureVerificationException.
      */
-    public function constructEvent(string $payload, string $sigHeader): \Stripe\Event
+    public function constructEvent(string $payload, string $sigHeader): Event
     {
         return Webhook::constructEvent(
             $payload,

@@ -13,9 +13,9 @@ class ProjectColumnFactory extends Factory
     public function definition(): array
     {
         return [
-            'project_id'     => Project::factory(),
-            'name'           => $this->faker->randomElement(['Backlog', 'To Do', 'In Progress', 'In Review', 'Done']),
-            'position'       => $this->faker->numberBetween(0, 10),
+            'project_id' => Project::factory(),
+            'name' => $this->faker->randomElement(['Backlog', 'To Do', 'In Progress', 'In Review', 'Done']),
+            'position' => $this->faker->numberBetween(0, 10),
             'is_done_column' => false,
         ];
     }

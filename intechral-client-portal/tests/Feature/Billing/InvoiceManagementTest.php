@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\User;
 use App\Services\InvoiceService;
 
@@ -43,14 +42,14 @@ it('returns 403 creating invoice without billing.create', function () {
 it('creates an invoice with line items and computes totals', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $this->actingAs($operator)->post(route('billing.invoices.store'), [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'tax_rate'  => '10',
-        'currency'  => 'USD',
+        'due_at' => '2026-04-30',
+        'tax_rate' => '10',
+        'currency' => 'USD',
         'items' => [
             ['description' => 'Web Design', 'quantity' => '1', 'unit_price' => '1000.00'],
             ['description' => 'Hosting',    'quantity' => '12', 'unit_price' => '10.00'],
@@ -77,13 +76,13 @@ it('validates required fields on invoice store', function () {
 it('validates due_at must be after issued_at', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $this->actingAs($operator)->post(route('billing.invoices.store'), [
         'client_id' => $client->id,
         'issued_at' => '2026-04-30',
-        'due_at'    => '2026-04-01',
-        'items'     => [['description' => 'x', 'quantity' => 1, 'unit_price' => 10]],
+        'due_at' => '2026-04-01',
+        'items' => [['description' => 'x', 'quantity' => 1, 'unit_price' => 10]],
     ])->assertSessionHasErrors('due_at');
 });
 
@@ -92,13 +91,13 @@ it('validates due_at must be after issued_at', function () {
 it('allows billing.view users to view an invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
     ]);
 
     $this->actingAs($operator)->get(route('billing.invoices.show', $invoice))->assertOk();
@@ -107,14 +106,14 @@ it('allows billing.view users to view an invoice', function () {
 it('allows the invoice client to view their own invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
     $client->assignRole('user');
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
     ]);
 
     $this->actingAs($client)->get(route('billing.client.invoices.show', $invoice))->assertOk();
@@ -123,15 +122,15 @@ it('allows the invoice client to view their own invoice', function () {
 it('returns 403 when another user tries to view a different client invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
-    $other    = User::factory()->create();
+    $client = User::factory()->create();
+    $other = User::factory()->create();
     $other->assignRole('user');
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
     ]);
 
     $this->actingAs($other)->get(route('billing.client.invoices.show', $invoice))->assertForbidden();
@@ -142,20 +141,20 @@ it('returns 403 when another user tries to view a different client invoice', fun
 it('allows billing.manage to update a draft invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Original', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Original', 'quantity' => 1, 'unit_price' => 100]],
     ]);
 
     $this->actingAs($operator)->put(route('billing.invoices.update', $invoice), [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Updated service', 'quantity' => 2, 'unit_price' => '200.00']],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Updated service', 'quantity' => 2, 'unit_price' => '200.00']],
     ])->assertRedirect();
 
     $invoice->refresh();
@@ -166,21 +165,21 @@ it('allows billing.manage to update a draft invoice', function () {
 it('returns 403 updating a non-draft invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
     app(InvoiceService::class)->send($invoice);
 
     $this->actingAs($operator)->put(route('billing.invoices.update', $invoice), [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Attempt', 'quantity' => 1, 'unit_price' => 999]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Attempt', 'quantity' => 1, 'unit_price' => 999]],
     ])->assertForbidden();
 });
 
@@ -189,13 +188,13 @@ it('returns 403 updating a non-draft invoice', function () {
 it('allows billing.manage to send a draft invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
 
     $this->actingAs($operator)->post(route('billing.invoices.send', $invoice))->assertRedirect();
@@ -207,13 +206,13 @@ it('allows billing.manage to send a draft invoice', function () {
 it('cannot send an already-sent invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
     app(InvoiceService::class)->send($invoice);
 
@@ -226,19 +225,19 @@ it('cannot send an already-sent invoice', function () {
 it('records a manual payment and marks invoice as paid when fully covered', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 500]],
     ]);
     app(InvoiceService::class)->send($invoice);
 
     $this->actingAs($operator)->post(route('billing.invoices.payment.record', $invoice), [
         'amount' => '500.00',
-        'notes'  => 'Bank transfer',
+        'notes' => 'Bank transfer',
     ])->assertRedirect();
 
     $invoice->refresh();
@@ -252,13 +251,13 @@ it('records a manual payment and marks invoice as paid when fully covered', func
 it('allows billing.admin to delete a draft invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
 
     $this->actingAs($operator)->delete(route('billing.invoices.destroy', $invoice))
@@ -270,13 +269,13 @@ it('allows billing.admin to delete a draft invoice', function () {
 it('returns 403 deleting a non-draft invoice', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
     app(InvoiceService::class)->send($invoice);
 
@@ -288,13 +287,13 @@ it('returns 403 deleting a non-draft invoice', function () {
 it('marks overdue invoices correctly', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client   = User::factory()->create();
+    $client = User::factory()->create();
 
     $invoice = app(InvoiceService::class)->create($operator, [
         'client_id' => $client->id,
         'issued_at' => '2026-03-01',
-        'due_at'    => '2026-03-10',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-03-10',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
     app(InvoiceService::class)->send($invoice);
 
@@ -308,21 +307,21 @@ it('marks overdue invoices correctly', function () {
 it('shows a client only their own invoices', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
-    $client1  = User::factory()->create();
+    $client1 = User::factory()->create();
     $client1->assignRole('user');
-    $client2  = User::factory()->create();
+    $client2 = User::factory()->create();
 
     $inv1 = app(InvoiceService::class)->create($operator, [
         'client_id' => $client1->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 100]],
     ]);
     $inv2 = app(InvoiceService::class)->create($operator, [
         'client_id' => $client2->id,
         'issued_at' => '2026-04-01',
-        'due_at'    => '2026-04-30',
-        'items'     => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
+        'due_at' => '2026-04-30',
+        'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
     ]);
 
     $response = $this->actingAs($client1)->get(route('billing.client.invoices.index'));

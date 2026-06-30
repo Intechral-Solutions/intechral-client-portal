@@ -6,7 +6,6 @@ use App\Models\PasswordHistory;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\UpdatesUserPasswords;
 
 class UpdateUserPassword implements UpdatesUserPasswords
@@ -17,7 +16,7 @@ class UpdateUserPassword implements UpdatesUserPasswords
     {
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
-            'password'         => $this->passwordRules(),
+            'password' => $this->passwordRules(),
         ], [
             'current_password.current_password' => __('The provided password does not match your current password.'),
         ])->after(function ($validator) use ($user, $input) {
@@ -46,8 +45,8 @@ class UpdateUserPassword implements UpdatesUserPasswords
     private function storeHistory(User $user): void
     {
         PasswordHistory::create([
-            'user_id'    => $user->id,
-            'password'   => $user->password,
+            'user_id' => $user->id,
+            'password' => $user->password,
             'created_at' => now(),
         ]);
 

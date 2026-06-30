@@ -43,7 +43,7 @@ class TicketController extends Controller
             'replies.attachments',
         ]);
 
-        $operators  = User::permission('tickets.assign')->orderBy('name')->get();
+        $operators = User::permission('tickets.assign')->orderBy('name')->get();
         $categories = UserTicketController::CATEGORIES;
 
         return view('operator.tickets.show', compact('ticket', 'operators', 'categories'));

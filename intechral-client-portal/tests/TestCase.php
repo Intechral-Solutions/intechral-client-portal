@@ -23,14 +23,14 @@ abstract class TestCase extends BaseTestCase
         parent::refreshApplication();
 
         $connection = config('database.default');
-        $database   = (string) config("database.connections.{$connection}.database");
+        $database = (string) config("database.connections.{$connection}.database");
 
         if (! str_contains($database, 'testing')) {
             throw new RuntimeException(
-                "Test safety guard rejected database \"{$database}\". " .
-                "The active database name must contain \"testing\" to prevent " .
-                "RefreshDatabase from wiping a non-test database. " .
-                "Check DB_DATABASE in phpunit.xml or .env.testing."
+                "Test safety guard rejected database \"{$database}\". ".
+                'The active database name must contain "testing" to prevent '.
+                'RefreshDatabase from wiping a non-test database. '.
+                'Check DB_DATABASE in phpunit.xml or .env.testing.'
             );
         }
     }

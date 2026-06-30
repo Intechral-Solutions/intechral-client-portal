@@ -8,7 +8,8 @@
 | All tests use the Laravel Pest plugin for database refresh helpers.
 */
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-uses(TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class)->in('Feature');
+uses(TestCase::class, RefreshDatabase::class)->in('Feature');
 uses(TestCase::class)->in('Unit');

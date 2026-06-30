@@ -29,13 +29,13 @@ class ProjectTaskController extends Controller
         $this->authorize('view', $project);
 
         $data = $request->validate([
-            'column_id'    => 'required|exists:project_columns,id',
-            'title'        => 'required|string|max:255',
-            'description'  => 'nullable|string',
-            'assignee_id'  => 'nullable|exists:users,id',
+            'column_id' => 'required|exists:project_columns,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'assignee_id' => 'nullable|exists:users,id',
             'milestone_id' => 'nullable|exists:project_milestones,id',
-            'priority'     => 'required|in:low,medium,high,critical',
-            'due_date'     => 'nullable|date',
+            'priority' => 'required|in:low,medium,high,critical',
+            'due_date' => 'nullable|date',
         ]);
 
         $position = Task::where('column_id', $data['column_id'])->max('position') + 1;
@@ -44,8 +44,8 @@ class ProjectTaskController extends Controller
             ...$data,
             'project_id' => $project->id,
             'created_by' => auth()->id(),
-            'position'   => $position,
-            'status'     => 'todo',
+            'position' => $position,
+            'status' => 'todo',
         ]);
 
         return back()->with('success', 'Task created.');
@@ -57,12 +57,12 @@ class ProjectTaskController extends Controller
         abort_unless($task->project_id === $project->id, 404);
 
         $data = $request->validate([
-            'title'        => 'required|string|max:255',
-            'description'  => 'nullable|string',
-            'assignee_id'  => 'nullable|exists:users,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'assignee_id' => 'nullable|exists:users,id',
             'milestone_id' => 'nullable|exists:project_milestones,id',
-            'priority'     => 'required|in:low,medium,high,critical',
-            'due_date'     => 'nullable|date',
+            'priority' => 'required|in:low,medium,high,critical',
+            'due_date' => 'nullable|date',
         ]);
 
         $task->update($data);
@@ -87,7 +87,7 @@ class ProjectTaskController extends Controller
 
         $data = $request->validate([
             'column_id' => 'required|exists:project_columns,id',
-            'position'  => 'required|integer|min:0',
+            'position' => 'required|integer|min:0',
         ]);
 
         $this->service->moveTask($task, $data['column_id'], $data['position']);
@@ -104,7 +104,7 @@ class ProjectTaskController extends Controller
 
         $task->comments()->create([
             'user_id' => auth()->id(),
-            'body'    => $data['body'],
+            'body' => $data['body'],
         ]);
 
         return back()->with('success', 'Comment added.');

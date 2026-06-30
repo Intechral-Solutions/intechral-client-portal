@@ -18,10 +18,10 @@ class InvitationService
             ->update(['status' => 'expired']);
 
         $invitation = Invitation::create([
-            'email'      => strtolower(trim($email)),
-            'token'      => Str::random(64),
+            'email' => strtolower(trim($email)),
+            'token' => Str::random(64),
             'invited_by' => $invitedBy->id,
-            'status'     => 'pending',
+            'status' => 'pending',
             'expires_at' => now()->addHours(48),
         ]);
 
@@ -45,7 +45,7 @@ class InvitationService
     public function accept(Invitation $invitation, User $user): void
     {
         $invitation->update([
-            'status'      => 'accepted',
+            'status' => 'accepted',
             'accepted_at' => now(),
         ]);
 

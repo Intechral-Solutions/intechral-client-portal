@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\CrmCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,9 +27,9 @@ class Ticket extends Model
     ];
 
     protected $casts = [
-        'sla_due_at'  => 'datetime',
+        'sla_due_at' => 'datetime',
         'resolved_at' => 'datetime',
-        'closed_at'   => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     // ── Relationships ────────────────────────────────────────
@@ -102,20 +101,20 @@ class Ticket extends Model
     {
         return $query->where(function ($q) use ($term) {
             $q->where('title', 'like', "%{$term}%")
-              ->orWhere('description', 'like', "%{$term}%")
-              ->orWhere('ticket_number', 'like', "%{$term}%")
-              ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', "%{$term}%"));
+                ->orWhere('description', 'like', "%{$term}%")
+                ->orWhere('ticket_number', 'like', "%{$term}%")
+                ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', "%{$term}%"));
         });
     }
 
     // ── Status valid transitions ─────────────────────────────
 
     public const TRANSITIONS = [
-        'open'         => ['in_progress', 'pending_user', 'resolved', 'closed'],
-        'in_progress'  => ['pending_user', 'resolved', 'closed', 'open'],
+        'open' => ['in_progress', 'pending_user', 'resolved', 'closed'],
+        'in_progress' => ['pending_user', 'resolved', 'closed', 'open'],
         'pending_user' => ['in_progress', 'resolved', 'closed', 'open'],
-        'resolved'     => ['closed', 'open'],
-        'closed'       => ['open'],
+        'resolved' => ['closed', 'open'],
+        'closed' => ['open'],
     ];
 
     public function canTransitionTo(string $newStatus): bool
@@ -127,8 +126,8 @@ class Ticket extends Model
 
     public const SLA_HOURS = [
         'critical' => 4,
-        'high'     => 8,
-        'medium'   => 24,
-        'low'      => 72,
+        'high' => 8,
+        'medium' => 24,
+        'low' => 72,
     ];
 }

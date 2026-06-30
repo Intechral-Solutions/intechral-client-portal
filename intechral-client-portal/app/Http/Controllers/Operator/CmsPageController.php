@@ -31,8 +31,8 @@ class CmsPageController extends Controller
     {
         $data = $request->validate([
             'title' => 'required|string|max:255',
-            'slug'  => 'nullable|string|max:255|regex:/^[a-z0-9\-]+$/|unique:cms_pages,slug',
-            'body'  => 'nullable|string',
+            'slug' => 'nullable|string|max:255|regex:/^[a-z0-9\-]+$/|unique:cms_pages,slug',
+            'body' => 'nullable|string',
         ]);
 
         $page = $this->service->create($request->user(), $data);
@@ -50,8 +50,8 @@ class CmsPageController extends Controller
     {
         $data = $request->validate([
             'title' => 'required|string|max:255',
-            'slug'  => "nullable|string|max:255|regex:/^[a-z0-9\\-]+$/|unique:cms_pages,slug,{$page->id}",
-            'body'  => 'nullable|string',
+            'slug' => "nullable|string|max:255|regex:/^[a-z0-9\\-]+$/|unique:cms_pages,slug,{$page->id}",
+            'body' => 'nullable|string',
         ]);
 
         $this->service->update($page, $request->user(), $data);

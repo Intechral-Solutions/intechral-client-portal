@@ -16,67 +16,97 @@ namespace App\Shared\Permissions;
 final class PermissionCatalogue
 {
     // ── Users & Invitations ────────────────────────────────
-    const USERS_VIEW    = 'users.view';
-    const USERS_INVITE  = 'users.invite';
-    const USERS_MANAGE  = 'users.manage';
-    const USERS_ADMIN   = 'users.admin';
+    const USERS_VIEW = 'users.view';
+
+    const USERS_INVITE = 'users.invite';
+
+    const USERS_MANAGE = 'users.manage';
+
+    const USERS_ADMIN = 'users.admin';
 
     // ── Roles ──────────────────────────────────────────────
-    const ROLES_VIEW    = 'roles.view';
-    const ROLES_MANAGE  = 'roles.manage';
-    const ROLES_ADMIN   = 'roles.admin';
+    const ROLES_VIEW = 'roles.view';
+
+    const ROLES_MANAGE = 'roles.manage';
+
+    const ROLES_ADMIN = 'roles.admin';
 
     // ── Settings ───────────────────────────────────────────
-    const SETTINGS_VIEW   = 'settings.view';
+    const SETTINGS_VIEW = 'settings.view';
+
     const SETTINGS_MANAGE = 'settings.manage';
 
     // ── Tickets ────────────────────────────────────────────
-    const TICKETS_VIEW     = 'tickets.view';
-    const TICKETS_CREATE   = 'tickets.create';
-    const TICKETS_ASSIGN   = 'tickets.assign';
-    const TICKETS_ADMIN    = 'tickets.admin';
+    const TICKETS_VIEW = 'tickets.view';
+
+    const TICKETS_CREATE = 'tickets.create';
+
+    const TICKETS_ASSIGN = 'tickets.assign';
+
+    const TICKETS_ADMIN = 'tickets.admin';
+
     const TICKETS_VIEW_ORG = 'tickets.view_org';
 
     // ── Projects ───────────────────────────────────────────
-    const PROJECTS_VIEW     = 'projects.view';
-    const PROJECTS_CREATE   = 'projects.create';
-    const PROJECTS_MANAGE   = 'projects.manage';
-    const PROJECTS_ADMIN    = 'projects.admin';
+    const PROJECTS_VIEW = 'projects.view';
+
+    const PROJECTS_CREATE = 'projects.create';
+
+    const PROJECTS_MANAGE = 'projects.manage';
+
+    const PROJECTS_ADMIN = 'projects.admin';
+
     const PROJECTS_VIEW_ORG = 'projects.view_org';
 
     // ── Tasks ──────────────────────────────────────────────
     const TASKS_VIEW_ORG = 'tasks.view_org';
 
     // ── Billing ────────────────────────────────────────────
-    const BILLING_VIEW     = 'billing.view';
-    const BILLING_CREATE   = 'billing.create';
-    const BILLING_MANAGE   = 'billing.manage';
-    const BILLING_ADMIN    = 'billing.admin';
+    const BILLING_VIEW = 'billing.view';
+
+    const BILLING_CREATE = 'billing.create';
+
+    const BILLING_MANAGE = 'billing.manage';
+
+    const BILLING_ADMIN = 'billing.admin';
+
     const BILLING_VIEW_ORG = 'billing.view_org';
 
     // ── Time Tracking ──────────────────────────────────────
-    const TIME_LOG      = 'time.log';
+    const TIME_LOG = 'time.log';
+
     const TIME_VIEW_OWN = 'time.view_own';
+
     const TIME_VIEW_ALL = 'time.view_all';
-    const TIME_MANAGE   = 'time.manage';
+
+    const TIME_MANAGE = 'time.manage';
+
     const TIME_VIEW_ORG = 'time.view_org';
 
     // ── CRM ────────────────────────────────────────────────
-    const CRM_VIEW   = 'crm.view';
+    const CRM_VIEW = 'crm.view';
+
     const CRM_CREATE = 'crm.create';
+
     const CRM_MANAGE = 'crm.manage';
-    const CRM_ADMIN  = 'crm.admin';
+
+    const CRM_ADMIN = 'crm.admin';
 
     // ── Organizations (within CRM) ─────────────────────────
-    const ORG_ADMIN        = 'org.admin';
-    const ORG_INVITE       = 'org.invite';
+    const ORG_ADMIN = 'org.admin';
+
+    const ORG_INVITE = 'org.invite';
+
     const ORG_MANAGE_ROLES = 'org.manage_roles';
 
     // ── CMS ────────────────────────────────────────────────
-    const CMS_VIEW    = 'cms.view';
-    const CMS_EDIT    = 'cms.edit';
+    const CMS_VIEW = 'cms.view';
+
+    const CMS_EDIT = 'cms.edit';
+
     const CMS_PUBLISH = 'cms.publish';
-    const CMS_ADMIN   = 'cms.admin';
+
+    const CMS_ADMIN = 'cms.admin';
 
     /**
      * All permissions — used by PermissionSeeder.

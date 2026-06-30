@@ -31,7 +31,7 @@ class CmsPage extends Model
     public function scopePublished($query)
     {
         return $query->where('status', 'published')
-                     ->whereNotNull('published_at');
+            ->whereNotNull('published_at');
     }
 
     // ── Relationships ──────────────────────────────────────

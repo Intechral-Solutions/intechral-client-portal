@@ -56,8 +56,8 @@ test('user can register via a valid invitation', function () {
     $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
 
     $this->post("/invitation/{$invitation->token}", [
-        'name'                  => 'New User',
-        'password'              => 'Str0ng!Password99',
+        'name' => 'New User',
+        'password' => 'Str0ng!Password99',
         'password_confirmation' => 'Str0ng!Password99',
     ])->assertRedirect('/dashboard');
 
@@ -74,8 +74,8 @@ test('email is always taken from invitation, not form input', function () {
     $invitation = Invitation::factory()->pending()->create(['email' => 'correct@example.com']);
 
     $this->post("/invitation/{$invitation->token}", [
-        'name'                  => 'New User',
-        'password'              => 'Str0ng!Password99',
+        'name' => 'New User',
+        'password' => 'Str0ng!Password99',
         'password_confirmation' => 'Str0ng!Password99',
     ])->assertRedirect('/dashboard');
 
@@ -86,8 +86,8 @@ test('password must meet complexity requirements', function () {
     $invitation = Invitation::factory()->pending()->create();
 
     $this->post("/invitation/{$invitation->token}", [
-        'name'                  => 'New User',
-        'password'              => 'weak',
+        'name' => 'New User',
+        'password' => 'weak',
         'password_confirmation' => 'weak',
     ])->assertSessionHasErrors('password');
 });

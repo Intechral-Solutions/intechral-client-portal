@@ -49,7 +49,7 @@ it('shows only published pages on the public listing', function () {
     $operator->assignRole('operator');
 
     $published = CmsPage::factory()->published()->create(['created_by' => $operator->id]);
-    $draft     = CmsPage::factory()->create(['created_by' => $operator->id]);
+    $draft = CmsPage::factory()->create(['created_by' => $operator->id]);
 
     $user = User::factory()->create();
     $user->assignRole('user');
@@ -66,7 +66,7 @@ it('shows a published page to a logged-in user', function () {
 
     $page = CmsPage::factory()->published()->create([
         'created_by' => $operator->id,
-        'body'       => '<p>Hello World</p>',
+        'body' => '<p>Hello World</p>',
     ]);
 
     $user = User::factory()->create();
@@ -97,8 +97,8 @@ it('creates a page', function () {
 
     $this->actingAs($operator)->post(route('operator.cms.store'), [
         'title' => 'Privacy Policy',
-        'slug'  => 'privacy-policy',
-        'body'  => '<p>Our privacy policy.</p>',
+        'slug' => 'privacy-policy',
+        'body' => '<p>Our privacy policy.</p>',
     ])->assertRedirect();
 
     expect(CmsPage::where('slug', 'privacy-policy')->exists())->toBeTrue();
@@ -110,7 +110,7 @@ it('auto-generates a slug when blank', function () {
 
     $this->actingAs($operator)->post(route('operator.cms.store'), [
         'title' => 'Terms of Service',
-        'slug'  => '',
+        'slug' => '',
     ])->assertRedirect();
 
     expect(CmsPage::where('slug', 'terms-of-service')->exists())->toBeTrue();
@@ -122,7 +122,7 @@ it('validates slug format', function () {
 
     $this->actingAs($operator)->post(route('operator.cms.store'), [
         'title' => 'Bad Slug',
-        'slug'  => 'Has Spaces!',
+        'slug' => 'Has Spaces!',
     ])->assertSessionHasErrors('slug');
 });
 
@@ -134,7 +134,7 @@ it('validates slug is unique', function () {
 
     $this->actingAs($operator)->post(route('operator.cms.store'), [
         'title' => 'Another Page',
-        'slug'  => 'taken-slug',
+        'slug' => 'taken-slug',
     ])->assertSessionHasErrors('slug');
 });
 
@@ -146,7 +146,7 @@ it('updates a page', function () {
 
     $this->actingAs($operator)->put(route('operator.cms.update', $page), [
         'title' => 'Updated Title',
-        'slug'  => $page->slug,
+        'slug' => $page->slug,
     ])->assertRedirect();
 
     expect($page->fresh()->title)->toBe('Updated Title');
@@ -216,7 +216,7 @@ it('returns 403 when a non-admin tries to delete', function () {
 // ── Service helpers ───────────────────────────────────────────────────────────
 
 it('generates unique slugs when titles collide', function () {
-    $user    = User::factory()->create();
+    $user = User::factory()->create();
     $service = app(CmsService::class);
 
     $page1 = $service->create($user, ['title' => 'About Us']);
@@ -227,7 +227,7 @@ it('generates unique slugs when titles collide', function () {
 });
 
 it('preserves the original published_at on re-publish', function () {
-    $user    = User::factory()->create();
+    $user = User::factory()->create();
     $service = app(CmsService::class);
 
     $page = $service->create($user, ['title' => 'Stable Date']);

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SocialAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -47,6 +46,6 @@ class ProfileController extends Controller
 
         $user->socialAccounts()->where('provider', $provider)->delete();
 
-        return back()->with('status', ucfirst($provider) . ' account unlinked.');
+        return back()->with('status', ucfirst($provider).' account unlinked.');
     }
 }

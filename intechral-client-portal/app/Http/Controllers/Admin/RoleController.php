@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -15,26 +14,28 @@ class RoleController extends Controller
     public function index()
     {
         $roles = Role::withCount('users')->orderBy('name')->get();
+
         return view('admin.roles.index', compact('roles'));
     }
 
     public function create()
     {
         $grouped = $this->groupedPermissions();
+
         return view('admin.roles.create', compact('grouped'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => ['required', 'string', 'max:64', 'unique:roles,name'],
+            'name' => ['required', 'string', 'max:64', 'unique:roles,name'],
             'description' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
         $role = Role::create([
-            'name'       => $validated['name'],
+            'name' => $validated['name'],
             'guard_name' => 'web',
         ]);
 
@@ -55,6 +56,7 @@ class RoleController extends Controller
         $grouped = $this->groupedPermissions();
         $assigned = $role->permissions->pluck('name')->toArray();
         $isBuiltIn = in_array($role->name, self::BUILT_IN);
+
         return view('admin.roles.edit', compact('role', 'grouped', 'assigned', 'isBuiltIn'));
     }
 

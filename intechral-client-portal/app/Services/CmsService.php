@@ -11,10 +11,10 @@ class CmsService
     public function create(User $creator, array $data): CmsPage
     {
         return CmsPage::create([
-            'slug'       => $data['slug'] ?? $this->uniqueSlug($data['title']),
-            'title'      => $data['title'],
-            'body'       => $data['body'] ?? null,
-            'status'     => 'draft',
+            'slug' => $data['slug'] ?? $this->uniqueSlug($data['title']),
+            'title' => $data['title'],
+            'body' => $data['body'] ?? null,
+            'status' => 'draft',
             'created_by' => $creator->id,
             'updated_by' => $creator->id,
         ]);
@@ -23,9 +23,9 @@ class CmsService
     public function update(CmsPage $page, User $editor, array $data): CmsPage
     {
         $page->update([
-            'title'      => $data['title']  ?? $page->title,
-            'slug'       => $data['slug']   ?? $page->slug,
-            'body'       => $data['body']   ?? $page->body,
+            'title' => $data['title'] ?? $page->title,
+            'slug' => $data['slug'] ?? $page->slug,
+            'body' => $data['body'] ?? $page->body,
             'updated_by' => $editor->id,
         ]);
 
@@ -35,9 +35,9 @@ class CmsService
     public function publish(CmsPage $page, User $publisher): CmsPage
     {
         $page->update([
-            'status'       => 'published',
+            'status' => 'published',
             'published_at' => $page->published_at ?? now(),
-            'updated_by'   => $publisher->id,
+            'updated_by' => $publisher->id,
         ]);
 
         return $page->fresh();
@@ -46,7 +46,7 @@ class CmsService
     public function unpublish(CmsPage $page, User $editor): CmsPage
     {
         $page->update([
-            'status'     => 'draft',
+            'status' => 'draft',
             'updated_by' => $editor->id,
         ]);
 
@@ -64,13 +64,13 @@ class CmsService
     {
         $base = Str::slug($title);
         $slug = $base;
-        $i    = 2;
+        $i = 2;
 
         while (CmsPage::where('slug', $slug)->exists()) {
             $slug = "{$base}-{$i}";
             $i++;
         }
 
-        return $slug ?: 'page-' . now()->timestamp;
+        return $slug ?: 'page-'.now()->timestamp;
     }
 }

@@ -14,19 +14,25 @@ class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
-        if ($user->can('projects.admin')) return true;
+        if ($user->can('projects.admin')) {
+            return true;
+        }
+
         return $project->hasMember($user);
     }
 
     public function manage(User $user, Project $project): bool
     {
-        if ($user->can('projects.admin')) return true;
+        if ($user->can('projects.admin')) {
+            return true;
+        }
         if ($user->can('projects.manage')) {
             return $project->members()
                 ->where('user_id', $user->id)
                 ->where('role', 'manager')
                 ->exists();
         }
+
         return false;
     }
 }

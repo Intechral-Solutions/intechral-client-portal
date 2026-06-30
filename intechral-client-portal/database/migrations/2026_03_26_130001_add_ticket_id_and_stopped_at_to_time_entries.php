@@ -10,15 +10,15 @@ return new class extends Migration
     {
         Schema::table('time_entries', function (Blueprint $table) {
             $table->foreignId('ticket_id')
-                  ->nullable()
-                  ->after('task_id')
-                  ->constrained('tickets')
-                  ->nullOnDelete();
+                ->nullable()
+                ->after('task_id')
+                ->constrained('tickets')
+                ->nullOnDelete();
 
             $table->timestamp('stopped_at')
-                  ->nullable()
-                  ->after('timer_started_at')
-                  ->comment('Set when timer is stopped; used for block overlap queries');
+                ->nullable()
+                ->after('timer_started_at')
+                ->comment('Set when timer is stopped; used for block overlap queries');
 
             $table->index(['user_id', 'timer_started_at'], 'time_entries_user_timer_idx');
         });

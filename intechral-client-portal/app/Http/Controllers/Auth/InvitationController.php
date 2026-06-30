@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\PasswordHistory;
+use App\Models\User;
 use App\Services\InvitationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +37,7 @@ class InvitationController extends Controller
         }
 
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'password' => [
                 'required',
                 'string',
@@ -45,11 +46,11 @@ class InvitationController extends Controller
             ],
         ]);
 
-        $user = \App\Models\User::create([
-            'name'        => $validated['name'],
-            'email'       => $invitation->email,
-            'password'    => Hash::make($validated['password']),
-            'invited_by'  => $invitation->invited_by,
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $invitation->email,
+            'password' => Hash::make($validated['password']),
+            'invited_by' => $invitation->invited_by,
         ]);
 
         // Assign default role
@@ -57,8 +58,8 @@ class InvitationController extends Controller
 
         // Store initial password history entry
         PasswordHistory::create([
-            'user_id'    => $user->id,
-            'password'   => $user->password,
+            'user_id' => $user->id,
+            'password' => $user->password,
             'created_at' => now(),
         ]);
 
@@ -78,6 +79,6 @@ class InvitationController extends Controller
 
         $this->service->invite($request->input('email'), $request->user());
 
-        return back()->with('status', 'Invitation sent to ' . $request->input('email'));
+        return back()->with('status', 'Invitation sent to '.$request->input('email'));
     }
 }

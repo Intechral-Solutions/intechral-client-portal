@@ -1,15 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\CmsController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Crm\CompanyController;
-use App\Http\Controllers\Crm\ContactController;
-use App\Http\Controllers\Organization\OrganizationController;
-use App\Http\Controllers\Organization\OrganizationMemberController;
-use App\Http\Controllers\Operator\CmsPageController;
-use App\Http\Controllers\Operator\TimeReportController;
-use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\SocialiteController;
@@ -17,10 +8,18 @@ use App\Http\Controllers\Billing\ClientInvoiceController;
 use App\Http\Controllers\Billing\InvoiceController;
 use App\Http\Controllers\Billing\InvoicePaymentController;
 use App\Http\Controllers\Billing\StripeWebhookController;
+use App\Http\Controllers\CmsController;
+use App\Http\Controllers\Crm\CompanyController;
+use App\Http\Controllers\Crm\ContactController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Operator\CmsPageController;
 use App\Http\Controllers\Operator\TicketBulkController;
+use App\Http\Controllers\Operator\TicketController as OperatorTicketController;
 use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyController;
 use App\Http\Controllers\Operator\TicketReportController;
-use App\Http\Controllers\Operator\TicketController as OperatorTicketController;
+use App\Http\Controllers\Operator\TimeReportController;
+use App\Http\Controllers\Organization\OrganizationController;
+use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
@@ -28,6 +27,8 @@ use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TimeEntryController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
 // Root redirect
@@ -155,7 +156,7 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
 
 // Stripe webhook (no auth, no CSRF — verified by Stripe signature)
 Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class])
+    ->withoutMiddleware([PreventRequestForgery::class])
     ->name('webhooks.stripe');
 
 // Billing — operator invoice management (literal routes before {invoice} wildcard)

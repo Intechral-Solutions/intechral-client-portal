@@ -2,11 +2,10 @@
 
 use App\Models\Ticket;
 use App\Models\User;
+use App\Notifications\TicketCreatedNotification;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
-use App\Notifications\TicketCreatedNotification;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -50,10 +49,10 @@ it('creates a ticket with a TKT-XXXX number', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('tickets.store'), [
-        'title'       => 'My first ticket',
+        'title' => 'My first ticket',
         'description' => 'Something is broken.',
-        'category'    => 'Technical',
-        'priority'    => 'high',
+        'category' => 'Technical',
+        'priority' => 'high',
     ])->assertRedirect();
 
     $ticket = Ticket::first();
@@ -68,10 +67,10 @@ it('sets SLA due date based on priority', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('tickets.store'), [
-        'title'       => 'Critical issue',
+        'title' => 'Critical issue',
         'description' => 'Urgent.',
-        'category'    => 'Technical',
-        'priority'    => 'critical',
+        'category' => 'Technical',
+        'priority' => 'critical',
     ]);
 
     $ticket = Ticket::first();
@@ -85,10 +84,10 @@ it('sends a confirmation email after ticket creation', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)->post(route('tickets.store'), [
-        'title'       => 'Notify me',
+        'title' => 'Notify me',
         'description' => 'Please help.',
-        'category'    => 'General',
-        'priority'    => 'medium',
+        'category' => 'General',
+        'priority' => 'medium',
     ]);
 
     Notification::assertSentTo($user, TicketCreatedNotification::class);
@@ -101,11 +100,11 @@ it('accepts file attachments on ticket submission', function () {
     $file = UploadedFile::fake()->create('document.pdf', 512, 'application/pdf');
 
     $this->actingAs($user)->post(route('tickets.store'), [
-        'title'         => 'Ticket with attachment',
-        'description'   => 'See attached.',
-        'category'      => 'General',
-        'priority'      => 'low',
-        'attachments'   => [$file],
+        'title' => 'Ticket with attachment',
+        'description' => 'See attached.',
+        'category' => 'General',
+        'priority' => 'low',
+        'attachments' => [$file],
     ]);
 
     $ticket = Ticket::first();
@@ -120,11 +119,11 @@ it('rejects attachments larger than 20 MB', function () {
     $file = UploadedFile::fake()->create('huge.zip', 21_000, 'application/zip');
 
     $this->actingAs($user)->post(route('tickets.store'), [
-        'title'         => 'Big file',
-        'description'   => 'Oops.',
-        'category'      => 'General',
-        'priority'      => 'low',
-        'attachments'   => [$file],
+        'title' => 'Big file',
+        'description' => 'Oops.',
+        'category' => 'General',
+        'priority' => 'low',
+        'attachments' => [$file],
     ])->assertSessionHasErrors('attachments.*');
 });
 
@@ -161,7 +160,7 @@ it('allows users to view their own ticket', function () {
 });
 
 it('prevents users from viewing another users ticket', function () {
-    $user  = User::factory()->create();
+    $user = User::factory()->create();
     $user->assignRole('user');
     $other = User::factory()->create();
     $ticket = Ticket::factory()->for($other, 'user')->create();

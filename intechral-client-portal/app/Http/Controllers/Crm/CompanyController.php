@@ -34,11 +34,11 @@ class CompanyController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'    => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'website' => 'nullable|url|max:255',
-            'phone'   => 'nullable|string|max:30',
+            'phone' => 'nullable|string|max:30',
             'address' => 'nullable|string|max:1000',
-            'notes'   => 'nullable|string|max:5000',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $company = $this->service->createCompany($request->user(), $data);
@@ -62,11 +62,11 @@ class CompanyController extends Controller
     public function update(Request $request, CrmCompany $company): RedirectResponse
     {
         $data = $request->validate([
-            'name'    => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'website' => 'nullable|url|max:255',
-            'phone'   => 'nullable|string|max:30',
+            'phone' => 'nullable|string|max:30',
             'address' => 'nullable|string|max:1000',
-            'notes'   => 'nullable|string|max:5000',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $this->service->updateCompany($company, $data);
