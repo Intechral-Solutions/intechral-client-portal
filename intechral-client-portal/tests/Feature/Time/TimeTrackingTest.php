@@ -1,12 +1,19 @@
 <?php
 
 use App\Models\TimeEntry;
+use App\Models\TimeEntryBlock;
 use App\Models\User;
 use App\Services\ProjectService;
 use App\Services\TimeEntryService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 // ── Guests ───────────────────────────────────────────────────────────────────
@@ -193,6 +200,128 @@ it('stops a timer and records elapsed minutes', function () {
 
     expect($entry->fresh()->timer_started_at)->toBeNull();
     expect($entry->fresh()->duration_minutes)->toBe(30);
+});
+
+it('permanently stops a legacy timer whose elapsed duration exceeds smallint storage', function () {
+    Carbon::setTestNow('2026-06-30 20:22:27');
+
+    $user = User::factory()->create();
+    $user->assignRole('user');
+
+    $entry = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'date' => now()->subDays(95)->toDateString(),
+        'duration_minutes' => 0,
+        'timer_started_at' => now()->subDays(95),
+        'stopped_at' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->getJson(route('time.timers.active'))
+        ->assertOk()
+        ->assertJsonFragment(['id' => $entry->id]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $entry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 136800);
+
+    $entry->refresh();
+
+    expect($entry->timer_started_at)->toBeNull()
+        ->and($entry->stopped_at->equalTo(now()))->toBeTrue()
+        ->and($entry->duration_minutes)->toBe(136800)
+        ->and($entry->blocks()->count())->toBeGreaterThan(9000);
+
+    $this->actingAs($user)
+        ->getJson(route('time.timers.active'))
+        ->assertOk()
+        ->assertExactJson([]);
+});
+
+it('hides and safely normalizes a partially stopped legacy timer', function () {
+    Carbon::setTestNow('2026-06-30 20:22:27');
+
+    $user = User::factory()->create();
+    $user->assignRole('user');
+
+    $entry = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 0,
+        'timer_started_at' => now()->subMinutes(30),
+    ]);
+    $originalStop = now()->subMinutes(5);
+
+    // Bypass model guardrails to reproduce a legacy/corrupt database row.
+    DB::table('time_entries')->where('id', $entry->id)->update([
+        'stopped_at' => $originalStop,
+    ]);
+    $entry->refresh();
+
+    expect($entry->isRunning())->toBeFalse();
+
+    $this->actingAs($user)
+        ->getJson(route('time.timers.active'))
+        ->assertOk()
+        ->assertExactJson([]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $entry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 25);
+
+    $entry->refresh();
+
+    expect($entry->timer_started_at)->toBeNull()
+        ->and($entry->stopped_at->equalTo($originalStop))->toBeTrue()
+        ->and($entry->duration_minutes)->toBe(25);
+
+    // A retry is a successful no-op and cannot add the duration twice.
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $entry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 25);
+});
+
+it('rejects impossible timer states through normal model writes', function () {
+    expect(fn () => TimeEntry::factory()->create([
+        'timer_started_at' => now()->subMinutes(30),
+        'stopped_at' => now(),
+    ]))->toThrow(LogicException::class)
+        ->and(fn () => TimeEntry::factory()->create([
+            'billed' => true,
+            'timer_started_at' => now()->subMinutes(30),
+            'stopped_at' => null,
+        ]))->toThrow(LogicException::class);
+});
+
+it('rebalances finalized blocks for overlapping concurrent timers', function () {
+    Carbon::setTestNow('2026-06-30 20:30:00');
+
+    $user = User::factory()->create();
+
+    $first = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'timer_started_at' => now()->subMinutes(30),
+    ]);
+    $second = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'timer_started_at' => now()->subMinutes(15),
+    ]);
+
+    $service = app(TimeEntryService::class);
+    $service->stopTimer($first);
+    $service->stopTimer($second);
+
+    $blockNumber = (int) (now()->startOfDay()->diffInMinutes(now()->subMinutes(15)) / 15);
+    $allocations = TimeEntryBlock::where('block_date', now()->toDateString())
+        ->where('block_number', $blockNumber)
+        ->whereIn('time_entry_id', [$first->id, $second->id])
+        ->pluck('allocation_pct', 'time_entry_id');
+
+    expect($allocations)->toHaveCount(2)
+        ->and((float) $allocations[$first->id])->toBe(50.0)
+        ->and((float) $allocations[$second->id])->toBe(50.0);
 });
 
 it('returns 403 stopping another user\'s timer', function () {

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class TimeEntry extends Model
 {
@@ -34,6 +35,19 @@ class TimeEntry extends Model
         'timer_started_at' => 'datetime',
         'stopped_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (TimeEntry $entry): void {
+            if ($entry->timer_started_at !== null && $entry->stopped_at !== null) {
+                throw new LogicException('A time entry cannot be both running and stopped.');
+            }
+
+            if ($entry->timer_started_at !== null && ($entry->billed || $entry->invoice_id !== null)) {
+                throw new LogicException('A billed or invoiced time entry cannot be running.');
+            }
+        });
+    }
 
     // ── Relationships ────────────────────────────────────────
 
@@ -71,7 +85,7 @@ class TimeEntry extends Model
 
     public function isRunning(): bool
     {
-        return $this->timer_started_at !== null;
+        return $this->timer_started_at !== null && $this->stopped_at === null;
     }
 
     /** Effective duration including live elapsed time if timer is running */
@@ -132,15 +146,29 @@ class TimeEntry extends Model
         return $query->where('billable', true)->where('billed', false);
     }
 
+    /** Canonical active timer state. */
+    public function scopeRunning($query)
+    {
+        return $query
+            ->whereNotNull('timer_started_at')
+            ->whereNull('stopped_at');
+    }
+
     /**
-     * Entries that were running at any point during the given window.
-     * Only matches finalized (stopped) entries; running timers are handled separately.
+     * Finalized entries that overlapped the given window.
+     *
+     * Stopped timers intentionally clear timer_started_at, so their approximate
+     * start is reconstructed from stopped_at - duration_minutes.
      */
     public function scopeRunningDuring($query, Carbon $from, Carbon $to)
     {
         return $query
+            ->whereNull('timer_started_at')
             ->whereNotNull('stopped_at')
-            ->where('timer_started_at', '<=', $to)
-            ->where('stopped_at', '>=', $from);
+            ->where('stopped_at', '>=', $from)
+            ->whereRaw(
+                'DATE_SUB(stopped_at, INTERVAL duration_minutes MINUTE) <= ?',
+                [$to],
+            );
     }
 }

@@ -26,7 +26,7 @@
         ->sum('duration_minutes');
 
     $runningEntry = TimeEntry::where($col, $contextId)
-        ->whereNotNull('timer_started_at')
+        ->running()
         ->where('user_id', auth()->id())
         ->first();
 
@@ -159,17 +159,23 @@
                 btn.disabled = true;
                 btn.textContent = '\u2026';
                 try {
-                    await fetch('/time/timer/' + entryId + '/stop', {
+                    var res = await fetch('/time/timer/' + entryId + '/stop', {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': CSRF },
                     });
+
+                    if (!res.ok) {
+                        throw new Error('Unable to stop timer (' + res.status + ')');
+                    }
+
                     window.dispatchEvent(new CustomEvent('timerStopped', { detail: { id: parseInt(entryId, 10) } }));
                     // Reload the page to refresh the totals / recent entries
                     location.reload();
-                } catch (e) {
-                    btn.disabled = false;
-                    btn.textContent = 'Stop';
-                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.textContent = 'Retry stop';
+                btn.title = e.message || 'Unable to stop timer';
+            }
             });
         });
     }

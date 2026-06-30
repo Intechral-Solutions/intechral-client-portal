@@ -106,4 +106,18 @@ Final result: **233/233 tests passing, 561 assertions** against `intechral_clien
 
 See [EPIC-010B](../epics/EPIC-010B-tenant-scoping.md) for the tenant-scoping matrix and verification details.
 
+---
+
+## Milestone 4 — Stuck Timer Integrity Preflight
+
+**Date:** 2026-06-30
+
+An abandoned local timer from 2026-03-27 could not be stopped because its elapsed duration exceeded the `UNSIGNED SMALLINT` capacity of `time_entries.duration_minutes`. MariaDB rejected the update, while both timer interfaces ignored the unsuccessful HTTP status and temporarily hid the unchanged timer.
+
+Timer state is now canonicalized as running only when `timer_started_at` is non-null and `stopped_at` is null. Duration storage is widened, stopping is transactional and idempotent, partially stopped legacy rows normalize safely, long allocation runs use batched upserts, and model guards reject impossible stopped/running or billed/running writes. Regression coverage includes the 95-day overflow case, partial legacy state, invalid-state guards, and overlapping concurrent allocation.
+
+Local entry 10 was stopped through `TimeEntryService` without deletion: 136,824 minutes were retained and 9,123 allocation blocks finalized. The canonical active-timer count is now zero. See [EPIC-007](../epics/EPIC-007-time-tracking.md#canonical-timer-state-2026-06-30) for invariants and the repair command.
+
+Final result: **237/237 Pest tests passing (586 assertions)** and **180/180 files passing Pint**.
+
 <!-- Add future milestones below -->

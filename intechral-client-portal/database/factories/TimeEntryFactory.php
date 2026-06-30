@@ -31,6 +31,7 @@ class TimeEntryFactory extends Factory
         return $this->state([
             'duration_minutes' => 0,
             'timer_started_at' => now()->subMinutes(rand(1, 60)),
+            'stopped_at' => null,
         ]);
     }
 

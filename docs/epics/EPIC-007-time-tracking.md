@@ -33,7 +33,7 @@ Allow team members to log time against projects and tasks, with reports and bill
 - [x] Start timer button creates an in-progress entry in the DB
 - [x] Timer state persisted server-side (survives page reload)
 - [x] Stop timer converts in-progress entry to a completed time entry
-- [x] Only one active timer per user at a time (multi-timer block system added 2026-03-27)
+- [x] Multiple simultaneous timers are supported by the block allocation system
 - [x] Timer displays in the navigation bar while running
 
 ### STORY-007-03: Operator Time Oversight
@@ -67,6 +67,7 @@ Allow team members to log time against projects and tasks, with reports and bill
 - `create_time_entries_table` — user, project, task (optional), ticket (optional), date, duration, description, billable flag, invoiced flag, stopped_at (for live timers)
 - `add_ticket_id_and_stopped_at_to_time_entries` (2026-03-26) — links entries to tickets
 - `create_time_entry_blocks_table` (2026-03-27) — block-based allocation for multi-timer sessions; stores block start, end, and allocation weights
+- `widen_time_entry_duration_minutes` (2026-06-30) — changes duration storage from unsigned smallint to unsigned integer so abandoned long-running timers can be finalized safely
 
 **Controllers**
 - `TimeEntryController` — full user-facing time tracking:
@@ -92,6 +93,32 @@ Allow team members to log time against projects and tasks, with reports and bill
 ### Multi-Timer / Block Allocation (2026-03-27)
 
 Users can run multiple concurrent timer blocks within a session. The `time_entry_blocks` table stores discrete blocks; a drag interface on the allocation view lets users adjust the proportional split of time across blocks before committing entries.
+
+### Canonical Timer State (2026-06-30)
+
+| State | `timer_started_at` | `stopped_at` | Notes |
+|---|---|---|---|
+| Running | Non-null | Null | Returned by `TimeEntry::running()` and the active-timers endpoint |
+| Stopped | Null | Non-null | Duration is persisted and allocation blocks are finalized |
+| Manual historical entry | Null | Usually null | No live timer interval exists |
+| Billed/invoiced | Null | Either stopped or manual | Must never remain running |
+
+`TimeEntry::isRunning()` and the `running` scope are the canonical definition. Model guards reject mixed running/stopped and billed/running states during normal Eloquent writes. `stopTimer()` locks the row, is idempotent, clears `timer_started_at`, preserves or sets `stopped_at`, and safely normalizes partially stopped legacy rows.
+
+### Stuck Timer Incident and Repair (2026-06-30)
+
+Local entry 10 had been running since 2026-03-27. Its elapsed duration exceeded the old unsigned-smallint maximum of 65,535 minutes, so MariaDB rejected every stop update while the frontend incorrectly treated the failed HTTP response as success. The column is now an unsigned integer, long block finalization uses batched upserts, and both timer UIs check `response.ok` before removing a timer.
+
+The local record was preserved and stopped through the application service after migrating:
+
+```bash
+docker compose exec app php artisan migrate --force
+docker compose exec app php artisan tinker --execute='$entry = App\Models\TimeEntry::findOrFail(10); app(App\Services\TimeEntryService::class)->stopTimer($entry);'
+```
+
+Result: entry 10 has `timer_started_at = NULL`, `stopped_at = 2026-06-30 20:46:58`, `duration_minutes = 136824`, and 9,123 finalized allocation blocks. No local timers remain active.
+
+Regression coverage reproduces the long-running overflow before stop, verifies it disappears from the active endpoint afterward, normalizes partially stopped rows idempotently, rejects impossible model states, and confirms concurrent block rebalancing. Final verification: **237/237 Pest tests passing (586 assertions)** and **180/180 files passing Pint**.
 
 ### Known Gaps
 

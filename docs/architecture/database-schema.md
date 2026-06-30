@@ -97,7 +97,7 @@ Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is
 - `invoice_payments` — invoice_id, amount, date, method, reference, stripe_payment_intent_id
 
 ### Time Tracking Module
-- `time_entries` — id, user_id, project_id, task_id nullable, ticket_id nullable, date, duration, description, billable, invoiced, stopped_at
+- `time_entries` — id, user_id, project_id, task_id nullable, ticket_id nullable, invoice_id nullable, date, duration_minutes (unsigned integer), description, billable, billed, timer_started_at, stopped_at
 - `time_entry_blocks` — id, time_entry_id, started_at, ended_at, allocation_weight (for multi-timer block allocation)
 
 ### CRM Module

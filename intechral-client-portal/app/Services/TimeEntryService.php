@@ -7,7 +7,7 @@ use App\Models\TimeEntryBlock;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class TimeEntryService
 {
@@ -33,7 +33,9 @@ class TimeEntryService
             'description' => $data['description'] ?? null,
             'billable' => $data['billable'] ?? true,
             'billed' => false,
+            'invoice_id' => null,
             'timer_started_at' => null,
+            'stopped_at' => null,
         ]);
     }
 
@@ -75,7 +77,9 @@ class TimeEntryService
             'description' => $data['description'] ?? null,
             'billable' => $data['billable'] ?? true,
             'billed' => false,
+            'invoice_id' => null,
             'timer_started_at' => now(),
+            'stopped_at' => null,
         ]);
     }
 
@@ -86,23 +90,42 @@ class TimeEntryService
      */
     public function stopTimer(TimeEntry $entry): TimeEntry
     {
-        if (! $entry->isRunning()) {
-            throw ValidationException::withMessages(['timer' => 'Timer is not running.']);
-        }
+        return DB::transaction(function () use ($entry): TimeEntry {
+            $current = TimeEntry::query()
+                ->lockForUpdate()
+                ->findOrFail($entry->getKey());
 
-        $startedAt = $entry->timer_started_at->copy(); // capture before nulling
-        $stoppedAt = now();
-        $elapsed = (int) $startedAt->diffInMinutes($stoppedAt);
+            // Idempotent retry: a prior request already normalized this entry.
+            if ($current->timer_started_at === null) {
+                return $current;
+            }
 
-        $entry->update([
-            'duration_minutes' => $entry->duration_minutes + $elapsed,
-            'stopped_at' => $stoppedAt,
-            'timer_started_at' => null,
-        ]);
+            $startedAt = $current->timer_started_at->copy();
+            $wasPartiallyStopped = $current->stopped_at !== null;
+            $stoppedAt = $current->stopped_at?->copy() ?? now();
 
-        $this->finalizeBlocks($entry->fresh(), $startedAt, $stoppedAt);
+            // A malformed legacy end before its start cannot define an interval.
+            if ($stoppedAt->lt($startedAt)) {
+                $stoppedAt = now();
+                $wasPartiallyStopped = false;
+            }
 
-        return $entry->fresh();
+            $elapsed = (int) $startedAt->diffInMinutes($stoppedAt);
+            $duration = $wasPartiallyStopped
+                ? max($current->duration_minutes, $elapsed)
+                : $current->duration_minutes + $elapsed;
+
+            $current->update([
+                'duration_minutes' => $duration,
+                'stopped_at' => $stoppedAt,
+                'timer_started_at' => null,
+            ]);
+
+            $current->refresh();
+            $this->finalizeBlocks($current, $startedAt, $stoppedAt);
+
+            return $current->fresh();
+        });
     }
 
     /**
@@ -111,7 +134,7 @@ class TimeEntryService
     public function activeTimers(User $user): Collection
     {
         return TimeEntry::where('user_id', $user->id)
-            ->whereNotNull('timer_started_at')
+            ->running()
             ->with(['project', 'task', 'ticket'])
             ->orderBy('timer_started_at')
             ->get();
@@ -200,11 +223,36 @@ class TimeEntryService
      */
     private function finalizeBlocks(TimeEntry $entry, Carbon $startedAt, Carbon $stoppedAt): void
     {
-
         // Snap to 15-minute block boundaries.
         $blockStart = $startedAt->copy()->floorUnit('minute', 15);
         $blockEnd = $stoppedAt->copy()->floorUnit('minute', 15);
 
+        $concurrent = TimeEntry::where('user_id', $entry->user_id)
+            ->where('id', '!=', $entry->id)
+            ->runningDuring($startedAt, $stoppedAt)
+            ->get();
+
+        $intervals = $concurrent->mapWithKeys(fn (TimeEntry $other) => [
+            $other->id => [
+                'entry' => $other,
+                'start' => $other->stopped_at->copy()->subMinutes($other->duration_minutes),
+                'end' => $other->stopped_at,
+            ],
+        ]);
+
+        $entryIds = $concurrent->modelKeys();
+        $entryIds[] = $entry->id;
+
+        $overridden = TimeEntryBlock::whereIn('time_entry_id', $entryIds)
+            ->whereBetween('block_date', [$blockStart->toDateString(), $blockEnd->toDateString()])
+            ->where('is_overridden', true)
+            ->get(['time_entry_id', 'block_date', 'block_number'])
+            ->mapWithKeys(fn (TimeEntryBlock $block) => [
+                $this->blockKey($block->time_entry_id, $block->block_date->toDateString(), $block->block_number) => true,
+            ]);
+
+        $rows = [];
+        $timestamp = now();
         $current = $blockStart->copy();
 
         while ($current->lte($blockEnd)) {
@@ -220,37 +268,54 @@ class TimeEntryService
                 continue;
             }
 
-            // Find other finalized entries for this user that ran during this slot.
-            $concurrent = TimeEntry::where('user_id', $entry->user_id)
-                ->where('id', '!=', $entry->id)
-                ->runningDuring($current, $slotEnd)
-                ->get();
+            $seconds = [$entry->id => $mySeconds];
 
-            $totalSeconds = $mySeconds;
-            $concurrentSeconds = [];
+            foreach ($intervals as $otherId => $interval) {
+                $otherSeconds = $this->secondsInWindow(
+                    $interval['start'],
+                    $interval['end'],
+                    $current,
+                    $slotEnd,
+                );
 
-            foreach ($concurrent as $other) {
-                // Concurrent entries in scopeRunningDuring are already stopped (have stopped_at).
-                // Reconstruct their start from stopped_at - duration_minutes as minute-level approximation.
-                // (Their exact timer_started_at was nulled when they stopped; this is the best we have
-                //  for historical entries. New entries stopped via this service will store exact times.)
-                $otherStart = $other->stopped_at->copy()->subMinutes($other->duration_minutes);
-                $secs = $this->secondsInWindow($otherStart, $other->stopped_at, $current, $slotEnd);
-                $concurrentSeconds[$other->id] = $secs;
-                $totalSeconds += $secs;
+                if ($otherSeconds > 0) {
+                    $seconds[$otherId] = $otherSeconds;
+                }
             }
 
-            $myPct = $totalSeconds > 0 ? round($mySeconds / $totalSeconds * 100, 2) : 100.00;
-            $this->upsertBlock($entry->id, $entry->user_id, $blockDate, $blockNumber, $myPct);
+            $totalSeconds = array_sum($seconds);
 
-            foreach ($concurrent as $other) {
-                $otherPct = $totalSeconds > 0
-                    ? round(($concurrentSeconds[$other->id] ?? 0) / $totalSeconds * 100, 2)
-                    : 0.00;
-                $this->upsertBlock($other->id, $other->user_id, $blockDate, $blockNumber, $otherPct);
+            foreach ($seconds as $timeEntryId => $entrySeconds) {
+                $key = $this->blockKey($timeEntryId, $blockDate, $blockNumber);
+                if ($overridden->has($key)) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'time_entry_id' => $timeEntryId,
+                    'user_id' => $timeEntryId === $entry->id
+                        ? $entry->user_id
+                        : $intervals[$timeEntryId]['entry']->user_id,
+                    'block_date' => $blockDate,
+                    'block_number' => $blockNumber,
+                    'allocation_pct' => $totalSeconds > 0
+                        ? round($entrySeconds / $totalSeconds * 100, 2)
+                        : 100.00,
+                    'is_overridden' => false,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ];
             }
 
             $current->addMinutes(15);
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            TimeEntryBlock::upsert(
+                $chunk,
+                ['time_entry_id', 'block_date', 'block_number'],
+                ['user_id', 'allocation_pct', 'is_overridden', 'updated_at'],
+            );
         }
     }
 
@@ -265,32 +330,9 @@ class TimeEntryService
         return max(0, (int) $overlapStart->diffInSeconds($overlapEnd, false));
     }
 
-    /**
-     * Upsert a time_entry_blocks row, skipping manually overridden rows.
-     */
-    private function upsertBlock(int $entryId, int $userId, string $blockDate, int $blockNumber, float $pct): void
+    private function blockKey(int $entryId, string $blockDate, int $blockNumber): string
     {
-        $existing = TimeEntryBlock::where('time_entry_id', $entryId)
-            ->where('block_date', $blockDate)
-            ->where('block_number', $blockNumber)
-            ->first();
-
-        if ($existing?->is_overridden) {
-            return;
-        }
-
-        TimeEntryBlock::updateOrCreate(
-            [
-                'time_entry_id' => $entryId,
-                'block_date' => $blockDate,
-                'block_number' => $blockNumber,
-            ],
-            [
-                'user_id' => $userId,
-                'allocation_pct' => $pct,
-                'is_overridden' => false,
-            ]
-        );
+        return "{$entryId}:{$blockDate}:{$blockNumber}";
     }
 
     private function applyFilters($query, array $filters): void

@@ -200,14 +200,20 @@ function buildTile(timer) {
         stopBtn.disabled = true;
         stopBtn.textContent = '…';
         try {
-            await fetch(`/time/timer/${id}/stop`, {
+            const response = await fetch(`/time/timer/${id}/stop`, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': CSRF() },
             });
+
+            if (!response.ok) {
+                throw new Error(`Unable to stop timer (${response.status})`);
+            }
+
             removeTile(id);
-        } catch {
+        } catch (error) {
             stopBtn.disabled = false;
-            stopBtn.textContent = 'Stop';
+            stopBtn.textContent = 'Retry stop';
+            stopBtn.title = error.message || 'Unable to stop timer';
         }
     });
 
