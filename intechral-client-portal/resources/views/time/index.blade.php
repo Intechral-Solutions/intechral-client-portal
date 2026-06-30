@@ -31,6 +31,12 @@
          role="alert">{{ session('success') }}</div>
     @endif
 
+    @error('time_entry')
+    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
+         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
+         role="alert">{{ $message }}</div>
+    @enderror
+
     {{-- Start New Timer ──────────────────────────────────────────────────── --}}
     <div class="mb-6 rounded-xl border p-5"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
@@ -267,12 +273,14 @@
                         @endif
                     </td>
                     <td class="px-4 py-3 text-right">
-                        @if (! $entry->billed && ! $entry->isRunning())
+                        @if (! $entry->isLockedForBilling() && ! $entry->isRunning())
                         <form method="POST" action="{{ route('time.destroy', $entry) }}"
                               onsubmit="return confirm('Delete this entry?')" class="inline">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-xs hover:underline" style="color: var(--text-danger);">Delete</button>
                         </form>
+                        @elseif ($entry->isLockedForBilling())
+                        <span class="text-xs" style="color: var(--text-muted);" title="Billed time entries cannot be modified.">Locked</span>
                         @endif
                     </td>
                 </tr>

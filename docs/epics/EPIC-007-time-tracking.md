@@ -21,7 +21,7 @@ Allow team members to log time against projects and tasks, with reports and bill
 **Acceptance Criteria:**
 - [x] Time entry: project, task (optional), date, duration (HH:MM), description, billable flag
 - [ ] Entries can be edited or deleted by the logger (within a configurable lock window)
-- [ ] Entries locked after invoicing (cannot be edited)
+- [x] Billed or invoice-linked entries are locked from ordinary mutation
 - [x] Daily/weekly timesheet view for self
 
 ### STORY-007-02: Timer (Start/Stop)
@@ -120,10 +120,13 @@ Result: entry 10 has `timer_started_at = NULL`, `stopped_at = 2026-06-30 20:46:5
 
 Regression coverage reproduces the long-running overflow before stop, verifies it disappears from the active endpoint afterward, normalizes partially stopped rows idempotently, rejects impossible model states, and confirms concurrent block rebalancing. Final verification: **237/237 Pest tests passing (586 assertions)** and **180/180 files passing Pint**.
 
+### Billing Lock (2026-06-30)
+
+A time entry is locked when `billed` is true or `invoice_id` is non-null. `TimeEntry::isLockedForBilling()` centralizes this definition, and transactional service methods enforce it for update, delete, timer description, timer stop, and allocation changes. Allocation rejects the whole affected slot if a target or sibling entry is locked, preventing indirect mutation. Locked entries remain available in owner timesheets and operator reports. See [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) for the lock matrix and regression coverage.
+
 ### Known Gaps
 
 - Configurable lock window for entry edits not confirmed
-- Entries locked after invoicing — `invoiced` flag exists, enforcement not confirmed
 - Bulk approve in operator view not implemented
 - Time-to-invoice export not yet implemented (see EPIC-006 gap)
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TimeEntryService
 {
@@ -40,25 +41,39 @@ class TimeEntryService
     }
 
     /**
-     * Update an existing entry (only allowed while not billed).
+     * Update an existing entry only while it is not billing-locked.
      */
     public function update(TimeEntry $entry, array $data): TimeEntry
     {
-        $minutes = isset($data['hours'])
-            ? (int) round((float) $data['hours'] * 60)
-            : ($data['duration_minutes'] ?? $entry->duration_minutes);
+        return DB::transaction(function () use ($entry, $data): TimeEntry {
+            $current = TimeEntry::query()->lockForUpdate()->findOrFail($entry->getKey());
+            $this->ensureMutable($current);
 
-        $entry->update([
-            'project_id' => $data['project_id'] ?? $entry->project_id,
-            'task_id' => $data['task_id'] ?? $entry->task_id,
-            'ticket_id' => $data['ticket_id'] ?? $entry->ticket_id,
-            'date' => $data['date'] ?? $entry->date,
-            'duration_minutes' => $minutes,
-            'description' => $data['description'] ?? $entry->description,
-            'billable' => $data['billable'] ?? $entry->billable,
-        ]);
+            $minutes = isset($data['hours'])
+                ? (int) round((float) $data['hours'] * 60)
+                : ($data['duration_minutes'] ?? $current->duration_minutes);
 
-        return $entry->fresh();
+            $current->update([
+                'project_id' => $data['project_id'] ?? $current->project_id,
+                'task_id' => $data['task_id'] ?? $current->task_id,
+                'ticket_id' => $data['ticket_id'] ?? $current->ticket_id,
+                'date' => $data['date'] ?? $current->date,
+                'duration_minutes' => $minutes,
+                'description' => $data['description'] ?? $current->description,
+                'billable' => $data['billable'] ?? $current->billable,
+            ]);
+
+            return $current->fresh();
+        });
+    }
+
+    public function delete(TimeEntry $entry): void
+    {
+        DB::transaction(function () use ($entry): void {
+            $current = TimeEntry::query()->lockForUpdate()->findOrFail($entry->getKey());
+            $this->ensureMutable($current);
+            $current->delete();
+        });
     }
 
     /**
@@ -95,6 +110,8 @@ class TimeEntryService
                 ->lockForUpdate()
                 ->findOrFail($entry->getKey());
 
+            $this->ensureMutable($current);
+
             // Idempotent retry: a prior request already normalized this entry.
             if ($current->timer_started_at === null) {
                 return $current;
@@ -125,6 +142,69 @@ class TimeEntryService
             $this->finalizeBlocks($current, $startedAt, $stoppedAt);
 
             return $current->fresh();
+        });
+    }
+
+    public function updateTimerDescription(TimeEntry $entry, ?string $description): TimeEntry
+    {
+        return DB::transaction(function () use ($entry, $description): TimeEntry {
+            $current = TimeEntry::query()->lockForUpdate()->findOrFail($entry->getKey());
+            $this->ensureMutable($current);
+
+            if (! $current->isRunning()) {
+                throw ValidationException::withMessages(['timer' => 'Timer is not running.']);
+            }
+
+            $current->update(['description' => $description]);
+
+            return $current->fresh();
+        });
+    }
+
+    public function updateBlockAllocation(TimeEntryBlock $block, float $newPercentage): void
+    {
+        DB::transaction(function () use ($block, $newPercentage): void {
+            $slotBlocks = TimeEntryBlock::where('user_id', $block->user_id)
+                ->where('block_date', $block->block_date)
+                ->where('block_number', $block->block_number)
+                ->lockForUpdate()
+                ->get();
+
+            $current = $slotBlocks->firstWhere('id', $block->id);
+            if (! $current) {
+                abort(404);
+            }
+
+            $timeEntries = TimeEntry::whereIn('id', $slotBlocks->pluck('time_entry_id'))
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($slotBlocks as $slotBlock) {
+                $timeEntry = $timeEntries->get($slotBlock->time_entry_id);
+                if (! $timeEntry) {
+                    abort(404);
+                }
+
+                $this->ensureMutable($timeEntry);
+            }
+
+            $siblings = $slotBlocks->where('id', '!=', $current->id);
+            $remainder = 100.0 - $newPercentage;
+            $siblingTotal = $siblings->sum('allocation_pct');
+
+            foreach ($siblings as $sibling) {
+                $adjusted = $siblingTotal > 0
+                    ? round(((float) $sibling->allocation_pct / $siblingTotal) * $remainder, 2)
+                    : round($remainder / max(1, $siblings->count()), 2);
+
+                $sibling->update(['allocation_pct' => $adjusted, 'is_overridden' => true]);
+            }
+
+            $current->update([
+                'allocation_pct' => $newPercentage,
+                'is_overridden' => true,
+            ]);
         });
     }
 
@@ -333,6 +413,15 @@ class TimeEntryService
     private function blockKey(int $entryId, string $blockDate, int $blockNumber): string
     {
         return "{$entryId}:{$blockDate}:{$blockNumber}";
+    }
+
+    private function ensureMutable(TimeEntry $entry): void
+    {
+        if ($entry->isLockedForBilling()) {
+            throw ValidationException::withMessages([
+                'time_entry' => TimeEntry::BILLING_LOCK_MESSAGE,
+            ]);
+        }
     }
 
     private function applyFilters($query, array $filters): void

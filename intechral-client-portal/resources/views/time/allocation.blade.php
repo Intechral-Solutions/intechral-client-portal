@@ -110,6 +110,9 @@
                         @if ($block->is_overridden)
                         <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
                               style="background-color: var(--surface-warning); color: var(--text-warning);">Manual</span>
+                        @elseif ($entry->isLockedForBilling())
+                        <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                              style="background-color: var(--surface-muted); color: var(--text-muted);">Locked</span>
                         @endif
                     </td>
                 </tr>
@@ -146,6 +149,7 @@ foreach ($blocks as $entryId => $entryBlocks) {
         'label'      => $label,
         'contextUrl' => $contextUrl,
         'description'=> $entry->description,
+        'locked'     => $entry->isLockedForBilling(),
         'blocks'     => $blockMap,
     ];
 }

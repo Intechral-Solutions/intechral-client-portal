@@ -15,6 +15,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-009](./EPIC-009-cms.md) | CMS & Documentation | **Implemented** |
 | [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) | MariaDB Test Parity | **Implemented** |
 | [EPIC-010B](./EPIC-010B-tenant-scoping.md) | Tenant Scoping Correctness & Regression Coverage | **Implemented** |
+| [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) | Billed Time-Entry Locking | **Implemented** |
 
 ## Epic Lifecycle
 
@@ -28,6 +29,6 @@ Pending → In Progress → Implemented → Verified → Done
 
 ## Notes
 
-All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. EPIC-010B (2026-06-30) corrected membership-based tenant scoping and added regression coverage. The next phase is formal hardening: closing the remaining product-level gaps documented in each epic file.
+All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. EPIC-010B (2026-06-30) corrected membership-based tenant scoping and added regression coverage. EPIC-010C (2026-06-30) made billed and invoice-linked time entries immutable across ordinary mutation paths. The current phase is formal hardening: closing the remaining product-level gaps documented in each epic file.
 
 Major milestone records are tracked in [docs/progress/](../progress/).

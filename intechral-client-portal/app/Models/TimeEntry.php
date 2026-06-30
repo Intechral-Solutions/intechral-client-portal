@@ -13,6 +13,8 @@ class TimeEntry extends Model
 {
     use HasFactory;
 
+    public const BILLING_LOCK_MESSAGE = 'This time entry has already been billed and can no longer be modified.';
+
     protected $fillable = [
         'user_id',
         'project_id',
@@ -43,7 +45,7 @@ class TimeEntry extends Model
                 throw new LogicException('A time entry cannot be both running and stopped.');
             }
 
-            if ($entry->timer_started_at !== null && ($entry->billed || $entry->invoice_id !== null)) {
+            if ($entry->timer_started_at !== null && $entry->isLockedForBilling()) {
                 throw new LogicException('A billed or invoiced time entry cannot be running.');
             }
         });
@@ -86,6 +88,11 @@ class TimeEntry extends Model
     public function isRunning(): bool
     {
         return $this->timer_started_at !== null && $this->stopped_at === null;
+    }
+
+    public function isLockedForBilling(): bool
+    {
+        return $this->billed || $this->invoice_id !== null;
     }
 
     /** Effective duration including live elapsed time if timer is running */

@@ -146,13 +146,17 @@ it('returns 403 when deleting another user\'s entry', function () {
     $this->actingAs($user)->delete(route('time.destroy', $entry))->assertForbidden();
 });
 
-it('returns 403 deleting a billed entry', function () {
+it('returns the billing lock message when deleting a billed entry', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
     $entry = TimeEntry::factory()->billed()->create(['user_id' => $user->id]);
 
-    $this->actingAs($user)->delete(route('time.destroy', $entry))->assertForbidden();
+    $this->actingAs($user)
+        ->delete(route('time.destroy', $entry))
+        ->assertSessionHasErrors([
+            'time_entry' => TimeEntry::BILLING_LOCK_MESSAGE,
+        ]);
 });
 
 // ── Timer ─────────────────────────────────────────────────────────────────────

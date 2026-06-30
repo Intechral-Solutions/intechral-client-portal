@@ -7,6 +7,7 @@
  *     label:      string,
  *     contextUrl: string|null,
  *     description:string|null,
+ *     locked:     boolean,
  *     blocks:     { [blockNumber: string]: { id: number, pct: number } }
  *   }>
  *
@@ -80,7 +81,7 @@ function buildDatasets(entries) {
             pointRadius:     0,
             pointHitRadius:  8,
             // dragData plugin uses this to know which points are draggable
-            dragData:        true,
+            dragData:        !entry.locked,
         };
     });
 }
@@ -145,7 +146,7 @@ function schedulePatch(entryIndex, blockNumber, pct) {
     pendingPatches.set(key, setTimeout(async () => {
         pendingPatches.delete(key);
         try {
-            await fetch(`${window.AllocationRoutes.blockAllocation}/${id}/allocation`, {
+            const response = await fetch(`${window.AllocationRoutes.blockAllocation}/${id}/allocation`, {
                 method:  'PATCH',
                 headers: {
                     'Content-Type':  'application/json',
@@ -154,8 +155,13 @@ function schedulePatch(entryIndex, blockNumber, pct) {
                 },
                 body: JSON.stringify({ allocation_pct: pct }),
             });
-        } catch (_) {
-            // silent — UI already reflects the change
+
+            if (!response.ok) {
+                throw new Error(`Unable to update allocation (${response.status})`);
+            }
+        } catch (error) {
+            window.alert(error.message || 'Unable to update allocation.');
+            window.location.reload();
         }
     }, 400));
 }
@@ -231,9 +237,14 @@ export function init() {
                     magnet: {
                         to: val => Math.max(0, Math.min(100, Math.round(val * 10) / 10)),
                     },
-                    onDragStart(_evt, _datasetIndex, _index, _value) {
-                        // allow drag only in day view (always true here)
-                        return true;
+                    onDragStart(_evt, datasetIndex, index, _value) {
+                        if (entries[datasetIndex]?.locked) return false;
+
+                        // Redistribution affects every persisted sibling in the
+                        // slot, so any locked sibling makes the whole slot read-only.
+                        return !entries.some((entry, entryIndex) => (
+                            entry.locked && blockIdMap[index]?.[entryIndex]
+                        ));
                     },
                     onDrag(_evt, datasetIndex, index, value) {
                         // Live visual update — redistribute in alloc matrix
