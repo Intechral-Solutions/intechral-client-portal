@@ -127,7 +127,9 @@ class TimeEntryService
                 $wasPartiallyStopped = false;
             }
 
-            $elapsed = (int) $startedAt->diffInMinutes($stoppedAt);
+            // Any partial minute counts as a full minute (e.g. 61s -> 2 min), never truncated.
+            $elapsedSeconds = $startedAt->diffInSeconds($stoppedAt);
+            $elapsed = $elapsedSeconds > 0 ? (int) ceil($elapsedSeconds / 60) : 0;
             $duration = $wasPartiallyStopped
                 ? max($current->duration_minutes, $elapsed)
                 : $current->duration_minutes + $elapsed;

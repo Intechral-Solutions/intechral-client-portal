@@ -188,6 +188,8 @@ it('allows multiple concurrent timers per user', function () {
 });
 
 it('stops a timer and records elapsed minutes', function () {
+    Carbon::setTestNow('2026-06-30 20:22:27');
+
     $user = User::factory()->create();
     $user->assignRole('user');
 
@@ -204,6 +206,46 @@ it('stops a timer and records elapsed minutes', function () {
 
     expect($entry->fresh()->timer_started_at)->toBeNull();
     expect($entry->fresh()->duration_minutes)->toBe(30);
+});
+
+it('rounds any partial minute up to the next full minute when stopping a timer', function () {
+    Carbon::setTestNow('2026-06-30 20:22:27');
+
+    $user = User::factory()->create();
+    $user->assignRole('user');
+
+    $oneSecondEntry = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 0,
+        'timer_started_at' => now()->subSecond(),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $oneSecondEntry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 1);
+
+    $overOneMinuteEntry = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 0,
+        'timer_started_at' => now()->subMinute()->subSecond(),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $overOneMinuteEntry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 2);
+
+    $exactlyOneMinuteEntry = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 0,
+        'timer_started_at' => now()->subMinute(),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.stop', $exactlyOneMinuteEntry))
+        ->assertOk()
+        ->assertJsonPath('duration_minutes', 1);
 });
 
 it('permanently stops a legacy timer whose elapsed duration exceeds smallint storage', function () {
