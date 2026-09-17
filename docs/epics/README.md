@@ -16,13 +16,18 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) | MariaDB Test Parity | **Implemented** |
 | [EPIC-010B](./EPIC-010B-tenant-scoping.md) | Tenant Scoping Correctness & Regression Coverage | **Implemented** |
 | [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) | Billed Time-Entry Locking | **Implemented** |
+| [EPIC-011](./EPIC-011-react-frontend-migration.md) | React Frontend Migration | **Planned** |
+| [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) | React Foundation and Coexistence Contract (EPIC-011 Phase A) | **Planned** |
+| [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 
 ## Epic Lifecycle
 
 ```
-Pending → In Progress → Implemented → Verified → Done
+Planned → In Progress → Implemented → Verified → Done
 ```
 
+- **Planned** — scope and architecture are documented, but implementation has not started
+- **In Progress** — implementation has begun
 - **Implemented** — code committed; acceptance criteria not yet formally verified
 - **Verified** — all acceptance criteria checked and passing tests
 - **Done** — merged to `main` via PR with review; DoD fully met
