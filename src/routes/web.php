@@ -30,12 +30,24 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // Root redirect
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
         : redirect()->route('login');
+});
+
+// Temporary EPIC-011A proof route. Remove in Phase B after a permanent
+// authenticated Inertia page covers the foundation contracts.
+Route::middleware('auth')->group(function () {
+    Route::get('/inertia-smoke', fn () => Inertia::render('foundation/smoke'))
+        ->name('inertia.smoke');
+
+    Route::post('/inertia-smoke/flash', function () {
+        return redirect()->route('inertia.smoke')->with('success', 'Foundation flash message received.');
+    })->name('inertia.smoke.flash');
 });
 
 // Fortify owns: GET/POST /login, POST /logout, GET/POST /forgot-password,

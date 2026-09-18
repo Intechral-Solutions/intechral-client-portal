@@ -791,3 +791,33 @@ EPIC-011A does not include:
 - The exact compatible dependency versions must be selected and locked at implementation time; the architecture and compatibility boundaries are settled.
 
 No live-repository fact contradicts ADR-007 or the parent EPIC-011. EPIC-011A should stop for user/architecture review only if Wayfinder cannot generate deterministically in the supported build environments or if adapting Blade navigation to a shared model would change current authorization behavior.
+
+## 26. Implementation Reality (2026-09-17)
+
+The implementation resolved and locked these foundation versions:
+
+- PHP: `inertiajs/inertia-laravel` `v3.3.4`; `laravel/wayfinder` `v0.1.21`.
+- Application runtime: React and React DOM `19.3.0`; `@inertiajs/react` and `@inertiajs/vite` `3.7.1`; Wayfinder Vite plugin `0.1.10`.
+- Build and static checks: Vite `8.1.0`; TypeScript `6.0.3`; ESLint `10.10.0`; Prettier `3.9.7`.
+- Tests: Vitest `5.0.1`; React Testing Library `16.3.3`; Playwright `1.63.0`.
+
+Wayfinder generates ignored files under `resources/js/actions`, `resources/js/routes`, and `resources/js/wayfinder`. The explicit generation command is `npm run wayfinder:generate`; `npm run check` runs generation, type checking, lint, formatting checks, unit tests, and the production build in sequence.
+
+Run the local release gates from `src/`:
+
+```bash
+php artisan test --compact
+npm ci
+npm run check
+npm run test:e2e
+```
+
+Playwright requires its Chromium binary and Linux browser libraries. On hosts that intentionally omit those libraries, the equivalent targeted browser gate can run in the version-matched official container:
+
+```bash
+docker run --rm --network host \
+  -v "$PWD:/work" -w /work \
+  mcr.microsoft.com/playwright:v1.63.0-noble npm run test:e2e
+```
+
+Wayfinder serializes a boolean query value such as `true` as `1`. The smoke proof uses and tests that generated behavior. The temporary Blade-to-Inertia proof link is visible only in `local` and `testing` environments.

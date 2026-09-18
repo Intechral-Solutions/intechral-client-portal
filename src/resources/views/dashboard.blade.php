@@ -10,6 +10,11 @@
         <p class="mt-1 text-sm" style="color: var(--text-secondary);">
             Here's what's happening across your portal.
         </p>
+        @env(['local', 'testing'])
+        <a href="{{ route('inertia.smoke') }}" class="mt-2 inline-block text-xs hover:underline" style="color: var(--accent);">
+            Frontend foundation smoke proof
+        </a>
+        @endenv
     </div>
 
     {{-- ── Stat cards ─────────────────────────────────────────── --}}

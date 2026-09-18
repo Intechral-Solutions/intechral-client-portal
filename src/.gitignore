@@ -13,6 +13,11 @@
 /.zed
 /auth.json
 /node_modules
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+/test-results
+/playwright-report
 /public/build
 /public/hot
 /public/storage

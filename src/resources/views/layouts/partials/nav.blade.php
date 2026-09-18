@@ -3,13 +3,12 @@
     No Alpine.js dependency — all interactivity handled with vanilla JS below.
 --}}
 @php
-    /**
-     * Returns CSS classes for a nav link, highlighting it when the current
-     * route matches $pattern (supports wildcards, e.g. 'tickets.*').
-     */
-    $navLink = fn (string $pattern): string =>
+    $navigationGroups = app(\App\Shared\Navigation\NavigationBuilder::class)->build(request());
+    $primaryNavigation = collect($navigationGroups)->firstWhere('key', 'primary')['items'] ?? [];
+    $managementNavigation = collect($navigationGroups)->firstWhere('key', 'management')['items'] ?? [];
+    $navLink = fn (bool $active): string =>
         'rounded-md px-3 py-2 text-sm font-medium transition-colors ' . (
-            request()->routeIs($pattern)
+            $active
                 ? 'bg-surface text-primary'
                 : 'text-secondary hover:bg-surface hover:text-primary'
         );
@@ -29,35 +28,9 @@
 
                 @auth
                 <div class="hidden md:flex items-center gap-0.5">
-
-                    @can('tickets.view')
-                    <a href="{{ route('tickets.index') }}" class="{{ $navLink('tickets.*') }}">Tickets</a>
-                    @endcan
-
-                    @can('projects.view')
-                    <a href="{{ route('projects.index') }}" class="{{ $navLink('projects.*') }}">Projects</a>
-                    @endcan
-
-                    <a href="{{ route('tasks.index') }}" class="{{ $navLink('tasks.*') }}">Tasks</a>
-
-                    @can('time.log')
-                    <a href="{{ route('time.index') }}" class="{{ $navLink('time.*') }}">Time</a>
-                    @endcan
-
-                    @if (auth()->user()->can('billing.manage'))
-                    <a href="{{ route('billing.invoices.index') }}" class="{{ $navLink('billing.*') }}">Billing</a>
-                    @elseif (auth()->user()->can('billing.view'))
-                    <a href="{{ route('billing.client.invoices.index') }}" class="{{ $navLink('billing.*') }}">Billing</a>
-                    @endif
-
-                    @can('crm.manage')
-                    <a href="{{ route('crm.companies.index') }}" class="{{ $navLink('crm.*') }}">CRM</a>
-                    @endcan
-
-                    @can('cms.view')
-                    <a href="{{ route('cms.index') }}" class="{{ $navLink('cms.*') }}">Pages</a>
-                    @endcan
-
+                    @foreach ($primaryNavigation as $item)
+                    <a href="{{ $item['href'] }}" class="{{ $navLink($item['isActive']) }}">{{ $item['label'] }}</a>
+                    @endforeach
                 </div>
                 @endauth
             </div>
@@ -115,69 +88,17 @@
                         </a>
 
                         {{-- Operator management links --}}
-                        @if (
-                            auth()->user()->can('tickets.assign') ||
-                            auth()->user()->can('time.view_all')  ||
-                            auth()->user()->can('cms.edit')       ||
-                            auth()->user()->can('users.view')     ||
-                            auth()->user()->can('roles.view')
-                        )
+                        @if ($managementNavigation)
                         <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
                         <p class="px-4 py-1 text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted);">Manage</p>
-
-                        @can('tickets.assign')
-                        <a href="{{ route('operator.tickets.index') }}"
+                        @foreach ($managementNavigation as $item)
+                        <a href="{{ $item['href'] }}"
                            role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('operator.tickets.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('operator.tickets.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            Ticket Queue
+                           class="block px-4 py-2 text-sm transition-colors {{ $item['isActive'] ? 'text-primary' : 'text-secondary hover:text-primary' }}"
+                           style="{{ $item['isActive'] ? 'background-color: var(--bg-surface);' : '' }}">
+                            {{ $item['label'] }}
                         </a>
-                        @endcan
-
-                        @can('time.view_all')
-                        <a href="{{ route('operator.time.index') }}"
-                           role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('operator.time.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('operator.time.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            Time Reports
-                        </a>
-                        @endcan
-
-                        @can('crm.manage')
-                        <a href="{{ route('organizations.index') }}"
-                           role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('organizations.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('organizations.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            Organizations
-                        </a>
-                        @endcan
-
-                        @can('cms.edit')
-                        <a href="{{ route('operator.cms.index') }}"
-                           role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('operator.cms.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('operator.cms.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            CMS Pages
-                        </a>
-                        @endcan
-
-                        @can('users.view')
-                        <a href="{{ route('users.index') }}"
-                           role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('users.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('users.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            Users
-                        </a>
-                        @endcan
-
-                        @can('roles.view')
-                        <a href="{{ route('roles.index') }}"
-                           role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('roles.*') ? 'text-primary' : 'text-secondary hover:text-primary' }}"
-                           style="{{ request()->routeIs('roles.*') ? 'background-color: var(--bg-surface);' : '' }}">
-                            Roles
-                        </a>
-                        @endcan
+                        @endforeach
                         @endif
 
                         {{-- Sign out --}}
@@ -221,58 +142,12 @@
          class="hidden border-t md:hidden"
          style="border-color: var(--border-base); background-color: var(--bg-base);">
         <div class="px-4 py-3 space-y-1">
-
-            @can('tickets.view')
-            <a href="{{ route('tickets.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('tickets.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Tickets
+            @foreach ($primaryNavigation as $item)
+            <a href="{{ $item['href'] }}"
+               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ $item['isActive'] ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
+                {{ $item['label'] }}
             </a>
-            @endcan
-
-            @can('projects.view')
-            <a href="{{ route('projects.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('projects.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Projects
-            </a>
-            @endcan
-
-            <a href="{{ route('tasks.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('tasks.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Tasks
-            </a>
-
-            @can('time.log')
-            <a href="{{ route('time.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('time.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Time
-            </a>
-            @endcan
-
-            @if (auth()->user()->can('billing.manage'))
-            <a href="{{ route('billing.invoices.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('billing.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Billing
-            </a>
-            @elseif (auth()->user()->can('billing.view'))
-            <a href="{{ route('billing.client.invoices.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('billing.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Billing
-            </a>
-            @endif
-
-            @can('crm.manage')
-            <a href="{{ route('crm.companies.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('crm.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                CRM
-            </a>
-            @endcan
-
-            @can('cms.view')
-            <a href="{{ route('cms.index') }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ request()->routeIs('cms.*') ? 'bg-surface text-primary' : 'text-secondary hover:bg-surface hover:text-primary' }}">
-                Pages
-            </a>
-            @endcan
+            @endforeach
         </div>
     </div>
     @endauth
