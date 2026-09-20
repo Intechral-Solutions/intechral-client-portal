@@ -7,18 +7,14 @@ beforeEach(function () {
     $this->seedRolesAndPermissions();
 });
 
-it('requires authentication for the inertia smoke page', function () {
-    $this->get(route('inertia.smoke'))->assertRedirect('/login');
-});
-
-it('renders the authenticated inertia smoke page with minimal shared props', function () {
+it('renders an authenticated production inertia page with minimal shared props', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
     $this->actingAs($user)
-        ->get(route('inertia.smoke'))
+        ->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->component('foundation/smoke')
+            ->component('dashboard/index')
             ->where('app.name', config('app.name'))
             ->where('auth.user.id', $user->id)
             ->where('auth.user.name', $user->name)
@@ -37,35 +33,39 @@ it('shares effective permissions but not role models', function () {
     $user->assignRole('user');
 
     $this->actingAs($user)
-        ->get(route('inertia.smoke'))
+        ->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
             ->where('auth.permissions', fn ($permissions) => $permissions->contains('tickets.view'))
             ->missing('auth.roles'));
 });
 
-it('exposes redirect flash once through the shared contract', function () {
+it('exposes flash once through the shared contract', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->post(route('inertia.smoke.flash'))
-        ->assertRedirect(route('inertia.smoke'));
+        ->put(route('user-profile-information.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+        ])
+        ->assertRedirect();
 
-    $this->get(route('inertia.smoke'))
+    $this->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('flash.success', 'Foundation flash message received.'));
+            ->where('flash.status', 'Profile information updated.'));
 
-    $this->get(route('inertia.smoke'))
+    $this->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('flash.success', null));
+            ->where('flash.status', null));
 });
 
 it('leaves existing blade pages as normal document responses', function () {
     $user = User::factory()->create();
+    $user->assignRole('user');
 
     $this->actingAs($user)
-        ->get(route('dashboard'))
+        ->get(route('projects.index'))
         ->assertOk()
-        ->assertViewIs('dashboard')
-        ->assertSee(route('inertia.smoke'))
+        ->assertViewIs('projects.index')
+        ->assertSee(route('dashboard'))
         ->assertHeader('Vary', 'X-Inertia');
 });

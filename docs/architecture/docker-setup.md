@@ -150,9 +150,17 @@ Test environment variables live in `phpunit.xml`. Key settings:
 | `DB_HOST` | `db` | Docker service hostname |
 | `DB_DATABASE` | `intechral_client_portal_testing` | Dedicated test database |
 | `CACHE_STORE` | `array` | In-memory, no Redis required |
-| `SESSION_DRIVER` | `array` | In-memory |
+| `SESSION_DRIVER` | `database` | Matches production browser-session semantics |
 | `QUEUE_CONNECTION` | `sync` | Jobs run inline, no worker required |
 | `MAIL_MAILER` | `array` | Emails captured in array, no SMTP required |
+
+## Browser sessions
+
+Browser sessions use Laravel's database driver so Profile can list safe session metadata and
+revoke a user's other sessions deterministically. Redis remains in use for cache and queues.
+Deployments must set `SESSION_DRIVER=database` and run the existing sessions-table migration.
+Changing an existing environment from Redis sessions signs users out once; live Redis sessions
+are intentionally not migrated.
 
 ## Useful Raw Docker Commands
 

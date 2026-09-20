@@ -125,6 +125,7 @@
 
 /* ── Dark theme ───────────────────────────────────────────── */
 [data-theme="dark"] {
+    color-scheme: dark;
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);

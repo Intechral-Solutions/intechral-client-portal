@@ -36,7 +36,12 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
-                'status' => fn () => $request->session()->get('status'),
+                'status' => fn () => match ($request->session()->get('status')) {
+                    'profile-information-updated' => 'Profile information updated.',
+                    'password-updated' => 'Password updated.',
+                    'recovery-codes-generated' => 'New recovery codes generated.',
+                    default => $request->session()->get('status'),
+                },
                 'warning' => fn () => $request->session()->get('warning'),
             ],
         ];

@@ -1,6 +1,6 @@
 # EPIC-011: React Frontend Migration
 
-**Status:** Planned  
+**Status:** In Progress
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 
 ---
@@ -153,6 +153,8 @@ Establish conventions for:
 
 ## Phase B: Dashboard and Profile
 
+Detailed implementation plan: [EPIC-011B](./EPIC-011B-dashboard-profile.md)
+
 ### Scope
 
 - Dashboard
@@ -181,6 +183,8 @@ These are real application pages but comparatively bounded. They validate forms,
 - Component and critical browser tests cover the converted profile flows.
 
 ## Phase C: Authentication and Invitations
+
+Detailed implementation plan: [EPIC-011C](./EPIC-011C-authentication-invitations.md)
 
 ### Scope
 

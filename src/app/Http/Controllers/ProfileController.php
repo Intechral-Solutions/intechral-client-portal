@@ -2,34 +2,61 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DatabaseSessionManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request)
+    private const PROVIDERS = ['google', 'microsoft'];
+
+    public function __construct(private readonly DatabaseSessionManager $sessions) {}
+
+    public function show(Request $request): Response
     {
-        $user = $request->user()->load('socialAccounts');
-        $recoveryCodes = [];
+        $user = $request->user();
+        $connectedProviders = $user->socialAccounts()
+            ->whereIn('provider', self::PROVIDERS)
+            ->pluck('provider');
 
-        if ($user->two_factor_secret && $user->two_factor_confirmed_at) {
-            $recoveryCodes = json_decode(decrypt($user->two_factor_recovery_codes), true) ?? [];
-        }
+        return Inertia::render('profile/show', [
+            'profile' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'hasPassword' => filled($user->password),
+            ],
+            'twoFactor' => [
+                'enabled' => filled($user->two_factor_secret),
+                'confirmed' => filled($user->two_factor_confirmed_at),
+            ],
+            'connectedAccounts' => collect(self::PROVIDERS)
+                ->map(fn (string $provider) => [
+                    'provider' => $provider,
+                    'connected' => $connectedProviders->contains($provider),
+                ])
+                ->all(),
+            'sessions' => $this->sessions->forUser($user, $request->session()->getId()),
+        ]);
+    }
 
-        return view('profile.show', compact('user', 'recoveryCodes'));
+    public function confirmPassword(Request $request): RedirectResponse
+    {
+        $request->session()->put('url.intended', route('profile.show'));
+
+        return redirect()->route('password.confirm');
     }
 
     /** Invalidate all other browser sessions. */
     public function destroyOtherSessions(Request $request)
     {
-        $request->validate([
+        $request->validateWithBag('destroySessions', [
             'password' => ['required', 'current_password'],
         ]);
 
-        DB::table('sessions')
-            ->where('user_id', $request->user()->id)
-            ->where('id', '!=', $request->session()->getId())
-            ->delete();
+        $this->sessions->revokeOtherSessions($request->user(), $request->session()->getId());
 
         return back()->with('status', 'Other sessions have been signed out.');
     }
@@ -37,11 +64,17 @@ class ProfileController extends Controller
     /** Unlink a social (SSO) provider from the account. */
     public function unlinkSocial(Request $request, string $provider)
     {
+        validator(['provider' => $provider], [
+            'provider' => ['required', Rule::in(self::PROVIDERS)],
+        ])->validate();
+
         $user = $request->user();
 
         // Prevent unlinking if the account has no password (would lock them out)
-        if (! $user->password && $user->socialAccounts()->count() === 1) {
-            return back()->withErrors(['provider' => 'You cannot unlink your only sign-in method. Set a password first.']);
+        if (! $user->password && $user->socialAccounts()->whereIn('provider', self::PROVIDERS)->count() <= 1) {
+            return back()->withErrors([
+                'provider' => 'Connect another sign-in provider before unlinking your only sign-in method.',
+            ]);
         }
 
         $user->socialAccounts()->where('provider', $provider)->delete();

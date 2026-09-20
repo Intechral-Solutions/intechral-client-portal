@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { ChevronDown, Menu, Moon, Sun, X } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
 
@@ -27,13 +27,13 @@ export function AppLayout({ children }: PropsWithChildren) {
             <header className="sticky top-0 z-40 border-b border-border bg-background shadow-sm">
                 <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-1">
-                        <a
+                        <Link
                             href={dashboard.url()}
                             className="mr-4 text-lg font-semibold text-foreground"
                             aria-label={`${app.name} home`}
                         >
                             Intechral Portal
-                        </a>
+                        </Link>
                         <nav
                             className="hidden items-center gap-0.5 md:flex"
                             aria-label="Primary navigation"
@@ -88,12 +88,12 @@ export function AppLayout({ children }: PropsWithChildren) {
                                             </p>
                                         </div>
                                         <DropdownMenu.Item asChild>
-                                            <a
+                                            <Link
                                                 href={profile.url()}
                                                 className="block cursor-pointer rounded-sm px-3 py-2 text-sm outline-none focus:bg-muted"
                                             >
                                                 Profile
-                                            </a>
+                                            </Link>
                                         </DropdownMenu.Item>
                                         {management.length ? (
                                             <>

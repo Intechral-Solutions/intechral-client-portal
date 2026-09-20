@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Models\PasswordHistory;
 use App\Models\User;
+use App\Services\DatabaseSessionManager;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\UpdatesUserPasswords;
@@ -11,6 +12,8 @@ use Laravel\Fortify\Contracts\UpdatesUserPasswords;
 class UpdateUserPassword implements UpdatesUserPasswords
 {
     use PasswordValidationRules;
+
+    public function __construct(private readonly DatabaseSessionManager $sessions) {}
 
     public function update(User $user, array $input): void
     {
@@ -29,8 +32,7 @@ class UpdateUserPassword implements UpdatesUserPasswords
 
         $user->forceFill(['password' => Hash::make($input['password'])])->save();
 
-        // Invalidate all other sessions
-        $user->tokens()->delete();
+        $this->sessions->revokeOtherSessions($user, session()->getId());
     }
 
     private function wasRecentlyUsed(User $user, string $newPassword): bool

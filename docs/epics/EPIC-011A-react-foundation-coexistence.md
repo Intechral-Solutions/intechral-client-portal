@@ -1,6 +1,6 @@
 # EPIC-011A: React Foundation and Coexistence Contract
 
-**Status:** Planned  
+**Status:** Implemented
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)  
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 

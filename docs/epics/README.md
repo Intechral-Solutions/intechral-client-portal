@@ -16,8 +16,10 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) | MariaDB Test Parity | **Implemented** |
 | [EPIC-010B](./EPIC-010B-tenant-scoping.md) | Tenant Scoping Correctness & Regression Coverage | **Implemented** |
 | [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) | Billed Time-Entry Locking | **Implemented** |
-| [EPIC-011](./EPIC-011-react-frontend-migration.md) | React Frontend Migration | **Planned** |
-| [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) | React Foundation and Coexistence Contract (EPIC-011 Phase A) | **Planned** |
+| [EPIC-011](./EPIC-011-react-frontend-migration.md) | React Frontend Migration | **In Progress** |
+| [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) | React Foundation and Coexistence Contract (EPIC-011 Phase A) | **Implemented** |
+| [EPIC-011B](./EPIC-011B-dashboard-profile.md) | Dashboard and Profile Migration (EPIC-011 Phase B) | **Implemented** |
+| [EPIC-011C](./EPIC-011C-authentication-invitations.md) | Authentication and Invitation Migration (EPIC-011 Phase C) | **Planned** |
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 
 ## Epic Lifecycle
