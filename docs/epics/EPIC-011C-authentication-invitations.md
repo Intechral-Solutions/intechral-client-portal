@@ -1,6 +1,6 @@
 # EPIC-011C: Authentication and Invitation Migration
 
-**Status:** Implemented
+**Status:** Verified
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)

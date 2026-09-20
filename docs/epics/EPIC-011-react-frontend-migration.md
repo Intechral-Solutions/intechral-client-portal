@@ -224,6 +224,8 @@ Fix the currently identified two-factor recovery-code toggle that uses Alpine di
 
 ## Phase D: Time Tracking, Timer, Allocation, and Operator Reports
 
+Detailed implementation plan: [EPIC-011D](./EPIC-011D-time-tracking-timer.md)
+
 ### Scope
 
 - Personal time index
