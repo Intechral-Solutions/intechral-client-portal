@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invitation extends Model
 {
@@ -29,9 +30,9 @@ class Invitation extends Model
         return $this->belongsTo(User::class, 'invited_by');
     }
 
-    public function acceptedUser(): BelongsTo
+    public function acceptedUser(): HasOne
     {
-        return $this->belongsTo(User::class, 'id', 'invitation_id');
+        return $this->hasOne(User::class, 'invitation_id');
     }
 
     public function isPending(): bool

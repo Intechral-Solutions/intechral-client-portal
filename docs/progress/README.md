@@ -49,7 +49,7 @@ The Pest feature test suite was entirely blocked (218/226 failing) because the S
 | File | Change |
 |---|---|
 | `phpunit.xml` | Replaced `DB_CONNECTION=sqlite / DB_DATABASE=:memory:` with MariaDB test DB credentials |
-| `tests/TestCase.php` | Added `refreshApplication()` safety guard that rejects non-testing database names before `RefreshDatabase` fires |
+| `AppServiceProvider` + `tests/TestCase.php` | Added exact environment/database safety checks at application boot and immediately before `RefreshDatabase` fires |
 | `.docker/mysql/init-testing.sql` | New init SQL that creates the test DB on fresh Docker volumes |
 | `docker-compose.yml` | Mounts `init-testing.sql` into MariaDB's `entrypoint-initdb.d` |
 | `tests/Feature/Time/TimeTrackingTest.php` | Updated one stale test that reflected old single-timer behavior (superseded by multi-timer block system in EPIC-007, 2026-03-27) |

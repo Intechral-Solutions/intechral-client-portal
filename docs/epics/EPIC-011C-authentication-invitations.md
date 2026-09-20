@@ -1,6 +1,6 @@
 # EPIC-011C: Authentication and Invitation Migration
 
-**Status:** Planned
+**Status:** Implemented
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
@@ -474,30 +474,30 @@ Mock Inertia and generated routes narrowly. Do not duplicate password, token, th
 
 ### Acceptance criteria
 
-- [ ] Login, forgot password, reset password, password confirmation, guest 2FA challenge, invitation registration, and unusable invitation responses are Inertia pages using one `AuthLayout`.
-- [ ] Existing route names, methods, middleware, Fortify actions, Laravel sessions, Socialite redirects/callbacks, and invitation-only registration remain authoritative.
-- [ ] Login preserves email, password, remember-me, throttling, 2FA branching, and intended redirects.
-- [ ] Forgot-password responses do not disclose whether an address is unknown, local-password, or SSO-only.
-- [ ] Local password reset preserves token expiry, validation, password history, remember-token rotation, session revocation, status, and login redirect.
-- [ ] SSO-only reset returns generic browser success, sends no email, and rejects old/current reset tokens without enrolling a local password.
-- [ ] Password confirmation preserves the three-hour server timestamp and same-origin intended redirect, including the Profile handoff.
-- [ ] TOTP and recovery-code login both work without Alpine and retain Fortify throttling, session state, remember choice, and one-time recovery-code use.
-- [ ] Invitation page props are explicit DTOs and unusable invitation states share one non-enumerating page.
-- [ ] OAuth operation intent is explicit, server-owned, provider-bound, and limited to `login`, `link`, or `invitation`.
-- [ ] Socialite's state validation remains enabled; application OAuth context is consumed once and cleaned on every callback outcome.
-- [ ] Normal provider login resolves only an existing provider identity and never auto-links by email.
-- [ ] Profile linking cannot transfer provider ownership, infer a target by email, or switch the authenticated user.
-- [ ] Invitation SSO cannot fall through to normal login/link or authenticate an unrelated linked identity.
-- [ ] Local and SSO invitation acceptance share a cohesive service contract, are transactional and row-locked, set provenance, and leave no partial state on failure.
-- [ ] Invitation GET/POST are guest-only and cannot replace an authenticated user's identity.
-- [ ] Existing `(provider, provider_id)` uniqueness remains and `(user_id, provider)` uniqueness is added only after a duplicate preflight that stops on conflicts.
-- [ ] `Invitation::acceptedUser()` is corrected to the `hasOne` inverse of `User::invitation()` and covered by regression tests.
-- [ ] Guest/shared/page props contain no password/history hashes, OAuth credentials, provider IDs, TOTP material, session internals, raw models, or unnecessary invitation details.
-- [ ] Auth pages use generated Wayfinder helpers; OAuth navigation remains a full document redirect.
-- [ ] Theme, flash/status feedback, accessibility, mobile layout, login-to-Dashboard, logout-to-login, expired-session redirect, and Blade/Inertia coexistence are verified.
-- [ ] All superseded auth Blade views and the duplicate Blade auth layout are removed only after reference searches and replacement coverage pass.
-- [ ] No local-password enrollment feature, API/Sanctum, SSR, TanStack, extra form framework, CI, or unrelated product migration is introduced.
-- [ ] Focused Pest, Vitest/RTL, Playwright, Wayfinder, TypeScript, lint, formatting, Pint, and production-build gates pass.
+- [x] Login, forgot password, reset password, password confirmation, guest 2FA challenge, invitation registration, and unusable invitation responses are Inertia pages using one `AuthLayout`.
+- [x] Existing route names, methods, middleware, Fortify actions, Laravel sessions, Socialite redirects/callbacks, and invitation-only registration remain authoritative.
+- [x] Login preserves email, password, remember-me, throttling, 2FA branching, and intended redirects.
+- [x] Forgot-password responses do not disclose whether an address is unknown, local-password, or SSO-only.
+- [x] Local password reset preserves token expiry, validation, password history, remember-token rotation, session revocation, status, and login redirect.
+- [x] SSO-only reset returns generic browser success, sends no email, and rejects old/current reset tokens without enrolling a local password.
+- [x] Password confirmation preserves the three-hour server timestamp and same-origin intended redirect, including the Profile handoff.
+- [x] TOTP and recovery-code login both work without Alpine and retain Fortify throttling, session state, remember choice, and one-time recovery-code use.
+- [x] Invitation page props are explicit DTOs and unusable invitation states share one non-enumerating page.
+- [x] OAuth operation intent is explicit, server-owned, provider-bound, and limited to `login`, `link`, or `invitation`.
+- [x] Socialite's state validation remains enabled; application OAuth context is consumed once and cleaned on every callback outcome.
+- [x] Normal provider login resolves only an existing provider identity and never auto-links by email.
+- [x] Profile linking cannot transfer provider ownership, infer a target by email, or switch the authenticated user.
+- [x] Invitation SSO cannot fall through to normal login/link or authenticate an unrelated linked identity.
+- [x] Local and SSO invitation acceptance share a cohesive service contract, are transactional and row-locked, set provenance, and leave no partial state on failure.
+- [x] Invitation GET/POST are guest-only and cannot replace an authenticated user's identity.
+- [x] Existing `(provider, provider_id)` uniqueness remains and `(user_id, provider)` uniqueness is added only after a duplicate preflight that stops on conflicts.
+- [x] `Invitation::acceptedUser()` is corrected to the `hasOne` inverse of `User::invitation()` and covered by regression tests.
+- [x] Guest/shared/page props contain no password/history hashes, OAuth credentials, provider IDs, TOTP material, session internals, raw models, or unnecessary invitation details.
+- [x] Auth pages use generated Wayfinder helpers; OAuth navigation remains a full document redirect.
+- [x] Theme, flash/status feedback, accessibility, mobile layout, login-to-Dashboard, logout-to-login, expired-session redirect, and Blade/Inertia coexistence are verified.
+- [x] All superseded auth Blade views and the duplicate Blade auth layout are removed only after reference searches and replacement coverage pass.
+- [x] No local-password enrollment feature, API/Sanctum, SSR, TanStack, extra form framework, CI, or unrelated product migration is introduced.
+- [x] Focused Pest, Vitest/RTL, Playwright, Wayfinder, TypeScript, lint, formatting, Pint, and production-build gates pass.
 
 ## 23. Ordered Work Packages
 
@@ -645,3 +645,12 @@ The authentication-domain review resolved all product decisions required to begi
 - OAuth redirect/callback endpoints remain server-only.
 
 No product decision currently blocks EPIC-011C. Stop and report rather than inventing behavior if implementation discovers a conflicting live-data condition or a new domain requirement.
+
+## 27. Implementation Record
+
+- Fortify page closures now return the `auth/*` Inertia components, while Fortify continues to own every authentication mutation.
+- The application OAuth context is stored under the server-session key `oauth_context` with `intent`, `provider`, an ISO-8601 `startedAt`, and nullable `initiatingUserId` and `invitationToken` targets. Callbacks validate the shape and pull it before provider retrieval.
+- `InvitationService::acceptWithPassword()` and `acceptWithSocialAccount()` share the locked transaction boundary. Expected email/provider conflicts roll back before the pending invitation is expired.
+- Migration `2026_09_19_000000_enforce_one_social_account_per_provider.php` aborts on duplicate `(user_id, provider)` groups, adds the unique key, then removes the superseded ordinary index.
+- Provider access/refresh tokens and expiry metadata remain stored for compatibility. Repository usage search found no consumer outside authentication writes and privacy regression fixtures; token-at-rest redesign remains later security debt.
+- The Profile password-confirmation handoff remains because proactive two-factor setup requests still require it.

@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Exceptions\InvitationUnavailableException;
 use App\Http\Controllers\Controller;
-use App\Models\PasswordHistory;
-use App\Models\User;
 use App\Services\InvitationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
 
 class InvitationController extends Controller
 {
@@ -21,21 +20,21 @@ class InvitationController extends Controller
         $invitation = $this->service->findValid($token);
 
         if (! $invitation) {
-            return view('auth.invitation-invalid');
+            return Inertia::render('auth/invitation-invalid');
         }
 
-        return view('auth.register', compact('invitation', 'token'));
+        return Inertia::render('auth/invitation-register', [
+            'invitation' => [
+                'email' => $invitation->email,
+                'expiresAt' => $invitation->expires_at->toIso8601String(),
+            ],
+            'token' => $token,
+        ]);
     }
 
     /** Process registration via an invitation link. */
     public function register(Request $request, string $token)
     {
-        $invitation = $this->service->findValid($token);
-
-        if (! $invitation) {
-            return view('auth.invitation-invalid');
-        }
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'password' => [
@@ -46,24 +45,11 @@ class InvitationController extends Controller
             ],
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $invitation->email,
-            'password' => Hash::make($validated['password']),
-            'invited_by' => $invitation->invited_by,
-        ]);
-
-        // Assign default role
-        $user->assignRole('user');
-
-        // Store initial password history entry
-        PasswordHistory::create([
-            'user_id' => $user->id,
-            'password' => $user->password,
-            'created_at' => now(),
-        ]);
-
-        $this->service->accept($invitation, $user);
+        try {
+            $user = $this->service->acceptWithPassword($token, $validated['name'], $validated['password']);
+        } catch (InvitationUnavailableException) {
+            return redirect()->route('invitation.show', $token);
+        }
 
         Auth::login($user);
 

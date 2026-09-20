@@ -2,21 +2,21 @@
 
 namespace Tests;
 
+use App\Support\TestDatabaseSafety;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Boot the application and enforce the test-database safety guard before
+     * Enforce the test-database safety contract again immediately before
      * RefreshDatabase can wipe any tables.
      *
      * RefreshDatabase is triggered inside setUpTraits(), which runs after
-     * refreshApplication(). Placing the guard here — after the app boots but
-     * before setUpTraits() fires — ensures it intercepts every test run.
+     * refreshApplication(). AppServiceProvider guards all testing bootstraps;
+     * this second check keeps the destructive test boundary explicit.
      */
     protected function refreshApplication(): void
     {
@@ -25,14 +25,7 @@ abstract class TestCase extends BaseTestCase
         $connection = config('database.default');
         $database = (string) config("database.connections.{$connection}.database");
 
-        if (! str_contains($database, 'testing')) {
-            throw new RuntimeException(
-                "Test safety guard rejected database \"{$database}\". ".
-                'The active database name must contain "testing" to prevent '.
-                'RefreshDatabase from wiping a non-test database. '.
-                'Check DB_DATABASE in phpunit.xml or .env.testing.'
-            );
-        }
+        TestDatabaseSafety::assertSafe($this->app->environment(), $database);
     }
 
     protected function setUp(): void

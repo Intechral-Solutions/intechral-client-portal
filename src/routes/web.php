@@ -44,8 +44,10 @@ Route::get('/', function () {
 //               GET/POST /user/password, GET/POST /user/two-factor-*
 
 // Invitation-based registration (replaces Fortify registration)
-Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.show');
-Route::post('/invitation/{token}', [InvitationController::class, 'register'])->name('invitation.register');
+Route::middleware('guest')->group(function () {
+    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.show');
+    Route::post('/invitation/{token}', [InvitationController::class, 'register'])->name('invitation.register');
+});
 
 // SSO (Socialite)
 Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('sso.redirect');

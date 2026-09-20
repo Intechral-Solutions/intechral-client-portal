@@ -25,6 +25,6 @@ Use **Stripe** as the payment gateway via the official **`stripe/stripe-php`** S
 ## Consequences
 
 - Requires Stripe API keys in `.env` (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`)
-- Webhook endpoint must be publicly accessible (use Stripe CLI for local dev: `stripe listen --forward-to localhost:8080/webhooks/stripe`)
+- Webhook endpoint must be publicly accessible (use Stripe CLI for local dev: `stripe listen --forward-to localhost:4242/webhooks/stripe`)
 - Failed webhook deliveries must be handled (idempotency keys on payment recording)
 - Laravel Cashier is available if subscription billing is needed in future

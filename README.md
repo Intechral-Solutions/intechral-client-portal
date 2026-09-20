@@ -24,7 +24,7 @@ cd "Client Portal"
 npm run setup
 
 # Open the portal
-open http://localhost:8080
+open http://localhost:4242
 
 # Open email testing UI
 open http://localhost:8025

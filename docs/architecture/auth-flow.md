@@ -35,7 +35,7 @@ Operator                          System                          Invitee
 
 1. User clicks "Sign in with Google/Microsoft" on registration/login page
 2. Laravel Socialite redirects to provider's OAuth endpoint
-3. Provider redirects back to `/auth/callback/{provider}`
+3. Provider redirects back to `/auth/{provider}/callback`
 4. Socialite retrieves the authenticated email from the provider
 5. **On first login (registration context):**
    - System checks for a valid invitation matching the provider email
@@ -48,7 +48,7 @@ Operator                          System                          Invitee
 
 ## Session Security
 
-- Sessions stored in Redis (not the DB or file system)
+- Sessions stored in the database
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`
 - Absolute session timeout: 8 hours (configurable)
 - Idle session timeout: 2 hours (configurable)
@@ -56,9 +56,9 @@ Operator                          System                          Invitee
 
 ## Password Reset Flow
 
-1. User requests reset at `/password/reset`
+1. User requests reset at `/forgot-password`
 2. System sends a signed, time-limited URL (60 min) to the email
-3. User clicks link → reset form shown
+3. User clicks `/reset-password/{token}` link → reset form shown
 4. New password validated (same rules; checked against last 5 hashes)
 5. Password updated; all sessions invalidated
 6. User logged in and redirected to dashboard

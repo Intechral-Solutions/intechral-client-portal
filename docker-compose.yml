@@ -15,9 +15,6 @@ services:
       - ./src:/var/www/app
       - ./.docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
       - ./.docker/php/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf:ro
-    environment:
-      - APP_ENV=local
-      - APP_DEBUG=true
     depends_on:
       db:
         condition: service_healthy
@@ -102,8 +99,6 @@ services:
     volumes:
       - ./src:/var/www/app
       - ./.docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
-    environment:
-      - APP_ENV=local
     depends_on:
       db:
         condition: service_healthy

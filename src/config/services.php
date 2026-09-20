@@ -38,14 +38,14 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('APP_URL').'/auth/google/callback',
+        'redirect' => env('GOOGLE_REDIRECT_URL', rtrim((string) env('APP_URL'), '/').'/auth/google/callback'),
     ],
 
     'microsoft' => [
         'client_id' => env('MICROSOFT_CLIENT_ID'),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
         'tenant' => env('MICROSOFT_TENANT_ID', 'common'),
-        'redirect' => env('APP_URL').'/auth/microsoft/callback',
+        'redirect' => env('MICROSOFT_REDIRECT_URL', rtrim((string) env('APP_URL'), '/').'/auth/microsoft/callback'),
     ],
 
     'stripe' => [

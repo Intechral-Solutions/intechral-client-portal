@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
@@ -15,6 +16,12 @@ class ResetUserPassword implements ResetsUserPasswords
 
     public function reset(User $user, array $input): void
     {
+        if ($user->password === null) {
+            throw ValidationException::withMessages([
+                'email' => [__('passwords.user')],
+            ]);
+        }
+
         Validator::make($input, [
             'password' => $this->passwordRules(),
         ])->after(function ($validator) use ($user, $input) {
@@ -23,14 +30,14 @@ class ResetUserPassword implements ResetsUserPasswords
             }
         })->validate();
 
-        $this->storeHistory($user);
+        DB::transaction(function () use ($user, $input) {
+            $this->storeHistory($user);
+            $user->forceFill(['password' => Hash::make($input['password'])])->save();
 
-        $user->forceFill(['password' => Hash::make($input['password'])])->save();
-
-        // Terminate all sessions on password reset (OWASP), when using DB session driver
-        if (config('session.driver') === 'database') {
-            DB::table('sessions')->where('user_id', $user->id)->delete();
-        }
+            if (config('session.driver') === 'database') {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+            }
+        });
     }
 
     private function wasRecentlyUsed(User $user, string $newPassword): bool

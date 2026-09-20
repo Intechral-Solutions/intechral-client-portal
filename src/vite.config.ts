@@ -12,7 +12,7 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/app.tsx'],
             refresh: true,
         }),
-        inertia(),
+        inertia({ ssr: false }),
         react(),
         tailwindcss(),
         wayfinder({

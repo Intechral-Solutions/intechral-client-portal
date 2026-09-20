@@ -5,7 +5,7 @@
 | Service | Image | Port (host) | Purpose |
 |---------|-------|-------------|---------|
 | `app` | `php:8.3-fpm` (custom) | — | Laravel PHP-FPM |
-| `nginx` | `nginx:1.25-alpine` | `8080` | Web server |
+| `nginx` | `nginx:1.25-alpine` | `4242` | Web server |
 | `db` | `mariadb:10.11` | `3306` | Primary database |
 | `redis` | `redis:7-alpine` | `6379` | Cache / sessions / queues |
 | `mailpit` | `axllent/mailpit` | `8025` (UI), `1025` (SMTP) | Local email testing |
@@ -38,7 +38,7 @@ cd "Client Portal"
 npm run setup
 ```
 
-That's it. `npm run setup` handles everything. Open `http://localhost:8080`.
+That's it. `npm run setup` handles everything. Open `http://localhost:4242`.
 
 ## Dev Scripts
 
@@ -83,6 +83,7 @@ docker compose exec app npm run build
 - Config at `.docker/nginx/default.conf`
 - Serves `intechral-client-portal/public/` as document root
 - Proxies PHP to `app:9000`
+- Maps browser-facing `http://localhost:4242` to Nginx port `80` in the container
 
 ### MariaDB (`db`)
 - Version: `10.11`
@@ -138,11 +139,13 @@ docker compose exec app ./vendor/bin/pest --coverage
 
 Each feature test uses `RefreshDatabase`. On every test, Pest drops and recreates the schema against `intechral_client_portal_testing` only — the dev database (`portal`) is never touched.
 
-A safety guard in `tests/TestCase.php` reads the active `DB_DATABASE` at boot time and throws a `RuntimeException` if the name does not contain `"testing"`. This prevents accidental data loss if `phpunit.xml` or `.env.testing` is misconfigured.
+`AppServiceProvider` rejects every testing bootstrap unless `APP_ENV` is exactly `testing` and the resolved database is exactly `intechral_client_portal_testing`. The test base class repeats this check immediately before `RefreshDatabase` runs. This also protects manual commands such as `php artisan --env=testing migrate:fresh`: `.env.testing` selects the dedicated database, and a bad override fails during application boot before the command can alter schema.
 
 ### Test configuration
 
-Test environment variables live in `phpunit.xml`. Key settings:
+Test environment variables live in both `.env.testing` (manual Artisan commands) and `phpunit.xml` (Pest/PHPUnit). The critical PHPUnit environment and database values are forced so inherited container variables cannot replace them. Docker Compose does not hard-code Laravel's application environment; normal services read `APP_ENV=local` from `.env`.
+
+Key settings:
 
 | Variable | Value | Why |
 |---|---|---|
