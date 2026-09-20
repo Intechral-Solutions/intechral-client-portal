@@ -16,6 +16,12 @@ class SocialAccount extends Model
         'token_expires_at',
     ];
 
+    protected $hidden = [
+        'token',
+        'refresh_token',
+        'token_expires_at',
+    ];
+
     protected $casts = [
         'token_expires_at' => 'datetime',
     ];

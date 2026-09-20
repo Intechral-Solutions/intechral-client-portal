@@ -87,7 +87,11 @@ class SocialiteController extends Controller
 
         try {
             $socialUser = Socialite::driver($provider)->user();
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            report(new \RuntimeException(
+                'OAuth provider request failed for '.$provider.' ('.get_debug_type($exception).').'
+            ));
+
             return $this->providerFailure($request, $context, $provider);
         }
 
@@ -158,6 +162,10 @@ class SocialiteController extends Controller
                 ...$this->tokenAttributes($socialUser),
             ]);
         } catch (QueryException) {
+            report(new \RuntimeException(
+                'An OAuth provider-link database operation failed; sensitive query details were suppressed.'
+            ));
+
             return redirect()->route('profile.show')
                 ->withErrors(['provider' => 'That provider account could not be connected.'])
                 ->with('error', 'That provider account could not be connected.');

@@ -128,12 +128,33 @@ class InvitationService
             });
         } catch (InvitationEmailMismatchException $exception) {
             throw $exception;
-        } catch (InvitationUnavailableException|QueryException $exception) {
-            Invitation::where('token', $token)
-                ->where('status', 'pending')
-                ->update(['status' => 'expired']);
+        } catch (InvitationUnavailableException $exception) {
+            $this->expirePendingInvitation($token);
+
+            throw new InvitationUnavailableException(previous: $exception);
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateKeyConflict($exception)) {
+                throw $exception;
+            }
+
+            $this->expirePendingInvitation($token);
 
             throw new InvitationUnavailableException(previous: $exception);
         }
+    }
+
+    private function expirePendingInvitation(string $token): void
+    {
+        Invitation::where('token', $token)
+            ->where('status', 'pending')
+            ->update(['status' => 'expired']);
+    }
+
+    private function isDuplicateKeyConflict(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? '');
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return $sqlState === '23000' && $driverCode === 1062;
     }
 }

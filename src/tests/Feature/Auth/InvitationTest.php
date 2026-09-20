@@ -1,10 +1,15 @@
 <?php
 
+use App\Exceptions\InvitationUnavailableException;
 use App\Models\Invitation;
 use App\Models\PasswordHistory;
+use App\Models\SocialAccount;
 use App\Models\User;
 use App\Notifications\InvitationNotification;
 use App\Services\InvitationService;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -155,6 +160,72 @@ test('duplicate account conflict leaves no partial invitation state', function (
     expect(User::where('email', 'existing@example.com')->count())->toBe(1)
         ->and(PasswordHistory::count())->toBe(0)
         ->and($invitation->fresh()->status)->toBe('expired');
+});
+
+test('duplicate provider identity expires the invitation without partial state', function () {
+    $owner = User::factory()->create();
+    SocialAccount::create([
+        'user_id' => $owner->id,
+        'provider' => 'google',
+        'provider_id' => 'provider-123',
+    ]);
+    $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+
+    expect(fn () => app(InvitationService::class)->acceptWithSocialAccount(
+        $invitation->token,
+        'google',
+        [
+            'name' => 'Invited Person',
+            'email' => 'invited@example.com',
+            'provider_id' => 'provider-123',
+            'token' => 'provider-token',
+            'refresh_token' => 'provider-refresh-token',
+            'token_expires_at' => now()->addHour(),
+        ],
+    ))->toThrow(InvitationUnavailableException::class);
+
+    expect($invitation->fresh()->status)->toBe('expired')
+        ->and(User::where('email', 'invited@example.com')->exists())->toBeFalse()
+        ->and(SocialAccount::count())->toBe(1)
+        ->and(PasswordHistory::count())->toBe(0)
+        ->and(DB::table('model_has_roles')->count())->toBe(0);
+});
+
+test('transient database failure rolls back partial state and leaves invitation pending', function () {
+    $invitation = Invitation::factory()->pending()->create(['email' => 'retry@example.com']);
+    $event = 'eloquent.updating: '.Invitation::class;
+
+    Event::listen($event, function (Invitation $updating): void {
+        if ($updating->status !== 'accepted') {
+            return;
+        }
+
+        $previous = new PDOException('Temporary database infrastructure failure', 1205);
+        $previous->errorInfo = ['HY000', 1205, 'Temporary database infrastructure failure'];
+
+        throw new QueryException(
+            'mysql',
+            'update invitations set status = ?',
+            ['accepted'],
+            $previous,
+        );
+    });
+
+    try {
+        expect(fn () => app(InvitationService::class)->acceptWithPassword(
+            $invitation->token,
+            'Retry Person',
+            'Str0ng!Password99',
+        ))->toThrow(QueryException::class);
+    } finally {
+        Event::forget($event);
+    }
+
+    expect($invitation->fresh()->status)->toBe('pending')
+        ->and(User::where('email', 'retry@example.com')->exists())->toBeFalse()
+        ->and(SocialAccount::count())->toBe(0)
+        ->and(PasswordHistory::count())->toBe(0)
+        ->and(DB::table('model_has_roles')->count())->toBe(0);
 });
 
 test('accepted user inverse resolves through invitation id', function () {

@@ -108,7 +108,7 @@ Tests run inside the `app` container against a dedicated MariaDB test database (
 
 **Fresh Docker setup (new volume):** The test database is created automatically. `init-testing.sql` is mounted into `/docker-entrypoint-initdb.d/` and MariaDB runs it on first start.
 
-**Existing Docker setup:** Create the test database once if it doesn't already exist:
+**Existing Docker setup:** The init script does not run again for an existing MariaDB volume. Run this idempotent command to create and grant only the designated test database; it does not drop or modify the development `portal` database:
 
 ```bash
 docker compose exec db mariadb -u root -proot -e "
@@ -139,11 +139,11 @@ docker compose exec app ./vendor/bin/pest --coverage
 
 Each feature test uses `RefreshDatabase`. On every test, Pest drops and recreates the schema against `intechral_client_portal_testing` only — the dev database (`portal`) is never touched.
 
-`AppServiceProvider` rejects every testing bootstrap unless `APP_ENV` is exactly `testing` and the resolved database is exactly `intechral_client_portal_testing`. The test base class repeats this check immediately before `RefreshDatabase` runs. This also protects manual commands such as `php artisan --env=testing migrate:fresh`: `.env.testing` selects the dedicated database, and a bad override fails during application boot before the command can alter schema.
+`tests/bootstrap.php` overwrites inherited process values with the designated test environment before Laravel is created. `AppServiceProvider` then rejects every testing bootstrap unless `APP_ENV` is exactly `testing` and the resolved database is exactly `intechral_client_portal_testing`; the test base class repeats that resolved-config check immediately before `RefreshDatabase` runs. This also protects manual commands such as `php artisan --env=testing migrate:fresh`: `.env.testing` selects the dedicated database, and a bad override fails during application boot before the command can alter schema.
 
 ### Test configuration
 
-Test environment variables live in both `.env.testing` (manual Artisan commands) and `phpunit.xml` (Pest/PHPUnit). The critical PHPUnit environment and database values are forced so inherited container variables cannot replace them. Docker Compose does not hard-code Laravel's application environment; normal services read `APP_ENV=local` from `.env`.
+Test environment variables live in `.env.testing` for manual Artisan commands and `phpunit.xml` for Pest/PHPUnit. Because PHPUnit's `force` attribute does not reliably replace every inherited `$_SERVER` value, `tests/bootstrap.php` is authoritative for the test process. Docker Compose does not hard-code Laravel's application environment; normal services read `APP_ENV=local` from `.env`.
 
 Key settings:
 

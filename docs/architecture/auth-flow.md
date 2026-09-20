@@ -12,7 +12,7 @@ Operator                          System                          Invitee
    │                                │── Send invitation email ──────►│ Mailpit/SMTP
    │                                │                               │
    │                                │               ◄── Click link ─┤
-   │                                │   GET /register?token=...     │
+   │                                │   GET /invitation/{token}    │
    │                                │── Validate token ─────────────┤
    │                                │── Pre-fill email (read-only) ─►│
    │                                │                               │
@@ -33,22 +33,19 @@ Operator                          System                          Invitee
 
 ## OpenID SSO Flow
 
-1. User clicks "Sign in with Google/Microsoft" on registration/login page
-2. Laravel Socialite redirects to provider's OAuth endpoint
-3. Provider redirects back to `/auth/{provider}/callback`
-4. Socialite retrieves the authenticated email from the provider
-5. **On first login (registration context):**
-   - System checks for a valid invitation matching the provider email
-   - If no invitation or email mismatch → redirect to error page
-   - If valid → create `User` + `SocialAccount` records; mark invitation `accepted`
-6. **On subsequent logins:**
-   - System looks up `SocialAccount` by `provider` + `provider_id`
-   - Falls back to email match if `SocialAccount` not found (for migration scenarios)
-   - User logged in; session created
+1. User starts Google/Microsoft authentication from login, Profile, or an invitation.
+2. The server stores a one-time OAuth intent (`login`, `link`, or `invitation`) and its target in the session.
+3. Laravel Socialite redirects to the provider, which returns to `/auth/{provider}/callback`.
+4. The callback consumes and validates the server-owned intent before performing exactly one operation:
+   - Normal login authenticates only an existing `(provider, provider_id)` `SocialAccount`. Provider email is never used to find or automatically link a portal user.
+   - Profile linking explicitly associates an unowned provider identity with the authenticated initiating user.
+   - Invitation registration validates the provider email against the pending invitation, then atomically creates the passwordless user and `SocialAccount` and accepts the invitation.
+5. Successful SSO login and invitation registration currently use Laravel's remember-me authentication unconditionally.
 
 ## Session Security
 
-- Sessions stored in the database
+- Browser sessions are stored in the database; Redis remains available for cache and queues.
+- Signing out other browser sessions deletes their database rows and rotates the user's remember token, while preserving the current session.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`
 - Absolute session timeout: 8 hours (configurable)
 - Idle session timeout: 2 hours (configurable)
@@ -61,7 +58,7 @@ Operator                          System                          Invitee
 3. User clicks `/reset-password/{token}` link → reset form shown
 4. New password validated (same rules; checked against last 5 hashes)
 5. Password updated; all sessions invalidated
-6. User logged in and redirected to dashboard
+6. User is redirected to login and signs in with the new password
 
 ## 2FA Flow (TOTP)
 

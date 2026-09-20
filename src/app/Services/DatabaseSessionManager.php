@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 final class DatabaseSessionManager
 {
@@ -32,14 +33,19 @@ final class DatabaseSessionManager
 
     public function revokeOtherSessions(User $user, string $currentSessionId): int
     {
-        if (config('session.driver') !== 'database') {
-            return 0;
-        }
+        return DB::transaction(function () use ($user, $currentSessionId) {
+            $user->setRememberToken(Str::random(60));
+            $user->save();
 
-        return DB::table(config('session.table', 'sessions'))
-            ->where('user_id', $user->id)
-            ->where('id', '!=', $currentSessionId)
-            ->delete();
+            if (config('session.driver') !== 'database') {
+                return 0;
+            }
+
+            return DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
+                ->where('id', '!=', $currentSessionId)
+                ->delete();
+        });
     }
 
     private function describeUserAgent(?string $userAgent): ?string

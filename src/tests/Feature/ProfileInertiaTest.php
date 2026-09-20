@@ -3,6 +3,7 @@
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\DatabaseSessionManager;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -46,6 +47,26 @@ it('shares only the explicit profile security contract', function () {
             ->missing('twoFactor.recoveryCodes')
             ->missing('connectedAccounts.0.providerId')
             ->missing('connectedAccounts.0.token'));
+});
+
+it('hides social account credentials from direct and nested serialization', function () {
+    $user = User::factory()->create();
+    $account = SocialAccount::create([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_id' => 'provider-123',
+        'token' => 'secret-token',
+        'refresh_token' => 'secret-refresh',
+        'token_expires_at' => now()->addHour(),
+    ]);
+
+    $serializedAccount = $account->fresh()->toArray();
+    $serializedUser = $user->fresh()->load('socialAccounts')->toArray();
+
+    expect($serializedAccount)
+        ->not->toHaveKeys(['token', 'refresh_token', 'token_expires_at'])
+        ->and($serializedUser['social_accounts'][0])
+        ->not->toHaveKeys(['token', 'refresh_token', 'token_expires_at']);
 });
 
 it('updates profile information through fortify', function () {
@@ -112,8 +133,12 @@ it('lists safe database session metadata and revokes only another session', func
         ->and(DB::table('sessions')->where('id', 'foreign')->exists())->toBeTrue();
 });
 
-it('revokes other sessions through the profile action and preserves unrelated sessions', function () {
-    $user = User::factory()->create(['password' => Hash::make('Str0ng!Password1')]);
+it('revokes other sessions and remembered credentials while preserving the current browser', function () {
+    $oldRememberToken = 'remember-token-from-secondary-browser';
+    $user = User::factory()->create([
+        'password' => Hash::make('Str0ng!Password1'),
+        'remember_token' => $oldRememberToken,
+    ]);
     $other = User::factory()->create();
     DB::table('sessions')->insert([
         sessionRow('current', $user->id),
@@ -126,9 +151,15 @@ it('revokes other sessions through the profile action and preserves unrelated se
         'password' => 'Str0ng!Password1',
     ])->assertRedirect()->assertSessionHas('status');
 
+    $freshUser = $user->fresh();
+
     expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(1)
         ->and(DB::table('sessions')->where('id', 'other')->exists())->toBeFalse()
-        ->and(DB::table('sessions')->where('id', 'foreign')->exists())->toBeTrue();
+        ->and(DB::table('sessions')->where('id', 'foreign')->exists())->toBeTrue()
+        ->and($freshUser->remember_token)->not->toBe($oldRememberToken)
+        ->and(Auth::getProvider()->retrieveByToken($user->id, $oldRememberToken))->toBeNull();
+
+    $this->assertAuthenticatedAs($user);
 });
 
 it('requires the current password to revoke sessions using the named bag', function () {
