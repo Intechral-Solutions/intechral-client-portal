@@ -1,6 +1,10 @@
 @extends('layouts.app', ['title' => $project->name . ' — Board'])
 
 @section('content')
+@php
+    // One policy check for the whole page: structural controls (D1) exist only for managers.
+    $canManage = auth()->user()->can('manage', $project);
+@endphp
 <div class="flex h-full flex-col" style="min-height: calc(100vh - 4rem);">
 
     {{-- Board Header --}}
@@ -24,11 +28,11 @@
             <a href="{{ route('projects.milestones.index', $project) }}"
                class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                style="border-color: var(--border-base); color: var(--text-secondary);">Milestones</a>
-            @can('manage', $project)
+            @if ($canManage)
             <a href="{{ route('projects.edit', $project) }}"
                class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                style="border-color: var(--border-base); color: var(--text-secondary);">Settings</a>
-            @endcan
+            @endif
         </div>
     </div>
 
@@ -57,6 +61,7 @@
                     <span class="text-sm font-medium" style="color: var(--text-primary);">{{ $column->name }}</span>
                     <span class="text-xs" style="color: var(--text-muted);">{{ $column->tasks->count() }}</span>
                 </div>
+                @if ($canManage)
                 <button type="button"
                         class="add-task-btn rounded p-1 transition-colors hover:opacity-80"
                         style="color: var(--text-muted);"
@@ -66,6 +71,7 @@
                         <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
                     </svg>
                 </button>
+                @endif
             </div>
 
             {{-- Task Cards --}}
@@ -83,7 +89,7 @@
                 <div class="task-card group cursor-pointer rounded-lg border p-3 transition-shadow hover:shadow-sm"
                      style="background-color: var(--surface-card); border-color: var(--border-base);"
                      data-task-id="{{ $task->id }}"
-                     draggable="true">
+                     @if ($canManage) draggable="true" @endif>
 
                     {{-- Priority badge --}}
                     <div class="mb-2 flex items-start justify-between">
@@ -107,8 +113,8 @@
                     {{-- Footer --}}
                     <div class="mt-2.5 flex items-center justify-between">
                         <div class="flex items-center gap-2 text-xs" style="color: var(--text-muted);">
-                            @if ($task->checklistItems->count() > 0)
-                            <span>&#9744; {{ $task->checklistItems->where('completed', true)->count() }}/{{ $task->checklistItems->count() }}</span>
+                            @if ($task->checklist_items_count > 0)
+                            <span>&#9744; {{ $task->done_checklist_items_count }}/{{ $task->checklist_items_count }}</span>
                             @endif
                             @if ($task->due_date)
                             <span class="{{ $task->isOverdue() ? 'font-medium' : '' }}"
@@ -130,6 +136,7 @@
             </div>
 
             {{-- Quick-add form (hidden by default) --}}
+            @if ($canManage)
             <div class="add-task-form hidden p-2 pt-0" data-column="{{ $column->id }}">
                 <form method="POST" action="{{ route('projects.tasks.store', $project) }}">
                     @csrf
@@ -148,11 +155,13 @@
                     </div>
                 </form>
             </div>
+            @endif
         </div>
         @endforeach
     </div>
 </div>
 
+@if ($canManage)
 @push('scripts')
 <script>
 (function () {
@@ -226,4 +235,5 @@
 }
 </style>
 @endpush
+@endif
 @endsection

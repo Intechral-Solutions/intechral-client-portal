@@ -41,8 +41,8 @@
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($projects as $project)
         @php
-            $completion = $project->completionPercentage();
-            $overdueCount = $project->overdueTasks();
+            $completion = $project->completionFromCounts();
+            $overdueCount = $project->overdue_tasks_count;
             $statusColors = [
                 'active'    => ['bg' => 'var(--surface-success)', 'text' => 'var(--text-success)', 'border' => 'var(--border-success)'],
                 'on_hold'   => ['bg' => 'var(--surface-warning)', 'text' => 'var(--text-warning)', 'border' => 'var(--border-warning)'],
@@ -81,7 +81,7 @@
             </div>
 
             <div class="flex items-center justify-between text-xs" style="color: var(--text-muted);">
-                <span>{{ $project->members()->count() }} member{{ $project->members()->count() !== 1 ? 's' : '' }}</span>
+                <span>{{ $project->members_count }} member{{ $project->members_count !== 1 ? 's' : '' }}</span>
                 @if ($overdueCount > 0)
                 <span class="font-medium" style="color: var(--text-danger);">{{ $overdueCount }} overdue</span>
                 @elseif ($project->target_date)

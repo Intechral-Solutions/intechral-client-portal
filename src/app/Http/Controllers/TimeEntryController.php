@@ -203,8 +203,10 @@ class TimeEntryController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn ($p) => ['id' => $p->id, 'label' => $p->name]),
 
+            // open() is the kind-aware "not done": a board task by its column, a standalone or
+            // ticket task by its status, so a Done-column task is no longer offered.
             'task' => Task::where('assignee_id', $user->id)
-                ->whereNotIn('status', ['done'])
+                ->open()
                 ->with(['project', 'ticket'])
                 ->orderBy('title')
                 ->limit(50)

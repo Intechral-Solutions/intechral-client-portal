@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,17 +26,29 @@ class ProjectMilestone extends Model
         return $this->hasMany(Task::class, 'milestone_id');
     }
 
+    /** Aggregates for the milestones page: every milestone in one query, not two each. */
+    public function scopeWithTaskCounts(Builder $query): Builder
+    {
+        return $query->withCount([
+            'tasks',
+            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->done(),
+        ]);
+    }
+
     public function completionPercentage(): int
     {
-        $total = $this->tasks()->count();
-        if ($total === 0) {
-            return 0;
-        }
+        return Project::percentage($this->tasks()->done()->count(), $this->tasks()->count());
+    }
 
-        $done = $this->tasks()
-            ->whereHas('column', fn ($q) => $q->where('is_done_column', true))
-            ->count();
+    /** Same figure from the aggregates added by scopeWithTaskCounts(). */
+    public function completionFromCounts(): int
+    {
+        return Project::percentage((int) $this->done_tasks_count, (int) $this->tasks_count);
+    }
 
-        return (int) round(($done / $total) * 100);
+    /** Due before today and not finished; a milestone due today is not overdue. */
+    public function isOverdueAt(int $completion): bool
+    {
+        return $this->due_date->lt(today()) && $completion < 100;
     }
 }

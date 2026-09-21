@@ -123,7 +123,7 @@
                 @forelse ($tasks as $task)
                 <tr class="hover:bg-surface transition-colors">
                     <td class="px-4 py-3">
-                        @if ($task->project_id)
+                        @if ($task->project_id && isset($openableProjects[$task->project_id]))
                         <a href="{{ route('projects.tasks.show', [$task->project, $task]) }}"
                            class="font-medium hover:underline {{ $task->isDone() ? 'line-through opacity-60' : '' }}"
                            style="color: var(--accent);">
@@ -159,9 +159,17 @@
                     </td>
                     <td class="px-4 py-3 text-xs" style="color: var(--text-secondary);">
                         @if ($task->project)
+                            @if (isset($openableProjects[$task->project_id]))
                             <a href="{{ route('projects.board', $task->project) }}" class="hover:underline">{{ $task->project->name }}</a>
+                            @else
+                            {{ $task->project->name }}
+                            @endif
                         @elseif ($task->ticket)
+                            @if (isset($openableTickets[$task->ticket_id]))
                             <a href="{{ route('tickets.show', $task->ticket) }}" class="hover:underline">{{ $task->ticket->ticket_number }}</a>
+                            @else
+                            {{ $task->ticket->ticket_number }}
+                            @endif
                         @else
                             <span style="color: var(--text-muted);">Standalone</span>
                         @endif

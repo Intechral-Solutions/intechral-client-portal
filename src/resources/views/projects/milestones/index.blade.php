@@ -1,6 +1,7 @@
 @extends('layouts.app', ['title' => $project->name . ' — Milestones'])
 
 @section('content')
+@php $canManage = auth()->user()->can('manage', $project); @endphp
 <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
 
     <div class="mb-6 flex items-center justify-between">
@@ -12,13 +13,13 @@
             </div>
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Milestones</h1>
         </div>
-        @can('manage', $project)
+        @if ($canManage)
         <button type="button" id="new-milestone-btn"
                 class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                 style="background-color: var(--accent); color: #fff;">
             + New Milestone
         </button>
-        @endcan
+        @endif
     </div>
 
     @if (session('success'))
@@ -28,7 +29,7 @@
     @endif
 
     {{-- New Milestone form --}}
-    @can('manage', $project)
+    @if ($canManage)
     <div id="new-milestone-form" class="mb-6 hidden rounded-xl border p-5"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
         <h2 class="mb-4 text-sm font-semibold" style="color: var(--text-primary);">New Milestone</h2>
@@ -64,11 +65,11 @@
             </div>
         </form>
     </div>
-    @endcan
+    @endif
 
     {{-- Milestones list --}}
     @forelse ($milestones as $milestone)
-    @php $completion = $milestone->completionPercentage(); $isOverdue = $milestone->due_date->isPast() && $completion < 100; @endphp
+    @php $completion = $milestone->completionFromCounts(); $isOverdue = $milestone->isOverdueAt($completion); @endphp
     <div class="mb-4 rounded-xl border p-5"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
         <div class="flex items-start justify-between mb-3">
@@ -83,7 +84,7 @@
                       style="color: {{ $isOverdue ? 'var(--text-danger)' : 'var(--text-muted)' }};">
                     Due {{ $milestone->due_date->format('M j, Y') }}
                 </span>
-                @can('manage', $project)
+                @if ($canManage)
                 <button type="button"
                         class="edit-milestone-btn text-xs"
                         style="color: var(--text-muted);"
@@ -98,7 +99,7 @@
                     @csrf @method('DELETE')
                     <button type="submit" class="text-xs" style="color: var(--text-danger);">Delete</button>
                 </form>
-                @endcan
+                @endif
             </div>
         </div>
 
@@ -124,7 +125,7 @@
 </div>
 
 {{-- Edit milestone modal --}}
-@can('manage', $project)
+@if ($canManage)
 <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
     <div class="w-full max-w-lg rounded-xl border p-6 mx-4"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
@@ -160,7 +161,7 @@
         </form>
     </div>
 </div>
-@endcan
+@endif
 
 @push('scripts')
 <script>

@@ -27,11 +27,9 @@ class DashboardController extends Controller
                 ->whereNotIn('status', ['closed', 'resolved'])->count();
 
         // ── Project stats ─────────────────────────────────────
-        $activeProjectCount = $user->can('projects.manage')
-            ? Project::where('status', 'active')->count()
-            : Project::where('status', 'active')
-                ->whereHas('members', fn ($q) => $q->where('user_id', $user->id))
-                ->count();
+        // The same set the projects index lists and ProjectPolicy::view allows (D2), so the
+        // figure neither disagrees with the index nor discloses projects the viewer cannot open.
+        $activeProjectCount = Project::visibleTo($user)->where('status', 'active')->count();
 
         // ── Time stats (current user) ─────────────────────────
         $timeThisMonth = TimeEntry::where('user_id', $user->id)

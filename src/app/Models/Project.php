@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,6 +67,33 @@ class Project extends Model
         return $this->hasMany(ProjectMilestone::class)->orderBy('due_date');
     }
 
+    // ── Scopes ───────────────────────────────────────────────
+
+    /**
+     * The projects ProjectPolicy::view allows: administrators see every project, everyone else
+     * only the ones they are a member of. A company link is metadata and never widens this
+     * (EPIC-011E D2). Keep it identical to the policy; a test compares them.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('projects.admin')) {
+            return $query;
+        }
+
+        return $query->whereHas('members', fn (Builder $members) => $members->where('users.id', $user->id));
+    }
+
+    /** Aggregate counts the index needs, so rendering a card never queries per project. */
+    public function scopeWithTaskStats(Builder $query): Builder
+    {
+        return $query->withCount([
+            'tasks',
+            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->done(),
+            'tasks as overdue_tasks_count' => fn (Builder $tasks) => $tasks->overdue(),
+            'members',
+        ]);
+    }
+
     // ── Helpers ──────────────────────────────────────────────
 
     public function hasMember(User $user): bool
@@ -75,24 +103,22 @@ class Project extends Model
 
     public function completionPercentage(): int
     {
-        $total = $this->tasks()->count();
-        if ($total === 0) {
-            return 0;
-        }
+        return self::percentage($this->tasks()->done()->count(), $this->tasks()->count());
+    }
 
-        $done = $this->tasks()
-            ->whereHas('column', fn ($q) => $q->where('is_done_column', true))
-            ->count();
-
-        return (int) round(($done / $total) * 100);
+    /** Same figure from the aggregates added by scopeWithTaskStats(). */
+    public function completionFromCounts(): int
+    {
+        return self::percentage((int) $this->done_tasks_count, (int) $this->tasks_count);
     }
 
     public function overdueTasks(): int
     {
-        return $this->tasks()
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', today())
-            ->whereHas('column', fn ($q) => $q->where('is_done_column', false))
-            ->count();
+        return $this->tasks()->overdue()->count();
+    }
+
+    public static function percentage(int $done, int $total): int
+    {
+        return $total === 0 ? 0 : (int) round(($done / $total) * 100);
     }
 }

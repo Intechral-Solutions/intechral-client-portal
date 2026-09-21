@@ -5,7 +5,7 @@
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 **Related:** [EPIC-005: Project Management](./EPIC-005-projects.md), [EPIC-010B: Tenant Scoping](./EPIC-010B-tenant-scoping.md), [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
-**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements
+**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements; [Amendment 4 (2026-09-21)](#amendment-4-wp1-results-2026-09-21): WP1 implemented and gated, S1/S2 browser-confirmed, lock protocol refined by the stress test, implementation decisions and observations
 
 ---
 
@@ -91,6 +91,62 @@ Tested versions: `@inertiajs/core` and `@inertiajs/react` 3.7.1, React and React
 5. **Drop position:** `onDragOver` fires only when the `over` target changes, so the final index is derived at drop time from the current layout; use a pointer-first collision strategy with `closestCorners` fallback, and test "drop below the last card" after re-aiming, because the target column shifts once the preview inserts the card (§9).
 6. **Announcements** must be built from the derived target (column name and position), not from dnd-kit's raw `over`, which is usually the dragged card's own placeholder once the preview has moved it (§9).
 7. **The horizontal board scroller is a native keyboard tab stop in Chromium.** Give it a deliberate `role="region"`, accessible name, and `tabIndex={0}`, as already planned (§7, §9).
+
+---
+
+## Amendment 4: WP1 Results (2026-09-21)
+
+WP1 (backend hardening and characterization) is **implemented** on `epic-011e-projects-kanban`, uncommitted, with no React change and no decision reopened. EPIC-011E stays **Planned**; the status moves with the epic, not the work package. Tests were written first: the original backend was characterized (22 tests green against unmodified production code), then the target contract was written and run red (**96 failures**), then fixed.
+
+**Gates (all green, final run 2026-09-21, after the maintainer applied the migration to the development database and after the dashboard fix W17):** full Pest on MariaDB 10.11, container PHP 8.3.33: **735 passed** (405 before WP1); focused WP1 suites (Projects, Dashboard, tenant scoping, navigation): 378 passed; Pint over the whole repository; `npm run check` (Wayfinder, typecheck, ESLint, Prettier, Vitest 73/73, build), exit 0; the full Playwright suite (1.63.0, Chromium in `portal_app`, `PLAYWRIGHT_BASE_URL=http://nginx`) against the migrated, RESTRICT-enforced development schema: **14 passed** (10 existing plus the 4 new WP1 regressions); `git diff --check` clean. The concurrency stress was run at 10 workers x 60 moves for three seeds (1,800 moves) with no error, no deadlock, and dense columns throughout. Development-database hygiene after the browser run: 0 projects, columns, members, milestones, tasks, comments, checklist items, time entries and allocation blocks, no `E2E`-named or hostile-name rows, only the two seeded accounts; `sessions` is the documented, uncleaned table (it fell from 66 to 36 through normal garbage collection during the run).
+
+### Where the live result differs from, or adds to, the plan
+
+| # | Item | Outcome |
+|---|---|---|
+| W1 | **S2 is now browser-confirmed** (closes the Amendment 2 / C6 condition) | On the unmodified page in Chromium 153, clicking *Save Changes* submitted `_method=PUT` then `_method=DELETE`, redirected to `/projects`, and the project returned 404 afterwards: no confirmation, no error. Three forms existed in the DOM and none was nested (the parser had discarded the inner tag). Fixed: the delete form is now a sibling in a Danger Zone section. Pinned by a Playwright regression and a PHP-8.3 stack-based Pest test |
+| W2 | **S1 is now browser-confirmed as DOM injection** | On the unmodified create page, a user named `</select><img src=x onerror="...">` injected one `<img src="x">` element into the manager's DOM when *Add member* was clicked. Script execution was not asserted (the probe read the DOM before the asynchronous `onerror`). `@json` hex-escapes the payload, so the served HTML was inert; the flaw was purely the client interpolation into `innerHTML`. Fixed with a server-rendered, Blade-escaped `<template>` cloned by `template.content.cloneNode(true)` |
+| W3 | **The stress test found a real locking defect in the first implementation** | A deadlock survived the three transaction retries. Two causes: (a) the task's current column was read before the locks, so when it changed the code locked the new column *out of order*; (b) that first plain read also opened the REPEATABLE READ snapshot, so positions read after the locks could be stale. Final protocol (**supersedes the wording of §16.2, which stays correct in outline**): read the task's column outside any transaction; inside the transaction lock the source and target column rows in ascending id order, then the task row (`FOR UPDATE`); if the task's column differs from what was read, return and **restart the whole attempt** (up to 5) instead of locking anything else; only then read positions (the first plain read, so a fresh snapshot); the transaction is additionally retried on deadlock (3). Exhausted restarts answer 409 |
+| W4 | **Assignee rule refinement (I8, server side)** | `assignee_id` must be a member of the route's project, **or equal to the task's current assignee**. Saving a task unchanged is not a new assignment, so a person who has since left keeps the task and the WP7 form can show them "(no longer a project member)" without a 422. Any *other* non-member is rejected. The Blade edit form now includes the ex-member option for the same reason |
+| W5 | Non-admin extra initial members answer **403** | `projects.store` calls `authorize('manageMembers', Project::class)` when `members` is non-empty, before validation. An empty `members` array is allowed. `ProjectPolicy::manageMembers(User, Project\|string\|null)` accepts a project or the class name; it returns `projects.admin` and nothing else, independent of `projects.manage` |
+| W6 | `projects.members.sync` route | The `can:projects.manage` middleware was removed from this one route (§16). A9 is otherwise untouched: create, edit, update, destroy, companies and milestone writes keep the middleware, pinned by a test. Consequence, unchanged from before: the Blade board *Settings* link is shown to anyone `manage` allows, including a `projects.admin` holder without `projects.manage`, who then gets 403 from the middleware. **WP5 must not reproduce this**: the React board derives the link from a dedicated `abilities.openSettings` (§5, §7), not from `abilities.manage` |
+| W7 | Blade view data now matches the WP3 prop names | `create`: `companies`, optional `memberCandidates`. `edit`: `project`, `members` (`{id,name,role,isOwner}`), optional `memberCandidates` (`{id,name,email}`, administrators only), `companies`, `linkedCompanyIds`. `memberCandidates` is absent from the view data, not empty, for everyone else, and the non-admin edit page lists members read-only without emails |
+| W8 | Service API | `ProjectService` gained `createTask`, `moveTask` (rewritten), `deleteTask`, `deleteProject`. Errors: unknown or foreign column on the HTTP move is 422 on `column_id`; a task or column that vanishes mid-request is 404; a blocked delete is a 422 `ValidationException` on `delete` (HTTP redirect-back with the error for Blade, 422 JSON for XHR); a foreign-key violation from the race between the check and the DELETE is mapped to the same message. Dense positions from 0; create appends at the true tail even over legacy gaps or duplicates; a no-op move writes nothing and leaves `updated_at` alone |
+| W9 | Checklist | `POST` and `DELETE` routes as planned (manager only, redirect-back). Position is `max + 1` (0 when empty), the 100-item cap and the tail position are serialised by a row lock on the task. Toggle accepts an optional boolean `completed` (idempotent) and still flips when it is omitted; it still returns JSON until WP7 |
+| W10 | `Task` gained `kind()` with `KIND_*` constants, and the SQL scopes `done()`, `open()`, `overdue()`; `Project::visibleTo()`, `withTaskStats()`, `completionFromCounts()`; `ProjectMilestone::withTaskCounts()`, `completionFromCounts()`, `isOverdueAt()` | `Task::isOverdue()`, `Project::overdueTasks()` and the milestone page now share one rule: due before today and not done by the kind-aware definition. `overdueTasks()` therefore also counts a null-column task whose raw status is not `done` (the pinned §15 edge case); before, it silently ignored those |
+| W11 | Query budgets (measured, warm request, 3 rows against 30) | Projects index **21 to 106 queries before, 4 and 4 after**; board 15 to 69 before, **8 and 8**; milestones 10 to 64 before, **4 and 4**; `/tasks` **10 and 10**. Each `@can` inside a loop was replaced by one policy check per page, because it ran one membership query per row |
+| W12 | D2 on `/tasks` | The org tab is the union of my tasks, tasks of company-linked projects **the viewer can open**, and tasks on tickets of the viewer's companies (ticket rows keep their list behavior, C8). Links are decided per page in two batches (`openableProjects`, `openableTickets`): a project the viewer cannot open, or a ticket `TicketPolicy` denies, still shows its name or number as plain text, never a link |
+| W13 | D6 on the Blade panel | Only the `task` context of `x-time-tracker` is scoped: own entries and own total unless `time.view_all`; running entries stay excluded. Project and ticket contexts are unchanged. A `time.view_all` holder without `time.log` still sees no Blade panel (the React panel in WP7 changes that, §11) |
+| W14 | D4 migration | `2026_09_21_120000_restrict_time_entry_project_and_task_deletes` switches `time_entries.project_id` and `.task_id` from `SET NULL` to `RESTRICT`, both columns stay nullable, `down()` restores `SET NULL`. Verified in a Pest test (rollback then forward, in its own fixture-free file because DDL commits implicitly), and through `migrate:rollback --step=1` and `migrate` on the testing database. **The maintainer then applied it to the development database (`portal`, batch 3)**; verified afterwards without re-running it: `migrate:status` lists it as run, no migration is pending, both foreign keys report `RESTRICT` for delete and update, both columns are still nullable, and the testing database is separately configured (`intechral_client_portal_testing`, its own batch 1) with the same rules. The application guard does not depend on the constraint. A side effect of the backstop, consistent with C3: deleting a *user* whose created project holds recorded time would now fail on the foreign key instead of nulling history; no user-deletion route exists |
+| W15 | Read-only audit (§16 "Existing data") | `php artisan projects:audit-integrity [--json]` (service `ProjectIntegrityAudit`, SELECT only, proven by a before/after table fingerprint). Counts: column from another project, milestone from another project, project task assigned to a non-member, time entries whose project or task row is missing, projects and tasks the D4 rule would refuse to delete. On the development database every count is 0, but that database currently holds **no** projects or tasks, so this says nothing about production data; **`projects:audit-integrity` must be run against populated production data before the restrictive foreign-key migration is applied there** (and before any legacy cleanup is contemplated); no cleanup was designed or run here |
+| W16 | Test support | `TaskFactory` default column now belongs to the task's own project (the old default produced the A1 shape); states `inColumn()` and `assignedTo()`; `TaskChecklistItemFactory`, `TaskCommentFactory` (models gained `HasFactory`); shared fixtures in `tests/Feature/Projects/ProjectTestHelpers.php` |
+| W17 | **Dashboard project count (D2), fixed in WP1** | `DashboardController` counted **every** active project for any `projects.manage` holder, so a non-administrator project manager saw a total that disagreed with the index and disclosed how many projects existed beyond their access; and a `projects.admin` holder without `projects.manage` saw the smaller member-only figure while their index lists everything. It now uses `Project::visibleTo($user)->where('status', 'active')->count()`, the same scope as the index, with no visibility logic duplicated and no change to `ProjectPolicy`. `ProjectDashboardCountTest` (6 tests, written red first: 5 failed) covers a manager who can open one of two active projects (1, not 2), a manager in no project (0), a plain member, a company link (ignored), administrators with and without `projects.manage` (all active), and equality with the index for every actor kind |
+
+### Tests added or changed
+
+| File | Purpose |
+|---|---|
+| `ProjectAuthorizationMatrixTest` | 25 routes x 8 actors (200 cases) plus authorization-before-404, authorization-before-deletion-guard, and cross-project manager checks |
+| `ProjectIntegrityTest` | A1 to A3, A7, I8, move and ordering (dense, clamped, legacy repair, no-op, 404), status contract per kind, timer-context options, overdue rule, checklist D5, comments, standalone D3 |
+| `ProjectDeletionGuardTest`, `TimeEntryForeignKeyMigrationTest` | D4 cases 1 to 10 and the migration case, including billed, invoiced, unbilled and running entries and the race mapping |
+| `ProjectVisibilityTest` | D2: index equals the policy for every user kind, `visibleTo` equals the policy, `ProjectPolicy` surface, `/tasks` rows and links, informational copy |
+| `ProjectMemberManagementTest` | D7-B: sync, initial members, validation, data minimization, read-only member DTO |
+| `ProjectBladeRegressionTest` | S1, S2, D1 Blade controls, D4 error display, D6 panel, ticket panel untouched |
+| `ProjectQueryBudgetTest`, `ProjectIntegrityAuditTest` | P1 to P3 and the audit |
+| `ProjectDashboardCountTest` (with the existing `DashboardInertiaTest`, unchanged) | W17: the dashboard figure equals the visible active projects and the index |
+| `ProjectMoveConcurrencyTest` (+ `tests/Support/project_task_worker.php`) | Parallel PHP processes on committed rows: cross and within-column moves, creates racing stale indexes, deletes racing moves. Cleans up after itself; `PROJECT_STRESS_WORKERS`, `_MOVES`, `_SEED` scale a soak run |
+| `ProjectPinnedBehaviorTest` | The characterized behavior WP1 deliberately leaves alone (A9, status contract, null-column edge, comment/toggle access, D3 route surface) |
+| `tests/Browser/wp1-blade-regressions.spec.ts` | Temporary (deleted with the Blade views, §24): S2, D4, S1 with a real hostile user, D1 read-only board with a second browser context |
+
+`ProjectManagementTest`, `ProjectTaskTest` and `ProjectMilestoneTest` pass unmodified.
+
+### Observations and non-goals, deliberately not changed
+
+- **A9 and the Settings link** stay as they were in Blade (pinned); the React board is planned to avoid the dead link through `abilities.openSettings` (§5, §7, W6).
+- **`time.view_own`** remains unenforced permission-model debt (C5); WP1 neither wires nor redefines it.
+- **User deletion**: no route exists and none is designed here; the RESTRICT backstop only means such a delete would now be refused for a user whose project holds recorded time.
+- The Blade board quick-add and the milestone forms still swallow validation errors (X5); the React pages fix that in WP4 and WP5.
+- Milestone selection in the Blade task edit form was not added (I4 is WP7 in React); the endpoint now validates it.
 
 ---
 
@@ -261,8 +317,8 @@ Severity: **H** = fix before any UI conversion, **M** = fix in this epic, **L** 
 
 | # | Sev | Defect | Evidence |
 |---|---|---|---|
-| S1 | M | **DOM-injection candidate; fixed in WP1 while Blade still works.** Member option markup is built with template strings (`${u.name} &lt;${u.email}&gt;`) assigned to `innerHTML`. Names are user-controlled (profile), so a name containing markup such as `</select>…` can break out of the select in a manager's browser. Not exercised end to end; unescaped by construction. WP1 replaces string-building with a server-rendered, Blade-escaped `<template>` row | `create.blade.php:164-165`; `edit.blade.php:186-187` |
-| S2 | **H** | **Invalid nested form on the edit page; fixed in WP1 while Blade still works.** The delete `<form>` sits inside the update `<form>`. HTML5 tree construction with PHP 8.4 `Dom\HTMLDocument` indicates the inner form tag is discarded and both `_method` inputs become associated with the outer form; `parse_str` keeps the later `DELETE`, making destructive submission a credible risk. **This destructive behavior is parser-confirmed but not yet browser-confirmed** because host Chromium cannot launch in this WSL environment (`libglib` missing). WP1 first reproduces the legacy page in Playwright. If reproduced, the browser behavior becomes a pinned regression; if it does not reproduce, the invalid nested markup is still removed but is documented as a potential rather than browser-observed defect. In both cases the delete form moves outside the update form and a PHP-8.3-compatible structural regression test proves forms are not nested | `edit.blade.php:23,83-92` |
+| S1 | M | **DOM-injection candidate; fixed in WP1 while Blade still works.** Member option markup is built with template strings (`${u.name} &lt;${u.email}&gt;`) assigned to `innerHTML`. Names are user-controlled (profile), so a name containing markup such as `</select>…` can break out of the select in a manager's browser. **Browser-confirmed as DOM injection in WP1 (Amendment 4, W2).** WP1 replaced string-building with a server-rendered, Blade-escaped `<template>` row | `create.blade.php:164-165`; `edit.blade.php:186-187` |
+| S2 | **H** | **Invalid nested form on the edit page; fixed in WP1 while Blade still works.** The delete `<form>` sits inside the update `<form>`. HTML5 tree construction with PHP 8.4 `Dom\HTMLDocument` indicates the inner form tag is discarded and both `_method` inputs become associated with the outer form; `parse_str` keeps the later `DELETE`, making destructive submission a credible risk. **Browser-confirmed in WP1 (Amendment 4, W1):** in the `portal_app` container's Chromium, *Save Changes* deleted the project. It is now fixed: the delete form is outside the update form, pinned by a Playwright regression and a PHP-8.3-compatible structural Pest test | `edit.blade.php:23,83-92` |
 
 ### 4.3 Data integrity and correctness
 
@@ -371,7 +427,10 @@ type BoardColumn = { id: number; name: string; isDone: boolean; tasks: BoardTask
 props: {
     project: { id: number; name: string; status: ProjectStatus };
     columns: BoardColumn[];
-    abilities: { manage: boolean };   // create / move / reorder / settings. Comments and checklist toggles live on the task page
+    abilities: {
+        manage: boolean;        // create / move / reorder (ProjectPolicy::manage, D1). Comments and checklist toggles live on the task page
+        openSettings: boolean;  // the Settings link: whether the actor can actually reach projects.edit (see A9 note below)
+    };
 }
 ```
 
@@ -490,14 +549,14 @@ Page composition (`projects/board`):
 
 ```
 AppLayout (persistent; TimerProvider and RunningTimerBar stay mounted)
-└─ ProjectHeader        breadcrumb · name · status badge · Milestones link · Settings link (abilities.manage)
+└─ ProjectHeader        breadcrumb · name · status badge · Milestones link · Settings link (abilities.openSettings)
    └─ BoardScrollRegion role="region" aria-label="Kanban board" tabIndex=0, overflow-x-auto, snap on small screens
       └─ BoardColumn × n   heading · count (from state) · Add task · task list
          └─ TaskCard × n   drag handle · title link · priority · due · assignee · checklist · milestone · Move menu
 ```
 
 - The page owns full-width layout inside `<main>`; only the scroll region scrolls horizontally, never the document (checked at mobile widths, §24).
-- Structural controls (Add task, drag handle, Move menu, Settings) render only when `abilities.manage` (D1). Other members see a read-only board and can still open tasks, comment, and toggle checklist items.
+- Structural controls (Add task, drag handle, Move menu) render only when `abilities.manage` (D1). The **Settings link renders only when `abilities.openSettings`**, which the server computes from what `projects.edit` will actually admit today (`manage` policy **and** the `projects.manage` route middleware, A9), so a `projects.admin` holder without `projects.manage` is not offered a link that answers 403. The Blade board still shows that link in that one case (pinned, Amendment 4 W6); the React board must not carry the defect over, and the authorization model itself is not changed here. Other members see a read-only board and can still open tasks, comment, and toggle checklist items.
 - Column count is derived from `columns[i].tasks.length` on every render, fixing X3's stale header count.
 - Task title links use Inertia `<Link prefetch>` once the task page is React (WP7); before that they use a plain anchor (§21).
 - Project header navigation is real links, not tabs, so each destination keeps its own URL and history entry.
@@ -902,7 +961,7 @@ React visibility is never authorization. Every mutation and page route authorize
 ### Integrity and scoping rules (server)
 
 1. **Ownership of referenced IDs.** `column_id` must be a column of the route's project; `milestone_id` a milestone of that project; `assignee_id` null or a **member of that project**. Enforced with scoped `Rule::exists(...)->where('project_id', …)` (members via `project_members`). Failure is a 422 on that field (A1 to A3).
-2. **Move algorithm.** One `DB::transaction`: lock the source and target `project_columns` rows in ascending ID order (`lockForUpdate`), read both task-ID lists ordered by `(position, id)`, splice, rewrite positions densely `0..n-1` for the affected columns, clamp the requested index to `0..count(target)`. Reject a task/column pair from different projects. The column rows are the mutex; this also tolerates today's legacy gaps and duplicates (I1, I2).
+2. **Move algorithm.** One `DB::transaction`: lock the source and target `project_columns` rows in ascending ID order (`lockForUpdate`), read both task-ID lists ordered by `(position, id)`, splice, rewrite positions densely `0..n-1` for the affected columns, clamp the requested index to `0..count(target)`. Reject a task/column pair from different projects. The column rows are the mutex; this also tolerates today's legacy gaps and duplicates (I1, I2). **Implementation refinement (Amendment 4, W3):** the task's column is read before the transaction and re-checked under the lock, and the attempt restarts if it changed, so locks are only ever taken in one order.
 3. **Create and delete** take the same column lock: create appends at `count`; delete closes the gap.
 4. **One overdue implementation.** `Task::isOverdue()`, `Project::overdueTasks()`, and the milestone check all use `due_date < today()` (I6).
 5. **Status is kind-aware** (§15).
@@ -1261,6 +1320,7 @@ Column creation/rename/reorder/delete and per-project workflows; task dependenci
 **Exit (met):** branch and base are correct; spike results and the fallback decision are written into §8 and §9.
 
 ### WP1: Characterize and harden the backend (Blade still works)
+**Status: complete (2026-09-21).** Results, deviations and observations are recorded in [Amendment 4](#amendment-4-wp1-results-2026-09-21). Not committed. The D4 foreign-key migration has been applied to the development database and verified; production still needs the audit-then-migrate sequence described in W15.
 Tests first (characterization, then the failing tests for each defect), then fixes, in this order of risk:
 1. Characterization suite: actor-by-route matrix against *current* behavior, status contract (§15), `contextOptions`, current member sync, current index/policy mismatch, A9, edit-page structure.
 2. **Cross-project column injection** (A1), **foreign milestone IDs** (A2), **foreign/ineligible assignee IDs** (A3): project-scoped validation on create, update, move, and standalone create (assignee is the actor or none).
@@ -1276,7 +1336,7 @@ Tests first (characterization, then the failing tests for each defect), then fix
 12. Blade D6 patch for the task-context branch of `x-time-tracker` (own time unless `time.view_all`); ticket context untouched.
 13. **Relevant query-count regressions** (P1 to P3): eager loading and aggregate counts; query-budget tests.
 14. Read-only audit query (§16).
-**Exit:** all new and existing backend tests pass on MariaDB; Blade pages work and offer no action the server refuses; concurrency stress green; no React change.
+**Exit (met):** all new and existing backend tests pass on MariaDB; Blade pages work and offer no action the server refuses; concurrency stress green; no React change.
 
 ### WP2: Shared frontend foundation
 `types/pagination.ts`, `lib/dates.ts`, pagination extraction (Time page refactored with its tests unchanged), `textarea`, `native-select`, `progress`, `dropdown-menu`, `form-dialog`, `TimerContextLink`, additive `context.id` on the timer DTO and TS type, Inertia test helpers.

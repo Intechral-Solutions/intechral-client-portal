@@ -15,7 +15,7 @@ class ProjectMilestoneController extends Controller
         $this->authorize('view', $project);
 
         $milestones = $project->milestones()
-            ->withCount('tasks')
+            ->withTaskCounts()
             ->get();
 
         return view('projects.milestones.index', compact('project', 'milestones'));

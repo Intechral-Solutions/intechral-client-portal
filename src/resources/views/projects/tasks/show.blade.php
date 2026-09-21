@@ -184,6 +184,9 @@
                                 @foreach ($project->members as $m)
                                 <option value="{{ $m->id }}" @selected($task->assignee_id === $m->id)>{{ $m->name }}</option>
                                 @endforeach
+                                @if ($task->assignee && ! $project->members->contains('id', $task->assignee_id))
+                                <option value="{{ $task->assignee_id }}" selected>{{ $task->assignee->name }} (no longer a project member)</option>
+                                @endif
                             </select>
                         </div>
                         <div>
@@ -204,6 +207,10 @@
                     </div>
                 </form>
 
+                @error('delete')
+                <div class="mt-3 rounded-lg border px-3 py-2 text-sm" role="alert"
+                     style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);">{{ $message }}</div>
+                @enderror
                 <form method="POST" action="{{ route('projects.tasks.destroy', [$project, $task]) }}" class="mt-3"
                       onsubmit="return confirm('Delete this task?')">
                     @csrf @method('DELETE')

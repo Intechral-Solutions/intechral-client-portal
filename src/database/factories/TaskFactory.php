@@ -16,7 +16,10 @@ class TaskFactory extends Factory
     {
         return [
             'project_id' => Project::factory(),
-            'column_id' => ProjectColumn::factory(),
+            // A board task's column belongs to the task's own project.
+            'column_id' => fn (array $attributes) => ProjectColumn::factory()->create([
+                'project_id' => $attributes['project_id'],
+            ])->id,
             'ticket_id' => null,
             'milestone_id' => null,
             'assignee_id' => null,
@@ -33,6 +36,20 @@ class TaskFactory extends Factory
     public function overdue(): static
     {
         return $this->state(['due_date' => now()->subDay()]);
+    }
+
+    /** A board task in the given column; the project is always the column's own. */
+    public function inColumn(ProjectColumn $column): static
+    {
+        return $this->state([
+            'project_id' => $column->project_id,
+            'column_id' => $column->id,
+        ]);
+    }
+
+    public function assignedTo(User $user): static
+    {
+        return $this->state(['assignee_id' => $user->id]);
     }
 
     public function standalone(): static

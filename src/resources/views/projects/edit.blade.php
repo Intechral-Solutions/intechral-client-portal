@@ -79,34 +79,45 @@
             </div>
         </div>
 
-        <div class="flex justify-between gap-3">
-            <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('Delete this project? This cannot be undone.')">
-                @csrf @method('DELETE')
-                <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
-                        style="border-color: var(--border-danger); color: var(--text-danger);">Delete Project</button>
-            </form>
+        <div class="flex justify-end gap-3">
             <button type="submit"
                     class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                     style="background-color: var(--accent); color: #fff;">Save Changes</button>
         </div>
     </form>
 
+    {{-- Danger zone: a sibling of the details form, never nested inside it (EPIC-011E S2) --}}
+    <div class="mt-8 rounded-xl border p-6"
+         style="background-color: var(--surface-card); border-color: var(--border-danger);">
+        <h2 class="mb-1 text-sm font-semibold uppercase tracking-wide" style="color: var(--text-danger);">Danger Zone</h2>
+        <p class="mb-4 text-xs" style="color: var(--text-secondary);">Deleting a project removes its board, tasks and milestones. A project with recorded time cannot be deleted; set its status to Archived instead.</p>
+        @error('delete')
+        <div class="mb-4 rounded-lg border px-4 py-3 text-sm" role="alert"
+             style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);">{{ $message }}</div>
+        @enderror
+        <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('Delete this project? This cannot be undone.')">
+            @csrf @method('DELETE')
+            <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
+                    style="border-color: var(--border-danger); color: var(--text-danger);">Delete Project</button>
+        </form>
+    </div>
+
     {{-- Company Management --}}
-    @if ($allCompanies->isNotEmpty())
+    @if ($companies->isNotEmpty())
     <div class="mt-8 rounded-xl border p-6"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
         <h2 class="mb-1 text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Linked Companies</h2>
-        <p class="mb-4 text-xs" style="color: var(--text-secondary);">Organization members of linked companies will have visibility of this project.</p>
+        <p class="mb-4 text-xs" style="color: var(--text-secondary);">Linking a company records the client relationship. It does not grant that company's organization members access to the project; only project members (and administrators) can open it.</p>
 
         <form method="POST" action="{{ route('projects.companies.sync', $project) }}">
             @csrf
             @method('PUT')
 
             <div class="space-y-2 mb-4">
-                @foreach ($allCompanies as $company)
+                @foreach ($companies as $company)
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="companies[]" value="{{ $company->id }}"
-                           {{ in_array($company->id, $linkedCompanies) ? 'checked' : '' }}
+                           {{ in_array($company->id, $linkedCompanyIds) ? 'checked' : '' }}
                            class="rounded border"
                            style="accent-color: var(--accent);">
                     <span class="text-sm" style="color: var(--text-primary);">{{ $company->name }}</span>
@@ -122,90 +133,45 @@
     </div>
     @endif
 
-    {{-- Member Management --}}
+    {{-- Members --}}
     <div class="mt-8 rounded-xl border p-6"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
         <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Members</h2>
 
+        @isset($memberCandidates)
         <form method="POST" action="{{ route('projects.members.sync', $project) }}" class="space-y-4">
             @csrf
             @method('PUT')
 
-            <div id="members-container" class="space-y-2">
-                @foreach ($currentMembers as $i => $member)
-                <div class="flex gap-2 member-row">
-                    <select name="members[{{ $i }}][user_id]" class="flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-                        @foreach ($allMembers as $u)
-                        <option value="{{ $u->id }}" @selected($u->id === $member->id)>{{ $u->name }} &lt;{{ $u->email }}&gt;</option>
-                        @endforeach
-                    </select>
-                    <select name="members[{{ $i }}][role]" class="rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-                        <option value="member" @selected($member->pivot_role === 'member')>Member</option>
-                        <option value="manager" @selected($member->pivot_role === 'manager')>Manager</option>
-                    </select>
-                    @if ($member->id !== $project->created_by)
-                    <button type="button" onclick="this.closest('.member-row').remove()"
-                            class="rounded-lg border px-2 py-1 text-sm transition-colors hover:opacity-80"
-                            style="border-color: var(--border-base); color: var(--text-danger);">&times;</button>
-                    @else
-                    <span class="rounded-lg border px-2 py-1 text-xs flex items-center"
-                          style="border-color: var(--border-base); color: var(--text-muted);">Owner</span>
-                    @endif
-                </div>
-                @endforeach
-            </div>
-
-            <button type="button" id="add-member" class="text-sm font-medium" style="color: var(--accent);">+ Add member</button>
+            @include('projects.partials.member-editor', [
+                'candidates' => $memberCandidates,
+                'rows' => collect($members)->map(fn ($member) => [
+                    'user_id' => $member['id'],
+                    'role' => $member['role'],
+                    'owner' => $member['isOwner'],
+                ])->all(),
+            ])
 
             <div class="flex justify-end">
                 <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                         style="background-color: var(--accent); color: #fff;">Update Members</button>
             </div>
         </form>
+        @else
+        <p class="mb-3 text-xs" style="color: var(--text-secondary);">Project membership is managed by an administrator.</p>
+        <ul class="space-y-2">
+            @foreach ($members as $member)
+            <li class="flex items-center justify-between text-sm">
+                <span style="color: var(--text-primary);">{{ $member['name'] }}</span>
+                <span class="text-xs" style="color: var(--text-muted);">
+                    {{ ucfirst($member['role']) }}@if ($member['isOwner']) &middot; Owner @endif
+                </span>
+            </li>
+            @endforeach
+        </ul>
+        @endisset
     </div>
 
 </div>
 
-@push('scripts')
-<script>
-(function() {
-    const members = @json($allMembers);
-    let idx = {{ $currentMembers->count() }};
-
-    document.getElementById('add-member').addEventListener('click', function () {
-        const container = document.getElementById('members-container');
-        const row = document.createElement('div');
-        row.className = 'flex gap-2 member-row';
-
-        const userSelect = document.createElement('select');
-        userSelect.name = `members[${idx}][user_id]`;
-        userSelect.className = 'flex-1 rounded-lg border px-3 py-2 text-sm outline-none';
-        userSelect.style.cssText = 'background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);';
-        userSelect.innerHTML = '<option value="">Select user\u2026</option>' +
-            members.map(u => `<option value="${u.id}">${u.name} &lt;${u.email}&gt;</option>`).join('');
-
-        const roleSelect = document.createElement('select');
-        roleSelect.name = `members[${idx}][role]`;
-        roleSelect.className = 'rounded-lg border px-3 py-2 text-sm outline-none';
-        roleSelect.style.cssText = 'background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);';
-        roleSelect.innerHTML = '<option value="member">Member</option><option value="manager">Manager</option>';
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.className = 'rounded-lg border px-2 py-1 text-sm transition-colors hover:opacity-80';
-        removeBtn.style.cssText = 'border-color: var(--border-base); color: var(--text-danger);';
-        removeBtn.addEventListener('click', () => row.remove());
-
-        row.appendChild(userSelect);
-        row.appendChild(roleSelect);
-        row.appendChild(removeBtn);
-        container.appendChild(row);
-        idx++;
-    });
-})();
-</script>
-@endpush
 @endsection

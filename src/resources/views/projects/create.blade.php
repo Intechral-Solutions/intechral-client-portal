@@ -83,7 +83,7 @@
         <div class="rounded-xl border p-6 space-y-4"
              style="background-color: var(--surface-card); border-color: var(--border-base);">
             <h2 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Linked Companies</h2>
-            <p class="text-xs" style="color: var(--text-secondary);">Associate this project with one or more client companies to grant their organization members visibility.</p>
+            <p class="text-xs" style="color: var(--text-secondary);">Linking a company records the client relationship. It does not grant that company's organization members access to the project; only project members (and administrators) can open it.</p>
 
             <div id="companies-container" class="space-y-2">
                 @foreach ($companies as $company)
@@ -103,36 +103,19 @@
         <div class="rounded-xl border p-6 space-y-4"
              style="background-color: var(--surface-card); border-color: var(--border-base);">
             <h2 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Initial Members</h2>
+            @isset($memberCandidates)
             <p class="text-xs" style="color: var(--text-secondary);">You will be added as manager automatically. Add additional members below.</p>
 
-            <div id="members-container" class="space-y-2">
-                @if (old('members'))
-                @foreach (old('members') as $i => $m)
-                <div class="flex gap-2 member-row">
-                    <select name="members[{{ $i }}][user_id]" class="flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-                        <option value="">Select user&hellip;</option>
-                        @foreach ($members as $u)
-                        <option value="{{ $u->id }}" @selected((string)($m['user_id'] ?? '') === (string)$u->id)>{{ $u->name }} &lt;{{ $u->email }}&gt;</option>
-                        @endforeach
-                    </select>
-                    <select name="members[{{ $i }}][role]" class="rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-                        <option value="member" @selected(($m['role'] ?? '') === 'member')>Member</option>
-                        <option value="manager" @selected(($m['role'] ?? '') === 'manager')>Manager</option>
-                    </select>
-                    <button type="button" onclick="this.closest('.member-row').remove()"
-                            class="rounded-lg border px-2 py-1 text-sm transition-colors hover:opacity-80"
-                            style="border-color: var(--border-base); color: var(--text-danger);">&times;</button>
-                </div>
-                @endforeach
-                @endif
-            </div>
-
-            <button type="button" id="add-member"
-                    class="text-sm font-medium" style="color: var(--accent);">
-                + Add member
-            </button>
+            @include('projects.partials.member-editor', [
+                'candidates' => $memberCandidates,
+                'rows' => collect(old('members', []))->map(fn ($m) => [
+                    'user_id' => filled($m['user_id'] ?? null) ? $m['user_id'] : null,
+                    'role' => $m['role'] ?? 'member',
+                ])->values()->all(),
+            ])
+            @else
+            <p class="text-xs" style="color: var(--text-secondary);">You will be added as manager automatically. Adding other members is done by an administrator.</p>
+            @endisset
         </div>
 
         <div class="flex justify-end gap-3">
@@ -146,44 +129,4 @@
     </form>
 </div>
 
-@push('scripts')
-<script>
-(function() {
-    const members = @json($members);
-    let idx = {{ old('members') ? count(old('members')) : 0 }};
-
-    document.getElementById('add-member').addEventListener('click', function () {
-        const container = document.getElementById('members-container');
-        const row = document.createElement('div');
-        row.className = 'flex gap-2 member-row';
-
-        const userSelect = document.createElement('select');
-        userSelect.name = `members[${idx}][user_id]`;
-        userSelect.className = 'flex-1 rounded-lg border px-3 py-2 text-sm outline-none';
-        userSelect.style.cssText = 'background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);';
-        userSelect.innerHTML = '<option value="">Select user\u2026</option>' +
-            members.map(u => `<option value="${u.id}">${u.name} &lt;${u.email}&gt;</option>`).join('');
-
-        const roleSelect = document.createElement('select');
-        roleSelect.name = `members[${idx}][role]`;
-        roleSelect.className = 'rounded-lg border px-3 py-2 text-sm outline-none';
-        roleSelect.style.cssText = 'background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);';
-        roleSelect.innerHTML = '<option value="member">Member</option><option value="manager">Manager</option>';
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.className = 'rounded-lg border px-2 py-1 text-sm transition-colors hover:opacity-80';
-        removeBtn.style.cssText = 'border-color: var(--border-base); color: var(--text-danger);';
-        removeBtn.addEventListener('click', () => row.remove());
-
-        row.appendChild(userSelect);
-        row.appendChild(roleSelect);
-        row.appendChild(removeBtn);
-        container.appendChild(row);
-        idx++;
-    });
-})();
-</script>
-@endpush
 @endsection

@@ -134,9 +134,12 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
         Route::get('/{project}/edit', [ProjectController::class, 'edit'])->name('edit');
         Route::put('/{project}', [ProjectController::class, 'update'])->name('update');
         Route::delete('/{project}', [ProjectController::class, 'destroy'])->name('destroy');
-        Route::put('/{project}/members', [ProjectController::class, 'syncMembers'])->name('members.sync');
         Route::put('/{project}/companies', [ProjectController::class, 'syncCompanies'])->name('companies.sync');
     });
+
+    // Membership is projects.admin only (D7-B). ProjectPolicy::manageMembers is the sole
+    // authority, so this route deliberately has no can:projects.manage middleware.
+    Route::put('/{project}/members', [ProjectController::class, 'syncMembers'])->name('members.sync');
 
     // Tasks (nested under project)
     Route::post('/{project}/tasks', [ProjectTaskController::class, 'store'])->name('tasks.store');
@@ -146,6 +149,8 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
     Route::put('/{project}/tasks/{task}/move', [ProjectTaskController::class, 'move'])->name('tasks.move');
     Route::post('/{project}/tasks/{task}/comments', [ProjectTaskController::class, 'addComment'])->name('tasks.comments.store');
     Route::put('/{project}/tasks/{task}/checklist/{item}/toggle', [ProjectTaskController::class, 'toggleChecklistItem'])->name('tasks.checklist.toggle');
+    Route::post('/{project}/tasks/{task}/checklist', [ProjectTaskController::class, 'storeChecklistItem'])->name('tasks.checklist.store');
+    Route::delete('/{project}/tasks/{task}/checklist/{item}', [ProjectTaskController::class, 'destroyChecklistItem'])->name('tasks.checklist.destroy');
 
     // Milestones
     Route::get('/{project}/milestones', [ProjectMilestoneController::class, 'index'])->name('milestones.index');
