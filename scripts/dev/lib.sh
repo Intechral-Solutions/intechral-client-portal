@@ -15,7 +15,9 @@ readonly SVC_APP=app SVC_DB=db SVC_NGINX=nginx
 readonly DEV_ENV=local DEV_DB=portal DEV_DB_HOST=db
 readonly TEST_ENV=testing TEST_DB=intechral_client_portal_testing TEST_DB_HOST=db
 readonly E2E_BASE_URL=http://nginx           # Playwright inside portal_app reaches the app via nginx
-readonly E2E_OUTPUT_DIR=/tmp/dev-e2e-results # container-local: keeps root-owned output off the host mount
+readonly E2E_OUTPUT_DIR=/tmp/dev-e2e-results # container-local: keeps test artifacts off the host mount
+readonly E2E_BROWSERS_PATH=/opt/ms-playwright # baked into the image (ENV in .docker/php/Dockerfile)
+readonly REBUILD_HINT='docker compose build && ./dev restart'
 readonly APP_DIR=/var/www/app
 readonly COUNT_SQL='SELECT (SELECT COUNT(*) FROM projects), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM time_entries)'
 
@@ -68,12 +70,26 @@ app_exec() {
 # Non-interactive probe: never reads or holds the caller's stdin.
 app_probe() { app_exec "$@" </dev/null; }
 
-# The ONLY root execution path (Playwright browsers live in /root/.cache, unreadable to other UIDs).
-# Callers must keep its output off the host mount.
-app_exec_root() {
-    local -a tty=()
-    [[ -t 0 && -t 1 ]] || tty=(-T)
-    dc exec ${tty[@]+"${tty[@]}"} -u 0 -e NPM_CONFIG_UPDATE_NOTIFIER=false "$SVC_APP" "$@"
+# Launching the image's Chromium exactly as E2E will (host UID/GID, project-locked playwright-core).
+# Proves the browser, its OS libraries and their permissions all work. Read-only: never installs anything.
+readonly E2E_LAUNCH_JS="const { chromium } = require('playwright-core'); chromium.launch().then(async (browser) => { console.log(browser.version()); await browser.close(); }, (error) => { console.error(String(error.message).split('\\n')[0]); process.exit(1); });"
+
+# playwright_version - the playwright-core version installed in src/node_modules (empty if absent).
+playwright_version() { app_probe node -p "require('playwright-core/package.json').version" 2>/dev/null; }
+
+# playwright_launch_probe - prints the Chromium version on success, or the first error line (returns non-zero).
+playwright_launch_probe() { app_probe node -e "$E2E_LAUNCH_JS" 2>&1; }
+
+# require_e2e_browser - E2E expects a correct image; it never installs browsers.
+require_e2e_browser() {
+    local out
+    [[ -n "$(playwright_version || true)" ]] || die "playwright-core is not installed in src/node_modules. Run: ./dev shell, then npm install"
+    if ! out="$(playwright_launch_probe)"; then
+        die "Chromium cannot launch in '$SVC_APP' as $HOST_UID:$HOST_GID: ${out:-no output}
+       The development image is expected to include Playwright's browser. Rebuild it and recreate the containers:
+         $REBUILD_HINT
+       (./dev never installs browsers itself.)"
+    fi
 }
 
 # ── Resolving what Laravel really targets ──────────────────────────────────────

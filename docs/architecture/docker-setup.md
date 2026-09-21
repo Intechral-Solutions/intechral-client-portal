@@ -74,7 +74,29 @@ docker compose exec app npm run build
 - PHP 8.3 with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `opcache`, `exif`
 - Composer 2.7 installed globally
 - Node.js 22 LTS + npm installed
+- Playwright Chromium + its OS libraries, baked in at build time (see [End-to-end browser tests](#end-to-end-browser-tests))
 - Working directory: `/var/www/app`
+
+### End-to-end browser tests
+
+`./dev test:e2e` runs the Playwright suite inside `portal_app`, as the host UID:GID like every other `./dev` container command, against `PLAYWRIGHT_BASE_URL=http://nginx`. The suite exercises the **development** database.
+
+Chromium comes from the image, not from the running container:
+
+- `.docker/php/Dockerfile` runs `playwright-core install --with-deps chromium` during the build, so the browser and its apt libraries are image layers. Recreating the container (`./dev down`, `./dev restart`, `docker compose down`) keeps them.
+- Browsers live in `/opt/ms-playwright` (`ENV PLAYWRIGHT_BROWSERS_PATH`), world-readable, so no root-only `/root/.cache` and no need to run E2E as root.
+- The version is not hard-coded: a build stage reads `playwright-core` from `src/package-lock.json` and fails the build if it is missing or differs from `@playwright/test`. After bumping Playwright, rebuild the image so the browser revision matches.
+- The Dockerfile is development-only (used by the `app` and `queue` services; production targets cPanel/PHP-FPM), so browser tooling does not reach production. The `queue` image shares the same layers.
+- `test:e2e` never installs anything. If Chromium cannot launch it stops and points at the rebuild; `./dev doctor` reports the same as a failure.
+
+Rebuild after Dockerfile or Playwright-version changes:
+
+```bash
+docker compose build && ./dev restart     # cached rebuild, then recreate ALL containers from it
+npm run build && ./dev restart            # from scratch (docker compose build --no-cache)
+```
+
+Use `./dev restart`, not just `./dev up`, after a rebuild: `up` recreates only the containers whose image changed, and the long-running `nginx` container would keep a stale address for the recreated `app` and answer 502.
 
 ### Nginx (`nginx`)
 - Config at `.docker/nginx/default.conf`

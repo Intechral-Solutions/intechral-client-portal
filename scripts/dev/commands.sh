@@ -6,8 +6,8 @@
 #   2. Add a "name|usage|description" line to DEV_COMMANDS. That list drives BOTH help and dispatch.
 #   3. If it can touch a database: resolve_or_die, print_target, enforce_contract - in that order,
 #      before acting. Never decide the target from the command name.
-#   4. Container work goes through app_exec (host UID/GID); only use app_exec_root if it truly
-#      cannot run unprivileged, and keep its output off the host mount.
+#   4. Container work goes through app_exec (host UID/GID). Nothing runs as root; if something
+#      truly must, add it deliberately, explain why, and keep its output off the host mount.
 #   5. Add a case to scripts/dev/tests/run.sh and mention it in README.md.
 
 # Lines starting with '#' are help section headings; the rest are "name|usage|description".
@@ -26,7 +26,7 @@ DEV_COMMANDS=(
     'db:backup||Dump the development DB to backups/dev/<db>-<timestamp>.sql'
     '#Tests and checks'
     'test:php|[pest args]|Pest against the TESTING DB (intechral_client_portal_testing); refuses otherwise'
-    'test:e2e|[playwright args]|Playwright in portal_app. Runs against the DEVELOPMENT DB; prints before/after counts'
+    'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; prints before/after counts'
     'check|[--no-php]|CLI self-tests, git diff --check, Pint, npm run check, then the full Pest suite (--no-php skips Pest)'
 )
 
@@ -73,8 +73,9 @@ cmd_help() {
 Notes
   - Commands act on the database they RESOLVE inside the container, verified before acting.
   - Container commands run as your host UID:GID, so no root-owned files land in the repo.
-    The one exception is test:e2e (Playwright's browsers live in root's home); its output
-    is redirected inside the container.
+    That includes test:e2e: Playwright's Chromium is baked into the dev image, and its
+    output goes to a container-local directory. After Dockerfile changes rebuild with:
+    docker compose build && ./dev restart
   - There is deliberately no db:fresh, db:restore or volume removal in this version.
   - Backups are written to backups/dev/ (gitignored).
 TXT
@@ -190,6 +191,7 @@ cmd_test_e2e() {
     done
 
     if [[ $listing -eq 0 ]]; then
+        require_e2e_browser
         resolve_or_die dev
         print_target "Development (E2E)"
         enforce_contract dev
@@ -201,8 +203,8 @@ cmd_test_e2e() {
         say
     fi
 
-    say "Running Playwright in '$SVC_APP' (root, isolated output: $E2E_OUTPUT_DIR), base URL $E2E_BASE_URL"
-    app_exec_root env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || rc=$?
+    say "Running Playwright in '$SVC_APP' as $HOST_UID:$HOST_GID (isolated output: $E2E_OUTPUT_DIR), base URL $E2E_BASE_URL"
+    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || rc=$?
 
     if [[ $listing -eq 0 ]]; then
         say
@@ -389,7 +391,6 @@ doctor_databases() {
 }
 
 doctor_versions() {
-    local out
     if command -v php >/dev/null 2>&1; then
         d_ok "host php $(php -r 'echo PHP_VERSION;' 2>/dev/null) (not required by ./dev)"
     else
@@ -408,17 +409,30 @@ doctor_versions() {
     d_ok "container php $(app_probe php -r 'echo PHP_VERSION;' 2>/dev/null || echo '?')"
     d_ok "container node $(app_probe node -v 2>/dev/null || echo '?'), npm $(app_probe npm -v 2>/dev/null || echo '?')"
 
-    # Root probe: Playwright's browsers are installed under root's home.
-    out="$(app_exec_root sh -c "cd $APP_DIR && ./node_modules/.bin/playwright --version 2>&1; ls -d /root/.cache/ms-playwright/chromium-* 2>/dev/null | tr '\\n' ' '" </dev/null 2>/dev/null)" || out=''
-    if [[ $out == *Version* ]]; then
-        d_ok "playwright: $(head -n 1 <<<"$out" | sed 's/^Version //') (container, run as root)"
-        if [[ -n $(sed -n '2p' <<<"$out" | tr -d ' ') ]]; then
-            d_ok "playwright browsers: $(sed -n '2p' <<<"$out" | xargs -n1 basename | tr '\n' ' ')"
-        else
-            d_warn "no Playwright chromium build found under /root/.cache/ms-playwright"
-        fi
+    doctor_playwright
+}
+
+# The image is expected to ship a working Chromium for the E2E user; anything less is a failure.
+doctor_playwright() {
+    local version path out
+    version="$(playwright_version || true)"
+    if [[ -z $version ]]; then
+        d_fail "playwright-core not found in src/node_modules (run npm install inside the container)"
+        return 0
+    fi
+    d_ok "playwright-core $version (locked by src/package-lock.json)"
+
+    path="$(app_probe printenv PLAYWRIGHT_BROWSERS_PATH 2>/dev/null || true)"
+    if [[ $path == "$E2E_BROWSERS_PATH" ]]; then
+        d_ok "PLAYWRIGHT_BROWSERS_PATH=$path (baked into the image)"
     else
-        d_warn "playwright not available in the container (run npm install inside it)"
+        d_fail "PLAYWRIGHT_BROWSERS_PATH is '${path:-unset}', expected $E2E_BROWSERS_PATH: this container is not from the current image. Rebuild: $REBUILD_HINT"
+    fi
+
+    if out="$(playwright_launch_probe)"; then
+        d_ok "chromium $out launches as $HOST_UID:$HOST_GID (E2E runs as your host user)"
+    else
+        d_fail "chromium cannot launch as $HOST_UID:$HOST_GID: ${out:-no output}. Rebuild the image: $REBUILD_HINT"
     fi
 }
 

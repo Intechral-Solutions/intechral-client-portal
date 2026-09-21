@@ -32,6 +32,12 @@ case "$*" in
         n=$(cat "$STUB_LOG.counts" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.counts"
         if [[ $n -eq 0 ]]; then printf '%b\n' "${STUB_COUNTS_BEFORE:-1\t2\t3}"; else printf '%b\n' "${STUB_COUNTS_AFTER:-1\t2\t3}"; fi
         exit 0 ;;
+    *"playwright-core/package.json"*) echo "${STUB_PW_VERSION-1.63.0}"; exit "${STUB_PW_VERSION_RC:-0}" ;;
+    *"printenv PLAYWRIGHT_BROWSERS_PATH"*) echo "${STUB_PW_PATH-/opt/ms-playwright}"; exit 0 ;;
+    *"chromium.launch"*)
+        if [[ ${STUB_BROWSER_RC:-0} -ne 0 ]]; then echo "${STUB_BROWSER_ERR:-browserType.launch: chromium executable is missing}"; exit 1; fi
+        echo "${STUB_BROWSER_OUT:-153.0.8010.12}"; exit 0 ;;
+    *"ps --all --format"*) printf '%b\n' "${STUB_PS:-app running \nnginx running \ndb running healthy\nredis running \nmailpit running healthy\nqueue running }"; exit 0 ;;
     *" down"*) exit "${STUB_DOWN_RC:-0}" ;;
     *"npm run test:e2e"*) exit "${STUB_PW_RC:-0}" ;;
     *"./vendor/bin/pest"*) exit "${STUB_PEST_RC:-0}" ;;
@@ -67,7 +73,7 @@ dev_run() {
 }
 
 reset_stubs() {
-    unset STUB_DOWN_RC STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC
+    unset STUB_PW_VERSION STUB_PW_VERSION_RC STUB_PW_PATH STUB_BROWSER_RC STUB_BROWSER_ERR STUB_BROWSER_OUT STUB_PS STUB_DOWN_RC STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC
     export STUB_RESOLVE_DEV="$DEV_OK" STUB_RESOLVE_TEST="$TEST_OK"
 }
 
@@ -341,9 +347,33 @@ assert_out "DEVELOPMENT database"
 assert_out "Before: projects=1  tasks=2  time_entries=3"
 assert_out "After:  projects=1  tasks=2  time_entries=3"
 assert_out "counts unchanged"
-assert_log "-u 0"
 assert_log "PLAYWRIGHT_BASE_URL=http://nginx"
 assert_log "--output=/tmp/dev-e2e-results --grep time entries tests/Browser/time-migration.spec.ts"
+E2E_LINE="$(grep 'npm run test:e2e' <<<"$LOG")"
+[[ $E2E_LINE == *" -u $UIDGID "* ]] && ok || bad "Playwright did not run as the host user $UIDGID: $E2E_LINE"
+[[ $E2E_LINE != *" -u 0 "* ]] && ok || bad "Playwright ran as root: $E2E_LINE"
+assert_out "as $UIDGID"
+assert_log "chromium.launch"
+assert_log_lacks "playwright install"
+assert_log_lacks "npx"
+
+begin "test:e2e fails with a rebuild hint when the image has no working browser (and installs nothing)"
+export STUB_BROWSER_RC=1
+dev_run -- test:e2e tests/Browser/auth-migration.spec.ts
+assert_rc 1
+assert_out "Chromium cannot launch"
+assert_out "docker compose build && ./dev restart"
+assert_out "never installs browsers"
+assert_log_lacks "npm run test:e2e"
+assert_log_lacks "mariadb"
+assert_log_lacks "install"
+
+begin "test:e2e explains a missing playwright package instead of blaming the image"
+export STUB_PW_VERSION='' STUB_PW_VERSION_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "playwright-core is not installed"
+assert_log_lacks "npm run test:e2e"
 
 begin "test:e2e reports changed counts without deleting anything"
 export STUB_COUNTS_AFTER='1\t2\t4'
@@ -364,14 +394,14 @@ export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=other\nhost=db\np
 dev_run -- test:e2e
 assert_rc 1
 assert_out "REFUSING"
-assert_log_lacks "playwright"
-assert_log_lacks "test:e2e"
+assert_log_lacks "npm run test:e2e"
 
 begin "test:e2e --list skips the database entirely"
 dev_run -- test:e2e --list
 assert_rc 0
 assert_log_lacks "mariadb"
 assert_log_lacks "php -- dev"
+assert_log_lacks "chromium.launch"
 assert_log "npm run test:e2e -- --output=/tmp/dev-e2e-results --list"
 
 # ── lifecycle ──────────────────────────────────────────────────────────────────
@@ -403,6 +433,47 @@ assert_rc 0
 assert_log " down"
 assert_log_lacks "-v"
 assert_log_lacks "--volumes"
+
+begin "doctor accepts an image with a launchable browser and is read-only"
+dev_run -- doctor
+assert_rc 0
+assert_out "playwright-core 1.63.0"
+assert_out "PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright"
+assert_out "chromium 153.0.8010.12 launches as $UIDGID"
+assert_out_lacks "[FAIL]"
+assert_log_lacks "install"
+assert_log_lacks "artisan migrate "
+assert_log_lacks "chown"
+assert_log_lacks "-u 0"
+
+begin "doctor FAILS (not warns) when Chromium cannot launch"
+export STUB_BROWSER_RC=1
+dev_run -- doctor
+assert_rc 1
+assert_out "[FAIL] chromium cannot launch as $UIDGID"
+assert_out "docker compose build && ./dev restart"
+
+begin "doctor FAILS when the container is not from the current image"
+export STUB_PW_PATH=''
+dev_run -- doctor
+assert_rc 1
+assert_out "PLAYWRIGHT_BROWSERS_PATH is 'unset'"
+
+begin "doctor FAILS when playwright-core is missing"
+export STUB_PW_VERSION='' STUB_PW_VERSION_RC=1
+dev_run -- doctor
+assert_rc 1
+assert_out "playwright-core not found"
+
+begin "Dockerfile bakes a lockfile-versioned Chromium at the path the CLI expects"
+DF="$ROOT/.docker/php/Dockerfile"
+LIB_PATH="$(sed -n 's/^readonly E2E_BROWSERS_PATH=\([^ ]*\).*/\1/p' "$ROOT/scripts/dev/lib.sh")"
+DF_PATH="$(sed -n 's/^ENV PLAYWRIGHT_BROWSERS_PATH=//p' "$DF")"
+[[ -n $LIB_PATH && $LIB_PATH == "$DF_PATH" ]] && ok || bad "lib.sh browsers path '$LIB_PATH' != Dockerfile ENV '$DF_PATH'"
+grep -q 'install --with-deps chromium' "$DF" && ok || bad "Dockerfile does not install chromium with its OS dependencies at build time"
+grep -q 'playwright-core@${PW_VERSION}' "$DF" && ok || bad "Dockerfile does not install the lockfile-derived playwright-core version"
+if grep -E 'playwright(-core)?@[0-9]' "$DF" >/dev/null; then bad "Dockerfile hard-codes a Playwright version"; else ok; fi
+grep -q 'src/package-lock.json' "$DF" && ok || bad "Dockerfile does not derive the version from src/package-lock.json"
 
 begin "restart is registered, documented and runs down then up without volumes or builds"
 dev_run -- help
