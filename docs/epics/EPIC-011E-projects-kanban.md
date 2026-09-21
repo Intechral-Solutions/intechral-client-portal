@@ -5,7 +5,7 @@
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 **Related:** [EPIC-005: Project Management](./EPIC-005-projects.md), [EPIC-010B: Tenant Scoping](./EPIC-010B-tenant-scoping.md), [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
-**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate
+**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements
 
 ---
 
@@ -24,7 +24,7 @@ Owner decisions D1 to D6 are **locked**. At the time of this amendment, D7 remai
 | D7 | Member eligibility was still open at Amendment 1; **resolved as option B by Amendment 2**: only `projects.admin` may add/remove members or assign member roles | §5, §6, §16, §23, §28, §29 |
 | Status | Board column is authoritative for board tasks; `Task.status` for standalone/ticket tasks; no dual write | §15 |
 | Drag | Move menu is the canonical keyboard/mobile path; drag is pointer-only with no focusable drag control | §9, §10 |
-| Spike | `router.optimistic()` is provisional until WP0 proves the installed behavior; fallback holds a move descriptor, never a board copy | §8, §29 |
+| Spike | `router.optimistic()` was provisional until WP0; **WP0 passed all eight gate items unchanged (Amendment 3)**. The fallback (a move descriptor, never a board copy) is not selected | §8, §29 |
 | dnd-kit | Stable `core` + `sortable` + `utilities`, versions pinned by lockfile, library types confined to two adapter files | §9 |
 | WP1 | Backend and Blade-visible defects are fixed and regression-tested before any React route flip | §29 |
 
@@ -69,6 +69,30 @@ All owner decisions D1 through D7 are now **locked**. D7 is resolved as **option
 - Assignment eligibility remains separate: a project task may be assigned only to an existing member of that project (A3). D7 governs who may change project membership, not who may be assigned once already a member.
 - Delegated member management for ordinary project managers is deferred until the product has a canonical project-member eligibility model. Organization membership and company links are **not** repurposed to invent that model in EPIC-011E.
 
+
+## Amendment 3: WP0 Results (2026-09-21)
+
+WP0 was executed exactly as written on a throwaway branch, in a real browser, against the real move endpoint. **The Inertia optimistic-move design passed all eight gate items unchanged; the `fetch` + `pendingMove` fallback is NOT selected.** The dnd-kit spike passed on React 19 and Vite 8. All spike code, temporary dependencies, fixture data, and the throwaway branch were removed; only this documentation is retained. Full results are in §8 (optimistic gate) and §9 (dnd-kit).
+
+Tested versions: `@inertiajs/core` and `@inertiajs/react` 3.7.1, React and React DOM 19.3.0, Vite 8.1.0, `@vitejs/plugin-react` 6.1.1, `@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/utilities` 3.2.2 (with transitive `@dnd-kit/accessibility` 3.1.1), Playwright 1.63.0 with Chromium 153.
+
+| Topic | Outcome | Applied in |
+|---|---|---|
+| Playwright environment | Host Chromium cannot launch (13 missing shared libraries, no sudo). **The suite runs inside the `portal_app` container** with `PLAYWRIGHT_BASE_URL=http://nginx`; an existing spec passed there | §24, §29 |
+| Optimistic design | Passed unchanged (8 of 8) | §8 |
+| dnd-kit | Passed: handle-only activation, cross-column and same-column sorting, empty-column drop, autoscroll, touch handle drag, reduced motion | §9 |
+
+**Implementation requirements added by the spike** (each is also stated where it applies):
+
+1. **`TaskCard` must use a structural `memo` comparator.** Inertia hands the optimistic callback a deep clone of the props, so every task object is a new reference during the optimistic phase; a reference-equality `memo` re-rendered all cards, while a comparator on the rendered fields re-rendered only the moved card (§8, §25).
+2. **Rollback restores the last client-known state, not fresh server state,** for non-Inertia failures (403, 404, 5xx, offline). The plan's `router.reload({ only: ['columns'] })` after those failures is therefore required, not optional (§8).
+3. **Single flight is mandatory,** not defensive: without the guard Inertia sent both requests concurrently and the server applied them out of order (§8).
+4. **Drag-preview clearing:** the preview descriptor is cleared by an effect on `props.columns` (after the optimistic or rolled-back props land), never at drop time, which avoids a snap-back frame. A failed drop was verified to roll back, clear the preview, and leave the board usable (§9).
+5. **Drop position:** `onDragOver` fires only when the `over` target changes, so the final index is derived at drop time from the current layout; use a pointer-first collision strategy with `closestCorners` fallback, and test "drop below the last card" after re-aiming, because the target column shifts once the preview inserts the card (§9).
+6. **Announcements** must be built from the derived target (column name and position), not from dnd-kit's raw `over`, which is usually the dragged card's own placeholder once the preview has moved it (§9).
+7. **The horizontal board scroller is a native keyboard tab stop in Chromium.** Give it a deliberate `role="region"`, accessible name, and `tabIndex={0}`, as already planned (§7, §9).
+
+---
 
 ## 1. Goal
 
@@ -533,9 +557,9 @@ While one move is pending, every handle and Move menu is disabled (`aria-busy` o
 
 Moving a card across columns unmounts and remounts it under another parent, which drops DOM focus. After a settled move (success or revert) the board restores focus to the card's Move button by task id, and a polite live region announces the outcome (`"Moved “Fix login” to In Progress, position 2 of 5"`) or an assertive one the failure. The live region is shared by the menu and pointer paths.
 
-### Spike gate (WP0): the design is provisional until this passes
+### Spike gate (WP0): PASSED 2026-09-21 (8 of 8, design unchanged)
 
-**What the installed 3.7.1 source does** (read from `@inertiajs/core/dist/index.js`, not yet executed by us):
+**What the installed 3.7.1 source does** (read from `@inertiajs/core/dist/index.js`, then executed in WP0; results below):
 
 - `router.optimistic(cb)` stores a one-shot callback consumed by the next `visit()`, which forces `async: true`.
 - The callback receives a deep clone of current props and returns a partial props object. Changed keys have their previous values saved as *baselines*; the merged props are applied with `setPropsQuietly`, which swaps the page asynchronously with `preserveState`.
@@ -555,6 +579,30 @@ Moving a card across columns unmounts and remounts it under another parent, whic
 8. React adapter behavior: `usePage()` re-renders after `setPropsQuietly`, and `preserveEqualProps` keeps memoized `TaskCard` identities stable when nothing changed.
 
 Record the result of each item, the installed versions, and the date in this section. **Pass = items 1 to 8 all pass.**
+
+#### WP0 results (executed 2026-09-21)
+
+Method: throwaway branch; a temporary Inertia page using the exact move flow above (`router.optimistic(...).put(...)` with `only: ['columns','flash']`, `preserveScroll`, `preserveState`, single-flight guard); the **real** `projects.tasks.move` endpoint with throwaway hooks (return `back()` for Inertia requests, and header-driven delay and forced-500 injection); a fixture project on the development database; Playwright with Chromium 153 inside `portal_app`. Failure cases used the real behaviors: 422 from an invalid `position`, 404 from a missing task ID, 403 from a plain member whose membership was removed while the board was open, 500 by injection, and offline through the browser context.
+
+| # | Gate item | Result | Evidence |
+|---|---|---|---|
+| 1 | Pure `applyMove` through the callback; original props not mutated | **Pass** | Optimistic DOM equalled the independently computed expected order. The callback ran once and received a deep clone (a different object from the page props, equal JSON). `applyMove` ran on a deep-frozen input without throwing, and the page's original props object was unchanged |
+| 2 | Rollback on 422, 403, 404, 500, offline; default modal suppressed | **Pass** | 422, 403, 404, 500: DOM went before, optimistic, before, in both DOM-mutation and painted-frame sequences. Offline failed fast enough that the optimistic state was never painted (React batched the two swaps) and the board stayed unchanged. `onSuccess` was never called. Returning `false` from `onHttpException` and `onNetworkError` suppressed Inertia's error dialog in every case (no iframe or dialog, no error HTML in the page). 422 produced `props.errors.position` and `onError`. The busy flag cleared in `onFinish` each time |
+| 3 | Canonical server response replaces optimistic state; no residue | **Pass** | With a concurrent insert the stale client showed `[B1, A1, B2]` optimistically; the server result `[A3, A1, B1, B2]` replaced it exactly and equalled the database. A later failing move rolled back to that fresh server state, and an external change followed by `reload({ only: ['columns'] })` applied immediately, so no baseline or pending callback was left behind |
+| 4 | One move in flight at a time | **Pass** | Guard on: the second move was refused and exactly one `/move` request was sent. Guard off (recorded for the record): both requests were sent concurrently, the server applied them out of order (the undelayed second ran first), and the final order differed from issue order. The guard is mandatory |
+| 5 | Page props remain the durable board state | **Pass** | After partial reloads (`meta`, `flash`), a full reload, a same-page visit, and a `columns` reload, each combined with external server changes, the rendered board equalled the database every time |
+| 6 | No reducer or store copy | **Pass** | The board page has no `useState` or `useReducer`; columns come only from `usePage().props`. New props won immediately. In the dnd page the preview state is a descriptor rendered through `applyMove(props.columns, preview)` |
+| 7 | Partial reload, scroll, focus; no snap-back | **Pass** | The PUT carried `X-Inertia-Partial-Data: columns,flash`. The unrelated `meta.loadedAt` (a server `microtime`, which changes on every full render) stayed identical, proving the follow-up response was partial. Document scroll (400 to 400), the horizontal board scroller (300 to 300), focus, and the typed input value were all preserved. DOM states were `before`, then `optimistic = final` with no intermediate revert, both in mutation records and painted frames. (`preserveScroll` restores only `[scroll-region]` elements; the window scroll is retained because the DOM nodes persist.) |
+| 8 | React adapter re-render and memo behavior | **Pass, with a requirement** | `usePage()` re-rendered on the quiet swap. With a reference-equality `memo`, all six cards re-rendered in the optimistic phase (the clone gives every task a new reference), none during the server-response phase (`preserveEqualProps` keeps the optimistic references when the response is deep-equal), and none on an unrelated partial reload. With a structural comparator only the moved card re-rendered. **`TaskCard` therefore uses a structural comparator** |
+
+**Decision:** the optimistic design is confirmed **unchanged**. The fallback is not selected and remains documented only as a contingency.
+
+**Findings recorded for implementation**
+
+- Rollback replays the *last client-known baseline*. For a validation redirect (an Inertia response) the response updates the baseline first, so the rollback lands on fresh server columns. For non-Inertia failures (403, 404, 5xx) and network errors the rollback restores the pre-move client state, which can be stale. The reload-after-failure rule in the table above is therefore required.
+- After a 422 the `errors` prop stays populated until the next visit; the board must not render stale errors from a previous move.
+- Very fast failures can collapse into no visible optimistic frame. That is acceptable and desirable.
+- The throwaway `move` hook that returns `back()` for `X-Inertia` requests worked as designed (303 to the referrer with partial-reload headers); WP5 makes it the permanent contract.
 
 **Fallback (already designed, no state library):** focused `fetch` JSON as `TimerProvider` does. The move endpoint returns JSON; a local transient reducer holds only `{ pendingMove, status, error }`; the board renders `applyMove(props.columns, pendingMove)`; on success it calls `router.reload({ only: ['columns'] })` and clears `pendingMove` once the new props arrive; on failure it clears `pendingMove`, so the board falls back to the unchanged props automatically. The pure `applyMove`, the single-flight guard, the failure table, and focus handling are identical in both designs, so the choice changes one hook and the endpoint's response contract.
 
@@ -608,6 +656,26 @@ Do **not** add `@dnd-kit/modifiers`, `@dnd-kit/accessibility` (it ships transiti
 - **Announcements:** custom `announcements` (`onDragStart/Over/End/Cancel`) in the project's vocabulary, feeding the same live region as menu moves.
 - **Isolation:** every `@dnd-kit` import lives in `components/projects/board-dnd.tsx` and `board-card-handle.tsx`. Nothing else in the codebase may import it (a `no-restricted-imports` lint rule enforces this), and no dnd-kit type crosses the adapter boundary: the adapter exposes library-agnostic props (`onMove({ taskId, toColumnId, toIndex })`, render callbacks) so domain components never see `UniqueIdentifier`, `DragEndEvent`, or similar. Replacing the library, including a later move to the `@dnd-kit/react` API once it is 1.0, touches two files. Vite already code-splits pages (`import.meta.glob`), so the library loads only with the board chunk; WP10 verifies this in the build output.
 - **Read-only users:** no handle, no Move menu, no quick-add, and no `DndContext` sensors unless `abilities.manage` (D1).
+
+### WP0 dnd-kit spike results (executed 2026-09-21)
+
+Method: the packages were copied into `node_modules` only (`package.json` and the lockfile were never changed); a throwaway page combined dnd-kit with the optimistic move above (handle-only `PointerSensor` with `distance: 6`, no `KeyboardSensor`, `attributes` not spread, `DragOverlay`, per-column `SortableContext` plus `useDroppable`, a preview descriptor rendered through `applyMove`, custom announcements, `screenReaderInstructions` override). Desktop tests used Chromium 153 through real mouse events; touch tests used the Pixel 7 emulation with real touch events through the DevTools input pipeline.
+
+| Check | Result |
+|---|---|
+| React 19 and Vite 8 | **Pass.** Vite 8.1.0 built the page and React 19.3.0 ran it with no console or page errors. The page chunk, including dnd-kit, was 51.05 kB raw and 16.91 kB gzip, consistent with the earlier ≈16.5 kB estimate |
+| Multi-column sorting | **Pass.** Cross-column drops landed at the top and in the middle of the target and persisted; DOM equalled the database; no snap-back frame (DOM states `before`, then `after`) |
+| Same-column reorder | **Pass.** Move up and move down both persisted correctly |
+| Empty-column drop | **Pass.** A card dropped on an empty column landed there |
+| Drop after the last card | **Pass after re-aiming.** The first attempt appeared to fail, but the pointer had been aimed at coordinates that the preview had already shifted; re-aiming at the shifted layout appended correctly, both on the last card's lower half and on the column body below the last card (pointer-first collision with `closestCorners` fallback) |
+| Handle-only activation | **Pass.** Dragging from the card body started no drag and sent no request; dragging from the handle worked. Tab, Space, and Enter never started a drag |
+| Accessibility tree | **Pass.** The handle carries only `aria-hidden="true"` and `tabindex="-1"`; no `role`, `aria-roledescription`, or `aria-describedby` exists anywhere on the page; the cards have no ARIA attributes. dnd-kit still renders a hidden (`display: none`) instructions node containing our pointer-only text, and a live region (`role="status"`, `aria-live="assertive"`) whose announcements fired during pointer drags. The only Tab stop on the page was the horizontal scroll container, which Chromium makes keyboard-focusable natively |
+| Touch and pointer | **Pass on emulation.** Pointer events were `pointerType: "touch"`. A swipe that started on a card body scrolled the board container (0 to 220 px) and did not start a drag or send a request; a touch drag from the handle moved the card across columns and persisted. No `TouchSensor` was needed. This is emulation through a real touch pipeline, not a physical device, so the real-device check (iOS Safari, Android Chrome) stays in WP10 |
+| Horizontal autoscroll | **Pass.** Holding the pointer at the right edge scrolled the container from 0 to its 628 px maximum in about 360 ms, and the card dropped into a column that had scrolled into view |
+| Reduced motion | **Pass.** With `prefers-reduced-motion: reduce`, the overlay's drop animation disappeared (overlay lifetime after release 11 to 13 ms versus 262 to 275 ms) and card transitions dropped from 0.2 s to 0 through `dropAnimation={null}` and omitting the sortable `transition` |
+| Failed drop | **Pass.** With a forced 500 the card returned, the preview descriptor cleared, and the next drag succeeded |
+
+**Outcome:** dnd-kit is confirmed for WP6 as planned (`core` + `sortable` + `utilities`, handle-only, pointer-only, no `KeyboardSensor`). The native-HTML5 fallback is not selected. The implementation requirements this produced are listed in Amendment 3.
 
 ### Version policy (Amendment 1)
 
@@ -1070,7 +1138,13 @@ Critical flows only, in `tests/Browser/projects-migration.spec.ts` (plus the WP1
 
 Not automated end to end: every CRUD field, every validation rule, permission permutations (covered by Pest), the cross-browser matrix (WP10 manual pass).
 
-**Environment note:** on this WSL host the Playwright headless shell fails to start (`libglib-2.0.so.0` missing), so browser specs cannot run here. WP0 confirms which environment runs the suite and installs the libraries if this host is intended to.
+**Environment (confirmed in WP0, 2026-09-21):** the host cannot run Playwright. Its Chromium headless shell fails to start because 13 shared libraries are missing (`libglib-2.0`, `libgobject-2.0`, `libgio-2.0`, `libatk-1.0`, `libatk-bridge-2.0`, `libXcomposite`, `libXdamage`, `libXfixes`, `libXrandr`, `libgbm`, `libxkbcommon`, `libasound`, `libatspi`) and there is no passwordless sudo. **The suite runs inside the `portal_app` container**, which has Playwright 1.63.0 and Chromium 153 installed:
+
+```bash
+docker exec -e PLAYWRIGHT_BASE_URL=http://nginx portal_app sh -c 'cd /var/www/app && npx playwright test <spec>'
+```
+
+The default `http://localhost:4242` base URL does not resolve inside the container, so the override is required. Verified by running an existing spec (`inertia-coexistence.spec.ts`, "mobile navigation") to a pass. Two practical consequences: files the container writes (for example `public/build`) are root-owned and cannot be deleted by the host user, so builds and their cleanup go through `docker exec`; and browser specs must be written to run with the container as the browser host.
 
 ---
 
@@ -1082,7 +1156,7 @@ Not automated end to end: every CRUD field, every validation rule, permission pe
 | Board payload | Card DTOs only (no descriptions/comments/emails). Sizing check in WP10 with a seeded 500-task project. If a Done column becomes large in practice, cap it at the most recent N with a "show all" partial reload; not implemented now |
 | Task list rows | One batched membership/ticket-visibility lookup for link computation, not one policy query per row |
 | Moves | Row locks limited to two column rows; rewrite only positions that change; requests are single-flight |
-| React rendering | `TaskCard` memoized by task identity, stable callbacks, no virtualization (columns are small). Drag preview updates only the affected columns |
+| React rendering | `TaskCard` memoized with a **structural comparator** (task fields, not object identity, because Inertia clones props for optimistic callbacks; WP0 measured all cards re-rendering under a reference `memo` versus only the moved card under a structural one), stable callbacks, no virtualization (columns are small). Drag preview updates only the affected columns |
 | Bundle | dnd-kit measured at ≈16.5 kB gzip for the symbols used (§9), isolated to the board chunk by `import.meta.glob` page splitting; WP10 compares the build report before/after and confirms no other page imports it |
 | Navigation | `Link prefetch` on project cards and task links; not on Move menus or mutations |
 | No polling | Board refreshes on mutation and navigation only |
@@ -1160,7 +1234,7 @@ Column creation/rename/reorder/delete and per-project workflows; task dependenci
 |---|---|
 | T1 | Moves preserve the exact insertion index; the menu's "Move to column" appends (the Blade board's effective behavior) |
 | T2 | The Move menu is the canonical accessible path; pointer drag is an enhancement with no focusable drag control |
-| T3 | Optimistic moves via Inertia with single-flight blocking, **provisional on the WP0 spike**; fallback pre-agreed (§8) |
+| T3 | Optimistic moves via Inertia with single-flight blocking, **confirmed by the WP0 spike (8 of 8, unchanged)**; fallback documented only as a contingency (§8) |
 | T4 | Drag is handle-activated, pointer-only, with no `KeyboardSensor` |
 | T5 | Milestone becomes selectable in the task edit form (manager-only) |
 | T6 | One overdue rule: due date strictly before today |
@@ -1177,12 +1251,14 @@ Column creation/rename/reorder/delete and per-project workflows; task dependenci
 **Backend hardening (WP1) precedes every React route flip.** The frontend migration must not mask backend correctness issues.
 
 ### WP0: Branch gate, environment, and spikes
+**Status: complete (2026-09-21).** Results are recorded in Amendment 3, §8, §9, and §24.
 - **No owner decisions remain open.** D1 through D7 are locked; D7-B is the membership contract in Amendment 2.
-- Commit the planning documentation first and confirm the verified EPIC-011D commits are in the implementation base. Start/switch to a dedicated EPIC-011E implementation branch; do not begin application work on a branch named for EPIC-011D.
-- Confirm the Playwright runner environment (host Chromium cannot start here: missing `libglib`).
-- **Optimistic-move spike** on a throwaway branch (spike code is deleted, results recorded in §8): prove items 1 to 8 of the spike gate against the installed `@inertiajs/core`/`react` 3.7.1 and the real endpoint. If any item fails or is awkward, adopt the `fetch` + `pendingMove` fallback and record why.
-- **dnd-kit spike:** handle activation, multi-container preview, empty-column drop, autoscroll in the horizontal region, `touch-action` on a phone viewport or real device, and React 19/Vite 8 behavior. **Packages are installed only on the throwaway branch;** the real install happens in WP6 with the version policy below.
-**Exit:** branch/base are correct; spike results and any fallback selection are written into §8 and §9.
+- Planning documentation is committed and the implementation runs on the dedicated branch `epic-011e-projects-kanban`, created from `dc06003` plus the Amendment 2 documentation commit `1b4d9fb`.
+- Playwright environment confirmed: it runs inside `portal_app` (§24).
+- **Optimistic-move spike:** executed against the installed `@inertiajs/core`/`react` 3.7.1 and the real endpoint. **All eight items passed; the design is unchanged and no fallback was selected.**
+- **dnd-kit spike:** executed on React 19.3.0 and Vite 8.1.0. Passed. The packages were installed only in `node_modules` for the spike and removed; the real install remains WP6.
+- All spike code, fixtures, temporary modules, and the throwaway branch were removed; the working tree was verified clean.
+**Exit (met):** branch and base are correct; spike results and the fallback decision are written into §8 and §9.
 
 ### WP1: Characterize and harden the backend (Blade still works)
 Tests first (characterization, then the failing tests for each defect), then fixes, in this order of risk:
