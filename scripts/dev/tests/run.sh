@@ -32,6 +32,7 @@ case "$*" in
         n=$(cat "$STUB_LOG.counts" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.counts"
         if [[ $n -eq 0 ]]; then printf '%b\n' "${STUB_COUNTS_BEFORE:-1\t2\t3}"; else printf '%b\n' "${STUB_COUNTS_AFTER:-1\t2\t3}"; fi
         exit 0 ;;
+    *" down"*) exit "${STUB_DOWN_RC:-0}" ;;
     *"npm run test:e2e"*) exit "${STUB_PW_RC:-0}" ;;
     *"./vendor/bin/pest"*) exit "${STUB_PEST_RC:-0}" ;;
 esac
@@ -66,7 +67,7 @@ dev_run() {
 }
 
 reset_stubs() {
-    unset STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC
+    unset STUB_DOWN_RC STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC
     export STUB_RESOLVE_DEV="$DEV_OK" STUB_RESOLVE_TEST="$TEST_OK"
 }
 
@@ -387,6 +388,12 @@ dev_run -- shell
 assert_rc 1
 assert_out "./dev up"
 
+begin "up and down propagate docker failures"
+export STUB_DOWN_RC=5
+dev_run -- down
+assert_rc 5
+assert_out_lacks "Containers removed"
+
 begin "up starts detached; down never removes volumes"
 dev_run -- up
 assert_rc 0
@@ -396,6 +403,34 @@ assert_rc 0
 assert_log " down"
 assert_log_lacks "-v"
 assert_log_lacks "--volumes"
+
+begin "restart is registered, documented and runs down then up without volumes or builds"
+dev_run -- help
+assert_out "restart"
+dev_run -- restart
+assert_rc 0
+assert_log " down"
+assert_log " up -d"
+assert_log_lacks "-v"
+assert_log_lacks "--volumes"
+assert_log_lacks "build"
+DOWN_LINE="$(grep -n ' down$' <<<"$LOG" | head -1 | cut -d: -f1)"
+UP_LINE="$(grep -n ' up -d$' <<<"$LOG" | head -1 | cut -d: -f1)"
+[[ -n $DOWN_LINE && -n $UP_LINE && $DOWN_LINE -lt $UP_LINE ]] && ok || bad "down did not precede up (down=$DOWN_LINE up=$UP_LINE)"
+
+begin "restart stops at a failed down and preserves its exit code"
+export STUB_DOWN_RC=17
+dev_run -- restart
+assert_rc 17
+assert_log " down"
+assert_log_lacks " up -d"
+
+begin "package.json restart calls a registered ./dev command"
+RESTART_CMD="$(sed -n 's/^ *"restart": "\(.*\)",\{0,1\}$/\1/p' "$ROOT/package.json")"
+[[ $RESTART_CMD == "./dev restart" ]] && ok || bad "restart script is '$RESTART_CMD', expected './dev restart'"
+for word in $RESTART_CMD; do
+    case "$word" in ./dev | '&&') ;; *) dev_run -- "$word"; assert_rc 0 ;; esac
+done
 
 begin "check rejects unknown options before running anything"
 dev_run -- check --bogus

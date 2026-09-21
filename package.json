@@ -5,7 +5,7 @@
     "scripts": {
         "up": "./dev up",
         "down": "./dev down",
-        "restart": "./dev down && ./dev up",
+        "restart": "./dev restart",
         "build": "docker compose build --no-cache",
         "setup": "npm run build && docker compose up -d && docker compose exec app cp .env.example .env && docker compose exec app chmod -R 777 storage bootstrap/cache && docker compose exec app composer install && docker compose exec app php artisan key:generate && docker compose exec app php artisan migrate --seed && docker compose exec app npm install && docker compose exec app chmod -R 755 node_modules/.bin && docker compose exec app npm run build && echo \"\n  Setup complete. Open http://localhost:4242\n\"",
         "test": "./dev test:php",

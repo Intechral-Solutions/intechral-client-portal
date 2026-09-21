@@ -18,6 +18,7 @@ DEV_COMMANDS=(
     '#Environment'
     'up||Start the dev stack (docker compose up -d; builds only if an image is missing)'
     'down||Stop and remove containers. Volumes (databases) are NEVER removed'
+    'restart||Same as down then up: recreates containers, keeps volumes, never rebuilds images'
     'shell||Interactive bash in the app container as your host UID:GID'
     '#Database (development DB "portal" only)'
     'db:status||Migration status of the development DB (read-only)'
@@ -82,15 +83,22 @@ TXT
 # ── Lifecycle ──────────────────────────────────────────────────────────────────
 cmd_up() {
     require_docker
-    dc up -d
+    dc up -d || return $?
     say
     say "Stack is up. App: http://localhost:4242   Mail: http://localhost:8025"
 }
 
 cmd_down() {
     require_docker
-    dc down
+    dc down || return $?
     say "Containers removed. Volumes (database, redis) were kept."
+}
+
+# down, then up. Stops at the first failure and returns its exit code. Never rebuilds, never removes volumes.
+# (cmd_up/cmd_down return their own failures explicitly: errexit is off inside a function used before ||.)
+cmd_restart() {
+    cmd_down || return $?
+    cmd_up
 }
 
 cmd_shell() {

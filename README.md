@@ -38,7 +38,7 @@ See [docs/architecture/docker-setup.md](docs/architecture/docker-setup.md) for f
 
 | Command | What it does | Database it uses |
 |---------|--------------|------------------|
-| `./dev up` / `./dev down` | Start / stop the Compose stack. `down` never removes volumes. | none |
+| `./dev up` / `./dev down` / `./dev restart` | Start / stop the Compose stack; `restart` is `down` then `up`. Never removes volumes, never rebuilds images. | none |
 | `./dev shell` | Bash in `portal_app` as your host UID:GID | none |
 | `./dev doctor` | Read-only diagnostics: Docker, services, resolved DBs, pending migrations, tool versions, ports, root-owned files | reads dev + testing |
 | `./dev db:status` | Migration status | **development** (`portal`) |
@@ -56,6 +56,8 @@ See [docs/architecture/docker-setup.md](docs/architecture/docker-setup.md) for f
 
 **E2E runs against the development database.** The Playwright suite drives the real app on `http://nginx` (inside the container), which uses `portal`. `test:e2e` prints project/task/time-entry counts before and after and warns if they differ; it never deletes anything (the tests' own fixture cleanup is authoritative). `--list` skips the database entirely.
 
+**Playwright browsers are not part of the image.** They are installed inside the running `portal_app` container, so recreating it (`./dev down`, `./dev restart`, `docker compose down`) removes them. `./dev doctor` warns when they are missing; reinstall with `docker compose exec -u 0 app npx playwright install --with-deps chromium`.
+
 **Backups** live in `backups/dev/` (gitignored, mode 0600, written as your host user). Credentials come from the `db` container's own environment and are never printed. A dump is only kept if it is non-empty and ends with mariadb-dump's completion marker.
 
 **File ownership.** Everything runs in the container as your host UID:GID, so build output, caches and Wayfinder files stay yours. The single exception is `test:e2e`: Playwright's browsers are installed under `/root`, so it runs as root with `--output` pointed inside the container (`/tmp/dev-e2e-results`, where failure traces stay). `./dev doctor` reports any root-owned files under the generated directories and prints a one-time repair command; no `./dev` command runs `chown`.
@@ -64,12 +66,12 @@ See [docs/architecture/docker-setup.md](docs/architecture/docker-setup.md) for f
 
 ### npm scripts
 
-The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` and `test` delegate to `./dev`; the `fresh` alias (`migrate:fresh --seed` against the development database) was removed because it bypassed these guards.
+The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` and `test` delegate to the matching `./dev` command; the `fresh` alias (`migrate:fresh --seed` against the development database) was removed because it bypassed these guards.
 
 | Script | Description |
 |--------|-------------|
 | `npm run setup` | First-time setup: build Docker image, install deps, migrate & seed |
-| `npm run up` / `down` / `restart` | Same as `./dev up` / `./dev down` |
+| `npm run up` / `down` / `restart` | Same as `./dev up` / `./dev down` / `./dev restart` |
 | `npm run build` | Rebuild Docker images (no cache) |
 | `npm run dev` | Start Vite HMR dev server inside the container |
 | `npm run test` | Same as `./dev test:php` (extra args pass through) |

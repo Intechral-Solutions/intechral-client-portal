@@ -85,12 +85,20 @@ docker compose exec app npm run build
 ### MariaDB (`db`)
 - Version: `10.11`
 - Dev credentials: `root/root`, database `portal`, user `portal/portal`
-- Data volume: `.docker/data/mysql/` (gitignored)
+- Persistence: the Compose named volume `dbdata`, mounted at `/var/lib/mysql`. It is managed by Docker, not stored in the repository; see [Data persistence](#data-persistence).
 
 ### Redis (`redis`)
 - Version: `7-alpine`
 - No auth in dev
-- Persistent data volume: `.docker/data/redis/`
+- Persistence: the Compose named volume `redisdata`, mounted at `/data` (append-only file enabled). See [Data persistence](#data-persistence).
+
+### Data persistence
+
+`docker-compose.yml` declares two top-level named volumes (`driver: local`): `dbdata` (MariaDB, mounted at `/var/lib/mysql`) and `redisdata` (Redis, mounted at `/data`). They live inside Docker's storage, not under `.docker/` or the repository. Docker prefixes the runtime volume name with the Compose project name (set by `name:` in `docker-compose.yml`, or overridden by `-p` / `COMPOSE_PROJECT_NAME`), so confirm the exact name with `docker volume ls` rather than assuming it.
+
+- `./dev down`, `./dev restart` and `docker compose down` keep both volumes; the databases survive.
+- Only `docker compose down -v` (or `docker volume rm`) deletes them. That destroys the development `portal` database *and* the testing database, and no `./dev` command does it. Take a `./dev db:backup` first if you ever need to.
+- `.docker/mysql/init-testing.sql` runs only when `dbdata` is first created (empty).
 
 ### Mailpit
 - SMTP on port `1025` — configure `MAIL_HOST=mailpit`, `MAIL_PORT=1025` in `.env`
@@ -178,6 +186,7 @@ docker compose exec app ./vendor/bin/pest --coverage
 docker compose exec db mariadb -u root -proot -e "DROP DATABASE IF EXISTS \`intechral_client_portal_testing\`;"
 docker compose exec db mariadb -u root -proot < .docker/mysql/init-testing.sql
 
-# Stop and remove volumes (destroys all database data — requires test DB recreation)
+# DESTRUCTIVE, raw Docker only (no ./dev equivalent): also removes the dbdata and redisdata
+# volumes, destroying the development AND testing databases. Run ./dev db:backup first.
 docker compose down -v
 ```
