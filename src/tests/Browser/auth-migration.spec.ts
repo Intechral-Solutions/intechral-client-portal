@@ -1,12 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-async function signIn(page: import('@playwright/test').Page) {
-    await page.goto('/login');
-    await page.getByLabel('Email address').fill('operator@intechral.test');
-    await page.getByLabel('Password').fill('password');
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
-}
+import { signIn } from './support/sign-in';
 
 test('React login reports invalid credentials and logout returns to the auth shell', async ({
     page,
@@ -42,7 +36,7 @@ test('forgot password gives an enumeration-safe browser response', async ({ page
 test('password confirmation returns to Profile through the server intended URL', async ({
     page,
 }) => {
-    await signIn(page);
+    await signIn(page, 'operator@intechral.test');
     await page.goto('/profile/confirm-password');
     await expect(page.getByRole('heading', { name: 'Confirm password' })).toBeVisible();
 

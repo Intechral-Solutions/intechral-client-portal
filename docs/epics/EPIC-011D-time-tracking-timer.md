@@ -1,6 +1,6 @@
 # EPIC-011D: Time Tracking and Persistent Timer Migration
 
-**Status:** Planned
+**Status:** Verified
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
@@ -312,7 +312,7 @@ Map the existing Wayfinder helpers:
 Use Inertia form/router mutations and server-confirmed results. Do not optimistically insert, edit, or delete entries. Preserve:
 
 - native `date` input with no future dates;
-- decimal-hours input with `min=0.25`, `max=24`, and `step=0.25`;
+- decimal-hours input with `max=24`, and a create-versus-edit distinction: **new manual entries** keep `min=0.25` (15 minutes) and `step=0.25`, while **editing an existing entry** uses `min=0.01` and `step=any` so any whole-minute timer duration can be re-saved (7 minutes is seeded as `0.12` hours, 50 minutes as `0.83`); Laravel enforces the same split (`min:0.25` on create, `min:0.01` on update, both `max:24`) and rejects any value that would round to zero stored minutes;
 - optional single context;
 - optional description up to 500 characters; and
 - billable defaulting to true.
@@ -779,19 +779,62 @@ User-local timezone presentation remains a future product/domain decision. EPIC-
 
 ## 32. Acceptance Criteria
 
-- [ ] Personal Time, allocation, and operator report pages render through Inertia/React.
-- [ ] TimerProvider hydrates once per persistent layout mount and supports multiple timers.
-- [ ] Timer elapsed display is derived from server timestamps and corrected for browser/server offset.
-- [ ] Start, stop, and description mutations reconcile with Laravel authority.
-- [ ] React timer persists across Inertia navigation and reconstructs after hard/Blade transitions.
-- [ ] Blade pages retain exactly one legacy timer UI using the same endpoints.
-- [ ] Manual create/edit/delete and filters preserve validation and permissions.
-- [ ] Context options and submitted IDs enforce existing resource/parent view boundaries without breaking authorized embedded Blade trackers.
-- [ ] Billed and invoice-linked entries remain immutable, including stale-page attempts.
-- [ ] Allocation drag sends one mutation and consumes the authoritative adjusted slot.
-- [ ] Allocation has an equivalent keyboard/form workflow.
-- [ ] Operator filters, full-result totals, pagination, and CSV agree.
-- [ ] No TanStack/global state/chart wrapper dependency is introduced.
-- [ ] Superseded Time Blade pages and allocation script are removed only after reference checks.
-- [ ] Global Blade timer files remain until later module phases retire their consumers.
-- [ ] Pest, Vitest/RTL, Playwright, TypeScript, ESLint, Prettier, Vite build, Pint, and diff checks pass.
+- [x] Personal Time, allocation, and operator report pages render through Inertia/React.
+- [x] TimerProvider hydrates once per persistent layout mount and supports multiple timers.
+- [x] Timer elapsed display is derived from server timestamps and corrected for browser/server offset.
+- [x] Start, stop, and description mutations reconcile with Laravel authority.
+- [x] React timer persists across Inertia navigation and reconstructs after hard/Blade transitions.
+- [x] Blade pages retain exactly one legacy timer UI using the same endpoints.
+- [x] Manual create/edit/delete and filters preserve validation and permissions.
+- [x] Context options and submitted IDs enforce existing resource/parent view boundaries without breaking authorized embedded Blade trackers.
+- [x] Billed and invoice-linked entries remain immutable, including stale-page attempts.
+- [x] Allocation drag sends one mutation and consumes the authoritative adjusted slot.
+- [x] Allocation has an equivalent keyboard/form workflow.
+- [x] Operator filters, full-result totals, pagination, and CSV agree.
+- [x] No TanStack/global state/chart wrapper dependency is introduced.
+- [x] Superseded Time Blade pages and allocation script are removed only after reference checks.
+- [x] Global Blade timer files remain until later module phases retire their consumers.
+- [x] Pest, Vitest/RTL, Playwright, TypeScript, ESLint, Prettier, Vite build, Pint, and diff checks pass.
+
+---
+
+## 33. Post-Review Hardening Notes
+
+An independent review of the implemented phase found no authorization, billing-lock, timer, allocation-data, or CSV-injection defect. The following correctness and accessibility gaps were then closed without changing the architecture or adding dependencies. A final domain-correctness pass then resolved sub-15-minute timer-entry editing and the slot allocation invariant (below). With every acceptance criterion satisfied and the Pest, Vitest, Playwright, TypeScript, ESLint, Prettier, build, Pint, and diff-check gates passing, the epic is **Verified**.
+
+- **Timer refresh ordering.** `TimerProvider` sequences refreshes: only the newest may publish, and a read that began before a successful start/stop/description mutation is re-read instead of applied, so a stale response can no longer remove a running timer. There is still no client-side merge and no query cache.
+- **Description draft.** The running-timer description draft is seeded from the current authoritative description each time editing begins and is never overwritten mid-edit.
+- **Allocation chart.** The direct Chart.js instance is created once per mounted dataset and updated in place; drag callbacks read the latest entries, processing slots, and `onAdjust` through a ref. Unrelated page renders no longer destroy it.
+- **Allocation editor.** Rows are keyed by block ID, adopt server-redistributed values without remounting, and use `readOnly`/`aria-disabled` while a slot saves (a disabled focused control drops keyboard focus to `<body>` in Chromium). Enter submits. The status message names the adjusted entry's new value and the redistributed siblings.
+- **Allocation concurrency.** In-flight slots are claimed synchronously in a ref, so two same-tick actions send one request. Per-slot version counters stop an older authoritative reload from clearing a slot mutated after the reload began; a successful reload clears stale client overrides for the slots it covers.
+- **Operator report.** Export mirrors the server-applied `filters` prop rather than unapplied draft controls; rows sort by `date` then `id` so pagination is deterministic; `from`/`to` are always serialized (as `null` when absent).
+- **Personal `ticket_id` filter.** The Blade page never exposed a ticket control, so it stays backend-only. The React page now carries an active `ticket_id` through Apply instead of silently dropping it.
+- **Partially stopped legacy rows.** A row with both `timer_started_at` and `stopped_at` is a corrupt legacy shape (see EPIC-007). It still lists, but its total is excluded until `stopTimer()` normalizes it; this is pinned by a test rather than redefined.
+- **Project context options.** Options now list only projects the user is a member of, matching `ProjectPolicy::view`, so a project the creator has since left is not offered only to be rejected on submit.
+
+Deferred as out of scope for the hardening passes: context-options N+1, UTF-8 BOM in CSV, unbounded operator selectors, stacked-axis drag-value semantics, drag-time sibling preview, and user-local timezones.
+
+### Short timer entries
+
+`duration_minutes` stores whole minutes, and a timer can legitimately stop after a few seconds (stored as 1 minute) or a few minutes (7). Manual creation intentionally keeps its 15-minute minimum, but that minimum must not apply to re-saving an existing entry, or a short timer entry could never have its description, context, or date changed without being inflated to 15 minutes. Editing therefore accepts any positive whole-minute duration up to 24 hours: `hours` must be at least `0.01` (0.6 minutes, which converts to 1), and `TimeEntryService` refuses to store anything that converts to zero minutes. Two-decimal hours round-trip every whole minute exactly, because the rounding error (at most 0.3 minutes) is under half a minute. Timer stopping is unchanged. A timer that ran longer than 24 hours can still only be edited down to 24 hours or less; that is the existing maximum, not new behavior.
+
+### Allocation semantics and invariant
+
+`time_entry_blocks.allocation_pct` is the share of one user's 15-minute UTC slot attributed to one finalized timer entry. **The invariant is: for one user, date, and slot, the allocation percentages of all blocks sum to exactly 100%.** The evidence is consistent across the domain: the migration documents that concurrent allocations "for each block sum to 100%", `TimeEntryBlock::minutesAllocated()` treats the value as a share of the 15-minute block, `updateBlockAllocation()` redistributes the whole `(user, date, slot)` group to 100 and rejects any single-entry slot other than 100, and the allocation page's stacked 0–100 chart and "Total" legend assume it. Independent 100% allocations per entry were **not** intended.
+
+The defect was in finalization: it only rebalanced entries whose wall-clock intervals overlapped the timer being stopped, so sequential short timers inside one slot each finalized at 100% (200–400% totals) until a manual adjustment normalized the slot. It also rewrote unlocked-looking blocks of entries that had since become billing-locked. Nothing outside the allocation UI consumes the percentage: reports, the dashboard, and CSV export use `duration_minutes`, and `InvoiceService` does not read time entries, so the over-100% state affected only the allocation display and the editor, never attributed time, billable totals, or invoices.
+
+Finalization now recomputes every slot the stopped entry touches, inside the stop transaction:
+
+- **Participants:** the stopped entry plus every entry that already holds a block in the slot (not only wall-clock-overlapping ones).
+- **Frozen blocks:** a block of a billing-locked entry (`billed` or `invoice_id`) is never mutated, and a block the user manually overrode (`is_overridden`) keeps its value.
+- **Remainder:** unfrozen participants share `max(0, 100 − frozen total)`, weighted by the seconds each spent in the slot, measured identically for every entry from its persisted interval (`stopped_at − duration_minutes … stopped_at`, at least one second), so the outcome does not depend on which timer finalizes last. A frozen total of 100% or more leaves the newcomer at 0% rather than touching a frozen block. This is the explicit rule for a new timer overlapping a billed slot: **the locked block is untouched and the new entry receives the unclaimed remainder.**
+- **One redistribution rule:** `distribute()` is shared by manual adjustment and finalization (proportional shares rounded to two decimals, the last participant by entry id takes the remainder, equal shares when all weights are zero), so there is a single algorithm.
+- **Concurrency:** stop and allocation-adjust take a row lock on the owning user first, then the user's blocks and the sibling entries, so one user's finalizations and adjustments run one after another with a consistent lock order. Eight to ten parallel processes stopping timers of one user against MariaDB produced no errors and exactly 100% slots.
+- **Self-healing:** a legacy over-allocated slot is normalized the next time an entry finalizes into it (its unfrozen blocks are recomputed). No data migration was added.
+
+Known related gaps, deliberately not changed: deleting an entry does not rebalance the remaining blocks in its slots (they can total less than 100% until adjusted), and whether a manual override should survive a new sibling joining its slot is a product question; the current rule follows the documented `is_overridden` meaning (skip automatic recalculation). A timer that runs under one second stores no allocation block because blocks are built from whole seconds.
+
+### Browser-test data hygiene
+
+The Playwright suite shares the development database, so every record a test creates must be deleted again, including when the test fails. `tests/Browser/support/e2e-fixtures.ts` provides an automatic per-test teardown: it records timer entry IDs from the start responses, registers a fixture project as soon as it exists, and deletes them through the application's own endpoints (deleting an entry cascades its allocation blocks; deleting the project cascades its columns and tasks). The Blade-tracker test uses a throwaway operator project and task rather than a ticket because tickets have no delete route. Tests also generate their own allocation data instead of depending on another test's leftovers. Fortify allows five login attempts per minute per email and a full run signs in more often than that, so `tests/Browser/support/sign-in.ts` waits out a `429 Retry-After` instead of failing whichever test signed in sixth. Repeated back-to-back full-suite runs leave every table unchanged except `sessions` (login sessions created by signing in).

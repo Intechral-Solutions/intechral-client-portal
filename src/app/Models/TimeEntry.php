@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -159,23 +158,5 @@ class TimeEntry extends Model
         return $query
             ->whereNotNull('timer_started_at')
             ->whereNull('stopped_at');
-    }
-
-    /**
-     * Finalized entries that overlapped the given window.
-     *
-     * Stopped timers intentionally clear timer_started_at, so their approximate
-     * start is reconstructed from stopped_at - duration_minutes.
-     */
-    public function scopeRunningDuring($query, Carbon $from, Carbon $to)
-    {
-        return $query
-            ->whereNull('timer_started_at')
-            ->whereNotNull('stopped_at')
-            ->where('stopped_at', '>=', $from)
-            ->whereRaw(
-                'DATE_SUB(stopped_at, INTERVAL duration_minutes MINUTE) <= ?',
-                [$to],
-            );
     }
 }

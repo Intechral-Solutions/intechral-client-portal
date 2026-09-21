@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Task;
+use App\Models\Ticket;
 use App\Models\TimeEntry;
 use App\Models\TimeEntryBlock;
 use App\Models\User;
@@ -7,6 +9,7 @@ use App\Services\ProjectService;
 use App\Services\TimeEntryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -122,6 +125,212 @@ it('links a time entry to a project', function () {
     expect(TimeEntry::where('user_id', $user->id)->where('project_id', $project->id)->exists())->toBeTrue();
 });
 
+it('rejects inaccessible and multiple time contexts', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $other->assignRole('user');
+    $project = app(ProjectService::class)->create($other, ['name' => 'Private project']);
+    $ticket = Ticket::factory()->open()->create(['user_id' => $other->id]);
+
+    $this->actingAs($user)->post(route('time.store'), [
+        'date' => today()->toDateString(),
+        'hours' => 1,
+        'project_id' => $project->id,
+    ])->assertSessionHasErrors('project_id');
+
+    $this->actingAs($user)->postJson(route('time.timer.start'), [
+        'project_id' => $project->id,
+        'ticket_id' => $ticket->id,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['project_id', 'ticket_id']);
+
+    expect(TimeEntry::where('user_id', $user->id)->exists())->toBeFalse();
+});
+
+it('allows authorized embedded task and ticket timer contexts', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $project = app(ProjectService::class)->create($other, ['name' => 'Shared project']);
+    $project->members()->attach($user->id, ['role' => 'member']);
+    $task = Task::create([
+        'project_id' => $project->id,
+        'column_id' => $project->columns()->firstOrFail()->id,
+        'assignee_id' => $other->id,
+        'created_by' => $other->id,
+        'title' => 'Shared task',
+        'priority' => 'medium',
+        'position' => 0,
+        'status' => 'todo',
+    ]);
+    $ticket = Ticket::factory()->open()->create([
+        'user_id' => $user->id,
+        'assignee_id' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.start'), ['task_id' => $task->id])
+        ->assertOk()
+        ->assertJsonPath('context.type', 'Task');
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->assertOk()
+        ->assertJsonPath('context.type', 'Ticket');
+});
+
+it('clears nullable fields and prior context when updating an entry', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $project = app(ProjectService::class)->create($user, ['name' => 'Clearable project']);
+    $entry = TimeEntry::factory()->create([
+        'user_id' => $user->id,
+        'project_id' => $project->id,
+        'description' => 'Remove me',
+    ]);
+
+    $this->actingAs($user)->put(route('time.update', $entry), [
+        'date' => today()->toDateString(),
+        'hours' => 1,
+        'project_id' => null,
+        'task_id' => null,
+        'ticket_id' => null,
+        'description' => null,
+        'billable' => false,
+    ])->assertRedirect();
+
+    $entry->refresh();
+
+    expect($entry->project_id)->toBeNull()
+        ->and($entry->task_id)->toBeNull()
+        ->and($entry->ticket_id)->toBeNull()
+        ->and($entry->description)->toBeNull()
+        ->and($entry->billable)->toBeFalse();
+});
+
+// ── Create vs edit duration contract ─────────────────────────────────────────
+
+it('keeps the 15-minute minimum for new manual entries', function (string $hours) {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+
+    $this->actingAs($user)->post(route('time.store'), [
+        'date' => today()->toDateString(),
+        'hours' => $hours,
+    ])->assertSessionHasErrors('hours');
+
+    expect(TimeEntry::where('user_id', $user->id)->exists())->toBeFalse();
+})->with(['seven minutes' => '0.12', 'just under quarter hour' => '0.24', 'zero' => '0', 'negative' => '-0.5']);
+
+it('still accepts normal quarter-hour manual entries', function (string $hours, int $minutes) {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+
+    $this->actingAs($user)->post(route('time.store'), [
+        'date' => today()->toDateString(),
+        'hours' => $hours,
+    ])->assertSessionHasNoErrors();
+
+    expect(TimeEntry::where('user_id', $user->id)->value('duration_minutes'))->toBe($minutes);
+})->with([['0.25', 15], ['1.5', 90], ['24', 1440]]);
+
+it('edits a legitimate short timer-derived entry without rounding it up to 15 minutes', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 7,
+        'description' => 'Short timer',
+        'timer_started_at' => null,
+        'stopped_at' => now(),
+    ]);
+
+    // The edit form seeds hours as round(7 / 60, 2) = 0.12.
+    $this->actingAs($user)->put(route('time.update', $entry), [
+        'date' => today()->toDateString(),
+        'hours' => 0.12,
+        'description' => 'Renamed short timer',
+        'billable' => true,
+    ])->assertSessionHasNoErrors();
+
+    expect($entry->fresh()->duration_minutes)->toBe(7)
+        ->and($entry->fresh()->description)->toBe('Renamed short timer');
+});
+
+it('round-trips every whole-minute duration through the two-decimal hours the page serializes', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->create(['user_id' => $user->id, 'duration_minutes' => 30]);
+
+    foreach ([1, 2, 7, 14, 15, 50, 59, 61, 133, 599, 1440] as $minutes) {
+        $entry->forceFill(['duration_minutes' => $minutes])->save();
+        $hours = round($minutes / 60, 2);
+
+        $this->actingAs($user)->put(route('time.update', $entry), [
+            'date' => today()->toDateString(),
+            'hours' => $hours,
+        ])->assertSessionHasNoErrors();
+
+        expect($entry->fresh()->duration_minutes)->toBe($minutes);
+    }
+});
+
+it('never lets an accepted edit round to zero minutes and rejects zero, negative, and oversized hours', function (mixed $hours, bool $accepted) {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->create(['user_id' => $user->id, 'duration_minutes' => 30]);
+
+    $response = $this->actingAs($user)->put(route('time.update', $entry), [
+        'date' => today()->toDateString(),
+        'hours' => $hours,
+    ]);
+
+    if ($accepted) {
+        $response->assertSessionHasNoErrors();
+        expect($entry->fresh()->duration_minutes)->toBeGreaterThanOrEqual(1);
+    } else {
+        $response->assertSessionHasErrors('hours');
+        expect($entry->fresh()->duration_minutes)->toBe(30);
+    }
+})->with([
+    'zero' => [0, false],
+    'negative' => [-1, false],
+    'rounds to zero minutes' => [0.005, false],
+    'above a day' => [24.01, false],
+    'smallest accepted hundredth' => [0.01, true],
+    'one minute' => [0.02, true],
+    'full day' => [24, true],
+]);
+
+it('rejects a sub-minute duration at the service boundary too', function () {
+    $user = User::factory()->create();
+    $entry = TimeEntry::factory()->create(['user_id' => $user->id, 'duration_minutes' => 30]);
+
+    expect(fn () => app(TimeEntryService::class)->update($entry, ['hours' => 0.004]))
+        ->toThrow(ValidationException::class)
+        ->and($entry->fresh()->duration_minutes)->toBe(30);
+});
+
+it('keeps billing locks in force for short entries regardless of duration', function (string $state) {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->{$state}()->create([
+        'user_id' => $user->id,
+        'duration_minutes' => 7,
+        'description' => 'Locked short entry',
+    ]);
+
+    $this->actingAs($user)->put(route('time.update', $entry), [
+        'date' => today()->toDateString(),
+        'hours' => 0.12,
+        'description' => 'Forbidden',
+    ])->assertSessionHasErrors(['time_entry' => TimeEntry::BILLING_LOCK_MESSAGE]);
+
+    expect($entry->fresh()->description)->toBe('Locked short entry')
+        ->and($entry->fresh()->duration_minutes)->toBe(7);
+})->with(['billed', 'invoiced']);
+
 // ── Delete ────────────────────────────────────────────────────────────────────
 
 it('allows a user to delete their own unbilled entry', function () {
@@ -168,9 +377,51 @@ it('starts a timer and returns started_at', function () {
     $this->actingAs($user)
         ->postJson(route('time.timer.start'), [])
         ->assertOk()
-        ->assertJsonStructure(['id', 'started_at']);
+        ->assertJsonStructure(['id', 'started_at', 'server_now', 'description', 'context'])
+        ->assertJsonMissingPath('user');
 
     expect(TimeEntry::where('user_id', $user->id)->whereNotNull('timer_started_at')->exists())->toBeTrue();
+});
+
+it('returns minimal ordered active timer DTOs with server time', function () {
+    Carbon::setTestNow('2026-09-20 12:00:00');
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $later = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'timer_started_at' => now()->subMinutes(5),
+    ]);
+    $earlier = TimeEntry::factory()->running()->create([
+        'user_id' => $user->id,
+        'timer_started_at' => now()->subMinutes(10),
+    ]);
+
+    $this->actingAs($user)
+        ->getJson(route('time.timers.active'))
+        ->assertOk()
+        ->assertJsonCount(2)
+        ->assertJsonPath('0.id', $earlier->id)
+        ->assertJsonPath('1.id', $later->id)
+        ->assertJsonPath('0.server_now', now()->toISOString())
+        ->assertJsonStructure([
+            '*' => ['id', 'started_at', 'server_now', 'description', 'context'],
+        ])
+        ->assertJsonMissingPath('0.user_id')
+        ->assertJsonMissingPath('0.billable');
+});
+
+it('returns the canonical description after updating a running timer', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->running()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user)
+        ->patchJson(route('time.timer.description', $entry), ['description' => 'Updated timer'])
+        ->assertOk()
+        ->assertExactJson([
+            'id' => $entry->id,
+            'description' => 'Updated timer',
+        ]);
 });
 
 it('allows multiple concurrent timers per user', function () {
@@ -370,6 +621,60 @@ it('rebalances finalized blocks for overlapping concurrent timers', function () 
         ->and((float) $allocations[$second->id])->toBe(50.0);
 });
 
+it('returns the authoritative whole slot after one allocation adjustment', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $first = TimeEntry::factory()->create(['user_id' => $user->id]);
+    $second = TimeEntry::factory()->create(['user_id' => $user->id]);
+    $firstBlock = TimeEntryBlock::create([
+        'time_entry_id' => $first->id,
+        'user_id' => $user->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 20,
+        'allocation_pct' => 50,
+        'is_overridden' => false,
+    ]);
+    TimeEntryBlock::create([
+        'time_entry_id' => $second->id,
+        'user_id' => $user->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 20,
+        'allocation_pct' => 50,
+        'is_overridden' => false,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->patchJson(route('time.blocks.allocation', $firstBlock), ['allocation_pct' => 75])
+        ->assertOk()
+        ->assertJsonPath('slot.block_number', 20)
+        ->assertJsonCount(2, 'slot.blocks');
+
+    expect((float) collect($response->json('slot.blocks'))->sum('allocation_pct'))->toBe(100.0)
+        ->and((float) $firstBlock->fresh()->allocation_pct)->toBe(75.0)
+        ->and((float) TimeEntryBlock::where('time_entry_id', $second->id)->value('allocation_pct'))->toBe(25.0);
+});
+
+it('rejects a non-100 allocation for a single-entry slot', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $entry = TimeEntry::factory()->create(['user_id' => $user->id]);
+    $block = TimeEntryBlock::create([
+        'time_entry_id' => $entry->id,
+        'user_id' => $user->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 21,
+        'allocation_pct' => 100,
+        'is_overridden' => false,
+    ]);
+
+    $this->actingAs($user)
+        ->patchJson(route('time.blocks.allocation', $block), ['allocation_pct' => 50])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('allocation_pct');
+
+    expect((float) $block->fresh()->allocation_pct)->toBe(100.0);
+});
+
 it('returns 403 stopping another user\'s timer', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
@@ -379,6 +684,106 @@ it('returns 403 stopping another user\'s timer', function () {
     $entry = TimeEntry::factory()->running()->create(['user_id' => $other->id]);
 
     $this->actingAs($user)->postJson(route('time.timer.stop', $entry))->assertForbidden();
+});
+
+// ── Ownership boundaries (routes lacking React-independent coverage) ─────────
+
+it('rejects updating another user\'s entry without mutating it', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $other->assignRole('user');
+    $entry = TimeEntry::factory()->create([
+        'user_id' => $other->id,
+        'duration_minutes' => 60,
+        'description' => 'Untouched',
+        'billable' => true,
+    ]);
+    $before = $entry->fresh()->getAttributes();
+
+    $this->actingAs($user)->put(route('time.update', $entry), [
+        'date' => today()->toDateString(),
+        'hours' => 5,
+        'description' => 'Hijacked',
+        'billable' => false,
+    ])->assertForbidden();
+
+    expect($entry->fresh()->getAttributes())->toBe($before);
+});
+
+it('rejects editing another user\'s timer description without mutating it', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $other->assignRole('user');
+    $entry = TimeEntry::factory()->running()->create([
+        'user_id' => $other->id,
+        'description' => 'Untouched',
+    ]);
+
+    $this->actingAs($user)
+        ->patchJson(route('time.timer.description', $entry), ['description' => 'Hijacked'])
+        ->assertForbidden();
+
+    expect($entry->fresh()->description)->toBe('Untouched')
+        ->and($entry->fresh()->isRunning())->toBeTrue();
+});
+
+it('rejects adjusting another user\'s allocation block without mutating the slot', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $other->assignRole('user');
+    $first = TimeEntry::factory()->create(['user_id' => $other->id]);
+    $second = TimeEntry::factory()->create(['user_id' => $other->id]);
+    $blocks = collect([$first, $second])->map(fn (TimeEntry $entry) => TimeEntryBlock::create([
+        'time_entry_id' => $entry->id,
+        'user_id' => $other->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 30,
+        'allocation_pct' => 50,
+        'is_overridden' => false,
+    ]));
+
+    $this->actingAs($user)
+        ->patchJson(route('time.blocks.allocation', $blocks[0]), ['allocation_pct' => 90])
+        ->assertForbidden();
+
+    expect($blocks->map(fn (TimeEntryBlock $block) => (float) $block->fresh()->allocation_pct)->all())
+        ->toBe([50.0, 50.0])
+        ->and($blocks->every(fn (TimeEntryBlock $block) => ! $block->fresh()->is_overridden))->toBeTrue();
+});
+
+it('rejects an allocation block owned by the caller when its time entry belongs to someone else', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $other->assignRole('user');
+    $foreignEntry = TimeEntry::factory()->create(['user_id' => $other->id]);
+    $ownEntry = TimeEntry::factory()->create(['user_id' => $user->id]);
+    $mismatched = TimeEntryBlock::create([
+        'time_entry_id' => $foreignEntry->id,
+        'user_id' => $user->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 31,
+        'allocation_pct' => 50,
+        'is_overridden' => false,
+    ]);
+    $sibling = TimeEntryBlock::create([
+        'time_entry_id' => $ownEntry->id,
+        'user_id' => $user->id,
+        'block_date' => today()->toDateString(),
+        'block_number' => 31,
+        'allocation_pct' => 50,
+        'is_overridden' => false,
+    ]);
+
+    $this->actingAs($user)
+        ->patchJson(route('time.blocks.allocation', $mismatched), ['allocation_pct' => 90])
+        ->assertForbidden();
+
+    expect((float) $mismatched->fresh()->allocation_pct)->toBe(50.0)
+        ->and((float) $sibling->fresh()->allocation_pct)->toBe(50.0);
 });
 
 // ── Service helpers ───────────────────────────────────────────────────────────

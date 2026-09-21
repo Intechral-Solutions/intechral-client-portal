@@ -7,61 +7,82 @@ use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
 use App\Models\TimeEntryBlock;
+use App\Models\User;
+use App\Rules\AccessibleTimeContext;
 use App\Services\TimeEntryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class TimeEntryController extends Controller
 {
     public function __construct(private TimeEntryService $service) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $user = auth()->user();
+        $filters = [
+            'project_id' => $request->filled('project_id') ? (string) $request->input('project_id') : null,
+            'ticket_id' => $request->filled('ticket_id') ? (string) $request->input('ticket_id') : null,
+            'from' => $request->filled('from') ? (string) $request->input('from') : null,
+            'to' => $request->filled('to') ? (string) $request->input('to') : null,
+        ];
 
         $entries = TimeEntry::forUser($user->id)
             ->with(['project', 'task', 'ticket'])
-            ->when($request->project_id, fn ($q, $id) => $q->where('project_id', $id))
-            ->when($request->ticket_id, fn ($q, $id) => $q->where('ticket_id', $id))
-            ->when($request->from, fn ($q, $d) => $q->where('date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->where('date', '<=', $d))
+            ->when($filters['project_id'], fn ($q, $id) => $q->where('project_id', $id))
+            ->when($filters['ticket_id'], fn ($q, $id) => $q->where('ticket_id', $id))
+            ->when($filters['from'], fn ($q, $date) => $q->where('date', '>=', $date))
+            ->when($filters['to'], fn ($q, $date) => $q->where('date', '<=', $date))
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(25)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (TimeEntry $entry) => $this->buildEntryPayload($entry));
 
         $projects = Project::whereHas('members', fn ($q) => $q->where('user_id', $user->id))
             ->orWhere('created_by', $user->id)
-            ->orderBy('name')->get(['id', 'name']);
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Project $project) => [
+                'id' => $project->id,
+                'name' => $project->name,
+            ]);
 
-        $activeTimers = $this->service->activeTimers($user);
-
+        // Rows with timer_started_at set are unsettled (running, or a corrupt legacy
+        // row that also has stopped_at). Their duration is only final once
+        // stopTimer() normalizes them, so they stay out of the total until then.
         $totalMinutes = TimeEntry::forUser($user->id)
             ->whereNull('timer_started_at')
-            ->when($request->from, fn ($q, $d) => $q->where('date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->where('date', '<=', $d))
+            ->when($filters['project_id'], fn ($q, $id) => $q->where('project_id', $id))
+            ->when($filters['ticket_id'], fn ($q, $id) => $q->where('ticket_id', $id))
+            ->when($filters['from'], fn ($q, $date) => $q->where('date', '>=', $date))
+            ->when($filters['to'], fn ($q, $date) => $q->where('date', '<=', $date))
             ->sum('duration_minutes');
 
-        return view('time.index', compact('entries', 'projects', 'activeTimers', 'totalMinutes'));
+        return Inertia::render('time/index', [
+            'entries' => $entries,
+            'projects' => $projects,
+            'filters' => $filters,
+            'totalMinutes' => (int) $totalMinutes,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
+        $data = $request->validate([
             'date' => 'required|date|before_or_equal:today',
             'hours' => 'required|numeric|min:0.25|max:24',
-            'project_id' => 'nullable|exists:projects,id',
-            'task_id' => 'nullable|exists:tasks,id',
-            'ticket_id' => 'nullable|exists:tickets,id',
+            ...$this->contextRules($request->user()),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
 
         $this->service->log(auth()->user(), [
-            ...$request->only(['date', 'hours', 'project_id', 'task_id', 'ticket_id', 'description']),
+            ...$data,
             'billable' => $request->boolean('billable', true),
         ]);
 
@@ -72,18 +93,23 @@ class TimeEntryController extends Controller
     {
         abort_unless($entry->user_id === auth()->id(), 403);
 
-        $request->validate([
+        $data = $request->validate([
             'date' => 'required|date|before_or_equal:today',
-            'hours' => 'required|numeric|min:0.25|max:24',
-            'project_id' => 'nullable|exists:projects,id',
-            'task_id' => 'nullable|exists:tasks,id',
-            'ticket_id' => 'nullable|exists:tickets,id',
+            // Manual creation keeps its 15-minute floor. An existing entry may hold any
+            // whole-minute duration a timer produced, so edits only require that the
+            // value still converts to at least one stored minute (0.01h = 0.6min -> 1).
+            'hours' => 'required|numeric|min:0.01|max:24',
+            ...$this->contextRules($request->user()),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
 
         $this->service->update($entry, [
-            ...$request->only(['date', 'hours', 'project_id', 'task_id', 'ticket_id', 'description']),
+            ...$data,
+            'project_id' => $request->input('project_id'),
+            'task_id' => $request->input('task_id'),
+            'ticket_id' => $request->input('ticket_id'),
+            'description' => $request->input('description'),
             'billable' => $request->boolean('billable', true),
         ]);
 
@@ -103,27 +129,23 @@ class TimeEntryController extends Controller
 
     public function timerStart(Request $request): JsonResponse
     {
-        $request->validate([
-            'project_id' => 'nullable|exists:projects,id',
-            'task_id' => 'nullable|exists:tasks,id',
-            'ticket_id' => 'nullable|exists:tickets,id',
+        $data = $request->validate([
+            ...$this->contextRules($request->user()),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
 
         $entry = $this->service->startTimer(
             auth()->user(),
-            $request->only(['project_id', 'task_id', 'ticket_id', 'description', 'billable'])
+            [
+                ...$data,
+                'billable' => $request->boolean('billable', true),
+            ],
         );
 
         $entry->load(['project', 'task', 'ticket']);
 
-        return response()->json([
-            'id' => $entry->id,
-            'started_at' => $entry->timer_started_at->toISOString(),
-            'description' => $entry->description,
-            'context' => $this->buildContextPayload($entry),
-        ]);
+        return response()->json($this->buildTimerPayload($entry, now()->toISOString()));
     }
 
     public function timerStop(TimeEntry $entry): JsonResponse
@@ -133,6 +155,7 @@ class TimeEntryController extends Controller
         $entry = $this->service->stopTimer($entry);
 
         return response()->json([
+            'id' => $entry->id,
             'duration_minutes' => $entry->duration_minutes,
             'duration_human' => $entry->durationForHumans(),
         ]);
@@ -144,9 +167,12 @@ class TimeEntryController extends Controller
 
         $request->validate(['description' => 'nullable|string|max:500']);
 
-        $this->service->updateTimerDescription($entry, $request->description);
+        $entry = $this->service->updateTimerDescription($entry, $request->description);
 
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'id' => $entry->id,
+            'description' => $entry->description,
+        ]);
     }
 
     // ── Active timers JSON (for global overlay) ──────────────
@@ -154,14 +180,10 @@ class TimeEntryController extends Controller
     public function activeTimersJson(): JsonResponse
     {
         $timers = $this->service->activeTimers(auth()->user());
+        $serverNow = now()->toISOString();
 
         return response()->json(
-            $timers->map(fn ($e) => [
-                'id' => $e->id,
-                'started_at' => $e->timer_started_at->toISOString(),
-                'description' => $e->description,
-                'context' => $this->buildContextPayload($e),
-            ])
+            $timers->map(fn ($entry) => $this->buildTimerPayload($entry, $serverNow))
         );
     }
 
@@ -173,9 +195,9 @@ class TimeEntryController extends Controller
         $type = $request->input('type');
 
         $options = match ($type) {
-            'project' => Project::where(fn ($q) => $q->whereHas('members', fn ($m) => $m->where('user_id', $user->id))
-                ->orWhere('created_by', $user->id)
-            )
+            // Membership is the ProjectPolicy::view boundary that submission enforces,
+            // so a project the creator has since left is not offered only to be rejected.
+            'project' => Project::whereHas('members', fn ($m) => $m->where('user_id', $user->id))
                 ->where('status', 'active')
                 ->orderBy('name')
                 ->get(['id', 'name'])
@@ -183,16 +205,19 @@ class TimeEntryController extends Controller
 
             'task' => Task::where('assignee_id', $user->id)
                 ->whereNotIn('status', ['done'])
+                ->with(['project', 'ticket'])
                 ->orderBy('title')
                 ->limit(50)
-                ->get(['id', 'title'])
+                ->get(['id', 'project_id', 'ticket_id', 'assignee_id', 'title'])
+                ->filter(fn ($task) => AccessibleTimeContext::allows($user, 'task', $task->id))
                 ->map(fn ($t) => ['id' => $t->id, 'label' => $t->title]),
 
             'ticket' => Ticket::where('assignee_id', $user->id)
                 ->whereIn('status', ['open', 'in_progress'])
                 ->orderBy('ticket_number')
                 ->limit(50)
-                ->get(['id', 'ticket_number', 'title'])
+                ->get(['id', 'user_id', 'assignee_id', 'ticket_number', 'title'])
+                ->filter(fn ($ticket) => AccessibleTimeContext::allows($user, 'ticket', $ticket->id))
                 ->map(fn ($t) => [
                     'id' => $t->id,
                     'label' => $t->ticket_number.' — '.Str::limit($t->title, 40),
@@ -206,10 +231,13 @@ class TimeEntryController extends Controller
 
     // ── Allocation chart ─────────────────────────────────────
 
-    public function allocationView(Request $request): View
+    public function allocationView(Request $request): Response
     {
         $user = auth()->user();
-        $date = $request->input('date', today()->toDateString());
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $date = $validated['date'] ?? today()->toDateString();
 
         $blocks = TimeEntryBlock::where('user_id', $user->id)
             ->where('block_date', $date)
@@ -217,20 +245,57 @@ class TimeEntryController extends Controller
             ->get()
             ->groupBy('time_entry_id');
 
-        $activeTimers = $this->service->activeTimers($user);
+        $entries = $blocks->map(function ($entryBlocks, $entryId): array {
+            $entry = $entryBlocks->first()->timeEntry;
 
-        return view('time.allocation', compact('blocks', 'activeTimers', 'date'));
+            return [
+                'id' => (int) $entryId,
+                'description' => $entry->description,
+                'locked' => $entry->isLockedForBilling(),
+                'context' => $this->buildContextPayload($entry),
+                'blocks' => $entryBlocks
+                    ->sortBy('block_number')
+                    ->map(fn (TimeEntryBlock $block) => [
+                        'id' => $block->id,
+                        'blockNumber' => $block->block_number,
+                        'allocationPct' => (float) $block->allocation_pct,
+                        'isOverridden' => $block->is_overridden,
+                    ])
+                    ->values(),
+            ];
+        })->values();
+
+        return Inertia::render('time/allocation', [
+            'date' => $date,
+            'entries' => $entries,
+        ]);
     }
 
     public function updateBlockAllocation(Request $request, TimeEntryBlock $block): JsonResponse
     {
-        abort_unless($block->timeEntry->user_id === auth()->id(), 403);
+        abort_unless(
+            $block->user_id === auth()->id() && $block->timeEntry->user_id === auth()->id(),
+            403,
+        );
 
         $data = $request->validate(['allocation_pct' => 'required|numeric|min:0|max:100']);
 
-        $this->service->updateBlockAllocation($block, (float) $data['allocation_pct']);
+        $slotBlocks = $this->service->updateBlockAllocation($block, (float) $data['allocation_pct']);
 
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'slot' => [
+                'block_date' => $block->block_date->toDateString(),
+                'block_number' => $block->block_number,
+                'allocation_pct' => round((float) $slotBlocks->sum('allocation_pct'), 2),
+                'blocks' => $slotBlocks->map(fn (TimeEntryBlock $slotBlock) => [
+                    'id' => $slotBlock->id,
+                    'time_entry_id' => $slotBlock->time_entry_id,
+                    'allocation_pct' => (float) $slotBlock->allocation_pct,
+                    'is_overridden' => $slotBlock->is_overridden,
+                    'locked' => $slotBlock->timeEntry->isLockedForBilling(),
+                ])->values(),
+            ],
+        ]);
     }
 
     // ── Private ──────────────────────────────────────────────
@@ -264,5 +329,85 @@ class TimeEntryController extends Controller
         }
 
         return null;
+    }
+
+    private function buildTimerPayload(TimeEntry $entry, string $serverNow): array
+    {
+        return [
+            'id' => $entry->id,
+            'started_at' => $entry->timer_started_at->toISOString(),
+            'server_now' => $serverNow,
+            'description' => $entry->description,
+            'context' => $this->buildContextPayload($entry),
+        ];
+    }
+
+    private function buildEntryPayload(TimeEntry $entry): array
+    {
+        $context = null;
+
+        if ($entry->ticket) {
+            $context = [
+                'kind' => 'ticket',
+                'id' => $entry->ticket_id,
+                'label' => $entry->ticket->ticket_number,
+                'url' => route('tickets.show', $entry->ticket),
+            ];
+        } elseif ($entry->task) {
+            $context = [
+                'kind' => 'task',
+                'id' => $entry->task_id,
+                'label' => Str::limit($entry->task->title, 50),
+                'url' => $entry->task->project_id
+                    ? route('projects.tasks.show', [$entry->task->project_id, $entry->task])
+                    : null,
+            ];
+        } elseif ($entry->project) {
+            $context = [
+                'kind' => 'project',
+                'id' => $entry->project_id,
+                'label' => $entry->project->name,
+                'url' => route('projects.board', $entry->project),
+            ];
+        }
+
+        return [
+            'id' => $entry->id,
+            'date' => $entry->date->format('Y-m-d'),
+            'durationMinutes' => $entry->duration_minutes,
+            'durationHuman' => $entry->durationForHumans(),
+            'hours' => round($entry->duration_minutes / 60, 2),
+            'description' => $entry->description,
+            'billable' => $entry->billable,
+            'billed' => $entry->billed,
+            'invoiceLinked' => $entry->invoice_id !== null,
+            'locked' => $entry->isLockedForBilling(),
+            'running' => $entry->isRunning(),
+            'context' => $context,
+        ];
+    }
+
+    private function contextRules(User $user): array
+    {
+        return [
+            'project_id' => [
+                'nullable',
+                'integer',
+                'prohibits:task_id,ticket_id',
+                new AccessibleTimeContext($user, 'project'),
+            ],
+            'task_id' => [
+                'nullable',
+                'integer',
+                'prohibits:project_id,ticket_id',
+                new AccessibleTimeContext($user, 'task'),
+            ],
+            'ticket_id' => [
+                'nullable',
+                'integer',
+                'prohibits:project_id,task_id',
+                new AccessibleTimeContext($user, 'ticket'),
+            ],
+        ];
     }
 }

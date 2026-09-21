@@ -26,6 +26,7 @@ it('builds user navigation from effective permissions', function () {
     expect($items->keys()->all())->toContain('tickets', 'projects', 'tasks', 'time', 'billing', 'pages')
         ->and($items->keys()->all())->not->toContain('crm')
         ->and($items['billing']['href'])->toBe(route('billing.client.invoices.index'))
+        ->and($items['time']['visit'])->toBe('inertia')
         ->and($items['tickets']['isActive'])->toBeTrue()
         ->and(collect($groups)->contains('key', 'management'))->toBeFalse();
 });
@@ -43,6 +44,7 @@ it('builds operator management navigation and operator billing destination', fun
 
     expect($primary['billing']['href'])->toBe(route('billing.invoices.index'))
         ->and($primary['billing']['isActive'])->toBeTrue()
+        ->and($management['time-reports']['visit'])->toBe('inertia')
         ->and($management->keys()->all())->toContain(
             'ticket-queue',
             'time-reports',

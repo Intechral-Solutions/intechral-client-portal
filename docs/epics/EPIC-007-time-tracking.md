@@ -94,6 +94,10 @@ Allow team members to log time against projects and tasks, with reports and bill
 
 Users can run multiple concurrent timer blocks within a session. The `time_entry_blocks` table stores discrete blocks; a drag interface on the allocation view lets users adjust the proportional split of time across blocks before committing entries.
 
+#### Allocation semantics (2026-09-21)
+
+`time_entry_blocks.allocation_pct` is a finalized timer entry's share of one 15-minute UTC slot. For one user, date, and slot the shares sum to exactly 100%, whether the timers overlapped in wall-clock time or ran one after another inside the slot. Timer finalization and `updateBlockAllocation()` maintain this with one shared redistribution rule; billing-locked and manually overridden blocks are frozen and the rest share the remainder, weighted by seconds in the slot. The percentage is presentation and attribution metadata only: reports, the dashboard, CSV export, and billing use `duration_minutes`. See [EPIC-011D](./EPIC-011D-time-tracking-timer.md#allocation-semantics-and-invariant) for the evidence, the locked-sibling rule, and locking.
+
 ### Canonical Timer State (2026-06-30)
 
 | State | `timer_started_at` | `stopped_at` | Notes |

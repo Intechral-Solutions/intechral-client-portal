@@ -77,13 +77,13 @@ class DashboardController extends Controller
         $metrics = array_values(array_filter([
             $user->can('tickets.view') ? $this->metric('tickets', 'Open Tickets', $openTicketCount, $openTicketCount ? 'Needs attention' : 'All clear', route('tickets.index')) : null,
             $user->can('projects.view') ? $this->metric('projects', 'Active Projects', $activeProjectCount, 'In progress', route('projects.index')) : null,
-            $user->can('time.log') ? $this->metric('time', 'Time This Month', number_format($timeThisMonth / 60, 1).'h', $unbilledMinutes ? number_format($unbilledMinutes / 60, 1).'h unbilled' : 'This month', route('time.index')) : null,
+            $user->can('time.log') ? $this->metric('time', 'Time This Month', number_format($timeThisMonth / 60, 1).'h', $unbilledMinutes ? number_format($unbilledMinutes / 60, 1).'h unbilled' : 'This month', route('time.index'), 'inertia') : null,
             ($user->can('billing.view') || $user->can('billing.manage')) ? $this->metric('billing', 'Outstanding Invoices', $outstandingInvoiceCount, $outstandingInvoiceCount ? 'Awaiting payment' : 'All settled', $user->can('billing.manage') ? route('billing.invoices.index') : route('billing.client.invoices.index')) : null,
         ]));
 
         $quickActions = array_values(array_filter([
             $user->can('tickets.create') ? ['key' => 'new-ticket', 'label' => 'New Ticket', 'href' => route('tickets.create'), 'visit' => 'document'] : null,
-            $user->can('time.log') ? ['key' => 'log-time', 'label' => 'Log Time', 'href' => route('time.index'), 'visit' => 'document'] : null,
+            $user->can('time.log') ? ['key' => 'log-time', 'label' => 'Log Time', 'href' => route('time.index'), 'visit' => 'inertia'] : null,
             $user->can('projects.view') ? ['key' => 'projects', 'label' => 'My Projects', 'href' => route('projects.index'), 'visit' => 'document'] : null,
             ['key' => 'profile', 'label' => 'My Profile', 'href' => route('profile.show'), 'visit' => 'inertia'],
         ]));
@@ -112,8 +112,8 @@ class DashboardController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function metric(string $key, string $label, int|string $value, string $supportingText, string $href): array
+    private function metric(string $key, string $label, int|string $value, string $supportingText, string $href, string $visit = 'document'): array
     {
-        return compact('key', 'label', 'value', 'supportingText', 'href') + ['visit' => 'document'];
+        return compact('key', 'label', 'value', 'supportingText', 'href', 'visit');
     }
 }
