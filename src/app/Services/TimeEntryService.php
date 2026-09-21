@@ -67,12 +67,73 @@ class TimeEntryService
         });
     }
 
+    /**
+     * Delete an entry and rebalance every allocation slot it occupied.
+     *
+     * Removing a member is a structural change to each slot it leaves, so the survivors
+     * are recomputed with the same rule finalization uses (see structuralRows()). The
+     * slots are identified and locked before the blocks disappear, in the same order as
+     * every other allocation write: owning user, blocks, sibling entries.
+     */
     public function delete(TimeEntry $entry): void
     {
         DB::transaction(function () use ($entry): void {
+            $this->lockAllocationScope($entry->user_id);
+
             $current = TimeEntry::query()->lockForUpdate()->findOrFail($entry->getKey());
             $this->ensureMutable($current);
+
+            $own = TimeEntryBlock::where('time_entry_id', $current->id)->get();
+
+            if ($own->isEmpty()) {
+                $current->delete();
+
+                return;
+            }
+
+            $slotBlocks = $this->lockSlotBlocks(
+                $current->user_id,
+                $own->map(fn (TimeEntryBlock $block) => $this->slotKey($block->block_date->toDateString(), $block->block_number))->all(),
+                $own->min(fn (TimeEntryBlock $block) => $block->block_date->toDateString()),
+                $own->max(fn (TimeEntryBlock $block) => $block->block_date->toDateString()),
+            );
+
+            $survivors = $slotBlocks->map(fn ($blocks) => $blocks->reject(fn (TimeEntryBlock $block) => $block->time_entry_id === $current->id));
+
+            $siblings = TimeEntry::whereIn('id', $survivors->flatten()->pluck('time_entry_id')->unique()->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
             $current->delete();
+
+            $rows = [];
+            $timestamp = now();
+
+            foreach ($survivors as $blocks) {
+                if ($blocks->isEmpty()) {
+                    continue;
+                }
+
+                $first = $blocks->first();
+                $slot = [
+                    'date' => $first->block_date->toDateString(),
+                    'number' => $first->block_number,
+                    'start' => $first->startsAt(),
+                    'end' => $first->endsAt(),
+                ];
+
+                $rows = [...$rows, ...$this->structuralRows(
+                    $slot,
+                    $blocks->keyBy('time_entry_id')->all(),
+                    $siblings,
+                    $current->user_id,
+                    $timestamp,
+                )];
+            }
+
+            $this->upsertBlocks($rows);
         });
     }
 
@@ -205,21 +266,22 @@ class TimeEntryService
                 ]);
             }
 
-            $shares = $this->distribute(
-                round(100.0 - $newPercentage, 2),
-                $siblings->mapWithKeys(fn (TimeEntryBlock $sibling) => [
-                    $sibling->id => (float) $sibling->allocation_pct,
-                ])->all(),
-            );
+            // Manual mode: the block the user edited is pinned at the value they chose and the
+            // siblings share the remainder in proportion to their current allocations. Every
+            // block in the slot then records this explicit choice for its current membership.
+            $participants = [];
 
-            foreach ($siblings as $sibling) {
-                $sibling->update(['allocation_pct' => $shares[$sibling->id], 'is_overridden' => true]);
+            foreach ($slotBlocks as $slotBlock) {
+                $participants[$slotBlock->id] = $slotBlock->id === $current->id
+                    ? ['pct' => $newPercentage, 'frozen' => true, 'weight' => 0.0]
+                    : ['pct' => (float) $slotBlock->allocation_pct, 'frozen' => false, 'weight' => (float) $slotBlock->allocation_pct];
             }
 
-            $current->update([
-                'allocation_pct' => $newPercentage,
-                'is_overridden' => true,
-            ]);
+            $shares = $this->allocateSlot($participants);
+
+            foreach ($slotBlocks as $slotBlock) {
+                $slotBlock->update(['allocation_pct' => $shares[$slotBlock->id], 'is_overridden' => true]);
+            }
 
             return TimeEntryBlock::where('user_id', $block->user_id)
                 ->where('block_date', $block->block_date)
@@ -335,23 +397,16 @@ class TimeEntryService
      * Compute and store 15-minute block allocations for a freshly stopped timer.
      *
      * Invariant: for one user, date, and slot, block allocations sum to exactly 100%
-     * (the same invariant updateBlockAllocation() enforces). Every slot this entry
-     * touches is therefore recomputed from all entries that hold a block in it, not only
-     * from ones that overlapped this timer in wall-clock time; otherwise sequential
-     * timers inside one slot would each keep 100%.
-     *
-     * Frozen blocks keep their value: those of a billing-locked entry (never mutated)
-     * and those the user manually overrode. The unfrozen entries share what remains,
-     * weighted by the seconds each spent in the slot. Every entry, including the one
-     * being finalized, is weighted from the same persisted interval
-     * (stopped_at - duration_minutes .. stopped_at, at least one second), so the result
-     * depends only on the set of entries and never on which one finalizes last. If
-     * frozen blocks already claim 100% or more, the unfrozen entries receive 0% rather
-     * than a locked or overridden block being touched.
+     * (the same invariant updateBlockAllocation() enforces), except where immutable billed
+     * history claims part of the slot. Finalizing an entry makes it a new member of every
+     * slot it touched, which is a structural change: each such slot is recomputed from all
+     * entries that hold a block in it, not only from ones that overlapped this timer in
+     * wall-clock time, and stale manual overrides in it are cleared (see structuralRows()).
      *
      * The caller holds the per-user allocation lock, so concurrent finalizations of one
      * user's timers run one after another and each sees the previous result; because the
-     * whole slot is recomputed, the outcome does not depend on the order they finish in.
+     * whole slot is recomputed from persisted intervals, the outcome does not depend on the
+     * order they finish in.
      */
     private function finalizeBlocks(TimeEntry $entry, Carbon $startedAt, Carbon $stoppedAt): void
     {
@@ -384,81 +439,157 @@ class TimeEntryService
             return;
         }
 
-        $existing = TimeEntryBlock::where('user_id', $entry->user_id)
-            ->whereBetween('block_date', [$blockStart->toDateString(), $blockEnd->toDateString()])
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get()
-            ->filter(fn (TimeEntryBlock $block) => isset($slots[$this->slotKey($block->block_date->toDateString(), $block->block_number)]))
-            ->groupBy(fn (TimeEntryBlock $block) => $this->slotKey($block->block_date->toDateString(), $block->block_number));
+        $existing = $this->lockSlotBlocks(
+            $entry->user_id,
+            array_keys($slots),
+            $blockStart->toDateString(),
+            $blockEnd->toDateString(),
+        );
 
         $siblings = TimeEntry::whereIn('id', $existing->flatten()->pluck('time_entry_id')->unique()->all())
             ->orderBy('id')
             ->lockForUpdate()
             ->get()
-            ->keyBy('id');
+            ->keyBy('id')
+            ->put($entry->id, $entry);
 
         $rows = [];
         $timestamp = now();
 
         foreach ($slots as $key => $slot) {
-            $participants = [
-                $entry->id => ['block' => null, 'frozen' => false, 'weight' => $this->slotWeight($entry, $slot)],
+            // The finalized entry joins every slot it touched (it may not have a block yet).
+            $blocksByEntry = ($existing->get($key) ?? collect())->keyBy('time_entry_id')->all();
+            $blocksByEntry[$entry->id] ??= null;
+
+            $rows = [...$rows, ...$this->structuralRows($slot, $blocksByEntry, $siblings, $entry->user_id, $timestamp)];
+        }
+
+        $this->upsertBlocks($rows);
+    }
+
+    /**
+     * Recompute one slot after its membership changed (an entry joined it or left it).
+     *
+     * A structural change makes every earlier manual choice stale: is_overridden records a
+     * user's explicit allocation for the set of entries that were in the slot when they made
+     * it, so the flag is cleared and the mutable blocks are recomputed. Only immutable
+     * history is frozen: a block of a billed or invoice-linked entry keeps its exact value
+     * and is never written. The mutable entries share what remains after it, weighted by the
+     * seconds each spent in the slot (slotWeight()), so the outcome depends only on the set
+     * of entries and never on the order they were finalized or deleted in. If the frozen
+     * blocks already claim 100% or more, the mutable entries receive 0% rather than a
+     * locked block being touched.
+     *
+     * Manual editing is deliberately different: it is not a membership change, its override
+     * stays sticky, and it goes through the same allocateSlot() primitive in manual mode.
+     *
+     * @param  array{date: string, number: int, start: Carbon, end: Carbon}  $slot
+     * @param  array<int, TimeEntryBlock|null>  $blocksByEntry  entry id => its block in the slot (null when joining)
+     * @param  Collection<int, TimeEntry>  $entries  the participating entries, keyed by id
+     * @return list<array<string, mixed>> upsert rows for the blocks that need writing
+     */
+    private function structuralRows(array $slot, array $blocksByEntry, Collection $entries, int $userId, Carbon $timestamp): array
+    {
+        ksort($blocksByEntry);
+
+        $participants = [];
+
+        foreach ($blocksByEntry as $entryId => $block) {
+            $entry = $entries->get($entryId);
+
+            $participants[$entryId] = [
+                'pct' => (float) ($block?->allocation_pct ?? 0),
+                'frozen' => $entry?->isLockedForBilling() ?? false,
+                'weight' => $entry ? $this->slotWeight($entry, $slot) : 1.0,
             ];
+        }
 
-            foreach ($existing->get($key, []) as $block) {
-                $entryId = $block->time_entry_id;
+        $rows = [];
 
-                if ($entryId === $entry->id) {
-                    $participants[$entryId]['block'] = $block;
-                    $participants[$entryId]['frozen'] = (bool) $block->is_overridden;
-
-                    continue;
-                }
-
-                $sibling = $siblings->get($entryId);
-                $participants[$entryId] = [
-                    'block' => $block,
-                    'frozen' => $block->is_overridden || ($sibling?->isLockedForBilling() ?? false),
-                    'weight' => $sibling ? $this->slotWeight($sibling, $slot) : 0.0,
-                ];
+        foreach ($this->allocateSlot($participants) as $entryId => $percentage) {
+            if ($participants[$entryId]['frozen']) {
+                continue;
             }
 
-            ksort($participants);
+            $block = $blocksByEntry[$entryId];
 
-            $frozenTotal = 0.0;
-            $weights = [];
-
-            foreach ($participants as $entryId => $participant) {
-                if ($participant['frozen']) {
-                    $frozenTotal += (float) $participant['block']->allocation_pct;
-                } else {
-                    $weights[$entryId] = max(1.0, $participant['weight']);
-                }
+            if ($block !== null && ! $block->is_overridden && abs((float) $block->allocation_pct - $percentage) < 0.005) {
+                continue;
             }
 
-            $shares = $this->distribute(max(0.0, round(100.0 - $frozenTotal, 2)), $weights);
+            $rows[] = [
+                'time_entry_id' => $entryId,
+                'user_id' => $userId,
+                'block_date' => $slot['date'],
+                'block_number' => $slot['number'],
+                'allocation_pct' => $percentage,
+                'is_overridden' => false,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
 
-            foreach ($shares as $entryId => $percentage) {
-                $block = $participants[$entryId]['block'];
+        return $rows;
+    }
 
-                if ($block !== null && abs((float) $block->allocation_pct - $percentage) < 0.005) {
-                    continue;
-                }
+    /**
+     * The one allocation primitive. Frozen participants keep their percentage; the rest
+     * share whatever remains of 100 (never below zero), weighted by their weights, through
+     * distribute() so rounding and remainder handling exist in exactly one place.
+     *
+     * Callers choose what "frozen" and "weight" mean: manual editing pins the edited block
+     * and weighs siblings by their current shares; structural changes freeze only immutable
+     * billed history and weigh by seconds in the slot.
+     *
+     * @param  array<int|string, array{pct: float, frozen: bool, weight: float}>  $participants  in deterministic order
+     * @return array<int|string, float> percentage per participant, in the same order
+     */
+    private function allocateSlot(array $participants): array
+    {
+        $frozenTotal = 0.0;
+        $weights = [];
 
-                $rows[] = [
-                    'time_entry_id' => $entryId,
-                    'user_id' => $entry->user_id,
-                    'block_date' => $slot['date'],
-                    'block_number' => $slot['number'],
-                    'allocation_pct' => $percentage,
-                    'is_overridden' => false,
-                    'created_at' => $timestamp,
-                    'updated_at' => $timestamp,
-                ];
+        foreach ($participants as $key => $participant) {
+            if ($participant['frozen']) {
+                $frozenTotal += $participant['pct'];
+            } else {
+                $weights[$key] = $participant['weight'];
             }
         }
 
+        $shares = $this->distribute(max(0.0, round(100.0 - $frozenTotal, 2)), $weights);
+        $result = [];
+
+        foreach ($participants as $key => $participant) {
+            $result[$key] = $participant['frozen'] ? $participant['pct'] : $shares[$key];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Lock a user's blocks for the given slots (after the per-user lock, before entry
+     * locks) and return them grouped by slot key.
+     *
+     * @param  list<string>  $slotKeys
+     * @return \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, TimeEntryBlock>>
+     */
+    private function lockSlotBlocks(int $userId, array $slotKeys, string $fromDate, string $toDate): \Illuminate\Support\Collection
+    {
+        $wanted = array_flip($slotKeys);
+
+        return TimeEntryBlock::where('user_id', $userId)
+            ->whereBetween('block_date', [$fromDate, $toDate])
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->filter(fn (TimeEntryBlock $block) => isset($wanted[$this->slotKey($block->block_date->toDateString(), $block->block_number)]))
+            ->groupBy(fn (TimeEntryBlock $block) => $this->slotKey($block->block_date->toDateString(), $block->block_number));
+    }
+
+    /** @param  list<array<string, mixed>>  $rows */
+    private function upsertBlocks(array $rows): void
+    {
         foreach (array_chunk($rows, 500) as $chunk) {
             TimeEntryBlock::upsert(
                 $chunk,
@@ -471,7 +602,8 @@ class TimeEntryService
     /**
      * Split $total percentage points across the weighted keys, in key order.
      *
-     * The single redistribution rule shared by manual adjustment and timer finalization:
+     * The single rounding/remainder rule behind allocateSlot(), and so shared by manual
+     * adjustment, timer finalization, and entry deletion:
      * each share is proportional to its weight rounded to two decimals, the last key
      * takes the rounding remainder so the shares sum to exactly $total, and equal
      * shares are used when every weight is zero. A rounding overshoot on a tiny total

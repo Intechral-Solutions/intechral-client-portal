@@ -1,22 +1,20 @@
 <?php
 
 use App\Models\Invoice;
-use App\Models\TimeEntry;
 use App\Models\TimeEntryBlock;
 use App\Models\User;
 use App\Services\TimeEntryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+require_once __DIR__.'/AllocationHelpers.php';
+
 /*
  * Invariant under test: for one user, date, and 15-minute slot, the allocation_pct of every
- * block sums to exactly 100. Blocks of a billing-locked entry and blocks the user has
- * manually overridden are frozen; only the remainder is shared by the rest of the slot,
- * weighted by the seconds each entry spent in it.
+ * block sums to exactly 100. Blocks of a billing-locked entry are immutable; the remainder is
+ * shared by the rest of the slot, weighted by the seconds each entry spent in it. How manual
+ * overrides behave when slot membership changes is covered in AllocationLifecycleTest.
  */
-
-const SLOT_DATE = '2026-06-30';
-const SLOT_NINE = 36; // 09:00-09:15
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -25,49 +23,6 @@ beforeEach(function () {
 afterEach(function () {
     Carbon::setTestNow();
 });
-
-function runningEntry(User $user, string $start, string $stop, ?string $description = null): TimeEntry
-{
-    return TimeEntry::factory()->running()->create([
-        'user_id' => $user->id,
-        'date' => SLOT_DATE,
-        'description' => $description,
-        'duration_minutes' => 0,
-        'timer_started_at' => Carbon::parse("2026-06-30 {$start}"),
-        'stopped_at' => null,
-    ]);
-}
-
-function finalizeAt(TimeEntry $entry, string $stop): TimeEntry
-{
-    Carbon::setTestNow("2026-06-30 {$stop}");
-    app(TimeEntryService::class)->stopTimer($entry);
-
-    return $entry->fresh();
-}
-
-/** Finalize a timer that ran start..stop in one step. */
-function finalizedTimer(User $user, string $start, string $stop): TimeEntry
-{
-    return finalizeAt(runningEntry($user, $start, $stop), $stop);
-}
-
-/** @return array<int, float> entry id => allocation_pct for one slot */
-function slotAllocations(User $user, int $slot = SLOT_NINE): array
-{
-    return TimeEntryBlock::where('user_id', $user->id)
-        ->where('block_date', SLOT_DATE)
-        ->where('block_number', $slot)
-        ->orderBy('time_entry_id')
-        ->pluck('allocation_pct', 'time_entry_id')
-        ->map(fn ($pct) => (float) $pct)
-        ->all();
-}
-
-function slotTotal(User $user, int $slot = SLOT_NINE): float
-{
-    return round(array_sum(slotAllocations($user, $slot)), 2);
-}
 
 it('gives a lone finalized entry the whole slot', function () {
     $user = User::factory()->create();
@@ -195,20 +150,6 @@ it('shares only the unfrozen remainder when an invoice-linked sibling holds part
     $newcomer = finalizedTimer($user, '09:10:00', '09:11:00');
 
     expect(slotAllocations($user))->toBe([$locked->id => 60.0, $open->id => 20.0, $newcomer->id => 20.0])
-        ->and(slotTotal($user))->toBe(100.0);
-});
-
-it('respects manual overrides instead of silently rescaling them', function () {
-    $user = User::factory()->create();
-    $first = finalizedTimer($user, '09:01:00', '09:02:00');
-    $second = finalizedTimer($user, '09:05:00', '09:06:00');
-    $firstBlock = TimeEntryBlock::where('time_entry_id', $first->id)->firstOrFail();
-    app(TimeEntryService::class)->updateBlockAllocation($firstBlock, 70);
-    expect(slotAllocations($user))->toBe([$first->id => 70.0, $second->id => 30.0]);
-
-    $third = finalizedTimer($user, '09:10:00', '09:11:00');
-
-    expect(slotAllocations($user))->toBe([$first->id => 70.0, $second->id => 30.0, $third->id => 0.0])
         ->and(slotTotal($user))->toBe(100.0);
 });
 

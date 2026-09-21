@@ -98,7 +98,7 @@ Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is
 
 ### Time Tracking Module
 - `time_entries` — id, user_id, project_id, task_id nullable, ticket_id nullable, invoice_id nullable, date, duration_minutes (unsigned integer), description, billable, billed, timer_started_at, stopped_at
-- `time_entry_blocks` — id, time_entry_id, user_id, block_date, block_number (0–95, 15-minute UTC slots), allocation_pct (share of the slot; a user's blocks in one slot sum to 100), is_overridden
+- `time_entry_blocks` — id, time_entry_id, user_id, block_date, block_number (0–95, 15-minute UTC slots), allocation_pct (share of the slot; a user's blocks in one slot sum to 100 except where billed history holds part of it), is_overridden (the user's explicit choice for the slot's current members; cleared when an entry joins or leaves it)
 
 ### CRM Module
 - `crm_companies` — id, organization_id nullable, created_by, name, website, phone, address, notes
