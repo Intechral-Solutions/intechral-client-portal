@@ -40,23 +40,20 @@ npm run setup
 
 That's it. `npm run setup` handles everything. Open `http://localhost:4242`.
 
-## Dev Scripts
+## Developer CLI
 
-All commands are npm scripts defined in the root `package.json`:
+Routine environment work goes through `./dev` at the repository root (`./dev help`). It resolves and verifies the actual database before any database or test command, runs container commands as the host UID:GID, and backs up before migrating. Command reference, safety rules, backup location and how to add commands are in the [README](../../README.md#developer-cli-dev).
 
 ```bash
-npm run setup    # First-time setup (build + install + migrate + seed)
-npm run up       # Start containers
-npm run down     # Stop containers
-npm run restart  # Stop and restart
-npm run build    # Rebuild Docker images (no cache)
-npm run dev      # Start Vite HMR dev server
-npm run fresh    # Reset database and re-seed
-npm run test     # Run Pest test suite
-npm run lint     # Run Laravel Pint
-npm run shell    # Open bash in the app container
-npm run logs     # Tail container logs
+./dev up               # Start containers
+./dev doctor           # Read-only diagnostics
+./dev db:migrate       # Back up, confirm, then run pending migrations (development DB)
+./dev test:php         # Pest against the testing DB
+./dev test:e2e         # Playwright (runs against the development DB)
+./dev check            # Full non-browser validation
 ```
+
+Root `npm run` aliases (`setup`, `up`, `down`, `restart`, `build`, `dev`, `test`, `lint`, `shell`, `logs`) still work; `up`, `down`, `restart`, `shell` and `test` delegate to `./dev`. The former `npm run fresh` alias was removed: it ran `migrate:fresh --seed` against the development database without any check.
 
 ## Frontend Tooling
 
@@ -122,7 +119,10 @@ docker compose exec db mariadb -u root -proot -e "
 ### Running Pest
 
 ```bash
-# Run the full suite (recommended — same command used by npm run test)
+# Run the full suite (recommended: ./dev test:php verifies the test DB target first,
+# runs Pest as your host user and forwards extra arguments)
+./dev test:php
+# ...or directly:
 docker compose exec app ./vendor/bin/pest
 
 # Run a single test file

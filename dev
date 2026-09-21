@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Intechral Client Portal developer CLI. Run `./dev help`.
+#
+# Deliberately host-only Bash: it must work while the containers are stopped, so it
+# needs no host PHP/Node and never boots Laravel on the host. See scripts/dev/.
+set -euo pipefail
+
+DEV_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=scripts/dev/lib.sh
+source "$DEV_ROOT/scripts/dev/lib.sh"
+# shellcheck source=scripts/dev/commands.sh
+source "$DEV_ROOT/scripts/dev/commands.sh"
+
+dev_main "$@"

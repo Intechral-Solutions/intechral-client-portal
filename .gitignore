@@ -21,6 +21,9 @@ intechral-client-portal/public/build/
 .docker/data/
 docker-compose.override.yml
 
+# ── ./dev database backups (contain real dev data) ─────────
+/backups/
+
 # ── OS & editor artifacts ──────────────────────────────────
 .DS_Store
 Thumbs.db
