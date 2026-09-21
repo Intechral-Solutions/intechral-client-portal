@@ -271,6 +271,8 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 
 ## Phase E: Projects and Tasks
 
+Detailed implementation plan: [EPIC-011E](./EPIC-011E-projects-kanban.md)
+
 ### Scope
 
 - Project index/create/show/edit
@@ -287,6 +289,8 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 - Use local optimistic state for drag movement and Laravel for authoritative mutation.
 - Revert or refresh cleanly on failed movement.
 - Convert inline form/modals/disclosure JavaScript to React components.
+
+The live assessment in [EPIC-011E](./EPIC-011E-projects-kanban.md) refines this direction: optimistic movement is planned around Inertia 3 `router.optimistic()` (provisional until the EPIC-011E WP0 spike proves it, with a no-state-library fallback) rather than a separate local copy of the board, `@dnd-kit` is narrowed to `core` + `sortable` as a pointer/touch enhancement over a library-independent keyboard Move menu, and a backend-hardening package precedes the page conversions.
 
 ### Risks
 
