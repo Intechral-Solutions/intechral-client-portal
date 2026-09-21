@@ -5,13 +5,13 @@
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 **Related:** [EPIC-005: Project Management](./EPIC-005-projects.md), [EPIC-010B: Tenant Scoping](./EPIC-010B-tenant-scoping.md), [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
-**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy
+**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate
 
 ---
 
 ## Amendment 1: Locked Decisions and Clarifications (2026-09-21)
 
-Owner decisions D1 to D6 are **locked**. D7 remains the only open owner decision. Further live inspection added the clarifications below. **Where this amendment and any other wording disagree, this amendment wins.** The affected sections have been rewritten to match, and §28 is the decision register. Status is unchanged: EPIC-011E is **Planned**, EPIC-011D remains Verified, EPIC-011 remains In Progress.
+Owner decisions D1 to D6 are **locked**. At the time of this amendment, D7 remained the only open owner decision; it is now resolved by [Amendment 2](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21). Further live inspection added the clarifications below. **Where this amendment and earlier wording disagree, this amendment wins unless Amendment 2 supersedes it.** The affected sections have been rewritten to match, and §28 is the decision register. Status is unchanged: EPIC-011E is **Planned**, EPIC-011D remains Verified, EPIC-011 remains In Progress.
 
 | Item | Lock or clarification | Applied in |
 |---|---|---|
@@ -21,7 +21,7 @@ Owner decisions D1 to D6 are **locked**. D7 remains the only open owner decision
 | D4 | A project or task referenced by **any** `TimeEntry` cannot be hard-deleted; historical context is never nulled | §16, §23, §29 |
 | D5 | Minimal checklist authoring (add, remove) is in scope for managers/admin; completion stays a native checkbox | §14, §23, §24 |
 | D6 | Task time panel: own time to the viewer; all users' time only with `time.view_all` | §5, §11, §23 |
-| D7 | Member eligibility: **owner decision pending**; live-domain finding and recommendation in §28 | §28 |
+| D7 | Member eligibility was still open at Amendment 1; **resolved as option B by Amendment 2**: only `projects.admin` may add/remove members or assign member roles | §5, §6, §16, §23, §28, §29 |
 | Status | Board column is authoritative for board tasks; `Task.status` for standalone/ticket tasks; no dual write | §15 |
 | Drag | Move menu is the canonical keyboard/mobile path; drag is pointer-only with no focusable drag control | §9, §10 |
 | Spike | `router.optimistic()` is provisional until WP0 proves the installed behavior; fallback holds a move descriptor, never a board copy | §8, §29 |
@@ -32,7 +32,7 @@ Owner decisions D1 to D6 are **locked**. D7 remains the only open owner decision
 
 | # | Finding | Consequence and resolution |
 |---|---|---|
-| C1 | D1 tightens current behavior: `move`, `store`, `update`, `destroy` authorize `view`, the Blade board shows *Add task* and drag to every member, and EPIC-005 story 005-02 says a *project member* wants to "visualize and manage tasks". No separate task permission exists, and every existing task test acts as `operator`, so nothing proves member-level create/move was deliberate | Implemented as locked. Plain members (typically client users) get a **read-only board** plus comments and checklist toggling. Recorded as an accepted behavior change; the Blade views hide the controls in WP1 so the interim UI never offers a forbidden action |
+| C1 | D1 tightens current behavior: `move`, `store`, `update`, `destroy` authorize `view`, the Blade board shows *Add task* and drag to every member, and EPIC-005 story 005-02 says a *project member* wants to "visualize and manage tasks". No separate task permission exists, and every existing task test acts as `operator`, so nothing proves member-level create/move was deliberate | Implemented as locked. Plain members (typically client users) get a **read-only board** plus comments and checklist toggling. Recorded as an accepted behavior change; the Blade views hide the controls in WP1 so the interim UI never offers a forbidden action, and WP9 corrects EPIC-005's stale wording |
 | C2 | D2 contradicts the documented tenant matrix that still says the project boundary is "project membership **or linked company**" (EPIC-010B table, ADR-005, `rbac-design.md`, `database-schema.md`) and the create/edit copy ("grant their organization members visibility") | Behavior follows the lock. WP9 adds corrective notes to those documents; WP3 corrects the UI copy. `projects.view_org` and `tasks.view_org` become inert for project rows; they stay in the catalogue and role defaults untouched |
 | C3 | D4 cannot be guaranteed by application code alone: `time_entries.project_id/task_id` are `nullOnDelete`, so a race (timer started between check and delete) or a DB-level cascade (`projects.created_by` and `tasks.project_id` cascade) would silently null history | The plan adds one additive, reversible FK-hardening migration (`restrictOnDelete`) as a backstop. This **supersedes the earlier "no schema changes" decision (T7)** |
 | C4 | Tickets have no delete route and `DevSeeder` seeds no tickets (EPIC-011D, Post-Review Hardening Notes, *Browser-test data hygiene*, records why the Blade-tracker E2E used a throwaway project). The earlier plan to re-point that test at a ticket page would leave undeletable fixtures | §21 and WP7 replace it with an idempotent seeded fixture ticket; §21 and WP3 also fix the 011D multi-timer test that treats `/projects` as a Blade document |
@@ -42,6 +42,33 @@ Owner decisions D1 to D6 are **locked**. D7 remains the only open owner decision
 | C8 | `TicketPolicy::view` is owner-or-operator only, while the ticket list and `/tasks?view=org` include same-company tickets | Ticket-derived task rows keep their current list behavior but render no link the ticket policy would deny; flagged for EPIC-011F |
 
 ---
+
+## Amendment 2: D7 Resolution and Final Implementation Clarifications (2026-09-21)
+
+All owner decisions D1 through D7 are now **locked**. D7 is resolved as **option B**. There is no remaining product decision blocking implementation. **Where Amendment 2 conflicts with Amendment 1 or later section text, Amendment 2 wins.** The body and decision register below have been updated so implementation does not need to branch on an unresolved member-eligibility policy.
+
+| Item | Final rule | Applied in |
+|---|---|---|
+| D7 | **Only `projects.admin` may add/remove project members, change project-member roles, or provide initial extra members during project creation.** A non-admin project manager retains every other `ProjectPolicy::manage` capability but cannot mutate membership | §2, §5, §6, §16, §23, §28, §29, §30 |
+| Member data | Only an actor allowed to manage membership receives the candidate-user directory. Non-admin project managers receive no `memberCandidates` prop and no candidate emails; existing membership is rendered read-only from a minimal `{id,name,role,isOwner}` DTO | §5, §6, §16, §23 |
+| Authorization | Add a dedicated server authorization boundary for membership management (recommended: `ProjectPolicy::manageMembers`) that returns true only for `projects.admin`. `projects.members.sync` uses it. `projects.store` remains available to normal project managers, but a non-admin request that supplies extra `members` is refused rather than silently ignored | §2, §6, §16, §23 |
+| D1 docs | D1 is an intentional product change even though EPIC-005 previously said a project member manages tasks. WP9 corrects EPIC-005 so current product documentation no longer contradicts the manager-only structural-mutation rule | §4 (C1), §29, §30 |
+| C5 | `time.view_own` remains permission-model debt. EPIC-011E does not start enforcing or redefining it; D6 continues to use only `time.log` and `time.view_all` | §3.4, §11, §27 |
+| C6 | The nested-form issue must be characterized in a real browser before being described as browser-confirmed. Whether or not the destructive behavior reproduces, the invalid nested form is removed in WP1 and covered by a structural regression test that runs on PHP 8.3 | §4 (S2), §23, §29 |
+| Done tasks | Done-column project tasks are excluded from timer-context options **server-side** through the kind-aware status contract; React filtering is never the enforcement boundary | §15, §16, §23 |
+| Drag accessibility | The pointer drag affordance itself remains outside the keyboard/accessibility tree; the Move menu is the canonical keyboard, assistive-technology, and mobile movement operation | §9, §10 |
+| Branch gate | Planning documentation is committed first; implementation starts only from a dedicated EPIC-011E branch based on the verified EPIC-011D state, not from a branch named for EPIC-011D | §29 |
+
+### D7-B operational consequences
+
+- `projects.admin` may select any existing `users` row as a project member because the current user model has no active/disabled lifecycle state. This is an administrative directory operation, not a new tenant-derived eligibility rule.
+- Non-admin project managers do **not** receive the portal user directory, even if React would hide the controls. Data minimization is part of the authorization contract.
+- On project create, the creator is still attached automatically as manager by the existing service. A non-admin manager may create a project but may not add other initial members. An administrator may provide initial members.
+- On project edit, non-admin managers see the current member list read-only (name, role, owner marker) so the page remains understandable, but they receive no candidate list, email directory, role controls, add/remove controls, or member-sync form.
+- `projects.members.sync` is administrator-only. Existing project membership still controls visibility through `ProjectPolicy::view`; D7 does not alter project visibility.
+- Assignment eligibility remains separate: a project task may be assigned only to an existing member of that project (A3). D7 governs who may change project membership, not who may be assigned once already a member.
+- Delegated member management for ordinary project managers is deferred until the product has a canonical project-member eligibility model. Organization membership and company links are **not** repurposed to invent that model in EPIC-011E.
+
 
 ## 1. Goal
 
@@ -91,10 +118,10 @@ All 22 routes below were verified against `php artisan route:list` on the live r
 | Method | URI | Route name | Authorization and change in this epic |
 |---|---|---|---|
 | GET | `/projects/{project}` | `projects.show` | Unchanged: `view`, redirects to `projects.board` |
-| POST | `/projects` | `projects.store` | Unchanged authorization; validation hardened; initial members per D7 (pending) |
+| POST | `/projects` | `projects.store` | Unchanged project-create authorization. Creator remains manager automatically. **D7-B:** only `projects.admin` may submit additional initial `members`; a non-admin request that supplies them is refused |
 | PUT | `/projects/{project}` | `projects.update` | Unchanged |
 | DELETE | `/projects/{project}` | `projects.destroy` | Manager; **blocked when any TimeEntry references the project or any of its tasks (D4)** |
-| PUT | `/projects/{project}/members` | `projects.members.sync` | Eligibility per D7 (**owner decision pending**; recommended interim: `projects.admin` only) |
+| PUT | `/projects/{project}/members` | `projects.members.sync` | **D7-B:** `projects.admin` only, via a dedicated membership-management authorization boundary. Candidate IDs must be existing users; roles remain `member\|manager` |
 | PUT | `/projects/{project}/companies` | `projects.companies.sync` | Unchanged (already tenant-validated); metadata only (D2) |
 | POST | `/projects/{project}/tasks` | `projects.tasks.store` | **Manager (D1).** Column, milestone, assignee scoped to the project; append under column lock |
 | PUT | `/projects/{project}/tasks/{task}` | `projects.tasks.update` | **Manager (D1).** Covers fields, assignee, milestone; scoped IDs; milestone added to the UI |
@@ -201,7 +228,7 @@ Severity: **H** = fix before any UI conversion, **M** = fix in this epic, **L** 
 | A3 | M | `assignee_id` and `members.*.user_id` accept any user ID. An assignee outside the project sees the task in `/tasks`, may start timers on it (`AccessibleTimeContext::canUseTask` grants assignees), and its label/link appears in their timer bar | `ProjectTaskController.php:35,62`; `TaskController.php:47`; `ProjectController.php:64,138`; `AccessibleTimeContext.php:47` |
 | A4 | M | **Resolved by lock D1.** Task create/update/delete/move/comment/checklist all authorize `view` (membership) only, although the Blade UI shows edit and delete to managers. Target: structural mutations require `manage`; comment and checklist toggle stay `view` (C1) | `ProjectTaskController.php:29,56,75,85,100,115`; `tasks/show.blade.php:155` |
 | A5 | M | **Resolved by lock D2 (queries, not policy).** The index lists company-linked projects and the create/edit copy promises org visibility, but `ProjectPolicy::view` denies non-members, so those links 403. `/tasks?view=org` rows link to member-only task pages and owner-only tickets. Fix: remove the company branch from the index, intersect the org tab with policy-visible projects, and render no link the destination policy would deny. `ProjectPolicy` is not changed | `ProjectController.php:24-34`; `ProjectPolicy.php:15-22`; `create.blade.php:86`; `TaskController.php:26-31` |
-| A6 | M | Create/edit expose every user's name and email to any `projects.manage` holder, and member/assignee IDs are unscoped. **Owner decision D7 pending** (§28); the member-eligibility fix is gated on it, the assignee fix (project members only) is not | `ProjectController.php:46,95` |
+| A6 | M | Create/edit expose every user's name and email to any `projects.manage` holder, and member/assignee IDs are unscoped. **Resolved by D7-B:** only `projects.admin` receives the candidate-user directory or may mutate membership; non-admin managers receive a minimal read-only member list. Assignee eligibility remains project-members-only (A3) | `ProjectController.php:46,95` |
 | A7 | M | Standalone `tasks.store` has no authorization beyond `auth`, and accepts any assignee | `TaskController.php:42-59` |
 | A8 | M | **Resolved by lock D4.** Deleting a project or task nulls `time_entries.project_id/task_id` by FK, including billed, invoice-linked, and running entries. Target: any referencing TimeEntry blocks the hard delete, with a friendly domain error and an FK `restrictOnDelete` backstop (C3) | `2026_03_26_120007_update_time_entries_task_id_fk.php`; `create_time_entries_table.php:21` |
 | A9 | L | Route middleware requires `projects.manage` while `ProjectPolicy` also admits `projects.admin`; a role with admin but not manage is blocked at the route. Latent (operator holds both). **Pinned by a characterization test and left unchanged in 011E**; new structural task routes use the policy only | `routes/web.php:125,133,152` |
@@ -211,7 +238,7 @@ Severity: **H** = fix before any UI conversion, **M** = fix in this epic, **L** 
 | # | Sev | Defect | Evidence |
 |---|---|---|---|
 | S1 | M | **DOM-injection candidate; fixed in WP1 while Blade still works.** Member option markup is built with template strings (`${u.name} &lt;${u.email}&gt;`) assigned to `innerHTML`. Names are user-controlled (profile), so a name containing markup such as `</select>…` can break out of the select in a manager's browser. Not exercised end to end; unescaped by construction. WP1 replaces string-building with a server-rendered, Blade-escaped `<template>` row | `create.blade.php:164-165`; `edit.blade.php:186-187` |
-| S2 | **H** | **Nested form on the edit page; fixed in WP1 while Blade still works.** The delete `<form>` sits inside the update `<form>`. HTML parsing ignores the inner form tag, so both buttons are owned by the outer update form and submit two `_method` fields (`PUT`, then `DELETE`). PHP keeps the last value and Laravel honours `_method`, so *Save Changes* submits `DELETE /projects/{id}` with no confirmation (the `onsubmit` confirm was on the discarded inner form). Verified: HTML5 tree construction with PHP 8.4 `Dom\HTMLDocument` places both buttons and both `_method` inputs under the outer form; `parse_str` keeps `DELETE`; `Kernel.php:142` enables `_method` override. **Not reproduced in a real browser** (host Chromium cannot launch in this WSL environment: missing `libglib`). WP1 reproduces it in Playwright, fixes it in the Blade view (delete form moved outside the update form), and adds a Pest structural regression test that does not use the PHP 8.4 DOM API (C6) | `edit.blade.php:23,83-92` |
+| S2 | **H** | **Invalid nested form on the edit page; fixed in WP1 while Blade still works.** The delete `<form>` sits inside the update `<form>`. HTML5 tree construction with PHP 8.4 `Dom\HTMLDocument` indicates the inner form tag is discarded and both `_method` inputs become associated with the outer form; `parse_str` keeps the later `DELETE`, making destructive submission a credible risk. **This destructive behavior is parser-confirmed but not yet browser-confirmed** because host Chromium cannot launch in this WSL environment (`libglib` missing). WP1 first reproduces the legacy page in Playwright. If reproduced, the browser behavior becomes a pinned regression; if it does not reproduce, the invalid nested markup is still removed but is documented as a potential rather than browser-observed defect. In both cases the delete form moves outside the update form and a PHP-8.3-compatible structural regression test proves forms are not nested | `edit.blade.php:23,83-92` |
 
 ### 4.3 Data integrity and correctness
 
@@ -257,7 +284,7 @@ Rules (same discipline as EPIC-011D):
 
 - Page props are built by dedicated presenter classes, never by serializing models. No `toArray()` of an Eloquent model reaches a page.
 - Field names are `camelCase`. Date-only fields (`dueDate`, `startDate`, `targetDate`) are `YYYY-MM-DD` strings and are never timezone-converted in the browser. Timestamps are ISO-8601 UTC and are formatted with `Intl` on the client.
-- Users are exposed as `{ id, name }`. Email appears only in member-management rows (as today) and only within the scope decided by D7.
+- Users are exposed as `{ id, name }` by default. Under D7-B, email appears only in the administrator-only `MemberCandidate` directory used to disambiguate users during member management. Non-admin project managers receive no candidate directory and no candidate emails.
 - Derived values (`overdue`, `status`, `abilities`) are computed by the server so React never re-implements a rule. **Abilities are display hints only.** Every route still authorizes (§16).
 - Presenters use eager loading and aggregate counts (§25); a presenter must not trigger a query per row.
 
@@ -287,19 +314,24 @@ The listed set is exactly the set `ProjectPolicy::view` allows (administrators: 
 
 ```ts
 type CompanyOption = { id: number; name: string };
-type MemberCandidate = { id: number; name: string; email: string };   // pool defined by D7 (pending)
+type ProjectMemberRef = { id: number; name: string; role: 'member' | 'manager'; isOwner: boolean };
+type MemberCandidate = { id: number; name: string; email: string };   // administrators only
 
-create props: { memberCandidates: MemberCandidate[]; companies: CompanyOption[]; abilities: { editMembers: boolean } }
+create props: {
+    companies: CompanyOption[];
+    abilities: { editMembers: boolean };
+    memberCandidates?: MemberCandidate[];   // present only when editMembers === true
+}
 edit props:   {
     project: { id; name; description; startDate; targetDate; status; budget: string | null };
-    members: (MemberCandidate & { role: 'member' | 'manager'; isOwner: boolean })[];
-    memberCandidates: MemberCandidate[];
+    members: ProjectMemberRef[];             // read-only DTO is safe for managers who cannot edit membership
+    memberCandidates?: MemberCandidate[];    // administrators only; omitted otherwise
     companies: CompanyOption[]; linkedCompanyIds: number[];
     abilities: { delete: boolean; editMembers: boolean };
 }
 ```
 
-`abilities.editMembers` and `memberCandidates` are shaped by D7 and stay unspecified beyond this until the owner decides; under the recommended interim (option B) `editMembers` is true only for `projects.admin` and `memberCandidates` is empty for everyone else. `budget` stays a decimal string end to end.
+D7-B makes `abilities.editMembers` true only for `projects.admin`. The candidate-user directory is **omitted**, not merely hidden or populated as an empty client-side control, for every other actor. Existing membership is still shown read-only to a non-admin project manager using `ProjectMemberRef`, which carries no email. `budget` stays a decimal string end to end.
 
 ### `projects/board`
 
@@ -403,13 +435,13 @@ props: { tasks: Paginated<TaskRow>; view: 'mine' | 'org'; canViewOrg: boolean }
 
 ### Create (`projects/create`)
 
-One Inertia `useForm` holds `name, description, start_date, target_date, status, budget, companies: number[]`, and `members: { key: string; user_id: number | ''; role }[]`. `key` is a client-only stable row identity (`crypto.randomUUID()`), removed by `transform` before submit, so removing a middle row cannot re-bind React state to the wrong row (the Blade version re-indexes names by a monotonically growing counter).
+One Inertia `useForm` always holds `name, description, start_date, target_date, status, budget, companies: number[]`. When `abilities.editMembers` is true (`projects.admin` only under D7-B), it also holds `members: { key: string; user_id: number | ''; role }[]`. `key` is a client-only stable row identity (`crypto.randomUUID()`), removed by `transform` before submit, so removing a middle row cannot re-bind React state to the wrong row (the Blade version re-indexes names by a monotonically growing counter). A non-admin project manager sends no `members` field; if a forged request supplies extra members anyway, the server refuses it rather than silently discarding it.
 
 - Submit `POST projects.store`; server validation errors map to `errors['members.0.user_id']` etc. and render beside the offending row. On success the server redirects to the board and the flash region shows the message.
-- Member rows are controlled `<select>`s (no `innerHTML`; S1 disappears structurally). Users already chosen are excluded from other rows' options, and the server still de-duplicates.
+- For `projects.admin`, member rows are controlled `<select>`s (no `innerHTML`; S1 disappears structurally). Users already chosen are excluded from other rows' options, and the server still de-duplicates. Non-admin project managers receive no candidate-user directory and no member-entry controls.
 - The actor is shown as a locked *Owner / Manager* row, matching `ProjectService::create` and the "you will be added automatically" copy.
 - Company checkboxes render inside a `<fieldset><legend>` with corrected, informational copy: linking a company records the client relationship and **does not grant its organization members access to the project** (D2).
-- **Member editing is gated by `abilities.editMembers` (D7 pending).** WP3 does not build the member UI before the owner answers D7. Under the recommended interim (B) it is editable for `projects.admin` and a read-only list for other managers.
+- **Member editing is gated by `abilities.editMembers` (D7-B).** It is editable only for `projects.admin`. Other project managers see only the creator/owner and current member list as read-only names and roles; they receive no `memberCandidates` prop or candidate emails.
 - Native `<select>` and `<input type="date">` are kept (consistent with EPIC-011D); no combobox or date-picker library.
 
 ### Edit (`projects/edit`)
@@ -420,7 +452,7 @@ Three **independent** forms with their own dirty state, processing state, and er
 |---|---|---|
 | Details | `PUT projects.update` | name, description, dates, status, budget. `preserveScroll` |
 | Linked companies | `PUT projects.companies.sync` | Sends `companies: []` when all are unchecked (`present\|array`) |
-| Members | `PUT projects.members.sync` | Owner row locked as manager and not removable; server re-adds the creator as manager regardless. Who may edit and who is offered as a candidate: D7 |
+| Members | `PUT projects.members.sync` | **D7-B:** rendered as a form only for `projects.admin`. Owner row locked as manager and not removable; server re-adds the creator as manager regardless. Other project managers see the same membership as a read-only list and receive no candidate directory |
 
 Delete lives in a *Danger zone* section using the existing `ConfirmationDialog` (replacing the nested form and native `confirm()`), sends `DELETE projects.destroy`, and shows the D4 guard result ("This project has recorded time and cannot be deleted.") as a form error rather than a 500; the existing `archived` status is the available alternative. Three forms rather than one aggregate endpoint keeps the migration free of backend contract changes and avoids partial-save ambiguity.
 
@@ -785,7 +817,7 @@ React visibility is never authorization. Every mutation and page route authorize
 | View board, task page, milestones | Admin, member | Unchanged |
 | Create project; edit/delete project; companies; milestone writes | Route `can:projects.manage` and policy `manage` | Unchanged; A9 pinned |
 | Delete project | `manage` | `manage` **and** no TimeEntry references the project or its tasks (D4) |
-| Members sync and candidate list | `manage`; all users offered; IDs unscoped | **Owner decision D7 pending (§28).** Until decided: characterized only |
+| Members sync and candidate list | `manage`; all users offered; IDs unscoped | **D7-B:** `projects.admin` only. Non-admin managers get no mutation form and no candidate directory; existing members are read-only. Candidate IDs must reference existing `users` rows |
 | Create task, edit fields, delete, assign, milestone, move, reorder, checklist add/remove | `view` | **`manage` (D1)**; delete also needs no TimeEntry reference (D4) |
 | Comment; checklist toggle | `view` | **Unchanged** (member or admin) |
 | Standalone `POST /tasks` | Any authenticated user; any assignee | Any authenticated user; assignee is the actor or none (D3) |
@@ -795,6 +827,7 @@ React visibility is never authorization. Every mutation and page route authorize
 ### Route authorization rules
 
 - Structural task routes call `$this->authorize('manage', $project)`. They add no `can:projects.manage` middleware (it would exclude a role holding `projects.admin` alone, which the policy admits).
+- Membership mutation is deliberately stricter than ordinary project management: `projects.members.sync` uses a dedicated membership-management authorization boundary (recommended `ProjectPolicy::manageMembers`) that returns true only for `projects.admin`. If the route currently inherits `can:projects.manage`, remove that middleware from the member-sync route so an actor holding `projects.admin` is not accidentally rejected by the weaker-but-different permission gate; the policy/ability is the sole membership-mutation authority. Project creation remains available through the existing create authorization, but extra initial `members` are prohibited unless the actor also satisfies that membership-management boundary.
 - Comment and checklist-toggle routes keep `authorize('view', $project)`.
 - The 404 for a child that does not belong to the route's project is unchanged and evaluated after authorization, so an unauthorized actor learns nothing about which IDs exist.
 
@@ -830,7 +863,7 @@ A3 and A1 stop new cross-project data, but pre-existing rows may exist. WP1 deli
 
 ### Tenant summary
 
-Company links are validated by the existing `AccessibleCrmCompany` rule and are **metadata only**: they grant no project visibility (D2), are shown as informational in the UI, and remain usable for reporting/context. Members and assignees are project-scoped (A3), with member eligibility pending D7. Child records (tasks, milestones, columns, comments, checklist items) are always resolved through the route's project, 404 on mismatch, and now also validated on write. Documentation that describes "project membership or linked company" as the project boundary is corrected in WP9 (C2).
+Company links are validated by the existing `AccessibleCrmCompany` rule and are **metadata only**: they grant no project visibility (D2), are shown as informational in the UI, and remain usable for reporting/context. Assignees are project-scoped (A3). Under D7-B, only `projects.admin` may alter the project-member set, and only that actor receives the candidate-user directory. Child records (tasks, milestones, columns, comments, checklist items) are always resolved through the route's project, 404 on mismatch, and now also validated on write. Documentation that describes "project membership or linked company" as the project boundary is corrected in WP9 (C2).
 
 ---
 
@@ -973,8 +1006,9 @@ Existing baseline: 35 Pest tests, almost all acting as `operator`. They remain a
 
 | Area | Cases |
 |---|---|
-| **Actor-by-route authorization matrix** | One Pest dataset: every route in §2 × actors in §16 (guest, outsider, member, manager-role-without-permission, project manager, admin, non-member assignee). Structural task routes (store, update, destroy, move, checklist add, checklist remove): guest redirected, outsider/member/manager-role-without-permission/non-member assignee **403**, project manager and admin succeed. Comment and checklist toggle: member, project manager, admin succeed; outsider and non-member assignee 403. Page routes: member, manager, admin 200; outsider 403. `POST /tasks`: any authenticated user. Member-sync rows are added once D7 is answered; until then the current behavior is characterized. Authorization precedes 404 and the deletion guard |
+| **Actor-by-route authorization matrix** | One Pest dataset: every route in §2 × actors in §16 (guest, outsider, member, manager-role-without-permission, project manager, admin, non-member assignee). Structural task routes (store, update, destroy, move, checklist add, checklist remove): guest redirected, outsider/member/manager-role-without-permission/non-member assignee **403**, project manager and admin succeed. Comment and checklist toggle: member, project manager, admin succeed; outsider and non-member assignee 403. Page routes: member, manager, admin 200; outsider 403. `POST /tasks`: any authenticated user. Member-sync coverage is explicit under D7-B: only `projects.admin` succeeds; project manager, manager-role-without-permission, member, outsider, and non-member assignee are refused. `projects.store` remains available to a non-admin project manager when no extra members are supplied, but a forged non-empty `members` payload is refused. Authorization precedes 404 and the deletion guard. Authorization precedes 404 and the deletion guard |
 | **Visibility equivalence (D2)** | Property-style test: for a mix of member, non-member, company-linked, and admin scenarios, every project on the index page passes `ProjectPolicy::view` and every project the policy allows appears; company-linked non-member projects **never** appear and never gain access; `/tasks` rows never carry a `url` that the destination policy denies; index props contain no `creator`, email, or unlisted fields; `ProjectPolicy` source behavior is unchanged (existing policy tests still pass) |
+| **Member management (D7-B)** | `projects.admin` may sync members and receives `memberCandidates`; non-admin project managers may still create/edit projects but cannot sync members, change roles, or submit extra initial members. Their Inertia props omit `memberCandidates` entirely and existing membership contains name/role/owner only, with no email directory. Candidate IDs must exist; duplicate IDs and invalid roles are rejected; creator remains manager. Include an actor holding `projects.admin` without `projects.manage` to prove member-sync authorization is not accidentally coupled to the old route middleware (A9 on the edit page itself remains pinned) |
 | **Deletion with time history (D4)** | (1) unreferenced task and project delete succeed; (2) direct project time blocks project deletion; (3) task time blocks task deletion; (4) task time blocks the parent project's deletion; (5) billed entries remain untouched (same `project_id`, `task_id`, `billed`, invoice link) after a blocked delete; (6) unbilled entries remain untouched; (7) a running timer also blocks; (8) the response is a validation error on `delete`, not a 500 or `QueryException`; (9) authorization is intact: outsider, member, and manager-role-without-permission get 403 before the guard runs and learn nothing; a manager of a different project gets 403; (10) FK backstop: `information_schema` shows `RESTRICT` on both `time_entries` FKs and a raw DB delete of a referenced project or task fails; (11) migration is reversible |
 | **Task structural integrity** | Create in own column; **foreign column, foreign milestone, non-member assignee, non-member assignee on update: 422**; update/delete by every actor; 404 on project mismatch; title/description limits; ex-member assignee shown in options |
 | **Move and ordering** | Cross-column, within column up/down, insert at 0/middle/end, position clamped; positions dense `0..n-1` after move, create, and delete; legacy gaps/duplicates normalize on first move; foreign column 422; foreign task 404; non-manager 403; deleted task/column 404; no-op idempotent |
@@ -1007,7 +1041,7 @@ Behavior, not markup snapshots:
 | Server reconciliation | Success replaces optimistic state; failure (422/403/404/500/offline) restores prior columns, shows the alert, reloads where specified; controls disabled while pending; a second move is refused; the board never holds a copy of `columns` (a test re-renders with new props and asserts the new props win) |
 | Announcements | Live-region text for success, failure, and drag start/over/end |
 | Quick-add | Open/close, one at a time, inline validation error, focus return, manager-only |
-| Project forms | Member rows: add, remove, keep row identity after removing a middle row, owner locked, duplicate exclusion, nested error mapping, no markup injection from names; member editing hidden per `abilities.editMembers` (D7); edit sections submit independently; delete dialog shows the D4 error |
+| Project forms | Administrator path: member rows add/remove, stable identity after middle-row removal, owner locked, duplicate exclusion, nested error mapping, no markup injection. Non-admin manager path: no member editor, no candidate list/email data, existing members rendered read-only. Edit sections submit independently; delete dialog shows the D4 error |
 | Milestone dialog | Focus trap, Escape, focus return, error display, prefill on edit |
 | Task detail | Edit form (manager-only) with milestone field; ex-member assignee option; delete dialog with the D4 error; member view has no edit/delete/add-remove controls but keeps comment and toggle |
 | Comments | Submit, reset, focus, counter, literal rendering of `<script>` text |
@@ -1025,7 +1059,7 @@ Behavior, not markup snapshots:
 Critical flows only, in `tests/Browser/projects-migration.spec.ts` (plus the WP1 Blade regressions in a temporary spec deleted with the Blade views). The suite runs against the shared development database, so fixtures follow the EPIC-011D hygiene rules: create through the real UI or HTTP endpoints, prefix names `E2E`, register the project with `E2eCleanup.trackProject` as soon as its URL is known, and delete through the application's own endpoints. **Because of D4, teardown must delete every time entry that references the fixture before deleting the project** (already the case: entries first, project second); a failed entry deletion now surfaces as a blocked project delete and is reported by the fixture.
 
 1. **Index → board with a persistent timer.** Start a timer, open Projects and a board from the navigation, assert the running timer bar and elapsed time never reset, then follow Milestones and task links.
-2. **Create project (React form).** Add a member row where D7 allows it, submit, land on the board with the flash message. A validation error renders next to the field.
+2. **Create project (React form).** As `projects.admin`, add a member row, submit, and land on the board with the flash message; a validation error renders next to the field. A non-admin project-manager path confirms project creation still works without member controls and that no candidate-user directory is present.
 3. **Edit-page safety regression.** Change the name, click *Save changes*, assert the project still exists with the new name (guards S2). Delete via the dialog removes it; a project with recorded time shows the D4 error and remains. (WP1 runs the Blade form version first; WP3 re-runs it against React.)
 4. **Mouse drag.** Drag a card by its handle to another column, reload, assert persistence and column counts; reorder within a column.
 5. **Keyboard move.** Using only the keyboard: focus Move, choose a column, assert the card moved, focus returned, and the live-region text; move up/down within a column.
@@ -1069,13 +1103,13 @@ Not automated end to end: every CRUD field, every validation rule, permission pe
 
 ## 27. Out of Scope
 
-Column creation/rename/reorder/delete and per-project workflows; task dependencies UI/validation; Gantt, burn-down, project dashboards, and reports; CSV/PDF export (EPIC-012); attachments, labels, rich text/Markdown; comment edit/delete, mentions, notifications, internal-only comments; watchers and subscriptions; live updates, polling, or real-time collaboration; bulk task operations; moving a task between projects; project templates; **project or task archiving semantics beyond the existing project `archived` status**; **any company-derived project access or new project-visibility rule (D2)**; **edit, delete, complete, comment, or checklist for standalone tasks (D3)**; **checklist groups, templates, ordering, due dates, assignees, nesting, and rename (D5)**; **a second time-report permission model (D6)**; **a member-eligibility policy beyond the D7 decision**; saved views, search, and filters on the projects and tasks lists; new project or task fields; changing time-entry semantics; ticket-to-task creation; dropping `projects.client_id` or `tasks.status`; redesigning the permission catalogue or role seeding (including the now-inert `projects.view_org` for project rows); changing the ticket module's own list/detail visibility (EPIC-011F); TanStack/Redux/Zustand; SSR; changing EPIC-011D timer or allocation behavior beyond the additive `context.id` and the `contextOptions` fix.
+Column creation/rename/reorder/delete and per-project workflows; task dependencies UI/validation; Gantt, burn-down, project dashboards, and reports; CSV/PDF export (EPIC-012); attachments, labels, rich text/Markdown; comment edit/delete, mentions, notifications, internal-only comments; watchers and subscriptions; live updates, polling, or real-time collaboration; bulk task operations; moving a task between projects; project templates; **project or task archiving semantics beyond the existing project `archived` status**; **any company-derived project access or new project-visibility rule (D2)**; **edit, delete, complete, comment, or checklist for standalone tasks (D3)**; **checklist groups, templates, ordering, due dates, assignees, nesting, and rename (D5)**; **a second time-report permission model (D6)**; **delegated member management or a tenant-derived member-eligibility model beyond D7-B**; saved views, search, and filters on the projects and tasks lists; new project or task fields; changing time-entry semantics; ticket-to-task creation; dropping `projects.client_id` or `tasks.status`; redesigning the permission catalogue or role seeding (including the now-inert `projects.view_org` for project rows); changing the ticket module's own list/detail visibility (EPIC-011F); enforcing or redefining the currently-unused `time.view_own` permission; TanStack/Redux/Zustand; SSR; changing EPIC-011D timer or allocation behavior beyond the additive `context.id` and the `contextOptions` fix.
 
 ---
 
 ## 28. Decision Register
 
-### Locked owner decisions (Amendment 1, 2026-09-21)
+### Locked owner decisions (Amendments 1–2, 2026-09-21)
 
 | # | Decision | Where implemented |
 |---|---|---|
@@ -1085,26 +1119,40 @@ Column creation/rename/reorder/delete and per-project workflows; task dependenci
 | D4 | A Project or Task referenced by any TimeEntry cannot be hard-deleted (task: task time; project: direct project time or any task's time). Billed and unbilled alike. Domain error, not a DB exception. EPIC-010C immutability stays. No new archiving | §16, §23 |
 | D5 | Minimal checklist authoring (add, remove) for manager/admin; toggle keeps its current actors; native checkbox controls; no groups, templates, ordering, dates, assignees, nesting | §14, §23, §24 |
 | D6 | Task time panel: own time to the viewer; all users' time only with `time.view_all`; project-manager status alone grants nothing; no new permission model | §5, §11, §23 |
+| D7 | **Option B:** only `projects.admin` may add/remove members, change member roles, or provide extra initial members. Non-admin project managers receive no candidate-user directory and see membership read-only | §2, §5, §6, §16, §23, §29 |
 
-### D7: Project member eligibility (the only open owner decision)
+### D7: Project member eligibility — resolved as option B
 
-**Live-domain finding.** There is a trustworthy *organization membership* relationship (`organization_members`, operator-curated, the basis of the 010B tenant scopes), but **no relationship that defines a "project member pool"**:
+**Owner decision (Amendment 2): B.** Only `projects.admin` may add or remove project members, change project-member roles, or provide extra initial members during project creation until the product has a canonical project-member eligibility model.
+
+**Why B is the current contract.** There is a trustworthy *organization membership* relationship (`organization_members`, operator-curated, the basis of the 010B tenant scopes), but **no relationship that defines a project-member pool**:
 
 - `Project` has no organization; the only project↔organization path is the company link, which D2 declares metadata and must not gain authority through eligibility either.
-- Staff and operators are not required to belong to any organization, so "users sharing an organization with the acting manager" is empty for a staff manager and says nothing about the client users a manager legitimately adds.
+- Staff and operators are not required to belong to any organization, so "users sharing an organization with the acting manager" would exclude valid org-less staff managers and still would not define which client users belong in a particular project.
 - `organization_members.role` (`admin|member`) says nothing about project eligibility.
-- No user lifecycle flag exists (no active, disabled, or deleted state), so "active portal user" reduces to "a `users` row exists".
+- No user lifecycle flag exists (no active, disabled, or deleted state), so for the administrator directory "eligible existing portal user" currently means an existing `users` row.
 - Non-admin project managers exist only via custom roles or direct grants; the seeded `user` role lacks `projects.manage`.
 
-**Options against the current data model**
+**Rejected alternatives for this epic**
 
-| Option | Supported today? | Notes |
-|---|---|---|
-| **A.** `projects.admin` adds any active portal user; other managers add only from a canonical same-organization pool | **Partially.** The admin branch is implementable ("active" = exists). The manager branch can be expressed as "shares at least one `organization_members` organization with the actor", but that is a *new rule*, not an existing canonical pool: it excludes org-less staff managers, ignores project scope, and needs the owner to define it | Would encode an unproven eligibility model into policy |
-| **B.** Only `projects.admin` may add or remove members (including role changes and initial members on create) until a canonical eligibility model exists | **Yes, fully.** One gate on `projects.members.sync`, on `members` in `projects.store`, and on `memberCandidates`. Non-admin managers keep every other project-management power; existing members are unaffected; the creator remains manager | Secure interim. Practical impact is small because only custom-role managers are affected |
-| **C.** Managers may add any active portal user across the portal | Yes (it is today's behavior), **not chosen** | Exposes the full user directory (name and email) and allows cross-tenant membership |
+| Option | Why not selected |
+|---|---|
+| **A.** Admin adds any user; ordinary manager adds from a same-organization pool | The manager half would invent a new organization-derived eligibility rule, conflicts with org-less staff managers, and has no canonical project scope |
+| **C.** Ordinary managers add any portal user | Exposes the global user directory and permits cross-tenant membership without a product rule |
 
-**Recommendation: B** as the secure interim until the owner defines an eligibility model (which would then be a normal follow-up to unlock A). This document does **not** apply B. **No default is applied:** the member-eligibility item of WP1 and the member-editing UI of WP3 wait for the owner's choice. Everything else in WP1 proceeds, and the characterization tests pin today's member-sync behavior in the meantime. Assignee eligibility is unaffected (project members only).
+**Implementation contract**
+
+1. Add a dedicated membership-management authorization boundary (recommended `ProjectPolicy::manageMembers`) whose current rule is `projects.admin`.
+2. `projects.members.sync` requires that ability. `ProjectPolicy::manage` alone is insufficient. The route must not also require `can:projects.manage`; membership authorization is intentionally `projects.admin`-specific.
+3. `projects.store` remains available to actors allowed to create projects. The creator is attached automatically as manager. Extra submitted `members` are allowed only when the actor may manage membership; an unauthorized non-empty members payload is refused rather than ignored.
+4. `memberCandidates` is computed and serialized **only** when the actor may manage membership. It is omitted entirely from all other page props. The admin candidate DTO is minimal `{id,name,email}`.
+5. Existing members are rendered to non-admin project managers as a read-only minimal `{id,name,role,isOwner}` list, with no candidate emails or add/remove/role controls.
+6. Administrators may choose any existing user row. D7 does not invent active/disabled semantics that the user model does not have.
+7. Project-task assignee eligibility remains project-members-only and is unchanged by D7.
+8. Existing membership continues to govern `ProjectPolicy::view`; D7 changes who may edit membership, not who may view once already a member.
+9. Delegated project-member management is deferred until a future design defines a canonical eligibility pool. Organization membership and company links are not repurposed for that purpose.
+
+**Privacy requirement:** tests must prove a non-admin project manager cannot obtain the candidate-user directory by inspecting the Inertia payload, not merely that the React controls are hidden.
 
 ### Decisions taken in this plan (override only with a reason)
 
@@ -1128,12 +1176,13 @@ Column creation/rename/reorder/delete and per-project workflows; task dependenci
 
 **Backend hardening (WP1) precedes every React route flip.** The frontend migration must not mask backend correctness issues.
 
-### WP0: Decisions, environment, and spikes
-- Ask the owner for **D7** (the only open decision). Confirm nothing else is pending.
+### WP0: Branch gate, environment, and spikes
+- **No owner decisions remain open.** D1 through D7 are locked; D7-B is the membership contract in Amendment 2.
+- Commit the planning documentation first and confirm the verified EPIC-011D commits are in the implementation base. Start/switch to a dedicated EPIC-011E implementation branch; do not begin application work on a branch named for EPIC-011D.
 - Confirm the Playwright runner environment (host Chromium cannot start here: missing `libglib`).
 - **Optimistic-move spike** on a throwaway branch (spike code is deleted, results recorded in §8): prove items 1 to 8 of the spike gate against the installed `@inertiajs/core`/`react` 3.7.1 and the real endpoint. If any item fails or is awkward, adopt the `fetch` + `pendingMove` fallback and record why.
 - **dnd-kit spike:** handle activation, multi-container preview, empty-column drop, autoscroll in the horizontal region, `touch-action` on a phone viewport or real device, and React 19/Vite 8 behavior. **Packages are installed only on the throwaway branch;** the real install happens in WP6 with the version policy below.
-**Exit:** D7 answered or its gate acknowledged; spike results and any fallback selection written into §8 and §9.
+**Exit:** branch/base are correct; spike results and any fallback selection are written into §8 and §9.
 
 ### WP1: Characterize and harden the backend (Blade still works)
 Tests first (characterization, then the failing tests for each defect), then fixes, in this order of risk:
@@ -1144,9 +1193,9 @@ Tests first (characterization, then the failing tests for each defect), then fix
 5. **Ordering transaction and locking** (I1, I2): `ProjectService::moveTask`, create, and delete under column locks with dense positions; concurrency stress on MariaDB. `move` still returns `{ok:true}`.
 6. **Project/task deletion with TimeEntry provenance** (D4): service guard, validation error, Blade shows the error, plus the reversible FK `restrictOnDelete` migration and its tests.
 7. **Overdue-rule inconsistency** (I6) and **done-column timer-target behavior** (I3): kind-aware `Task::open()`/`done()`, `contextOptions` fix.
-8. **Nested project edit/delete form** (S2): reproduce in a browser, move the delete form outside the update form, add the Pest structural test.
+8. **Nested project edit/delete form** (S2): attempt reproduction against the legacy Blade page in Playwright before changing it. If reproduced, pin the destructive behavior; if not, record the parser finding as potential only. Either way, move the delete form outside the update form and add the PHP-8.3-compatible Pest structural test.
 9. **Member-name `innerHTML` XSS candidate** (S1): server-rendered escaped `<template>` member row, no client string-built markup, Pest escaping test and a hostile-name Playwright check.
-10. **Foreign member IDs** (A6): **D7-gated.** Only the parts independent of eligibility (existence, de-duplication, valid role) proceed now.
+10. **Membership management and foreign member IDs** (A6, D7-B): add the administrator-only membership authorization boundary; restrict `projects.members.sync` and initial extra members accordingly; serialize `memberCandidates` only for administrators; validate candidate existence, de-duplicate IDs, validate roles, and keep creator as manager. Add Inertia-prop privacy tests for non-admin managers.
 11. Checklist add/remove endpoints, idempotent `completed` on toggle, `TaskChecklistItemFactory`/`TaskCommentFactory` (D5).
 12. Blade D6 patch for the task-context branch of `x-time-tracker` (own time unless `time.view_all`); ticket context untouched.
 13. **Relevant query-count regressions** (P1 to P3): eager loading and aggregate counts; query-budget tests.
@@ -1158,7 +1207,7 @@ Tests first (characterization, then the failing tests for each defect), then fix
 **Exit:** `npm run check` green; Time page behavior unchanged.
 
 ### WP3: Projects index, create, edit
-Presenters, `projects/index|create|edit`, member-rows editor (**member editing per the D7 answer**), three-form edit page, delete dialog with the D4 error, informational company copy, `NavigationBuilder` and dashboard link flips, Pest `assertInertia` conversions, Vitest, delete three Blade views. **Re-point the 011D multi-timer test's *Projects* step to the Tickets index** (§21).
+Presenters, `projects/index|create|edit`, administrator-only member-rows editor (D7-B), read-only member list for non-admin managers, three-form edit page (members form present only for administrators), delete dialog with the D4 error, informational company copy, `NavigationBuilder` and dashboard link flips, Pest `assertInertia` conversions, Vitest, delete three Blade views. **Re-point the 011D multi-timer test's *Projects* step to the Tickets index** (§21).
 **Exit:** S1/S2 gone in React with browser regression; Playwright flows 2 and 3 pass.
 
 ### WP4: Milestones
@@ -1182,7 +1231,7 @@ Add `@dnd-kit/core`, `@dnd-kit/sortable`, and `@dnd-kit/utilities`; **pin exact 
 **Exit:** no dead org links; standalone surface unchanged; Pest and Vitest green.
 
 ### WP9: Cleanup, coexistence, and documentation
-Run the verification greps (§22); mark the parent inventory rows migrated; ADR-007 note (measured dnd-kit comparison, Move-menu rule, version policy); corrective notes for the D2 change in `EPIC-010B`, `ADR-005`, `rbac-design.md`, and `database-schema.md` (C2); update `docs/epics/README.md` status.
+Run the verification greps (§22); mark the parent inventory rows migrated; ADR-007 note (measured dnd-kit comparison, Move-menu rule, version policy); corrective notes for the D2 change in `EPIC-010B`, `ADR-005`, `rbac-design.md`, and `database-schema.md` (C2); correct EPIC-005's stale statement that a generic project member manages tasks so it reflects D1's manager-only structural mutations; record `time.view_own` as still-unenforced permission-model debt rather than wiring it in this epic; update `docs/epics/README.md` status.
 **Exit:** no dead scripts, views, or globals remain; no document still describes company link as a project boundary.
 
 ### WP10: Hardening and verification
@@ -1200,11 +1249,12 @@ Full Playwright suite including mixed navigation; mobile and responsive pass; ke
 **Locked decisions**
 - [ ] D1: every structural task mutation is refused for non-managers by the server, proven by the actor-by-route matrix; members retain comments and checklist toggling; the board is read-only for them
 - [ ] D2: the project index equals the set `ProjectPolicy::view` allows; no rendered link is one the destination policy denies; `ProjectPolicy` unchanged; no document describes company link as access
+- [ ] D1 documentation: EPIC-005 no longer states that every project member may manage tasks; current documentation reflects manager-only structural mutation
 - [ ] D3: `/tasks` shows standalone tasks accurately with no new mutation route or control
 - [ ] D4: all seven required deletion tests pass; historical time entries are never nulled or modified; the FK backstop is in place and reversible
 - [ ] D5: manager/admin can add and remove checklist items; members can toggle; native checkboxes; backend, Vitest, and Playwright coverage
 - [ ] D6: the time panel shows own time to the viewer and all users' time only with `time.view_all`
-- [ ] D7: the owner has chosen A, B, or C and the implementation matches (or the gated items are explicitly deferred)
+- [ ] D7-B: only `projects.admin` can add/remove members, change member roles, or provide extra initial members; non-admin project managers receive no candidate-user directory/email data and can still create/edit projects without membership controls
 
 **Defects**
 - [ ] A1 to A3: foreign column, milestone, and assignee IDs rejected on every write path with tests
