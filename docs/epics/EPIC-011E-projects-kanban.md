@@ -510,7 +510,7 @@ props: { tasks: Paginated<TaskRow>; view: 'mine' | 'org'; canViewOrg: boolean }
 
 ### Shared timer DTO change (additive)
 
-`ActiveTimer.context` gains `id` (and the `TimerContext` TS type follows) so the React task page can recognise "a timer is running for this task" without URL matching. The field is additive; `timer-overlay.js` ignores it.
+`ActiveTimer.context` gains `id` (and the `TimerContext` TS type follows) so the React task page can recognise "a timer is running for this task" without URL matching. The field is additive; `timer-overlay.js` ignores it. **Implemented in WP2** for every context branch (timer start, active list, allocation entries).
 
 ---
 
@@ -1046,7 +1046,7 @@ All URLs come from generated modules; no string paths (the Blade scripts hard-co
 | `components/ui/native-select.tsx` | Consolidates the class string currently repeated across Time pages; used for status, priority, assignee, milestone, role, member selects |
 | `components/ui/progress.tsx` | `role="progressbar"` bar for project, milestone, and checklist progress |
 | `components/ui/dropdown-menu.tsx` | shadcn-style wrapper over the already-installed `@radix-ui/react-dropdown-menu`, used by the Move menu (the layout currently uses the raw primitive) |
-| `components/ui/form-dialog.tsx` | Wrapper over the already-installed `@radix-ui/react-dialog` for the milestone dialog, sharing chrome with `ConfirmationDialog` |
+| `components/ui/form-dialog.tsx` | Wrapper over the already-installed `@radix-ui/react-dialog` for the milestone dialog, sharing chrome with `ConfirmationDialog` through `components/ui/dialog-shell.tsx` (WP2) |
 | `components/pagination.tsx` | Extracted from the Time page; used by Time, Projects, Tasks |
 
 ### Deliberately not added
@@ -1057,7 +1057,7 @@ Radix Select, Tabs, Popover, Sheet, Toast, Checkbox (native input is more testab
 
 ## 20. Shared vs Module-Specific Components
 
-**Shared** (reusable by tickets, billing, CRM later): `ui/textarea`, `ui/native-select`, `ui/progress`, `ui/dropdown-menu`, `ui/form-dialog`, `components/pagination`, `lib/dates.ts` (date-only and timestamp formatting extracted from the Time page), `types/pagination.ts`.
+**Shared** (reusable by tickets, billing, CRM later): `ui/textarea`, `ui/native-select`, `ui/progress`, `ui/dropdown-menu`, `ui/form-dialog`, `ui/dialog-shell` (chrome shared by `ConfirmationDialog` and `FormDialog`), `components/pagination`, `lib/dates.ts` (date-only and timestamp formatting extracted from the Time page), `types/pagination.ts`, and the `test/inertia.tsx` test double. `components/time/timer-context-link.tsx` is shared between the Time module and the project pages that link to it.
 
 **Module-specific** (`resources/js/components/projects/`, kebab-case files): `project-header`, `project-card`, `project-status-badge`, `priority-badge`, `member-rows-editor`, `board`, `board-column`, `task-card`, `quick-add-task`, `move-task-menu`, `board-moves.ts` (pure), `board-dnd.tsx`, `board-card-handle.tsx`, `board-announcements.ts`, `task-detail-form`, `checklist`, `comments`, `task-time-panel`, `milestone-list`, `milestone-dialog`, `task-table`.
 
@@ -1339,8 +1339,25 @@ Tests first (characterization, then the failing tests for each defect), then fix
 **Exit (met):** all new and existing backend tests pass on MariaDB; Blade pages work and offer no action the server refuses; concurrency stress green; no React change.
 
 ### WP2: Shared frontend foundation
+**Status: complete (2026-09-21).** Not committed. Nothing in WP3 onward was started, no route or page was migrated, and no dnd-kit package was installed.
 `types/pagination.ts`, `lib/dates.ts`, pagination extraction (Time page refactored with its tests unchanged), `textarea`, `native-select`, `progress`, `dropdown-menu`, `form-dialog`, `TimerContextLink`, additive `context.id` on the timer DTO and TS type, Inertia test helpers.
-**Exit:** `npm run check` green; Time page behavior unchanged.
+**Exit (met):** `npm run check` green (Vitest 112, was 73; existing Time, Profile, layout and timer-bar tests unchanged and passing); full Pest 737 (735 plus 2 for `context.id`); Pint clean; the Time, coexistence and auth browser specs pass in Chromium; Time page behavior unchanged.
+
+Where the result differs from, or adds to, the plan:
+
+| Item | Outcome |
+|---|---|
+| `ui/dialog-shell.tsx` (not in the plan) | The chrome the plan says `FormDialog` shares with `ConfirmationDialog` (overlay, panel, title, description, close button) is one small component both now render, instead of two copies. `ConfirmationDialog` is otherwise unchanged; the panel gained `max-h` and `overflow-y-auto` so a tall form cannot run off a phone screen |
+| `FormDialog` focus return | **Radix returns focus only to its own `Dialog.Trigger`**; a dialog opened through controlled state (the milestone Edit button in WP4) has none, so closing dropped focus onto `<body>`. Found by the focus-return test, fixed in `FormDialog` (it remembers the opener at open time and refocuses it on close; skipped when the caller passes `trigger`). `FormDialog` also calls `preventDefault` and `stopPropagation` on submit so a dialog rendered inside another form cannot submit it through React's portal event bubbling. API: `open`, `onOpenChange`, `title`, `description`, `submitLabel`, `onSubmit`, `processing`, optional `trigger`; fields are children, the footer (Cancel, submit) is built in |
+| `lib/dates.ts` | `formatDate` (date-only, UTC-anchored, the Time page's former `displayDate`) and `formatTimestamp` (instant, viewer locale; the Profile page's session time now uses it). Malformed input is returned unchanged rather than throwing during render. Verified under `TZ=America/Los_Angeles` and `Pacific/Kiritimati` |
+| `Pagination` | Takes the paginator (`<Pagination paginator={entries} />`) and now renders inside `<nav aria-label="Pagination">`. **Used by both the Time page and the operator time report** (the plan named one), so the duplicate markup is gone from both |
+| `NativeSelect` | Adopted at all six existing raw selects (Time filter, operator report x3, both `ContextSelector` selects); stacked forms pass `className="w-full"`, filter rows size to content as before. Gains the focus ring `Input` already had |
+| `dropdown-menu` | Wrapper exports `DropdownMenu`, `Trigger`, `Content` (portal included), `Item`, `Label`, `Separator`, `Group`. The persistent layout's user menu now uses it (its tests unchanged), so the wrapper has a second consumer and no duplicated class strings before the Move menu arrives |
+| `TimerContextLink` | `contextLinkModes` (`project`, `task`, `ticket`, all `'document'` today) is the one edit point for the WP5 and WP7 flips; `ticket` stays `'document'` until EPIC-011F. Adopted by the timer bar and the Time page context column. It accepts the timer DTO's `'Project'` and the entry DTO's `'project'`. A destination with no `url` renders as text |
+| `context.id` (backend) | Added to all three branches of `TimeEntryController::buildContextPayload`, so it appears on timer start, active-timer list and allocation entries. `TimerContext.id: number` in TS. Additive; `timer-overlay.js` ignores it. Two Pest tests |
+| Inertia test helper | `resources/js/test/inertia.tsx`: one `vi.mock` factory (`inertiaReactMock`) providing `Head`, `Link` (Inertia-only props never reach the DOM), `router` spies, a state-backed `useForm` (all three setter shapes, `reset`, configurable errors and processing) and `usePage`, plus `setFormErrors`, `setFormProcessing`, `setPageProps`, `resetInertiaMock`. It has its own test. Existing test files keep their local mocks (they were deliberately left untouched); WP3 onward use the helper |
+| **Test finding for WP5** | Under jsdom, Radix `DropdownMenu` opens on *pointer* interaction only for the first test in a file; later tests do not open. Opening by keyboard (Tab, Enter) is reliable and is the canonical path (§10), so **menu tests must open by keyboard**. Keyboard opening focuses the first item and arrow keys skip disabled items, which the Move menu's disabled Move up/down at the ends relies on |
+| Deliberately not added | No project or task DTO modules (`types/projects.ts` and the ability types in §5): the presenters and pages that use them arrive in WP3 to WP8, and shared types with no consumer would be speculative. `types/pagination.ts` is exported from `types/index.ts` |
 
 ### WP3: Projects index, create, edit
 Presenters, `projects/index|create|edit`, administrator-only member-rows editor (D7-B), read-only member list for non-admin managers, three-form edit page (members form present only for administrators), delete dialog with the D4 error, informational company copy, `NavigationBuilder` and dashboard link flips, Pest `assertInertia` conversions, Vitest, delete three Blade views. **Re-point the 011D multi-timer test's *Projects* step to the Tickets index** (§21).

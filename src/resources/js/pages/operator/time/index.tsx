@@ -1,18 +1,19 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Download } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
 import { PageHeader } from '@/components/page-header';
+import { Pagination } from '@/components/pagination';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { AppLayout } from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import { exportMethod, index } from '@/routes/operator/time';
-import type { Paginated } from '@/types/time';
+import type { Paginated } from '@/types/pagination';
 
 type ReportEntry = {
     id: number;
@@ -118,7 +119,7 @@ export function ReportPage({
                 <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">
                         <Label htmlFor="report-user">User</Label>
-                        <select
+                        <NativeSelect
                             id="report-user"
                             value={userId}
                             onChange={(event) => setUserId(event.target.value)}
@@ -130,11 +131,11 @@ export function ReportPage({
                                     {user.name}
                                 </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="report-project">Project</Label>
-                        <select
+                        <NativeSelect
                             id="report-project"
                             value={projectId}
                             onChange={(event) => setProjectId(event.target.value)}
@@ -146,7 +147,7 @@ export function ReportPage({
                                     {project.name}
                                 </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="report-from">From</Label>
@@ -168,7 +169,7 @@ export function ReportPage({
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="report-billable">Billing</Label>
-                        <select
+                        <NativeSelect
                             id="report-billable"
                             value={billable}
                             onChange={(event) => setBillable(event.target.value)}
@@ -177,7 +178,7 @@ export function ReportPage({
                             <option value="">All entries</option>
                             <option value="1">Billable only</option>
                             <option value="0">Non-billable only</option>
-                        </select>
+                        </NativeSelect>
                     </div>
                     <Button type="submit">Apply filters</Button>
                 </form>
@@ -256,31 +257,7 @@ export function ReportPage({
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between">
-                        {entries.prev_page_url ? (
-                            <Link
-                                href={entries.prev_page_url}
-                                className={cn(buttonVariants({ variant: 'outline' }))}
-                            >
-                                Previous
-                            </Link>
-                        ) : (
-                            <span />
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                            Page {entries.current_page} of {entries.last_page}
-                        </span>
-                        {entries.next_page_url ? (
-                            <Link
-                                href={entries.next_page_url}
-                                className={cn(buttonVariants({ variant: 'outline' }))}
-                            >
-                                Next
-                            </Link>
-                        ) : (
-                            <span />
-                        )}
-                    </div>
+                    <Pagination paginator={entries} />
                 </section>
             </div>
         </>

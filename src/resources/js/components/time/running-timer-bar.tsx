@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TimerContextLink } from '@/components/time/timer-context-link';
 import { useTimers } from '@/components/time/timer-provider';
 import type { ActiveTimer } from '@/types/time';
 
@@ -112,19 +113,14 @@ function TimerItem({ timer, now }: { timer: ActiveTimer; now: number }) {
                 {formatElapsed(timer.started_at, now)}
             </span>
             {timer.context ? (
-                timer.context.url ? (
-                    <a
-                        href={timer.context.url}
-                        className="max-w-40 truncate text-xs text-muted-foreground hover:underline"
-                        title={timer.context.label}
-                    >
-                        {timer.context.type}: {timer.context.label}
-                    </a>
-                ) : (
-                    <span className="max-w-40 truncate text-xs text-muted-foreground">
-                        {timer.context.type}: {timer.context.label}
-                    </span>
-                )
+                <TimerContextLink
+                    kind={timer.context.type}
+                    url={timer.context.url}
+                    label={timer.context.label}
+                    className="max-w-40 truncate text-xs text-muted-foreground hover:underline"
+                >
+                    {timer.context.type}: {timer.context.label}
+                </TimerContextLink>
             ) : null}
             <TimerDescription timer={timer} />
             <Button

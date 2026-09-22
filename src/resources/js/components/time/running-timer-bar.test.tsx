@@ -130,3 +130,33 @@ it('retains the draft and surfaces the error after a failed save', async () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Billing locked.');
     expect(screen.getByLabelText('Timer description')).toHaveValue('Precious draft');
 });
+
+it('renders the timer context as a link to its destination, or as text when there is none', async () => {
+    vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValueOnce(
+            jsonResponse([
+                {
+                    ...timer('Linked'),
+                    context: {
+                        type: 'Task',
+                        id: 9,
+                        label: 'Fix the bug',
+                        url: '/projects/1/tasks/9',
+                    },
+                },
+                {
+                    ...timer('Unlinked'),
+                    id: 5,
+                    context: { type: 'Project', id: 2, label: 'Portal', url: null },
+                },
+            ]),
+        ),
+    );
+    renderBar();
+
+    const link = await screen.findByRole('link', { name: 'Task: Fix the bug' });
+    expect(link).toHaveAttribute('href', '/projects/1/tasks/9');
+    expect(screen.getByText('Project: Portal')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Project: Portal' })).not.toBeInTheDocument();
+});

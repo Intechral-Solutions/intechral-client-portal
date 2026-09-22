@@ -180,6 +180,77 @@ it('allows authorized embedded task and ticket timer contexts', function () {
         ->assertJsonPath('context.type', 'Ticket');
 });
 
+it('identifies the context record by id on every timer context DTO', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $other = User::factory()->create();
+    $project = app(ProjectService::class)->create($other, ['name' => 'Shared project']);
+    $project->members()->attach($user->id, ['role' => 'member']);
+    $task = Task::create([
+        'project_id' => $project->id,
+        'column_id' => $project->columns()->firstOrFail()->id,
+        'assignee_id' => $other->id,
+        'created_by' => $other->id,
+        'title' => 'Shared task',
+        'priority' => 'medium',
+        'position' => 0,
+        'status' => 'todo',
+    ]);
+    $ticket = Ticket::factory()->open()->create(['user_id' => $user->id, 'assignee_id' => null]);
+
+    $this->actingAs($user)
+        ->postJson(route('time.timer.start'), ['project_id' => $project->id])
+        ->assertOk()
+        ->assertJsonPath('context.type', 'Project')
+        ->assertJsonPath('context.id', $project->id);
+    $this->actingAs($user)
+        ->postJson(route('time.timer.start'), ['task_id' => $task->id])
+        ->assertOk()
+        ->assertJsonPath('context.type', 'Task')
+        ->assertJsonPath('context.id', $task->id);
+    $this->actingAs($user)
+        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->assertOk()
+        ->assertJsonPath('context.type', 'Ticket')
+        ->assertJsonPath('context.id', $ticket->id);
+
+    $contexts = collect($this->actingAs($user)->getJson(route('time.timers.active'))->assertOk()->json())
+        ->pluck('context')
+        ->mapWithKeys(fn (array $context) => [$context['type'] => $context['id']]);
+
+    expect($contexts->all())->toBe([
+        'Project' => $project->id,
+        'Task' => $task->id,
+        'Ticket' => $ticket->id,
+    ]);
+});
+
+it('identifies the context record by id on allocation entries and leaves context-free entries null', function () {
+    $user = User::factory()->create();
+    $user->assignRole('user');
+    $project = app(ProjectService::class)->create($user, ['name' => 'Own project']);
+    $withContext = TimeEntry::factory()->create(['user_id' => $user->id, 'project_id' => $project->id]);
+    $withoutContext = TimeEntry::factory()->create(['user_id' => $user->id, 'project_id' => null]);
+
+    foreach ([[$withContext, 40], [$withoutContext, 41]] as [$entry, $number]) {
+        TimeEntryBlock::create([
+            'time_entry_id' => $entry->id,
+            'user_id' => $user->id,
+            'block_date' => today()->toDateString(),
+            'block_number' => $number,
+            'allocation_pct' => 100,
+            'is_overridden' => false,
+        ]);
+    }
+
+    $this->actingAs($user)
+        ->get(route('time.allocation'))
+        ->assertInertia(fn ($page) => $page
+            ->where('entries.0.context.type', 'Project')
+            ->where('entries.0.context.id', $project->id)
+            ->where('entries.1.context', null));
+});
+
 it('clears nullable fields and prior context when updating an entry', function () {
     $user = User::factory()->create();
     $user->assignRole('user');

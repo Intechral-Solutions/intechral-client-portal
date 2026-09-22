@@ -1,3 +1,4 @@
+export type { Paginated, PaginationLink } from './pagination';
 export type {
     AuthProps,
     AuthUser,

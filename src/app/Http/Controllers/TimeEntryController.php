@@ -307,6 +307,7 @@ class TimeEntryController extends Controller
         if ($entry->ticket_id && $entry->ticket) {
             return [
                 'type' => 'Ticket',
+                'id' => $entry->ticket_id,
                 'label' => $entry->ticket->ticket_number.' — '.Str::limit($entry->ticket->title, 40),
                 'url' => route('tickets.show', $entry->ticket),
             ];
@@ -315,6 +316,7 @@ class TimeEntryController extends Controller
         if ($entry->task_id && $entry->task) {
             return [
                 'type' => 'Task',
+                'id' => $entry->task_id,
                 'label' => Str::limit($entry->task->title, 50),
                 'url' => $entry->task->project_id
                     ? route('projects.tasks.show', [$entry->task->project_id, $entry->task])
@@ -325,6 +327,7 @@ class TimeEntryController extends Controller
         if ($entry->project_id && $entry->project) {
             return [
                 'type' => 'Project',
+                'id' => $entry->project_id,
                 'label' => $entry->project->name,
                 'url' => route('projects.board', $entry->project),
             ];

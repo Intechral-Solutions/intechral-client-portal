@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { options } from '@/routes/time/context';
 import type { ContextKind, ContextOption } from '@/types/time';
 
@@ -68,11 +69,11 @@ export function ContextSelector({ idPrefix, value, onChange, disabled, error }: 
         <>
             <div className="space-y-2">
                 <Label htmlFor={`${idPrefix}-context-type`}>Context</Label>
-                <select
+                <NativeSelect
                     id={`${idPrefix}-context-type`}
                     value={kind}
                     disabled={disabled}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="w-full"
                     onChange={(event) => {
                         const next = event.target.value as ContextKind | '';
                         setKind(next);
@@ -93,19 +94,19 @@ export function ContextSelector({ idPrefix, value, onChange, disabled, error }: 
                     <option value="project">Project</option>
                     <option value="task">Task</option>
                     <option value="ticket">Ticket</option>
-                </select>
+                </NativeSelect>
             </div>
 
             {kind ? (
                 <div className="space-y-2">
                     <Label htmlFor={recordId}>Record</Label>
-                    <select
+                    <NativeSelect
                         id={recordId}
                         value={value?.kind === kind ? value.id : ''}
                         disabled={disabled || status === 'loading'}
                         aria-invalid={Boolean(error)}
                         aria-describedby={error ? errorId : undefined}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="w-full"
                         onChange={(event) => {
                             const id = Number(event.target.value);
                             onChange(id ? { kind, id } : null);
@@ -128,7 +129,7 @@ export function ContextSelector({ idPrefix, value, onChange, disabled, error }: 
                         !items.some((item) => item.id === value.id) ? (
                             <option value={value.id}>{value.label}</option>
                         ) : null}
-                    </select>
+                    </NativeSelect>
                     {status === 'ready' && items.length === 0 ? (
                         <p className="text-xs text-muted-foreground">No available records.</p>
                     ) : null}

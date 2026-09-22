@@ -1,5 +1,4 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Link, router, usePage } from '@inertiajs/react';
 import { ChevronDown, Menu, Moon, Sun, X } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
@@ -9,6 +8,14 @@ import { NavigationLink } from '@/components/navigation/navigation-link';
 import { RunningTimerBar } from '@/components/time/running-timer-bar';
 import { TimerProvider } from '@/components/time/timer-provider';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import { dashboard, logout } from '@/routes';
 import { show as profile } from '@/routes/profile';
@@ -63,8 +70,8 @@ export function AppLayout({ children }: PropsWithChildren) {
                             </Button>
 
                             {auth.user ? (
-                                <DropdownMenu.Root>
-                                    <DropdownMenu.Trigger asChild>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
                                         <Button
                                             type="button"
                                             variant="ghost"
@@ -75,55 +82,43 @@ export function AppLayout({ children }: PropsWithChildren) {
                                             </span>
                                             <ChevronDown className="h-4 w-4" aria-hidden="true" />
                                         </Button>
-                                    </DropdownMenu.Trigger>
-                                    <DropdownMenu.Portal>
-                                        <DropdownMenu.Content
-                                            align="end"
-                                            sideOffset={6}
-                                            className="z-50 w-56 rounded-md border border-border bg-card p-1 text-card-foreground shadow-lg"
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                        <div className="border-b border-border px-3 py-2">
+                                            <p className="truncate text-sm font-medium">
+                                                {auth.user.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {auth.user.email}
+                                            </p>
+                                        </div>
+                                        <DropdownMenuItem asChild>
+                                            <Link href={profile.url()} className="block">
+                                                Profile
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        {management.length ? (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuLabel>Manage</DropdownMenuLabel>
+                                                {management.map((item) => (
+                                                    <DropdownMenuItem key={item.key} asChild>
+                                                        <NavigationLink
+                                                            item={item}
+                                                            className="block rounded-sm"
+                                                        />
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </>
+                                        ) : null}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onSelect={() => router.post(logout.url())}
                                         >
-                                            <div className="border-b border-border px-3 py-2">
-                                                <p className="truncate text-sm font-medium">
-                                                    {auth.user.name}
-                                                </p>
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {auth.user.email}
-                                                </p>
-                                            </div>
-                                            <DropdownMenu.Item asChild>
-                                                <Link
-                                                    href={profile.url()}
-                                                    className="block cursor-pointer rounded-sm px-3 py-2 text-sm outline-none focus:bg-muted"
-                                                >
-                                                    Profile
-                                                </Link>
-                                            </DropdownMenu.Item>
-                                            {management.length ? (
-                                                <>
-                                                    <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                                                    <DropdownMenu.Label className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase">
-                                                        Manage
-                                                    </DropdownMenu.Label>
-                                                    {management.map((item) => (
-                                                        <DropdownMenu.Item key={item.key} asChild>
-                                                            <NavigationLink
-                                                                item={item}
-                                                                className="block cursor-pointer rounded-sm px-3 py-2 outline-none focus:bg-muted"
-                                                            />
-                                                        </DropdownMenu.Item>
-                                                    ))}
-                                                </>
-                                            ) : null}
-                                            <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                                            <DropdownMenu.Item
-                                                className="cursor-pointer rounded-sm px-3 py-2 text-sm outline-none focus:bg-muted"
-                                                onSelect={() => router.post(logout.url())}
-                                            >
-                                                Sign out
-                                            </DropdownMenu.Item>
-                                        </DropdownMenu.Content>
-                                    </DropdownMenu.Portal>
-                                </DropdownMenu.Root>
+                                            Sign out
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             ) : null}
 
                             <Dialog.Root>
@@ -162,7 +157,10 @@ export function AppLayout({ children }: PropsWithChildren) {
                                         >
                                             {primary.map((item) => (
                                                 <Dialog.Close key={item.key} asChild>
-                                                    <NavigationLink item={item} className="block" />
+                                                    <NavigationLink
+                                                        item={item}
+                                                        className="block rounded-sm"
+                                                    />
                                                 </Dialog.Close>
                                             ))}
                                         </nav>

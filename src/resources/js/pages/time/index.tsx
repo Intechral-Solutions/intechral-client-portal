@@ -4,17 +4,20 @@ import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
 import { ContextSelector, type SelectedContext } from '@/components/time/context-selector';
+import { TimerContextLink } from '@/components/time/timer-context-link';
 import { useTimers } from '@/components/time/timer-provider';
 import { FormFieldError } from '@/components/forms/form-field-error';
 import { PageHeader } from '@/components/page-header';
+import { Pagination } from '@/components/pagination';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { AppLayout } from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/dates';
 import {
     allocation,
     destroy as destroyEntry,
@@ -22,7 +25,8 @@ import {
     store,
     update,
 } from '@/routes/time';
-import type { Paginated, TimeEntryData } from '@/types/time';
+import type { Paginated } from '@/types/pagination';
+import type { TimeEntryData } from '@/types/time';
 
 type ProjectOption = { id: number; name: string };
 
@@ -69,15 +73,6 @@ function formatDuration(totalMinutes: number) {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return hours ? `${hours}h ${minutes ? `${minutes}m` : ''}`.trim() : `${minutes}m`;
-}
-
-function displayDate(date: string) {
-    return new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-    }).format(new Date(`${date}T00:00:00Z`));
 }
 
 function TimerStartForm() {
@@ -407,7 +402,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                         <form onSubmit={filter} className="flex flex-wrap items-end gap-3">
                             <div className="space-y-1">
                                 <Label htmlFor="filter-project">Project</Label>
-                                <select
+                                <NativeSelect
                                     id="filter-project"
                                     value={projectId}
                                     onChange={(event) => setProjectId(event.target.value)}
@@ -419,7 +414,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                                             {project.name}
                                         </option>
                                     ))}
-                                </select>
+                                </NativeSelect>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="filter-from">From</Label>
@@ -473,18 +468,22 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                                             className="border-b border-border align-top"
                                         >
                                             <td className="px-3 py-3 whitespace-nowrap">
-                                                {displayDate(entry.date)}
+                                                {formatDate(entry.date)}
                                             </td>
                                             <td className="px-3 py-3">
-                                                {entry.context?.url ? (
-                                                    <a
-                                                        href={entry.context.url}
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {entry.context.label}
-                                                    </a>
+                                                {entry.context ? (
+                                                    <TimerContextLink
+                                                        kind={entry.context.kind}
+                                                        url={entry.context.url}
+                                                        label={entry.context.label}
+                                                        className={
+                                                            entry.context.url
+                                                                ? 'text-primary hover:underline'
+                                                                : undefined
+                                                        }
+                                                    />
                                                 ) : (
-                                                    (entry.context?.label ?? 'None')
+                                                    'None'
                                                 )}
                                             </td>
                                             <td className="max-w-80 px-3 py-3">
@@ -512,31 +511,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between">
-                        {entries.prev_page_url ? (
-                            <Link
-                                href={entries.prev_page_url}
-                                className={cn(buttonVariants({ variant: 'outline' }))}
-                            >
-                                Previous
-                            </Link>
-                        ) : (
-                            <span />
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                            Page {entries.current_page} of {entries.last_page}
-                        </span>
-                        {entries.next_page_url ? (
-                            <Link
-                                href={entries.next_page_url}
-                                className={cn(buttonVariants({ variant: 'outline' }))}
-                            >
-                                Next
-                            </Link>
-                        ) : (
-                            <span />
-                        )}
-                    </div>
+                    <Pagination paginator={entries} />
                 </section>
             </div>
         </>

@@ -1,5 +1,6 @@
 export type TimerContext = {
     type: 'Project' | 'Task' | 'Ticket';
+    id: number;
     label: string;
     url: string | null;
 };
@@ -47,24 +48,6 @@ export type TimeEntryData = {
     locked: boolean;
     running: boolean;
     context: EntryContext | null;
-};
-
-export type PaginationLink = {
-    url: string | null;
-    label: string;
-    active: boolean;
-};
-
-export type Paginated<T> = {
-    data: T[];
-    current_page: number;
-    last_page: number;
-    from: number | null;
-    to: number | null;
-    total: number;
-    links: PaginationLink[];
-    prev_page_url: string | null;
-    next_page_url: string | null;
 };
 
 export type AllocationBlock = {
