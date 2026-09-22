@@ -92,13 +92,24 @@ it('adds only manageMembers to ProjectPolicy and leaves view, manage and create 
         ->and((new ProjectPolicy)->manage($outsider, $this->unrelated))->toBeFalse();
 });
 
-// ── /tasks (org tab and links) ───────────────────────────────────────────────
+// ── /tasks (org tab and links, EPIC-011E WP8: now an Inertia page) ───────────
 
 function boardTask(Project $project, array $attributes = []): Task
 {
     $column = $project->columns()->first() ?? $project->columns()->create(['name' => 'To Do', 'position' => 0, 'is_done_column' => false]);
 
     return makeTask($column, ['title' => 'Task in '.$project->name, ...$attributes]);
+}
+
+/** @return array<int, array<string, mixed>> the `tasks.data` rows, as the page receives them */
+function taskIndexRows($response): array
+{
+    return $response->viewData('page')['props']['tasks']['data'];
+}
+
+function taskIndexRowByTitle($response, string $title): ?array
+{
+    return collect(taskIndexRows($response))->firstWhere('title', $title);
 }
 
 it('limits the org tab to company-linked projects the viewer can actually open', function () {
@@ -108,10 +119,9 @@ it('limits the org tab to company-linked projects the viewer can actually open',
     boardTask($this->unrelated);
 
     $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'org']))->assertOk();
-    $titles = $response->viewData('tasks')->pluck('title')->all();
+    $titles = collect(taskIndexRows($response))->pluck('title')->all();
 
     expect($titles)->toBe([$visible->title]);
-    $response->assertDontSee('Task in Linked Not Member');
 });
 
 it('gives an admin the org tab of every company-linked project', function () {
@@ -121,23 +131,27 @@ it('gives an admin the org tab of every company-linked project', function () {
     boardTask($this->linkedMember);
     boardTask($this->unrelated);
 
-    $titles = $this->actingAs($admin)->get(route('tasks.index', ['view' => 'org']))
-        ->viewData('tasks')->pluck('title')->sort()->values()->all();
+    $titles = collect(taskIndexRows(
+        $this->actingAs($admin)->get(route('tasks.index', ['view' => 'org']))
+    ))->pluck('title')->sort()->values()->all();
 
     expect($titles)->toBe(['Task in Linked And Member', 'Task in Linked Not Member']);
 });
 
 it('renders no link to a project or task page the viewer cannot open', function () {
-    $legacy = boardTask($this->unrelated, ['title' => 'Assigned before leaving', 'assignee_id' => $this->orgUser->id]);
-    $ok = boardTask($this->memberOnly, ['title' => 'Assigned and member', 'assignee_id' => $this->orgUser->id]);
+    boardTask($this->unrelated, ['title' => 'Assigned before leaving', 'assignee_id' => $this->orgUser->id]);
+    boardTask($this->memberOnly, ['title' => 'Assigned and member', 'assignee_id' => $this->orgUser->id]);
 
     $response = $this->actingAs($this->orgUser)->get(route('tasks.index'))->assertOk();
 
-    $response->assertSee('Assigned before leaving')
-        ->assertDontSee(route('projects.tasks.show', [$this->unrelated, $legacy]), false)
-        ->assertDontSee(route('projects.board', $this->unrelated), false)
-        ->assertSee(route('projects.tasks.show', [$this->memberOnly, $ok]), false)
-        ->assertSee(route('projects.board', $this->memberOnly), false);
+    $legacyRow = taskIndexRowByTitle($response, 'Assigned before leaving');
+    expect($legacyRow)->not->toBeNull();
+    expect($legacyRow['url'])->toBeNull();
+    expect($legacyRow['context']['url'])->toBeNull();
+
+    $okRow = taskIndexRowByTitle($response, 'Assigned and member');
+    expect($okRow['url'])->toBe(route('projects.tasks.show', [$this->memberOnly, $okRow['id']]));
+    expect($okRow['context']['url'])->toBe(route('projects.board', $this->memberOnly));
 });
 
 it('renders no ticket link that TicketPolicy would deny', function () {
@@ -149,10 +163,14 @@ it('renders no ticket link that TicketPolicy would deny', function () {
     $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'org']))->assertOk();
 
     // Both rows stay listed (current list behavior; flagged for EPIC-011F, C8) ...
-    $response->assertSee('On foreign ticket')->assertSee('On own ticket')->assertSee('TKT-7001')->assertSee('TKT-7002');
+    $foreignRow = taskIndexRowByTitle($response, 'On foreign ticket');
+    $ownRow = taskIndexRowByTitle($response, 'On own ticket');
+    expect($foreignRow['context'])->toBe(['kind' => 'ticket', 'label' => 'TKT-7001', 'url' => null]);
     // ... but only the ticket the viewer may open is a link.
-    $response->assertDontSee(route('tickets.show', $foreignTicket), false)
-        ->assertSee(route('tickets.show', $ownTicket), false);
+    expect($ownRow['context'])->toBe(['kind' => 'ticket', 'label' => 'TKT-7002', 'url' => route('tickets.show', $ownTicket)]);
+    // A ticket-derived row never gets the project-task detail URL (kind-aware, not a fake one).
+    expect($foreignRow['url'])->toBeNull();
+    expect($ownRow['url'])->toBeNull();
 });
 
 it('keeps standalone tasks unlinked and the mine tab scoped to the assignee', function () {
@@ -160,12 +178,14 @@ it('keeps standalone tasks unlinked and the mine tab scoped to the assignee', fu
     Task::factory()->standalone()->create(['title' => 'Standalone theirs', 'assignee_id' => $this->owner->id]);
 
     $response = $this->actingAs($this->orgUser)->get(route('tasks.index'))->assertOk();
+    $rows = taskIndexRows($response);
 
-    expect($response->viewData('tasks')->pluck('title')->all())->toBe(['Standalone mine']);
-    $response->assertSee('Standalone')->assertDontSee('Standalone theirs');
+    expect(collect($rows)->pluck('title')->all())->toBe(['Standalone mine']);
+    expect($rows[0]['context'])->toBe(['kind' => 'standalone', 'label' => 'Standalone', 'url' => null]);
+    expect($rows[0]['url'])->toBeNull();
 });
 
-it('shows no org rows to a user without tasks.view_org', function () {
+it('shows no org rows to a user without tasks.view_org, and hides the org tab', function () {
     $user = User::factory()->create(); // no role: no tasks.view_org
     $this->org->members()->attach($user, ['role' => 'member']);
     $this->linkedMember->members()->attach($user, ['role' => 'member']);
@@ -173,5 +193,6 @@ it('shows no org rows to a user without tasks.view_org', function () {
 
     $response = $this->actingAs($user)->get(route('tasks.index', ['view' => 'org']))->assertOk();
 
-    expect($response->viewData('tasks')->count())->toBe(0);
+    expect(taskIndexRows($response))->toHaveCount(0);
+    expect($response->viewData('page')['props']['canViewOrg'])->toBeFalse();
 });

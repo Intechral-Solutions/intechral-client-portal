@@ -20,7 +20,7 @@ final class NavigationBuilder
         $primary = array_values(array_filter([
             $user->can('tickets.view') ? $this->item($request, 'tickets', 'Tickets', 'tickets.index', ['tickets.*']) : null,
             $user->can('projects.view') ? $this->item($request, 'projects', 'Projects', 'projects.index', ['projects.*'], 'inertia') : null,
-            $this->item($request, 'tasks', 'Tasks', 'tasks.index', ['tasks.*']),
+            $this->item($request, 'tasks', 'Tasks', 'tasks.index', ['tasks.*'], 'inertia'),
             $user->can('time.log') ? $this->item($request, 'time', 'Time', 'time.index', ['time.*'], 'inertia') : null,
             $this->billingItem($request),
             $user->can('crm.manage') ? $this->item($request, 'crm', 'CRM', 'crm.companies.index', ['crm.*']) : null,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\TaskListPresenter;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -9,18 +10,34 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class TaskController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         /** @var User $user */
         $user = auth()->user();
-        $view = $request->get('view', 'mine');
+        // A closed two-value enum, clamped rather than rejected: this is a navigational tab
+        // link, not a form submission, so an unrecognized value falls back to "mine" (the
+        // narrower, always-safe view) instead of a validation redirect a stray/edited URL would
+        // otherwise bounce through.
+        $view = $request->query('view') === 'org' ? 'org' : 'mine';
         $companyIds = $user->can('tasks.view_org') ? $user->orgCompanyIds() : [];
+        // The org tab only ever widens the query with company-linked rows (below); with no
+        // company to link through it can show nothing beyond "mine", so it stays hidden rather
+        // than rendering an org tab that behaves exactly like the one already shown.
+        $canViewOrg = ! empty($companyIds);
 
-        $query = Task::with(['assignee', 'project', 'ticket', 'column'])
+        $query = Task::with([
+            'assignee:id,name',
+            'project:id,name',
+            // `user_id` is loaded (never rendered) because TicketPolicy::view needs it to decide
+            // openableTickets below; trimming it would silently deny every ticket owner's link.
+            'ticket:id,ticket_number,user_id',
+            'column:id,project_id,name,is_done_column',
+        ])
             ->where(function ($q) use ($user, $companyIds, $view) {
                 // "mine" tab — always includes tasks assigned directly to the user
                 $q->where('assignee_id', $user->id);
@@ -42,7 +59,7 @@ class TaskController extends Controller
 
         // Which destinations the viewer may open, so no row renders a link that would 403.
         // Projects are answered with one query for the whole page (the same rule as
-        // ProjectPolicy::view); tickets ask TicketPolicy, which needs no query per row.
+        // ProjectPolicy::view, D2); tickets ask TicketPolicy, which needs no query per row.
         $projectIds = $tasks->getCollection()->pluck('project_id')->filter()->unique()->all();
         $openableProjects = $projectIds === []
             ? []
@@ -52,7 +69,27 @@ class TaskController extends Controller
             ->filter(fn ($ticket) => Gate::forUser($user)->allows('view', $ticket))
             ->pluck('id')->flip()->all();
 
-        return view('tasks.index', compact('tasks', 'view', 'companyIds', 'openableProjects', 'openableTickets'));
+        $tasks->through(fn (Task $task) => TaskListPresenter::row($task, $openableProjects, $openableTickets));
+
+        return Inertia::render('tasks/index', [
+            'tasks' => $tasks,
+            'view' => $view,
+            'canViewOrg' => $canViewOrg,
+            // The server is the source of truth for task vocabulary (§15); the standalone
+            // create form receives labelled options rather than hard-coding labels in React.
+            'createOptions' => [
+                'priorities' => collect(Task::PRIORITIES)
+                    ->map(fn (string $value) => ['value' => $value, 'label' => ucfirst($value)])
+                    ->values(),
+                'statuses' => collect(Task::STATUSES)
+                    ->map(fn (string $value) => ['value' => $value, 'label' => match ($value) {
+                        'in_progress' => 'In Progress',
+                        'done' => 'Done',
+                        default => 'To Do',
+                    }])
+                    ->values(),
+            ],
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -60,7 +97,8 @@ class TaskController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            // The form only offers "Me" or "Unassigned"; the server enforces exactly that (A7).
+            // The form only offers "Me" or "Unassigned"; the server enforces exactly that (A7,
+            // D3): no route exists to expand a standalone task's assignee beyond the actor.
             'assignee_id' => ['nullable', Rule::in([$request->user()->id])],
             'priority' => 'required|in:low,medium,high,critical',
             'due_date' => 'nullable|date',
