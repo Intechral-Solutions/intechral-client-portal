@@ -138,8 +138,11 @@ it('keeps milestone completion counts equal to the per-milestone method', functi
     }
 
     $response = $this->actingAs($admin)->get(route('projects.milestones.index', $project))->assertOk();
+    $pageCompletionById = collect($response->viewData('page')['props']['milestones'])
+        ->pluck('completion', 'id');
 
-    foreach ($response->viewData('milestones') as $milestone) {
+    foreach ($project->milestones()->withTaskCounts()->get() as $milestone) {
+        expect($pageCompletionById[$milestone->id])->toBe($milestone->completionFromCounts());
         expect($milestone->completionFromCounts())->toBe($milestone->completionPercentage());
     }
 });

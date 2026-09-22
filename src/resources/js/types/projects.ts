@@ -40,3 +40,17 @@ export type ProjectMemberRef = {
 
 /** The administrator-only user directory for the membership editor. */
 export type MemberCandidate = { id: number; name: string; email: string };
+
+/** One row on the milestones page (ProjectMilestonePresenter::item). */
+export type MilestoneItem = {
+    id: number;
+    name: string;
+    description: string | null;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    dueDate: string;
+    taskCount: number;
+    doneCount: number;
+    /** 0 to 100, tasks in done columns/status over all tasks on this milestone. */
+    completion: number;
+    overdue: boolean;
+};
