@@ -23,6 +23,13 @@ export function QuickAddTask({ projectId, columnId, open, onClose }: QuickAddTas
     const form = useForm({ title: '', column_id: columnId, priority: 'medium' as const });
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // A synchronous guard against a same-tick double submit (double click, or Enter held while
+    // repeating): `form.processing` only disables the button after React commits the re-render
+    // triggered by useForm's own onBefore, which is too late to stop a second `submit()` call
+    // that happens before that commit (EPIC-011E Amendment 6, Fix 2). Never creates a task
+    // optimistically — this only decides whether a second `form.post` is sent at all.
+    const submittingRef = useRef(false);
+
     useEffect(() => {
         if (open) inputRef.current?.focus();
     }, [open]);
@@ -32,12 +39,22 @@ export function QuickAddTask({ projectId, columnId, open, onClose }: QuickAddTas
     function submit(event: FormEvent) {
         event.preventDefault();
 
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+
         form.post(storeTask.url({ project: projectId }), {
             preserveScroll: true,
             only: ['columns', 'flash'],
             onSuccess: () => {
                 form.reset();
                 onClose();
+            },
+            // The single terminal callback for every outcome (success, a validation error that
+            // leaves the form open and editable, an HTTP/server error, a network failure, or a
+            // cancellation): the one correct place to release the guard so the form can submit
+            // again once this request has actually settled.
+            onFinish: () => {
+                submittingRef.current = false;
             },
         });
     }

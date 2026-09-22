@@ -50,6 +50,19 @@ function lastMove(): OptimisticSubmission {
     return submissions[0]!;
 }
 
+/**
+ * The most recent `router.reload(...)` call's options, cast to what `reconcileAfterFailure`
+ * passes (EPIC-011E Amendment 6, Fix 1). A failure defers releasing the single-flight guard to
+ * this call's own `onFinish`, so a test must invoke it explicitly to settle the board, the same
+ * way it invokes a move's own `onFinish` above.
+ */
+function lastReload(): { only: string[]; onFinish?: () => void } {
+    const calls = inertiaSpies.router.reload.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+
+    return calls[calls.length - 1]![0] as { only: string[]; onFinish?: () => void };
+}
+
 async function openMoveMenuAndSelectFirst(cardTitle: string) {
     const user = userEvent.setup();
     const article = screen.getByRole('article', { name: cardTitle });
@@ -164,7 +177,22 @@ it('reverts, reloads, and shows an assertive alert on a validation failure (422)
     act(() => move.options.onFinish?.());
 
     expect(screen.getByRole('alert')).toHaveTextContent('The selected column is invalid.');
-    expect(inertiaSpies.router.reload).toHaveBeenCalledWith({ only: ['columns'] });
+    expect(lastReload().only).toEqual(['columns']);
+
+    // Fix 1: the single-flight guard is held through the reconciliation reload, not released by
+    // the PUT's own onFinish — the board is still busy and focus has not returned yet.
+    expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'true',
+    );
+    expect(screen.getByRole('button', { name: 'Move "Fix login"' })).not.toHaveFocus();
+
+    act(() => lastReload().onFinish?.());
+
+    expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'false',
+    );
     expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toHaveFocus();
 });
 
@@ -189,7 +217,19 @@ it.each([403, 404, 500])(
         // Suppresses Inertia's default error modal (EPIC-011E §8).
         expect(result).toBe(false);
         expect(screen.getByRole('alert')).toBeInTheDocument();
-        expect(inertiaSpies.router.reload).toHaveBeenCalledWith({ only: ['columns'] });
+        expect(lastReload().only).toEqual(['columns']);
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'true',
+        );
+
+        act(() => lastReload().onFinish?.());
+
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+        expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toHaveFocus();
     },
 );
 
@@ -211,7 +251,19 @@ it('reverts, reloads, and shows an alert on a network error', async () => {
 
     expect(result).toBe(false);
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save the move. Try again.");
-    expect(inertiaSpies.router.reload).toHaveBeenCalledWith({ only: ['columns'] });
+    expect(lastReload().only).toEqual(['columns']);
+    expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'true',
+    );
+
+    act(() => lastReload().onFinish?.());
+
+    expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'false',
+    );
+    expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toHaveFocus();
 });
 
 it('does a full reload instead of the usual reconciliation on a 401/419 session expiry', async () => {
@@ -232,6 +284,124 @@ it('does a full reload instead of the usual reconciliation on a 401/419 session 
     expect(inertiaSpies.router.reload).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+});
+
+describe('reconciliation sequencing (EPIC-011E Amendment 6, Fix 1)', () => {
+    it('holds the single-flight guard through a failed move’s reconciliation reload, refuses a second move until it settles, and a later move is never overwritten by the stale reload', async () => {
+        const original = initialColumns();
+        const { rerender } = render(
+            <Board projectId={7} columns={original} abilities={{ manage: true }} />,
+        );
+
+        // Move A: "Fix login" (To Do) fails on the network.
+        await openMoveMenuAndSelectFirst('Fix login');
+        const moveA = optimisticSubmitted()[0]!;
+        act(() => moveA.options.onNetworkError?.());
+        rerender(<Board projectId={7} columns={original} abilities={{ manage: true }} />);
+        act(() => moveA.options.onFinish?.());
+
+        // A's reconciliation reload is outstanding: a second move is refused. The guard now
+        // spans the whole failure-plus-reconcile cycle, not just the PUT — this is the
+        // structural fix for the race (a late reload for A could otherwise land after a
+        // successful B and overwrite it).
+        const user = userEvent.setup();
+        const writeDocsCard = screen.getByRole('article', { name: 'Write docs' });
+        within(writeDocsCard).getByRole('button', { name: /Move/ }).focus();
+        await user.keyboard('{Enter}');
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        expect(optimisticSubmitted()).toHaveLength(1);
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'true',
+        );
+
+        // Only once A's reload settles does the guard release.
+        const reloadA = lastReload();
+        act(() => reloadA.onFinish?.());
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+
+        // Move B: "Write docs" (In Progress) is now allowed, and succeeds.
+        await openMoveMenuAndSelectFirst('Write docs');
+        expect(optimisticSubmitted()).toHaveLength(2);
+        const moveB = optimisticSubmitted()[1]!;
+        const bColumns = moveB.transform({ columns: original }).columns as BoardColumn[];
+        rerender(<Board projectId={7} columns={bColumns} abilities={{ manage: true }} />);
+        act(() => {
+            moveB.options.onSuccess?.({ props: { columns: bColumns } });
+            moveB.options.onFinish?.();
+        });
+
+        const toDoColumn = document.querySelector('[data-column-id="1"]') as HTMLElement;
+        expect(within(toDoColumn).getByRole('link', { name: 'Write docs' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move "Write docs"' })).toHaveFocus();
+
+        // A defensive proof of the generation guard (EPIC-011E Amendment 6): if A's already-
+        // consumed reload callback were somehow invoked again — the exact "late, stale
+        // reconciliation" shape the bug described — it must not publish a side effect for a
+        // move that is no longer current. It must not steal focus back to "Fix login", and B's
+        // result must still stand.
+        act(() => reloadA.onFinish?.());
+        expect(within(toDoColumn).getByRole('link', { name: 'Write docs' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move "Fix login"' })).not.toHaveFocus();
+        expect(screen.getByRole('button', { name: 'Move "Write docs"' })).toHaveFocus();
+    });
+
+    it('still performs the reconciliation reload on failure when no later move is attempted, and the guard clears cleanly', async () => {
+        const original = initialColumns();
+        const { rerender } = render(
+            <Board projectId={7} columns={original} abilities={{ manage: true }} />,
+        );
+
+        await openMoveMenuAndSelectFirst('Fix login');
+        const move = lastMove();
+
+        act(() => move.options.onError?.({ position: 'The selected position is invalid.' }));
+        rerender(<Board projectId={7} columns={original} abilities={{ manage: true }} />);
+        act(() => move.options.onFinish?.());
+
+        expect(lastReload().only).toEqual(['columns']);
+        act(() => lastReload().onFinish?.());
+
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+        expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toHaveFocus();
+
+        // The guard is fully released: a further move is accepted normally.
+        await openMoveMenuAndSelectFirst('Fix login');
+        expect(optimisticSubmitted()).toHaveLength(2);
+    });
+});
+
+describe('defensive hardening (EPIC-011E Amendment 6, Fix 3)', () => {
+    it('recovers from a synchronous throw when starting a move: the guard clears, the failure is reported normally, and another move can follow', async () => {
+        render(<Board projectId={7} columns={initialColumns()} abilities={{ manage: true }} />);
+
+        inertiaSpies.router.optimistic.mockImplementationOnce(() => {
+            throw new Error('boom: synchronous failure before any visit started');
+        });
+
+        await openMoveMenuAndSelectFirst('Fix login');
+
+        // No visit was ever actually issued for the failed attempt, and no reconciliation reload
+        // was scheduled — there is nothing for a later visit to reconcile.
+        expect(optimisticSubmitted()).toHaveLength(0);
+        expect(inertiaSpies.router.reload).not.toHaveBeenCalled();
+        expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save the move. Try again.");
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+        expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toHaveFocus();
+
+        // The guard was released rather than stranded: a subsequent move is attempted normally.
+        await openMoveMenuAndSelectFirst('Fix login');
+        expect(optimisticSubmitted()).toHaveLength(1);
+    });
 });
 
 describe('quick-add', () => {

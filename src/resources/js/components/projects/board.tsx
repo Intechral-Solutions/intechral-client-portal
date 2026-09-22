@@ -28,8 +28,22 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
     // A guard read synchronously by requestMove, so a second call in the same tick (before a
     // setState from the first has flushed) is still refused. Single flight is mandatory, not
     // defensive (EPIC-011E §8, WP0 gate item 4): sending overlapping moves lets the server
-    // apply them out of order.
+    // apply them out of order. On a failure this guard is held not just for the PUT itself but
+    // through its authoritative reconciliation reload too (EPIC-011E Amendment 6, Fix 1):
+    // releasing it as soon as the PUT settles would let a second move start while a stale
+    // reconciliation read for the first move was still in flight, and a late-arriving stale read
+    // could then overwrite the second move's fresher canonical state. Holding the guard through
+    // the reload makes that overlap structurally impossible instead of racing it.
     const pendingRef = useRef<number | null>(null);
+
+    // Defense in depth alongside the guard above: a monotonic token identifying which move is
+    // currently allowed to publish UI side effects (live-region text, focus restoration).
+    // Because the guard above already prevents two moves from ever being in flight at once, this
+    // should never actually matter in practice — but it makes "a stale callback cannot publish
+    // after a newer move supersedes it" an explicit, testable invariant rather than an
+    // accident of the guard's current shape, and it stays correct even if a future caller (WP6)
+    // reaches these callbacks by a different path.
+    const moveGenerationRef = useRef(0);
 
     // "Latest value" refs for the stable requestMove callback below: updated in an effect after
     // every commit, never included in a dependency array. This is how requestMove reads current
@@ -69,85 +83,143 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
             const move = { taskId, toColumnId, toIndex };
             if (isNoopMove(columnsRef.current, move)) return;
 
+            const generation = ++moveGenerationRef.current;
+            const isCurrentMove = () => moveGenerationRef.current === generation;
+
             pendingRef.current = taskId;
             setPendingTaskId(taskId);
             setAlertMessage('');
 
-            const reconcileAfterFailure = () => router.reload({ only: ['columns'] });
+            // Set only on a failure path, before this PUT's own onFinish runs (Inertia calls
+            // onError/onHttpException/onNetworkError before onFinish for the same visit): tells
+            // onFinish below to leave the single-flight guard held for the reconciliation
+            // reload to release instead of releasing it itself (Fix 1).
+            let awaitingReconciliation = false;
 
-            router
-                .optimistic((props: { columns: BoardColumnData[] }) => ({
-                    columns: applyMove(props.columns, move),
-                }))
-                .put(
-                    moveTaskRoute.url({ project: projectIdRef.current, task: taskId }),
-                    { column_id: toColumnId, position: toIndex },
-                    {
-                        only: ['columns', 'flash'],
-                        preserveScroll: true,
-                        preserveState: true,
-                        onSuccess: (page) => {
-                            const resultColumns = (page.props.columns ??
-                                columnsRef.current) as BoardColumnData[];
-                            setPoliteMessage(
-                                moveSuccessMessage(resultColumns, taskId, taskTitle) ??
-                                    `Moved "${taskTitle}".`,
-                            );
-                        },
-                        // A validation failure (422): the field error is the useful message;
-                        // reload because the client's guessed index may itself now be stale.
-                        onError: (errors) => {
-                            setAlertMessage(
-                                moveFailureMessage(errors.column_id ?? errors.position),
-                            );
-                            reconcileAfterFailure();
-                        },
-                        // 403/404/419/401/5xx and any other non-Inertia error response. Returning
-                        // false suppresses Inertia's default error modal so the inline alert (this
-                        // assertive live region) is what the user sees (EPIC-011E §8).
-                        onHttpException: (response: { status: number }) => {
-                            if (response.status === 401 || response.status === 419) {
-                                // Same session-expiry handling as EPIC-011D: the rollback this
-                                // component would otherwise perform can itself be stale once the
-                                // session is gone, so a full reload is the only correct recovery.
-                                window.location.reload();
+            const settleMove = () => {
+                pendingRef.current = null;
+                setPendingTaskId(null);
+            };
+
+            // The task's canonical location — not the pre-move one — is what focus follows
+            // (EPIC-011E §8, §10): a stable id lookup, never DOM position.
+            const restoreFocus = () => {
+                document.querySelector<HTMLElement>(`[data-move-button="${taskId}"]`)?.focus();
+            };
+
+            // The authoritative re-read after a failure. The single-flight guard stays held
+            // (pendingRef is released by this reload's own onFinish, not the PUT's) so a second
+            // move cannot start while this read for the FIRST move is still outstanding — the
+            // exact overlap that previously let a stale reconciliation overwrite a newer move's
+            // canonical result (EPIC-011E Amendment 6, Fix 1). This trades a slightly longer busy
+            // window after a failure (one extra GET, not the whole UI) for making the race
+            // structurally impossible instead of racing it with a version check.
+            const reconcileAfterFailure = () => {
+                awaitingReconciliation = true;
+
+                router.reload({
+                    only: ['columns'],
+                    onFinish: () => {
+                        settleMove();
+                        if (isCurrentMove()) restoreFocus();
+                    },
+                });
+            };
+
+            try {
+                router
+                    .optimistic((props: { columns: BoardColumnData[] }) => ({
+                        columns: applyMove(props.columns, move),
+                    }))
+                    .put(
+                        moveTaskRoute.url({ project: projectIdRef.current, task: taskId }),
+                        { column_id: toColumnId, position: toIndex },
+                        {
+                            only: ['columns', 'flash'],
+                            preserveScroll: true,
+                            preserveState: true,
+                            onSuccess: (page) => {
+                                if (!isCurrentMove()) return;
+
+                                const resultColumns = (page.props.columns ??
+                                    columnsRef.current) as BoardColumnData[];
+                                setPoliteMessage(
+                                    moveSuccessMessage(resultColumns, taskId, taskTitle) ??
+                                        `Moved "${taskTitle}".`,
+                                );
+                            },
+                            // A validation failure (422): the field error is the useful message;
+                            // reload because the client's guessed index may itself now be stale.
+                            onError: (errors) => {
+                                if (isCurrentMove()) {
+                                    setAlertMessage(
+                                        moveFailureMessage(errors.column_id ?? errors.position),
+                                    );
+                                }
+                                reconcileAfterFailure();
+                            },
+                            // 403/404/419/401/5xx and any other non-Inertia error response.
+                            // Returning false suppresses Inertia's default error modal so the
+                            // inline alert (this assertive live region) is what the user sees
+                            // (EPIC-011E §8).
+                            onHttpException: (response: { status: number }) => {
+                                if (response.status === 401 || response.status === 419) {
+                                    // Same session-expiry handling as EPIC-011D: the rollback
+                                    // this component would otherwise perform can itself be stale
+                                    // once the session is gone, so a full reload is the only
+                                    // correct recovery. The page is about to unload, so settling
+                                    // the guard here (rather than deferring to a reconciliation
+                                    // reload that will never get the chance to run) is enough.
+                                    window.location.reload();
+
+                                    return false;
+                                }
+
+                                if (isCurrentMove()) {
+                                    setAlertMessage(
+                                        moveFailureMessage(
+                                            response.status === 404
+                                                ? 'This task no longer exists.'
+                                                : undefined,
+                                        ),
+                                    );
+                                }
+                                reconcileAfterFailure();
 
                                 return false;
-                            }
+                            },
+                            onNetworkError: () => {
+                                if (isCurrentMove()) setAlertMessage(moveFailureMessage());
+                                reconcileAfterFailure();
 
-                            setAlertMessage(
-                                moveFailureMessage(
-                                    response.status === 404
-                                        ? 'This task no longer exists.'
-                                        : undefined,
-                                ),
-                            );
-                            reconcileAfterFailure();
-
-                            return false;
+                                return false;
+                            },
+                            onFinish: () => {
+                                // Success and the 401/419 short-circuit above both settle
+                                // immediately here. Every other failure already set
+                                // awaitingReconciliation and defers settling to
+                                // reconcileAfterFailure's own reload above, so the guard stays
+                                // held for the whole reload rather than being released early.
+                                if (!awaitingReconciliation) {
+                                    settleMove();
+                                    if (isCurrentMove()) restoreFocus();
+                                }
+                            },
                         },
-                        onNetworkError: () => {
-                            setAlertMessage(moveFailureMessage());
-                            reconcileAfterFailure();
-
-                            return false;
-                        },
-                        onFinish: () => {
-                            pendingRef.current = null;
-                            setPendingTaskId(null);
-
-                            // The rollback (if any) has already been applied by Inertia's own
-                            // onFinish wrapper by the time this callback runs (it replays
-                            // baselines before calling back out), and the success path's props
-                            // update happens before onSuccess above. Either way, the task's
-                            // canonical location — not the pre-move one — is what focus follows
-                            // (EPIC-011E §8, §10): a stable id lookup, never DOM position.
-                            document
-                                .querySelector<HTMLElement>(`[data-move-button="${taskId}"]`)
-                                ?.focus();
-                        },
-                    },
-                );
+                    );
+            } catch {
+                // A synchronous throw before Inertia ever started the visit (building the move
+                // URL, or router.optimistic/.put itself): there is no visit left for onFinish to
+                // settle, so this is the only chance to release the guard (Fix 3). Handled as an
+                // ordinary failed move — the inline alert, not a rethrow — consistent with every
+                // other failure path here resolving locally rather than surfacing a second,
+                // uncontrolled error path. A throw from inside the optimistic transform itself
+                // (applyMove, which is pure and exhaustively tested) happens later, inside
+                // Inertia's own async visit handling, and is out of this catch's reach.
+                settleMove();
+                setAlertMessage(moveFailureMessage());
+                if (isCurrentMove()) restoreFocus();
+            }
         },
         [],
     );
