@@ -2,45 +2,63 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CrmCompany;
+use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
-use App\Models\User;
 use App\Rules\AccessibleCrmCompany;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class ProjectController extends Controller
 {
     public function __construct(private ProjectService $service) {}
 
-    public function index(): View
+    public function index(): Response
     {
-        $projects = Project::visibleTo(auth()->user())
+        $user = auth()->user();
+
+        $projects = Project::visibleTo($user)
             ->withTaskStats()
             ->latest()
-            ->paginate(20);
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (Project $project) => ProjectPresenter::card($project));
 
-        return view('projects.index', compact('projects'));
+        return Inertia::render('projects/index', [
+            'projects' => $projects,
+            // What projects.create actually admits: the route requires projects.manage even
+            // though the create policy also allows projects.admin alone (A9), so a link built
+            // from the policy alone would lead an administrator to a 403.
+            'abilities' => [
+                'create' => Gate::allows('create', Project::class) && $user->can('projects.manage'),
+            ],
+        ]);
     }
 
-    public function create(): View
+    public function create(): Response
     {
         $this->authorize('create', Project::class);
 
-        $data = ['companies' => CrmCompany::orderBy('name')->get(['id', 'name'])];
+        $props = [
+            'companies' => ProjectPresenter::companyOptions(),
+            'abilities' => ['editMembers' => Gate::allows('manageMembers', Project::class)],
+        ];
 
-        // Only an actor who may manage membership receives the user directory (D7-B).
-        if (Gate::allows('manageMembers', Project::class)) {
-            $data['memberCandidates'] = $this->memberCandidates();
+        // Only an actor who may manage membership receives the user directory (D7-B): the prop
+        // is absent, not empty, for everyone else.
+        if ($props['abilities']['editMembers']) {
+            $props['memberCandidates'] = ProjectPresenter::memberCandidates();
         }
 
-        return view('projects.create', $data);
+        return Inertia::render('projects/create', $props);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): SymfonyResponse
     {
         $this->authorize('create', Project::class);
 
@@ -71,8 +89,13 @@ class ProjectController extends Controller
             $project->companies()->sync($data['companies']);
         }
 
-        return redirect()->route('projects.board', $project)
-            ->with('success', 'Project created successfully.');
+        // The board is still a Blade page. Redirecting an Inertia request to a non-Inertia
+        // response makes Inertia show its error modal, so an Inertia request gets a location
+        // visit (a full page load); every other request still gets the plain redirect. Once the
+        // board is a React page (WP5) this becomes an ordinary redirect again.
+        session()->flash('success', 'Project created successfully.');
+
+        return Inertia::location(route('projects.board', $project));
     }
 
     public function show(Project $project): RedirectResponse
@@ -82,35 +105,27 @@ class ProjectController extends Controller
         return redirect()->route('projects.board', $project);
     }
 
-    public function edit(Project $project): View
+    public function edit(Project $project): Response
     {
         $this->authorize('manage', $project);
 
-        // Existing membership is shown to every manager, but only as {id, name, role, isOwner}:
-        // no email. The candidate directory below is what carries emails.
-        $members = $project->members()
-            ->orderBy('name')
-            ->get(['users.id', 'users.name'])
-            ->map(fn (User $member) => [
-                'id' => $member->id,
-                'name' => $member->name,
-                'role' => $member->pivot->role,
-                'isOwner' => $member->id === $project->created_by,
-            ])
-            ->all();
-
-        $data = [
-            'project' => $project,
-            'members' => $members,
-            'companies' => CrmCompany::orderBy('name')->get(['id', 'name']),
-            'linkedCompanyIds' => $project->companies()->pluck('crm_companies.id')->all(),
+        $props = [
+            'project' => ProjectPresenter::detail($project),
+            // Existing membership goes to every manager as {id, name, role, isOwner}: no email.
+            'members' => ProjectPresenter::members($project),
+            'companies' => ProjectPresenter::companyOptions(),
+            'linkedCompanyIds' => ProjectPresenter::linkedCompanyIds($project),
+            'abilities' => [
+                'delete' => Gate::allows('manage', $project),
+                'editMembers' => Gate::allows('manageMembers', $project),
+            ],
         ];
 
-        if (Gate::allows('manageMembers', $project)) {
-            $data['memberCandidates'] = $this->memberCandidates();
+        if ($props['abilities']['editMembers']) {
+            $props['memberCandidates'] = ProjectPresenter::memberCandidates();
         }
 
-        return view('projects.edit', $data);
+        return Inertia::render('projects/edit', $props);
     }
 
     public function update(Request $request, Project $project): RedirectResponse
@@ -185,14 +200,5 @@ class ProjectController extends Controller
             'members.*.user_id' => 'required|integer|distinct|exists:users,id',
             'members.*.role' => 'required|in:member,manager',
         ];
-    }
-
-    /** @return array<int, array{id: int, name: string, email: string}> */
-    private function memberCandidates(): array
-    {
-        return User::orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email])
-            ->all();
     }
 }

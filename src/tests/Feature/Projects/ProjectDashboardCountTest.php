@@ -87,8 +87,8 @@ it('agrees with the number of active projects on the projects index for every ki
 
     foreach (['outsider', 'member', 'manager_role', 'project_manager', 'admin', 'admin_only'] as $actor) {
         $user = projectActor($actor, $project);
-        $indexActive = test()->actingAs($user)->get(route('projects.index'))
-            ->viewData('projects')->where('status', 'active')->count();
+        $indexActive = collect(test()->actingAs($user)->get(route('projects.index'))->viewData('page')['props']['projects']['data'])
+            ->where('status', 'active')->count();
 
         expect(dashboardProjectCount($user))->toBe($indexActive, "dashboard vs index for {$actor}");
     }

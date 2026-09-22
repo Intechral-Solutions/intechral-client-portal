@@ -62,10 +62,12 @@ it('leaves existing blade pages as normal document responses', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
+    // Projects index/create/edit are React pages as of EPIC-011E WP3; tickets.index is still
+    // Blade, so it is the coexistence example here.
     $this->actingAs($user)
-        ->get(route('projects.index'))
+        ->get(route('tickets.index'))
         ->assertOk()
-        ->assertViewIs('projects.index')
+        ->assertViewIs('tickets.index')
         ->assertSee(route('dashboard'))
         ->assertHeader('Vary', 'X-Inertia');
 });

@@ -2,6 +2,7 @@
 
 use App\Models\Project;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
 
@@ -147,15 +148,20 @@ it('validates initial members from an administrator', function () {
 
 // ── Data minimization ────────────────────────────────────────────────────────
 
+function candidateProps($response): ?array
+{
+    return $response->viewData('page')['props']['memberCandidates'] ?? null;
+}
+
 it('gives projects.admin the candidate directory on create and edit', function () {
     $create = $this->actingAs($this->admin)->get(route('projects.create'))->assertOk();
     $edit = $this->actingAs($this->admin)->get(route('projects.edit', $this->project))->assertOk();
 
     foreach ([$create, $edit] as $response) {
-        $candidates = collect($response->viewData('memberCandidates'));
+        $candidates = collect(candidateProps($response));
         expect($candidates->pluck('id')->all())->toContain($this->candidate->id, $this->bystander->id)
-            ->and($candidates->first())->toHaveKeys(['id', 'name', 'email']);
-        $response->assertSee('candy.date@example.test');
+            ->and($candidates->first())->toHaveKeys(['id', 'name', 'email'])
+            ->and($candidates->firstWhere('id', $this->candidate->id)['email'])->toBe('candy.date@example.test');
     }
 });
 
@@ -163,18 +169,19 @@ it('gives a non-admin manager no candidate directory, no emails and no member co
     $create = $this->actingAs($this->manager)->get(route('projects.create'))->assertOk();
     $edit = $this->actingAs($this->manager)->get(route('projects.edit', $this->project))->assertOk();
 
-    $create->assertViewMissing('memberCandidates')->assertViewMissing('members');
-    $edit->assertViewMissing('memberCandidates');
-
     foreach ([$create, $edit] as $response) {
-        $response->assertDontSee('candy.date@example.test')
-            ->assertDontSee('bystander.bee@example.test')
-            ->assertDontSee('Candy Date')
-            ->assertDontSee('Bystander Bee')
-            ->assertDontSee('name="members[', false)
-            ->assertDontSee('member-row', false)
-            ->assertDontSee(route('projects.members.sync', $this->project), false);
+        $props = $response->viewData('page')['props'];
+        // Absent, not empty: the prop key itself does not exist.
+        expect($props)->not->toHaveKey('memberCandidates')
+            ->and($props['abilities']['editMembers'])->toBeFalse();
+
+        // The whole serialized page, including the shared props, names no other user.
+        $json = json_encode($props);
+        foreach (['candy.date@example.test', 'bystander.bee@example.test', 'Candy Date', 'Bystander Bee'] as $leak) {
+            expect($json)->not->toContain($leak);
+        }
     }
+    expect($create->viewData('page')['props'])->not->toHaveKey('members');
 });
 
 it('shows a non-admin manager the current members read-only with name, role and owner marker only', function () {
@@ -182,25 +189,36 @@ it('shows a non-admin manager the current members read-only with name, role and 
 
     $edit = $this->actingAs($this->manager)->get(route('projects.edit', $this->project))->assertOk();
 
-    $members = collect($edit->viewData('members'));
+    $members = collect($edit->viewData('page')['props']['members']);
     expect($members->map(fn ($m) => collect($m)->only(['id', 'name', 'role', 'isOwner'])->all())->sortBy('id')->values()->all())
         ->toBe(collect([
             ['id' => $this->admin->id, 'name' => 'Ada Admin', 'role' => 'manager', 'isOwner' => true],
             ['id' => $this->manager->id, 'name' => $this->manager->name, 'role' => 'manager', 'isOwner' => false],
             ['id' => $this->candidate->id, 'name' => 'Candy Date', 'role' => 'member', 'isOwner' => false],
         ])->sortBy('id')->values()->all())
-        ->and($members->every(fn ($m) => array_keys((array) $m) === ['id', 'name', 'role', 'isOwner']))->toBeTrue();
-
-    $edit->assertSee('Candy Date')->assertDontSee('candy.date@example.test')->assertSee('Owner');
+        ->and($members->every(fn ($m) => array_keys((array) $m) === ['id', 'name', 'role', 'isOwner']))->toBeTrue()
+        ->and($members->first()['isOwner'])->toBeTrue();   // the owner is listed first
 });
 
 it('keeps the rest of the edit page working for a non-admin manager', function () {
-    $edit = $this->actingAs($this->manager)->get(route('projects.edit', $this->project))->assertOk();
-
-    $edit->assertSee(route('projects.update', $this->project), false);
+    $this->actingAs($this->manager)->get(route('projects.edit', $this->project))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/edit')
+            ->where('project.id', $this->project->id)
+            ->where('abilities.delete', true));
 
     $this->actingAs($this->manager)->put(route('projects.update', $this->project), ['name' => 'Manager Rename', 'status' => 'on_hold'])
         ->assertRedirect();
     $this->actingAs($this->manager)->put(route('projects.companies.sync', $this->project), ['companies' => []])->assertRedirect();
     expect($this->project->fresh()->name)->toBe('Manager Rename');
+});
+
+it('refuses a forged member sync from the manager who can otherwise edit the page', function () {
+    $this->actingAs($this->manager)->withHeaders(['X-Inertia' => 'true'])
+        ->put(route('projects.members.sync', $this->project), [
+            'members' => [['user_id' => $this->bystander->id, 'role' => 'manager']],
+        ])->assertForbidden();
+
+    expect($this->project->members()->whereKey($this->bystander->id)->exists())->toBeFalse();
 });

@@ -38,7 +38,7 @@ beforeEach(function () {
 
 function indexedProjectIds($response): array
 {
-    return $response->viewData('projects')->pluck('id')->sort()->values()->all();
+    return collect($response->viewData('page')['props']['projects']['data'])->pluck('id')->sort()->values()->all();
 }
 
 it('lists on the index exactly the projects ProjectPolicy::view allows, for every kind of user', function () {
@@ -61,7 +61,8 @@ it('never lists a company-linked non-member project and never grants access thro
     $response = $this->actingAs($this->orgUser)->get(route('projects.index'))->assertOk();
 
     expect(indexedProjectIds($response))->toBe(collect([$this->linkedMember->id, $this->memberOnly->id])->sort()->values()->all());
-    $response->assertDontSee('Linked Not Member')->assertDontSee('Unrelated');
+    expect(json_encode($response->viewData('page')['props']['projects']))
+        ->not->toContain('Linked Not Member')->not->toContain('Unrelated');
 
     $this->actingAs($this->orgUser)->get(route('projects.board', $this->linkedNotMember))->assertForbidden();
     $this->actingAs($this->orgUser)->get(route('projects.milestones.index', $this->linkedNotMember))->assertForbidden();
@@ -173,20 +174,4 @@ it('shows no org rows to a user without tasks.view_org', function () {
     $response = $this->actingAs($user)->get(route('tasks.index', ['view' => 'org']))->assertOk();
 
     expect($response->viewData('tasks')->count())->toBe(0);
-});
-
-// ── Copy (C2) ────────────────────────────────────────────────────────────────
-
-it('describes a company link as informational and never as granting visibility', function () {
-    $manager = makeUser('operator');
-    $project = makeProject($manager);
-    CrmCompany::factory()->create(['created_by' => $manager->id, 'name' => 'Some Co']);
-
-    foreach ([route('projects.create'), route('projects.edit', $project)] as $url) {
-        $html = $this->actingAs($manager)->get($url)->assertOk()->getContent();
-
-        expect($html)->not->toContain('grant their organization members visibility')
-            ->and($html)->not->toContain('will have visibility of this project')
-            ->and($html)->toContain('does not grant');
-    }
 });

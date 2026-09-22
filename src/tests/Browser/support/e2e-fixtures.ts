@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
  */
 export class E2eCleanup {
     private readonly timerEntryIds = new Set<number>();
-    private projectId: number | null = null;
+    private readonly projectIds = new Set<number>();
 
     constructor(private readonly page: Page) {
         page.on('response', async (response) => {
@@ -33,8 +33,9 @@ export class E2eCleanup {
         });
     }
 
+    /** A test may create more than one project (e.g. one per actor); every one is cleaned up. */
     trackProject(id: number) {
-        this.projectId = id;
+        this.projectIds.add(id);
     }
 
     async run() {
@@ -65,8 +66,10 @@ export class E2eCleanup {
             await remove(`time entry ${id}`, `/time/${id}`);
         }
 
-        if (this.projectId !== null) {
-            await remove(`project ${this.projectId}`, `/projects/${this.projectId}`);
+        for (const id of this.projectIds) {
+            // A project the test itself already deleted (e.g. the delete-flow test) 404s here,
+            // which `remove` already treats as success.
+            await remove(`project ${id}`, `/projects/${id}`);
         }
 
         await this.deleteManualEntries();

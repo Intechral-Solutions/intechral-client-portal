@@ -27,6 +27,11 @@ it('builds user navigation from effective permissions', function () {
         ->and($items->keys()->all())->not->toContain('crm')
         ->and($items['billing']['href'])->toBe(route('billing.client.invoices.index'))
         ->and($items['time']['visit'])->toBe('inertia')
+        // Projects index/create/edit are React pages (WP3); the board, milestones, task pages
+        // and /tasks are still Blade, so only the projects entry point flips.
+        ->and($items['projects']['visit'])->toBe('inertia')
+        ->and($items['tasks']['visit'])->toBe('document')
+        ->and($items['tickets']['visit'])->toBe('document')
         ->and($items['tickets']['isActive'])->toBeTrue()
         ->and(collect($groups)->contains('key', 'management'))->toBeFalse();
 });

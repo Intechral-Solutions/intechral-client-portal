@@ -3,6 +3,7 @@
 use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectService;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -230,8 +231,10 @@ it('shows only the projects the user is a member of (non-admin)', function () {
     $member->assignRole('user');
     $visible->members()->attach($member->id, ['role' => 'member']);
 
-    $response = $this->actingAs($member)->get(route('projects.index'));
-    $response->assertOk();
-    $response->assertSee('Visible');
-    $response->assertDontSee('Invisible');
+    $this->actingAs($member)->get(route('projects.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/index')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.name', 'Visible'));
 });

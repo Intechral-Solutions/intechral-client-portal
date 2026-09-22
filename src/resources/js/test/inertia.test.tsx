@@ -8,6 +8,7 @@ import {
     setFormErrors,
     setFormProcessing,
     setPageProps,
+    submitted,
 } from '@/test/inertia';
 import type { SharedPageProps } from '@/types';
 
@@ -85,7 +86,79 @@ it('records a form submission', async () => {
 
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(inertiaSpies.form.post).toHaveBeenCalledWith('/things');
+    expect(inertiaSpies.form.post).toHaveBeenCalledWith('/things', {});
+});
+
+it('records each submission with the transformed payload and its options', async () => {
+    const user = userEvent.setup();
+
+    function Transforming() {
+        const form = useForm({ title: 'a', keys: [{ key: 'k1', id: 1 }] });
+
+        return (
+            <button
+                type="button"
+                onClick={() => {
+                    form.transform((data) => ({
+                        ...data,
+                        keys: data.keys.map(({ id }) => ({ id })),
+                    }));
+                    form.put('/things/1', { errorBag: 'edit', preserveScroll: true });
+                }}
+            >
+                Send
+            </button>
+        );
+    }
+
+    render(<Transforming />);
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(inertiaSpies.form.put).toHaveBeenCalledWith('/things/1', {
+        errorBag: 'edit',
+        preserveScroll: true,
+    });
+    expect(submitted()).toEqual([
+        {
+            method: 'put',
+            url: '/things/1',
+            options: { errorBag: 'edit', preserveScroll: true },
+            data: { title: 'a', keys: [{ id: 1 }] },
+        },
+    ]);
+
+    resetInertiaMock();
+    expect(submitted()).toEqual([]);
+});
+
+it('clears errors on request', async () => {
+    const user = userEvent.setup();
+    setFormErrors({ title: 'Bad.', other: 'Also bad.' });
+
+    function Clearing() {
+        const form = useForm({ title: '' });
+
+        return (
+            <>
+                <button type="button" onClick={() => form.clearErrors('title')}>
+                    Clear title
+                </button>
+                <button type="button" onClick={() => form.clearErrors()}>
+                    Clear all
+                </button>
+                <output>{Object.keys(form.errors).join(',') || 'none'}</output>
+            </>
+        );
+    }
+
+    render(<Clearing />);
+    expect(screen.getByRole('status')).toHaveTextContent('title,other');
+
+    await user.click(screen.getByRole('button', { name: 'Clear title' }));
+    expect(screen.getByRole('status')).toHaveTextContent('other');
+
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(screen.getByRole('status')).toHaveTextContent('none');
 });
 
 it('renders links without leaking Inertia-only props to the DOM', () => {

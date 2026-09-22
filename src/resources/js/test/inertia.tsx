@@ -27,6 +27,31 @@ const formMethods = {
     clearErrors: vi.fn(),
 };
 
+type FormMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+export type Submission = {
+    method: FormMethod;
+    url: string;
+    /** The options passed to the submit method: `errorBag`, `preserveScroll`, `onSuccess`, ... */
+    options: Record<string, unknown> & {
+        onSuccess?: (page?: unknown) => void;
+        onError?: (errors: Record<string, string>) => void;
+    };
+    /** The form data as it would be sent: after any `form.transform()` callback ran. */
+    data: Record<string, unknown>;
+};
+
+const submissions: Submission[] = [];
+const transformers = new WeakMap<
+    object,
+    (data: Record<string, unknown>) => Record<string, unknown>
+>();
+
+/** Every `useForm()` submission in order; the last one is what a test usually asserts on. */
+export function submitted(): Submission[] {
+    return submissions;
+}
+
 /** Recorded calls. `router.*` are the imperative visits; `form.*` are `useForm()` submissions. */
 export const inertiaSpies = {
     router: {
@@ -76,6 +101,7 @@ export function setPageProps(props: Record<string, unknown>, url = '/') {
 export function resetInertiaMock() {
     Object.values(inertiaSpies.router).forEach((spy) => spy.mockReset());
     Object.values(formMethods).forEach((spy) => spy.mockReset());
+    submissions.length = 0;
     state.props = {};
     state.url = '/';
     state.errors = {};
@@ -123,6 +149,10 @@ type FormSetter<T> = {
 
 function useForm<T extends Record<string, unknown>>(initial: T) {
     const [data, setDataState] = useState<T>(initial);
+    const [errors, setErrors] = useState<Record<string, string>>(state.errors);
+    // Keyed by a stable per-hook object: a callback set in one event handler must be visible to
+    // the submit call in the same handler, before any re-render, so it cannot live in state.
+    const [holder] = useState(() => ({}));
 
     const setData = ((first: keyof T | Partial<T> | ((current: T) => T), value?: T[keyof T]) => {
         if (typeof first === 'function') setDataState(first);
@@ -131,13 +161,47 @@ function useForm<T extends Record<string, unknown>>(initial: T) {
         else setDataState((current) => ({ ...current, [first]: value }));
     }) as FormSetter<T>;
 
+    // Mirrors Inertia: the method spies see (url, options); the data that would be sent (after
+    // transform) is recorded separately so tests can assert the exact payload.
+    const submit =
+        (method: FormMethod) =>
+        (url: string, options: Submission['options'] = {}) => {
+            formMethods[method](url, options);
+            submissions.push({
+                method,
+                url,
+                options,
+                data: transformers.get(holder)?.(data) ?? { ...data },
+            });
+        };
+
     return {
         data,
         setData,
-        errors: state.errors,
-        hasErrors: Object.keys(state.errors).length > 0,
+        errors,
+        hasErrors: Object.keys(errors).length > 0,
         processing: state.processing,
-        ...formMethods,
+        transform: (callback: (data: T) => Record<string, unknown>) => {
+            transformers.set(
+                holder,
+                callback as (data: Record<string, unknown>) => Record<string, unknown>,
+            );
+        },
+        get: submit('get'),
+        post: submit('post'),
+        put: submit('put'),
+        patch: submit('patch'),
+        delete: submit('delete'),
+        clearErrors: (...fields: string[]) => {
+            formMethods.clearErrors(...fields);
+            setErrors((current) =>
+                fields.length
+                    ? Object.fromEntries(
+                          Object.entries(current).filter(([key]) => !fields.includes(key)),
+                      )
+                    : {},
+            );
+        },
         // Mirrors Inertia: reset() with no argument restores every initial value.
         reset: (...fields: (keyof T)[]) => {
             formMethods.reset(...fields);

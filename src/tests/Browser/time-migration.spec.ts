@@ -61,8 +61,10 @@ test('multiple timers persist through Inertia and reconstruct across Blade docum
     await page.getByRole('button', { name: 'Stop timer' }).first().click();
     await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
 
-    await page.getByRole('link', { name: 'Projects' }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    // Projects is a React page as of EPIC-011E WP3, so the Blade-document leg of this journey
+    // moves to Tickets (still Blade until EPIC-011F); it needs no fixture (§21, C4).
+    await page.getByRole('link', { name: 'Tickets' }).click();
+    await expect(page).toHaveURL(/\/tickets$/);
     await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
     const bladeClock = page.locator('#timer-overlay .timer-clock');
     const bladeInitial = await bladeClock.textContent();
@@ -201,9 +203,10 @@ test('a timer started from the embedded Blade tracker is reconstructed by React'
 
     // The embedded tracker lives on a still-Blade task page. Create a throwaway project and
     // task for it; the fixture teardown deletes the timer entries and then the project.
+    // (The create page is React as of WP3; the board and task page it lands on are still Blade.)
     await page.goto('/projects/create');
-    await page.getByLabel('Project Name').fill('E2E Blade tracker project');
-    await page.getByRole('button', { name: /Create Project/ }).click();
+    await page.getByLabel('Project name').fill('E2E Blade tracker project');
+    await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
     const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
     cleanup.trackProject(projectId);

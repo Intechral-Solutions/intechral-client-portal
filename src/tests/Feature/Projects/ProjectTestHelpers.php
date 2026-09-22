@@ -123,34 +123,3 @@ function columnIsDense(ProjectColumn|int $column): bool
 
     return $positions === ($positions === [] ? [] : range(0, count($positions) - 1));
 }
-
-/**
- * Maximum <form> nesting depth in an HTML document, computed with a plain tag stack (the
- * container runs PHP 8.3, so the HTML5 tree-builder Dom\HTMLDocument of PHP 8.4 is not
- * available). A depth above 1 means a form is opened before the previous one is closed.
- * Script and template bodies are ignored.
- */
-function formNestingDepth(string $html): int
-{
-    $html = preg_replace('#<script\b.*?</script>#is', '', $html);
-    $html = preg_replace('#<template\b.*?</template>#is', '', $html);
-
-    $depth = 0;
-    $max = 0;
-    preg_match_all('#<(/?)form\b#i', $html, $matches);
-    foreach ($matches[1] as $closing) {
-        $depth += $closing === '/' ? -1 : 1;
-        $max = max($max, $depth);
-    }
-
-    return $max;
-}
-
-/** Sanity check that every opened form is closed. */
-function formsAreBalanced(string $html): bool
-{
-    $html = preg_replace('#<script\b.*?</script>#is', '', $html);
-    $html = preg_replace('#<template\b.*?</template>#is', '', $html);
-
-    return preg_match_all('#<form\b#i', $html) === preg_match_all('#</form>#i', $html);
-}
