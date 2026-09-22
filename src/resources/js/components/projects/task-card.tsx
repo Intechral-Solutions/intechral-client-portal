@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import type { ReactNode } from 'react';
 
 import { MoveTaskMenu, type MoveTargetColumn } from '@/components/projects/move-task-menu';
 import { PriorityBadge } from '@/components/projects/priority-badge';
@@ -6,7 +7,7 @@ import { formatDate } from '@/lib/dates';
 import { show as taskShowRoute } from '@/routes/projects/tasks';
 import type { BoardTask } from '@/types/projects';
 
-type TaskCardProps = {
+export type TaskCardProps = {
     task: BoardTask;
     projectId: number;
     columnId: number;
@@ -20,6 +21,14 @@ type TaskCardProps = {
     /** True while any move is in flight (single-flight, EPIC-011E §8): disables every Move menu. */
     boardBusy: boolean;
     onMove: (taskId: number, toColumnId: number, toIndex: number, taskTitle: string) => void;
+    /**
+     * The pointer/touch drag affordance (EPIC-011E §9, WP6), already fully wired by
+     * `SortableTaskCard` (`board-dnd.tsx`) — this component never imports dnd-kit itself, or
+     * even knows it exists; it only ever renders whatever node it is handed, or nothing at all.
+     * `undefined` for a read-only card (no `SortableTaskCard` wrapper is ever mounted for one)
+     * and for every card before WP6, so this slot changes nothing about the existing render.
+     */
+    dragHandle?: ReactNode;
 };
 
 function TaskCardImpl({
@@ -32,6 +41,7 @@ function TaskCardImpl({
     canManage,
     boardBusy,
     onMove,
+    dragHandle,
 }: TaskCardProps) {
     const titleId = `task-${task.id}-title`;
 
@@ -42,7 +52,10 @@ function TaskCardImpl({
             className="space-y-2.5 rounded-lg border border-border bg-card p-3 text-card-foreground shadow-xs"
         >
             <div className="flex items-start justify-between gap-2">
-                <PriorityBadge priority={task.priority} />
+                <div className="flex items-center gap-1.5">
+                    {dragHandle}
+                    <PriorityBadge priority={task.priority} />
+                </div>
                 {task.milestone ? (
                     <span
                         className="truncate text-xs text-muted-foreground"
@@ -140,8 +153,13 @@ function tasksEqual(a: BoardTask, b: BoardTask): boolean {
  * Inertia hands the optimistic callback a deep clone of every prop, so every task object is a
  * new reference during the optimistic phase; a reference-equality `memo` re-renders every card
  * on every move (WP0 measured this). Comparing the rendered fields instead re-renders only the
- * card that actually changed. `columns` and `onMove` are expected to be stable references from
- * the parent (`board.tsx`) and are compared by identity, not deep-compared.
+ * card that actually changed. `columns`, `onMove`, and `dragHandle` are expected to be stable
+ * references from the parent (`board.tsx` for the first two; `SortableTaskCard` for the third,
+ * EPIC-011E §25 WP6) and are compared by identity, not deep-compared: `SortableTaskCard` only
+ * hands this component a new `dragHandle` element when dnd-kit's own `listeners` reference
+ * actually changes (verified stable across ordinary re-renders, including every pointer-move
+ * frame during a drag, against the installed dnd-kit source — see `board-dnd.tsx`), so an
+ * identity comparison here is exactly as cheap and correct as the existing two.
  */
 /** Exported so a test can verify the comparator directly (see task-card.test.tsx). */
 export function taskCardPropsAreEqual(prev: TaskCardProps, next: TaskCardProps): boolean {
@@ -154,6 +172,7 @@ export function taskCardPropsAreEqual(prev: TaskCardProps, next: TaskCardProps):
         prev.boardBusy === next.boardBusy &&
         prev.columns === next.columns &&
         prev.onMove === next.onMove &&
+        prev.dragHandle === next.dragHandle &&
         tasksEqual(prev.task, next.task)
     );
 }

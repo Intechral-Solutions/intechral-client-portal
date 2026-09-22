@@ -65,8 +65,15 @@ test('index to create, and the create page as projects.admin adds a member and l
     // The board is a React page as of WP5, so this landed as an ordinary Inertia navigation
     // (no more Inertia::location() full-page-visit workaround, EPIC-011E §21); the shared
     // FlashRegion renders a success message with role="status", not "alert" (that was the old
-    // Blade board's own markup, reached via the pre-WP5 location-visit fallback).
-    await expect(page.getByRole('status')).toContainText('Project created successfully.');
+    // Blade board's own markup, reached via the pre-WP5 location-visit fallback). `getByRole`
+    // alone is ambiguous here now that WP6's dnd-kit mounts its own empty `role="status"` live
+    // region on any board a manager can drag on (EPIC-011E §11: its announcement text is
+    // silenced, but the element itself always exists) — `filter` on the flash text is what picks
+    // out the real one, the same disambiguation `board-migration.spec.ts` already relies on for
+    // this board's `aria-live="polite"` region.
+    await expect(
+        page.getByRole('status').filter({ hasText: 'Project created successfully.' }),
+    ).toBeVisible();
 });
 
 test('edit-page safety regression: saving renames without deleting, and delete needs confirmation and works', async ({

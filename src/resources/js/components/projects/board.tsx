@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { moveFailureMessage, moveSuccessMessage } from '@/components/projects/board-announcements';
 import { BoardColumn } from '@/components/projects/board-column';
+import { BoardDndContext } from '@/components/projects/board-dnd';
 import { applyMove, isNoopMove } from '@/components/projects/board-moves';
 import { move as moveTaskRoute } from '@/routes/projects/tasks';
 import type { BoardColumn as BoardColumnData } from '@/types/projects';
@@ -228,30 +229,41 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
         setQuickAddColumnId((current) => (current === columnId ? null : columnId));
     }
 
+    const boardBusy = pendingTaskId !== null;
+
     return (
         <div>
-            <div
-                role="region"
-                aria-label="Kanban board"
-                aria-busy={pendingTaskId !== null}
-                tabIndex={0}
-                className="flex gap-4 overflow-x-auto pb-2"
+            <BoardDndContext
+                enabled={abilities.manage}
+                columns={columns}
+                busy={boardBusy}
+                onMove={requestMove}
             >
-                {columns.map((column) => (
-                    <BoardColumn
-                        key={column.id}
-                        column={column}
-                        projectId={projectId}
-                        columns={columnSummaries}
-                        canManage={abilities.manage}
-                        boardBusy={pendingTaskId !== null}
-                        quickAddOpen={quickAddColumnId === column.id}
-                        onToggleQuickAdd={toggleQuickAdd}
-                        onCloseQuickAdd={() => setQuickAddColumnId(null)}
-                        onMove={requestMove}
-                    />
-                ))}
-            </div>
+                {(displayColumns) => (
+                    <div
+                        role="region"
+                        aria-label="Kanban board"
+                        aria-busy={boardBusy}
+                        tabIndex={0}
+                        className="flex gap-4 overflow-x-auto pb-2"
+                    >
+                        {displayColumns.map((column) => (
+                            <BoardColumn
+                                key={column.id}
+                                column={column}
+                                projectId={projectId}
+                                columns={columnSummaries}
+                                canManage={abilities.manage}
+                                boardBusy={boardBusy}
+                                quickAddOpen={quickAddColumnId === column.id}
+                                onToggleQuickAdd={toggleQuickAdd}
+                                onCloseQuickAdd={() => setQuickAddColumnId(null)}
+                                onMove={requestMove}
+                            />
+                        ))}
+                    </div>
+                )}
+            </BoardDndContext>
 
             {alertMessage ? (
                 <p
@@ -262,8 +274,9 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
                 </p>
             ) : null}
 
-            {/* One board-level live region, shared by the menu path here and the drag path in
-                WP6, rather than one per card (EPIC-011E §8, §10). */}
+            {/* One board-level live region, shared by the Move menu and the pointer-drag path
+                (EPIC-011E §8, §9, §10): dnd-kit's own announcements are silenced in
+                board-dnd.tsx specifically so this stays the only surface. */}
             <p aria-live="polite" className="sr-only">
                 {politeMessage}
             </p>

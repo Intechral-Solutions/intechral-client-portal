@@ -83,11 +83,21 @@ it('renders columns, their tasks, and an empty column', () => {
     expect(screen.getByText('No tasks.')).toBeInTheDocument();
 });
 
+it('gives a manager both the pointer/touch drag handle and the Move menu (EPIC-011E §9, WP6)', () => {
+    render(<Board projectId={7} columns={initialColumns()} abilities={{ manage: true }} />);
+
+    expect(screen.getAllByTestId('task-drag-handle')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Move "Fix login"' })).toBeInTheDocument();
+});
+
 it('hides Add task and Move controls from a non-manager, but keeps the board and title links', () => {
     render(<Board projectId={7} columns={initialColumns()} abilities={{ manage: false }} />);
 
     expect(screen.queryByRole('button', { name: /Add task/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Move "/ })).not.toBeInTheDocument();
+    // No pointer/touch drag affordance either (D1): a read-only board offers no mutation
+    // control of any kind, not even one hidden from the accessibility tree.
+    expect(screen.queryByTestId('task-drag-handle')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Fix login' })).toBeInTheDocument();
 });
 

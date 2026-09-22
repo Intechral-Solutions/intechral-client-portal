@@ -207,3 +207,70 @@ it('tabs from the title link straight to the Move button, and nothing else', () 
     expect(tabbables[0]).toHaveAccessibleName('Fix login');
     expect(tabbables[1]).toHaveAccessibleName('Move "Fix login"');
 });
+
+describe('dragHandle slot (EPIC-011E §9, WP6)', () => {
+    // TaskCard never imports dnd-kit or knows it exists (EPIC-011E §9): it only ever renders
+    // whatever node `dragHandle` is, so these tests stand in for `SortableTaskCard`'s real,
+    // fully-wired handle with a plain marker element.
+    function marker() {
+        return <span data-testid="handle-marker" aria-hidden="true" tabIndex={-1} />;
+    }
+
+    it('renders nothing extra when no dragHandle is given (every pre-WP6 card, and every read-only one)', () => {
+        renderTask();
+
+        expect(screen.queryByTestId('handle-marker')).not.toBeInTheDocument();
+    });
+
+    it('renders whatever dragHandle it is handed, as a sibling of the priority badge, not a wrapper around any other content', () => {
+        renderTask({ dragHandle: marker() });
+
+        const handle = screen.getByTestId('handle-marker');
+        expect(handle).toBeInTheDocument();
+        expect(screen.getByText('High')).toBeInTheDocument(); // the priority badge, still rendered
+
+        // Nothing meaningful sits inside an aria-hidden ancestor: the handle's own aria-hidden
+        // span contains only itself, and is a sibling of — never a parent of — the title link,
+        // the priority badge, or the Move button.
+        const article = screen.getByRole('article');
+        expect(
+            article.querySelector('[aria-hidden="true"] a, [aria-hidden="true"] button'),
+        ).toBeNull();
+    });
+
+    it('does not add the handle to the tab order: title link then Move button only, unaffected by a dragHandle being present', () => {
+        renderTask({ dragHandle: marker() });
+
+        const article = screen.getByRole('article');
+        const tabbables = Array.from(
+            article.querySelectorAll<HTMLElement>('a[href], button:not([tabindex="-1"])'),
+        );
+        expect(tabbables).toHaveLength(2);
+        expect(tabbables[0]).toHaveAccessibleName('Fix login');
+        expect(tabbables[1]).toHaveAccessibleName('Move "Fix login"');
+    });
+
+    it('is compared by identity in the structural memo, exactly like columns and onMove', () => {
+        const a = makeTask({ id: 1 });
+        const handle = marker();
+        const stableHandleOnMove = () => {};
+        const propsFor = (overrides: Record<string, unknown> = {}) =>
+            ({
+                task: a,
+                projectId: 7,
+                columnId: 1,
+                columnIndex: 0,
+                columnSize: 2,
+                columns,
+                canManage: true,
+                boardBusy: false,
+                onMove: stableHandleOnMove,
+                dragHandle: handle,
+                ...overrides,
+            }) as React.ComponentProps<typeof TaskCard>;
+
+        expect(taskCardPropsAreEqual(propsFor(), propsFor())).toBe(true);
+        expect(taskCardPropsAreEqual(propsFor(), propsFor({ dragHandle: marker() }))).toBe(false);
+        expect(taskCardPropsAreEqual(propsFor({ dragHandle: undefined }), propsFor())).toBe(false);
+    });
+});

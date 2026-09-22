@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
+import { SortableColumnBody, SortableTaskCard } from '@/components/projects/board-dnd';
 import type { MoveTargetColumn } from '@/components/projects/move-task-menu';
 import { QuickAddTask } from '@/components/projects/quick-add-task';
 import { TaskCard } from '@/components/projects/task-card';
@@ -78,25 +79,56 @@ export function BoardColumn({
                 ) : null}
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                {column.tasks.length === 0 ? (
-                    <p className="px-1 py-4 text-center text-xs text-muted-foreground">No tasks.</p>
-                ) : null}
-                {column.tasks.map((task, index) => (
-                    <TaskCard
-                        key={task.id}
-                        task={task}
-                        projectId={projectId}
-                        columnId={column.id}
-                        columnIndex={index}
-                        columnSize={column.tasks.length}
-                        columns={columns}
-                        canManage={canManage}
-                        boardBusy={boardBusy}
-                        onMove={onMove}
-                    />
-                ))}
-            </div>
+            {canManage ? (
+                <SortableColumnBody
+                    columnId={column.id}
+                    taskIds={column.tasks.map((task) => task.id)}
+                    className="flex-1 space-y-2 overflow-y-auto p-2"
+                >
+                    {column.tasks.length === 0 ? (
+                        <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                            No tasks.
+                        </p>
+                    ) : null}
+                    {column.tasks.map((task, index) => (
+                        <SortableTaskCard
+                            key={task.id}
+                            task={task}
+                            projectId={projectId}
+                            columnId={column.id}
+                            columnIndex={index}
+                            columnSize={column.tasks.length}
+                            columns={columns}
+                            canManage
+                            boardBusy={boardBusy}
+                            disabled={boardBusy}
+                            onMove={onMove}
+                        />
+                    ))}
+                </SortableColumnBody>
+            ) : (
+                <div className="flex-1 space-y-2 overflow-y-auto p-2">
+                    {column.tasks.length === 0 ? (
+                        <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                            No tasks.
+                        </p>
+                    ) : null}
+                    {column.tasks.map((task, index) => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            projectId={projectId}
+                            columnId={column.id}
+                            columnIndex={index}
+                            columnSize={column.tasks.length}
+                            columns={columns}
+                            canManage={false}
+                            boardBusy={boardBusy}
+                            onMove={onMove}
+                        />
+                    ))}
+                </div>
+            )}
 
             {canManage ? (
                 <QuickAddTask

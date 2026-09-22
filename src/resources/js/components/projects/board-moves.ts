@@ -93,3 +93,103 @@ export function isNoopMove(columns: BoardColumn[], move: MoveDescriptor): boolea
 
     return placement.columnId === move.toColumnId && placement.index === move.toIndex;
 }
+
+/** The full task record, wherever it sits, or `null` if no column holds it. */
+export function findTask(
+    columns: BoardColumn[],
+    taskId: number,
+): BoardColumn['tasks'][number] | null {
+    for (const column of columns) {
+        const task = column.tasks.find((candidate) => candidate.id === taskId);
+        if (task) return task;
+    }
+
+    return null;
+}
+
+// ── Drag-and-drop target resolution (EPIC-011E §9, WP6) ─────────────────────
+//
+// dnd-kit identifies a hover/drop target (`over.id`) by whichever sortable item or droppable
+// region the pointer is over. A task card's own id doubles as its dnd-kit id (both are already
+// globally unique numbers); a column's *body* — the droppable that keeps an empty column, or the
+// area below its last card, a valid drop target — uses a distinct string id built by
+// `columnDroppableId` so it can never collide with a task id. `resolveDragTarget` turns either
+// shape of `over.id` into the same `MoveDescriptor` `applyMove` and `requestMove` already use,
+// so the drag path computes "what would the board look like" exactly the way the Move menu does.
+// This module still imports no drag library: the adapter (`board-dnd.tsx`) extracts `active.id`/
+// `over.id` from dnd-kit's own event objects and passes plain `string | number` values in.
+
+export type DragTargetId = string | number;
+
+/** The droppable id for a column's own body (empty space and the area below the last card). */
+export function columnDroppableId(columnId: number): string {
+    return `column-${columnId}`;
+}
+
+function parseColumnDroppableId(id: DragTargetId): number | null {
+    if (typeof id !== 'string') return null;
+
+    const match = /^column-(\d+)$/.exec(id);
+
+    return match ? Number(match[1]) : null;
+}
+
+/**
+ * Resolves a dnd-kit hover/drop target into a `MoveDescriptor`, or `null` when it cannot be
+ * resolved (an unrelated, foreign, or missing target — the caller treats that as no valid
+ * destination and leaves the board unchanged).
+ *
+ * - `over` names a column body: append to that column (its current length with the dragged task
+ *   excluded, if it happens to already be there) — this is what makes an empty column, and the
+ *   area below the last card, valid drop targets.
+ * - `over` names another task: target that task's own column, at that task's own original index.
+ *   `applyMove` (like `@dnd-kit/sortable`'s own `arrayMove` utility, which this deliberately
+ *   matches) removes the active task first and inserts into the resulting, already-shorter
+ *   array, so the hovered task's own original index is already the correct post-removal
+ *   position — it needs no further shift correction, and applying one (an earlier version of
+ *   this function did) makes an adjacent forward drag — the most common single-step
+ *   reorder — silently collapse into a no-op, since "insert immediately before the very next
+ *   card" reconstructs the original order. The natural result of the uncorrected index is a
+ *   clean swap for an adjacent drag in either direction, and "after the hovered card" for a
+ *   forward drag of more than one slot (exactly `arrayMove`'s own behavior).
+ * - `over` names the dragged task itself (its own placeholder): resolves to its current spot,
+ *   which `isNoopMove` then recognizes as no change.
+ */
+export function resolveDragTarget(
+    columns: BoardColumn[],
+    activeTaskId: number,
+    overId: DragTargetId | null,
+): MoveDescriptor | null {
+    if (overId === null) return null;
+
+    const activePlacement = locateTask(columns, activeTaskId);
+    if (!activePlacement) return null;
+
+    const targetColumnId = parseColumnDroppableId(overId);
+
+    if (targetColumnId !== null) {
+        const column = columns.find((candidate) => candidate.id === targetColumnId);
+        if (!column) return null;
+
+        const withoutActive = column.tasks.filter((task) => task.id !== activeTaskId);
+
+        return { taskId: activeTaskId, toColumnId: targetColumnId, toIndex: withoutActive.length };
+    }
+
+    if (overId === activeTaskId) {
+        return {
+            taskId: activeTaskId,
+            toColumnId: activePlacement.columnId,
+            toIndex: activePlacement.index,
+        };
+    }
+
+    const overPlacement = locateTask(columns, overId as number);
+    if (!overPlacement) return null;
+
+    return {
+        taskId: activeTaskId,
+        toColumnId: overPlacement.columnId,
+        toIndex: overPlacement.index,
+    };
+}
