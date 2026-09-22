@@ -62,9 +62,64 @@ export const inertiaSpies = {
         patch: vi.fn(),
         delete: vi.fn(),
         reload: vi.fn(),
+        optimistic: vi.fn(),
     },
     form: formMethods,
 };
+
+export type OptimisticVisitOptions = Record<string, unknown> & {
+    onSuccess?: (page: { props: Record<string, unknown> }) => void;
+    onError?: (errors: Record<string, string>) => void;
+    onHttpException?: (response: { status: number }) => boolean | void;
+    onNetworkError?: (error?: unknown) => boolean | void;
+    onFinish?: () => void;
+};
+
+export type OptimisticSubmission = {
+    method: FormMethod;
+    url: string;
+    data: Record<string, unknown>;
+    options: OptimisticVisitOptions;
+    /** The callback passed to `router.optimistic(...)`, so a test can apply it itself. */
+    transform: (props: Record<string, unknown>) => Record<string, unknown>;
+};
+
+const optimisticSubmissions: OptimisticSubmission[] = [];
+
+/**
+ * Every `router.optimistic(cb).put/post/patch(...)` call in order. The double does not apply
+ * the transform, replay a rollback, or re-render on its own — real Inertia's props update by
+ * swapping the whole page component's props, which in these tests happens by the test
+ * re-rendering with new props, exactly as `<App>` would. What this double gives a test is the
+ * exact callback and options a real optimistic visit would have received, so it can drive them:
+ * call `.transform(props)` and re-render with the result for the optimistic phase, then invoke
+ * `.options.onSuccess(page)` / `.onError(errors)` / `.onHttpException(response)` /
+ * `.onNetworkError()` / `.onFinish()` the way the real request lifecycle would, and re-render
+ * with the columns that implies (canonical, or the pre-move baseline for a rollback).
+ */
+export function optimisticSubmitted(): OptimisticSubmission[] {
+    return optimisticSubmissions;
+}
+
+function optimistic(transform: (props: Record<string, unknown>) => Record<string, unknown>) {
+    inertiaSpies.router.optimistic(transform);
+
+    const submit =
+        (method: FormMethod) =>
+        (url: string, data: Record<string, unknown> = {}, options: OptimisticVisitOptions = {}) => {
+            inertiaSpies.router[method](url, options);
+            optimisticSubmissions.push({ method, url, data, options, transform });
+        };
+
+    return {
+        get: submit('get'),
+        post: submit('post'),
+        put: submit('put'),
+        patch: submit('patch'),
+        delete: (url: string, options: OptimisticVisitOptions = {}) =>
+            submit('delete')(url, {}, options),
+    };
+}
 
 const defaultShared: SharedPageProps = {
     app: { name: 'Intechral Portal' },
@@ -102,6 +157,7 @@ export function resetInertiaMock() {
     Object.values(inertiaSpies.router).forEach((spy) => spy.mockReset());
     Object.values(formMethods).forEach((spy) => spy.mockReset());
     submissions.length = 0;
+    optimisticSubmissions.length = 0;
     state.props = {};
     state.url = '/';
     state.errors = {};
@@ -231,7 +287,7 @@ export function inertiaReactMock() {
     return {
         Head: () => null,
         Link,
-        router: inertiaSpies.router,
+        router: { ...inertiaSpies.router, optimistic },
         useForm,
         usePage,
     };

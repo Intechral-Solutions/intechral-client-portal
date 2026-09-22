@@ -5,7 +5,7 @@
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 **Related:** [EPIC-005: Project Management](./EPIC-005-projects.md), [EPIC-010B: Tenant Scoping](./EPIC-010B-tenant-scoping.md), [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
-**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements; [Amendment 4 (2026-09-21)](#amendment-4-wp1-results-2026-09-21): WP1 implemented and gated, S1/S2 browser-confirmed, lock protocol refined by the stress test, implementation decisions and observations
+**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements; [Amendment 4 (2026-09-21)](#amendment-4-wp1-results-2026-09-21): WP1 implemented and gated, S1/S2 browser-confirmed, lock protocol refined by the stress test, implementation decisions and observations; [Amendment 5 (2026-09-22)](#amendment-5-wp5-results-2026-09-22): WP5 implemented and gated, board flipped Blade→React, move contract switched to redirect-back, structural memo proven, deviations and observations
 
 ---
 
@@ -147,6 +147,53 @@ WP1 (backend hardening and characterization) is **implemented** on `epic-011e-pr
 - **User deletion**: no route exists and none is designed here; the RESTRICT backstop only means such a delete would now be refused for a user whose project holds recorded time.
 - The Blade board quick-add and the milestone forms still swallow validation errors (X5); the React pages fix that in WP4 and WP5.
 - Milestone selection in the Blade task edit form was not added (I4 is WP7 in React); the endpoint now validates it.
+
+---
+
+## Amendment 5: WP5 Results (2026-09-22)
+
+WP5 (the board without drag) is **implemented** on `epic-011e-projects-kanban`, uncommitted, no `dnd-kit` package installed, task detail/`/tasks`/tickets untouched and still Blade. EPIC-011E stays **Planned**; the status moves with the epic, not the work package.
+
+**Gates (all green, 2026-09-22):** full Pest on MariaDB, container PHP 8.3: **797 passed** (up from 763 after WP3; WP4 added milestone coverage in between); Pint clean over the whole repository; `npm run check` (Wayfinder, typecheck, ESLint, Prettier, Vitest 263/263 across 42 files — up from 171 after WP3 — build), exit 0; the full Playwright suite (1.63.0, Chromium, `portal_app`) against the shared development database: **22 of 23 passed**; `git diff --check` clean.
+
+The one Playwright non-pass is `auth-migration.spec.ts`'s "React login reports invalid credentials" test, a file WP5 does not touch. Under the full suite's 6-worker parallel load it intermittently fails on two different symptoms across repeated runs (an empty accessible-description read, and a login that never reaches `/dashboard`), both consistent with Fortify's login rate limiter reacting to six concurrent sign-ins against the shared development database. Run alone, or serially with `--workers=1` alongside the rest of the suite, it passed **every time** (verified twice). This is pre-existing browser-suite infrastructure behavior, not a WP5 regression; no WP5 file is in its call path.
+
+### Where the live result differs from, or adds to, the plan
+
+| # | Item | Outcome |
+|---|---|---|
+| X1 | `app/Http/Presenters/ProjectBoardPresenter.php` (new) | `project()`, `column()`, `task()`. Matches §5's `BoardTask`/`BoardColumn` shapes exactly; `overdue` and column-done state go through `Task::isOverdue()`/`isDone()` only, never re-derived |
+| X2 | `move` contract switch | `ProjectTaskController::move` now returns `back()->with('success', 'Task moved.')` instead of `response()->json(['ok' => true])`, exactly as §2 anticipated. A genuine Inertia partial reload (`X-Inertia-Partial-Data: columns,flash`) after the redirect returns only `columns`, `flash`, and Inertia's own always-shared `errors` — pinned by a Pest test that drives the real partial-reload headers rather than asserting on the JSON body shape |
+| X3 | `projects.store` response | Now an ordinary `redirect()->route('projects.board', $project)` again: the `Inertia::location()` full-page-visit workaround from WP3 (needed only because the board was still Blade) is removed, since the board is a React page as of this work package |
+| X4 | `requestMove` stability under React's newer ref-mutation lint | `react-hooks/refs` (part of this repo's React Compiler-era ESLint config) forbids assigning `ref.current` during render, which the initially-drafted "latest value ref" pattern did. Fixed by moving the three ref assignments (`columns`, `abilities`, `projectId`) into a bare `useEffect(() => {...})` (no dependency array, so it runs after every commit); `requestMove` itself stays a `useCallback` with an empty dependency array and is never recreated, which is what keeps it a stable identity for `TaskCard`'s structural memo |
+| X5 | "Move to \<column\>" append semantics vs. memo stability | Rather than pass each card `column.tasks.length` (which changes on every move for the affected columns, and would force `columns`, and therefore every card's Move menu, off a stable reference), a cross-column "Move to" selection sends `APPEND_TO_END` (`Number.MAX_SAFE_INTEGER`) as the position and lets the same clamp that already handles any out-of-range index — client-side in `applyMove`, and server-side under the column lock (§16.2) — land it at the true tail. `columnSummaries` (`{id,name,isDone}`) is a separate, `useMemo`'d, content-keyed prop from the full `columns`, so it stays referentially stable across moves that don't add, remove, or rename a column |
+| X6 | Structural memo test strategy | `React.Profiler`'s `onRender` fires once per commit for a Profiler's whole subtree even when a memoized child bails out, so it cannot distinguish "re-rendered" from "bailed out" by itself; an early Profiler-based render-count suite gave false failures unrelated to any real bug. `taskCardPropsAreEqual` (the comparator `TaskCard`'s `memo` uses) is exported and unit-tested directly instead — true/false for every rendered-field and structural-prop combination — plus one `render`/`rerender` DOM check that a genuine field change does propagate. This is what §25/WP0's "Add tests proving..." requirement is actually about: the comparator WP5 wrote, not React's own trusted `memo` mechanics |
+| X7 | `board.blade.php` deletion cascade | Deleting it also retired `tests/Browser/wp1-blade-regressions.spec.ts` (its own header already said it would be deleted with the Blade board); its one remaining case (D1 read-only board) is now `board-migration.spec.ts`'s "plain project member" test against the React board. Two **pre-existing** browser tests needed small updates because they exercised the Blade board's own markup or copy, neither a WP5 regression: `time-migration.spec.ts`'s embedded-tracker setup used `.add-task-btn`/`Task title…` (Blade quick-add markers), updated to the React board's `Add task to <column>` button and `New task title` label; `projects-migration.spec.ts`'s create-project flow asserted `getByRole('alert')` for the "Project created successfully." flash, which was the *Blade* board's location-visit fallback page; the shared React `FlashRegion` renders a success flash as `role="status"`, and now that `projects.store` no longer needs that fallback (X3), the assertion is updated to match |
+| X8 | `TimerContextLink` flip | `contextLinkModes.project` flipped from `'document'` to `'inertia'`, exactly as §21 specified for WP5; `task` and `ticket` are untouched. Adopted by the timer bar and the Time page; a Vitest case pins the new default alongside the still-`'document'` kinds |
+| X9 | Deliberately not added | No `board-dnd.tsx`, `board-card-handle.tsx`, or `board-announcements.ts` beyond the pure success/failure message builders; no `dnd-kit` package; no keyboard drag; no fake focusable drag handle; no second time-report or status model |
+
+### Tests added or changed
+
+| File | Purpose |
+|---|---|
+| `app/Http/Presenters/ProjectBoardPresenter.php`, `ProjectBoardController.php`, `ProjectTaskController::move` | The board DTO and its Inertia render; the redirect-back move contract |
+| `ProjectBoardInertiaTest` (new) | Component/prop shape, minimal DTO (no raw model/description/comment/checklist-text/email leakage), column/task order, column-done and overdue rules, `abilities.manage`/`abilities.openSettings` per actor (including the A9 `admin_only` case), checklist aggregate counts, the move partial-reload contract (`only` returns exactly `columns`+`flash`+`errors`), 404 on a foreign project id |
+| `ProjectIntegrityTest`, `ProjectTaskTest` (edited) | Move-response assertions flipped from `assertExactJson(['ok'=>true])`/`assertOk()` to `assertRedirect()`, matching the new contract; behavior itself (dense positions, locking, concurrency) is unchanged and still covered by the existing WP1 suites |
+| `ProjectInertiaPagesTest` (edited) | `projects.store`'s Inertia-request test updated from the 409/`X-Inertia-Location` assertion to an ordinary `assertRedirect()` |
+| `ProjectBladeRegressionTest` (edited) | The board-specific D1 Blade-markup test removed (superseded by the React board's own coverage); task-page, D4, and D6 Blade cases untouched |
+| `board-moves.test.ts`, `board-announcements.test.ts` (new) | The pure `applyMove`/`locateTask`/`isNoopMove` transform and the announcement-string builders, exhaustively |
+| `move-task-menu.test.tsx`, `task-card.test.tsx`, `quick-add-task.test.tsx`, `board.test.tsx`, `pages/projects/board.test.tsx` (new) | Menu keyboard behavior and payloads (opened by keyboard per the WP2 jsdom finding); the structural-memo comparator; quick-add open/close/validate/focus; the full optimistic→success/422/403/404/500/network/401/419 reconciliation matrix against the extended Inertia test double, single-flight, live region, focus restoration; the page's header and Settings-link gating |
+| `resources/js/test/inertia.tsx` (extended) | `router.optimistic(cb).put/post/patch/delete(...)` recording (`optimisticSubmitted()`), with its own self-test; the double still never applies the transform or replays a rollback itself, by design (a test drives both, the way real Inertia's props swap would) |
+| `tests/Browser/board-migration.spec.ts` (new) | Flows 1 (index→board with a persistent timer, Board↔Milestones stays Inertia), 5 (keyboard-only cross-column move, focus return, live-region text), 6 (read-only board for a plain member; open/comment/toggle still work), plus same-column up/down, and a phone-viewport Move-menu flow |
+| `tests/Browser/time-migration.spec.ts`, `tests/Browser/projects-migration.spec.ts`, `tests/Browser/milestones-migration.spec.ts` (edited) | Updated for the Blade→React board flip, as detailed in X7 above and the stale "still Blade" comment in the milestones spec |
+| `tests/Browser/wp1-blade-regressions.spec.ts` | Deleted (superseded; see X7) |
+
+### Observations and non-goals, deliberately not changed
+
+- **WP6 is untouched.** No `dnd-kit` package, no pointer/touch drag, no drag handle, no `DragOverlay`. The Move menu is the only mutation path, exactly as designed.
+- **Task detail, `/tasks`, and tickets remain Blade.** Title links on the board are plain anchors; `TimerContextLink`'s `task` and `ticket` modes are untouched.
+- **The server-side move algorithm is untouched.** WP5 changed only the HTTP response contract (redirect-back instead of JSON), never the locking/ordering/dense-position logic WP1 hardened and stress-tested; the existing concurrency suite (`ProjectMoveConcurrencyTest`) passes unmodified.
+- **No new state library, no reducer, no board copy.** `Board` reads `columns` only from its props; the only local state is `pendingTaskId`, `quickAddColumnId`, and the two live-region strings, matching §8's architecture exactly.
 
 ---
 
@@ -1401,8 +1448,9 @@ Where the result differs from, or adds to, the plan:
 | Deliberately not added | No task list or task badge beyond the two counts; no milestone owners, budgets, colors, or dependency graph; no `MilestoneProgress` sub-component (the progress bar is a few lines inline in `MilestoneCard`, used once per card, not worth a separate file per the "used once, keep it local" rule) |
 
 ### WP5: Board without drag
+**Status: complete (2026-09-22).** Results, deviations and observations are recorded in [Amendment 5](#amendment-5-wp5-results-2026-09-22). Not committed. No `dnd-kit` package was installed; task detail, `/tasks`, and tickets remain Blade.
 `projects/board`, `BoardColumn`/`TaskCard`, manager-only quick-add and Move menu, `board-moves.ts`, the move flow chosen by WP0, single flight, failure handling, live region, focus restoration, `move` contract switch, `TimerContextLink` flip for Project, delete Blade board.
-**Exit:** a fully keyboard-operable, touch-usable board; read-only for non-managers; Vitest menu/reconcile/no-focusable-drag suites and Playwright flows 1, 5, and 6 pass.
+**Exit (met):** a fully keyboard-operable, touch-usable board; read-only for non-managers; Vitest menu/reconcile/no-focusable-drag suites and Playwright flows 1, 5, and 6 pass (plus additional WP5 flows beyond the minimum).
 
 ### WP6: Drag-and-drop layer
 Add `@dnd-kit/core`, `@dnd-kit/sortable`, and `@dnd-kit/utilities`; **pin exact compatible versions via the committed lockfile** (and `--save-exact` in `package.json`); `board-dnd.tsx` and `board-card-handle.tsx` as the only importers; library-agnostic adapter props (`onMove({taskId,toColumnId,toIndex})`, render callbacks) so **no dnd-kit types leak into domain components**; a `no-restricted-imports` lint rule; announcements, `DragOverlay`, reduced-motion, `accessibility.screenReaderInstructions`.
@@ -1450,12 +1498,12 @@ Full Playwright suite including mixed navigation; mobile and responsive pass; ke
 - [ ] P1 to P3: query counts independent of row count
 
 **Board and accessibility**
-- [ ] Tasks move across and within columns by keyboard through the Move menu alone (every other column, up, down), with focus return and live-region announcements
-- [ ] The drag handle is not focusable and exposes no keyboard instructions
-- [ ] Pointer drag works by handle and persists after reload; touch users can move tasks (menu required; handle drag verified on real devices)
-- [ ] Failed, forbidden, stale, and offline moves revert with a visible alert; no move can be issued while another is pending
-- [ ] The optimistic-move spike results are recorded and the chosen design matches them
-- [ ] Column counts, progress, and overdue indicators always reflect the current state
+- [x] Tasks move across and within columns by keyboard through the Move menu alone (every other column, up, down), with focus return and live-region announcements (WP5)
+- [ ] The drag handle is not focusable and exposes no keyboard instructions (no drag handle exists yet; WP6)
+- [ ] Pointer drag works by handle and persists after reload; touch users can move tasks (menu required; handle drag verified on real devices) (WP6)
+- [x] Failed, forbidden, stale, and offline moves revert with a visible alert; no move can be issued while another is pending (WP5)
+- [x] The optimistic-move spike results are recorded and the chosen design matches them (WP0/WP5)
+- [x] Column counts, progress, and overdue indicators always reflect the current state (WP5)
 
 **Quality gates**
 - [ ] Pest: new suites plus the converted baseline pass on MariaDB

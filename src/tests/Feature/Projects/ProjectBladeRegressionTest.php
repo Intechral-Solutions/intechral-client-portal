@@ -9,8 +9,9 @@ require_once __DIR__.'/ProjectTestHelpers.php';
 /*
  * EPIC-011E WP1: defects fixed in the Blade pages while they still serve the routes. The
  * create/edit pages left Blade in WP3 (S1, S2 and the project half of D4 are now covered by the
- * React page suites and ProjectInertiaPagesTest); the rest goes with the board (WP5) and the task
- * page (WP7).
+ * React page suites and ProjectInertiaPagesTest); the board left Blade in WP5 (D1's read-only
+ * board is now covered by ProjectInertiaPagesTest and the Vitest board suites); the rest goes
+ * with the task page (WP7).
  */
 
 beforeEach(function () {
@@ -21,20 +22,6 @@ beforeEach(function () {
 });
 
 // ── D1: Blade offers no structural action to non-managers ────────────────────
-
-it('hides Add task and dragging on the board from non-managers and shows them to managers and admins', function () {
-    makeTask($this->todo, ['title' => 'Card']);
-
-    foreach (['member' => false, 'manager_role' => false, 'project_manager' => true, 'admin' => true] as $actor => $sees) {
-        $user = projectActor($actor, $this->project);
-        $html = $this->actingAs($user)->get(route('projects.board', $this->project))->assertOk()->getContent();
-
-        expect($html)->toContain('Card');
-        foreach (['add-task-btn', 'draggable="true"', 'dragstart', 'action="'.route('projects.tasks.store', $this->project).'"'] as $marker) {
-            expect(str_contains($html, $marker))->toBe($sees, "{$actor} / {$marker}");
-        }
-    }
-});
 
 it('hides the edit form and delete button on the task page from non-managers', function () {
     $task = makeTask($this->todo, ['title' => 'Detail']);

@@ -69,7 +69,7 @@ class ProjectTaskController extends Controller
         return back()->with('success', 'Task deleted.');
     }
 
-    public function move(Request $request, Project $project, Task $task): JsonResponse
+    public function move(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('manage', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -81,7 +81,10 @@ class ProjectTaskController extends Controller
 
         $this->service->moveTask($task, (int) $data['column_id'], (int) $data['position']);
 
-        return response()->json(['ok' => true]);
+        // Redirect-back so Inertia's partial reload (`only: ['columns', 'flash']`, EPIC-011E §8)
+        // returns the authoritative board state; the optimistic overlay is replaced by it. The
+        // Blade board's fire-and-forget JSON contract ({ok:true}) ends here (WP5).
+        return back()->with('success', 'Task moved.');
     }
 
     public function storeChecklistItem(Request $request, Project $project, Task $task): RedirectResponse

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import {
     inertiaSpies,
+    optimisticSubmitted,
     resetInertiaMock,
     setFormErrors,
     setFormProcessing,
@@ -198,4 +199,34 @@ it('exposes the router spies and configured page props, and resets between tests
 
     resetInertiaMock();
     expect(inertiaSpies.router.reload).not.toHaveBeenCalled();
+});
+
+it('records an optimistic visit with its transform, payload and options, and resets between tests', () => {
+    const transform = (props: Record<string, unknown>) => ({ columns: props.columns });
+    const onSuccess = vi.fn();
+
+    router
+        .optimistic(transform)
+        .put('/things/1/move', { column_id: 2, position: 0 }, { onSuccess, preserveScroll: true });
+
+    expect(inertiaSpies.router.optimistic).toHaveBeenCalledWith(transform);
+    expect(inertiaSpies.router.put).toHaveBeenCalledWith('/things/1/move', {
+        onSuccess,
+        preserveScroll: true,
+    });
+    expect(optimisticSubmitted()).toEqual([
+        {
+            method: 'put',
+            url: '/things/1/move',
+            data: { column_id: 2, position: 0 },
+            options: { onSuccess, preserveScroll: true },
+            transform,
+        },
+    ]);
+    // The double never applies the transform itself: a test drives it, exactly as it would
+    // drive whatever new props a real optimistic swap produced.
+    expect(transform({ columns: ['a', 'b'] })).toEqual({ columns: ['a', 'b'] });
+
+    resetInertiaMock();
+    expect(optimisticSubmitted()).toEqual([]);
 });

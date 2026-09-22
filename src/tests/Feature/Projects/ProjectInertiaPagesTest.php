@@ -217,14 +217,15 @@ it('serializes companies as id and name only', function () {
         ->and(json_encode($companies))->not->toContain('secret.acme.test')->not->toContain('555-0100');
 });
 
-it('sends a successful create to the still-Blade board as a full-page location visit for Inertia requests', function () {
+it('sends a successful create to the board as an ordinary Inertia redirect', function () {
+    // The board is a React page as of WP5, so this is an ordinary redirect again: no
+    // Inertia::location() full-page-visit workaround (EPIC-011E §21, superseded W7/WP3 note).
     $response = $this->actingAs($this->manager)->withHeaders(['X-Inertia' => 'true'])
         ->post(route('projects.store'), ['name' => 'Inertia Created', 'status' => 'active']);
 
     $project = Project::where('name', 'Inertia Created')->firstOrFail();
 
-    // A 302 to a non-Inertia page would make Inertia show its error modal (EPIC-011E §21).
-    $response->assertStatus(409)->assertHeader('X-Inertia-Location', route('projects.board', $project));
+    $response->assertRedirect(route('projects.board', $project));
     expect(session('success'))->toBe('Project created successfully.')
         ->and($project->members()->pluck('project_members.role', 'users.id')->all())->toBe([$this->manager->id => 'manager']);
 });
@@ -401,7 +402,7 @@ it('keeps a project whose time history blocks deletion and reports it in the del
         ->toBe($entry->only(['project_id', 'task_id', 'duration_minutes']));
 })->with(['direct project time' => ['project'], 'time on one of its tasks' => ['task']]);
 
-it('keeps projects.show redirecting to the still-Blade board', function () {
+it('keeps projects.show redirecting to the board', function () {
     $this->actingAs($this->admin)->get(route('projects.show', $this->project))
         ->assertRedirect(route('projects.board', $this->project));
 });

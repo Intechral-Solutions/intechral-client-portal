@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { CalendarClock, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
@@ -27,11 +27,10 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
             <Head title={`${project.name} — Milestones`} />
             <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
                 <p className="mb-2 text-sm text-muted-foreground">
-                    {/* The board is still a Blade page (EPIC-011E §21): a plain anchor, not
-                        Inertia's Link, so a non-Inertia response never triggers its error modal. */}
-                    <a href={board.url(project.id)} className="hover:underline">
+                    {/* The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link. */}
+                    <Link href={board.url(project.id)} className="hover:underline">
                         {project.name}
-                    </a>{' '}
+                    </Link>{' '}
                     / Milestones
                 </p>
                 <PageHeader
@@ -81,12 +80,12 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
                 )}
 
                 <div className="mt-8">
-                    <a
+                    <Link
                         href={board.url(project.id)}
                         className={buttonVariants({ variant: 'outline' })}
                     >
                         Back to board
-                    </a>
+                    </Link>
                 </div>
             </div>
 

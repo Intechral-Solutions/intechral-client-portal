@@ -1,3 +1,5 @@
+import { Link } from '@inertiajs/react';
+
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { Progress } from '@/components/ui/progress';
 import { formatDate } from '@/lib/dates';
@@ -15,15 +17,15 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
                     id={`project-${project.id}-title`}
                     className="text-base leading-snug font-semibold"
                 >
-                    {/* A plain anchor: the board is still a Blade page (EPIC-011E §21), and Inertia
-                        would show its error modal for a non-Inertia response. The stretched link
-                        makes the whole card clickable while the accessible name stays the title. */}
-                    <a
+                    {/* The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link. The
+                        stretched link makes the whole card clickable while the accessible name
+                        stays the title. */}
+                    <Link
                         href={board.url(project.id)}
                         className="outline-none after:absolute after:inset-0 after:content-['']"
                     >
                         {project.name}
-                    </a>
+                    </Link>
                 </h2>
                 <ProjectStatusBadge status={project.status} />
             </div>

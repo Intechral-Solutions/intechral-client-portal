@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
@@ -246,13 +246,13 @@ export function EditProjectPage({
                     title="Edit project"
                     description={project.name}
                     actions={
-                        // A plain anchor: the board is still a Blade page (EPIC-011E §21).
-                        <a
+                        // The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link.
+                        <Link
                             href={board.url(project.id)}
                             className={buttonVariants({ variant: 'outline' })}
                         >
                             Back to board
-                        </a>
+                        </Link>
                     }
                 />
 

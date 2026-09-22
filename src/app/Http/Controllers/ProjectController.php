@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class ProjectController extends Controller
 {
@@ -58,7 +57,7 @@ class ProjectController extends Controller
         return Inertia::render('projects/create', $props);
     }
 
-    public function store(Request $request): SymfonyResponse
+    public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Project::class);
 
@@ -89,13 +88,10 @@ class ProjectController extends Controller
             $project->companies()->sync($data['companies']);
         }
 
-        // The board is still a Blade page. Redirecting an Inertia request to a non-Inertia
-        // response makes Inertia show its error modal, so an Inertia request gets a location
-        // visit (a full page load); every other request still gets the plain redirect. Once the
-        // board is a React page (WP5) this becomes an ordinary redirect again.
-        session()->flash('success', 'Project created successfully.');
-
-        return Inertia::location(route('projects.board', $project));
+        // The board is a React page as of WP5, so an ordinary redirect is an ordinary Inertia
+        // visit again (no Inertia::location() full-page-visit workaround needed).
+        return redirect()->route('projects.board', $project)
+            ->with('success', 'Project created successfully.');
     }
 
     public function show(Project $project): RedirectResponse

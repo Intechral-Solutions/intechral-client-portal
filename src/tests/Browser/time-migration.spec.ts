@@ -203,7 +203,8 @@ test('a timer started from the embedded Blade tracker is reconstructed by React'
 
     // The embedded tracker lives on a still-Blade task page. Create a throwaway project and
     // task for it; the fixture teardown deletes the timer entries and then the project.
-    // (The create page is React as of WP3; the board and task page it lands on are still Blade.)
+    // (The create and board pages are React as of WP3/WP5; the task page it lands on is still
+    // Blade until WP7.)
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill('E2E Blade tracker project');
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -211,9 +212,9 @@ test('a timer started from the embedded Blade tracker is reconstructed by React'
     const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
     cleanup.trackProject(projectId);
 
-    await page.locator('.add-task-btn').first().click();
-    await page.getByPlaceholder('Task title…').first().fill('E2E Blade tracker task');
-    await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Add task to Backlog' }).click();
+    await page.getByLabel('New task title').fill('E2E Blade tracker task');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('link', { name: 'E2E Blade tracker task' }).click();
     await expect(page).toHaveURL(/\/projects\/\d+\/tasks\/\d+$/);
     const taskUrl = page.url();

@@ -223,18 +223,21 @@ it('treats a move to the current place as a no-op', function () {
     $this->travel(5)->minutes();
     $this->actingAs($this->manager)->putJson(route('projects.tasks.move', [$this->project, $b]), [
         'column_id' => $this->todo->id, 'position' => 1,
-    ])->assertOk()->assertExactJson(['ok' => true]);
+    ])->assertRedirect();
 
     expect(columnOrder($this->todo))->toBe([$a->id, $b->id])
         ->and($b->fresh()->updated_at->equalTo($stamp))->toBeTrue();
 });
 
-it('keeps the move response contract as {ok:true}', function () {
+it('keeps the move response contract as a redirect-back with a flash message (WP5)', function () {
+    // Redirect-back, not {ok:true}: Inertia's partial reload (only: ['columns','flash']) is
+    // what returns the authoritative board state (EPIC-011E §8).
     $task = makeTask($this->todo);
 
     $this->actingAs($this->manager)->putJson(route('projects.tasks.move', [$this->project, $task]), [
         'column_id' => $this->done->id, 'position' => 0,
-    ])->assertOk()->assertExactJson(['ok' => true]);
+    ])->assertRedirect();
+    expect(session('success'))->toBe('Task moved.');
 });
 
 it('closes the gap when a task is deleted', function () {
@@ -261,7 +264,7 @@ it('never touches tasks.status when moving', function () {
 
     $this->actingAs($this->manager)->putJson(route('projects.tasks.move', [$this->project, $task]), [
         'column_id' => $this->done->id, 'position' => 0,
-    ])->assertOk();
+    ])->assertRedirect();
 
     expect($task->fresh()->status)->toBe('todo');
 });

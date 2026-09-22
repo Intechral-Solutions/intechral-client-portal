@@ -2,6 +2,8 @@ export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
 
 export type MemberRole = 'member' | 'manager';
 
+export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+
 /** One card on the projects index (ProjectPresenter::card). */
 export type ProjectCardData = {
     id: number;
@@ -53,4 +55,25 @@ export type MilestoneItem = {
     /** 0 to 100, tasks in done columns/status over all tasks on this milestone. */
     completion: number;
     overdue: boolean;
+};
+
+/** One card on the board (ProjectBoardPresenter::task). No description, comments, or emails. */
+export type BoardTask = {
+    id: number;
+    title: string;
+    priority: TaskPriority;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    dueDate: string | null;
+    overdue: boolean;
+    assignee: { id: number; name: string } | null;
+    milestone: { id: number; name: string } | null;
+    checklist: { done: number; total: number };
+};
+
+/** One column of the board, tasks already in board order (ProjectBoardPresenter::column). */
+export type BoardColumn = {
+    id: number;
+    name: string;
+    isDone: boolean;
+    tasks: BoardTask[];
 };

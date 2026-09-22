@@ -31,7 +31,7 @@ test('board to milestones, create, edit and delete an unreferenced milestone', a
     await signIn(page, 'operator@intechral.test');
     const projectId = await createProject(page, cleanup, 'E2E WP4 milestones project');
 
-    // The board is still Blade; a plain document navigation into the React milestones page.
+    // The board and milestones are both React pages as of WP5: an Inertia navigation.
     await page.getByRole('link', { name: 'Milestones' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
     await expect(page.getByRole('heading', { name: 'Milestones' })).toBeVisible();

@@ -115,8 +115,8 @@ it('moves a task to another column via the move endpoint', function () {
             'column_id' => $target->id,
             'position' => 0,
         ])
-        ->assertOk()
-        ->assertJson(['ok' => true]);
+        // Redirect-back (WP5): Inertia's partial reload returns the authoritative board state.
+        ->assertRedirect();
 
     expect($task->fresh()->column_id)->toBe($target->id);
 });

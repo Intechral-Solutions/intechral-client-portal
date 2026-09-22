@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectBoardPresenter;
 use App\Models\Project;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectBoardController extends Controller
 {
-    public function show(Project $project): View
+    public function show(Project $project): Response
     {
         $this->authorize('view', $project);
 
@@ -25,6 +28,19 @@ class ProjectBoardController extends Controller
                 ->orderBy('id'),
         ]);
 
-        return view('projects.board', compact('project'));
+        return Inertia::render('projects/board', [
+            'project' => ProjectBoardPresenter::project($project),
+            'columns' => $project->columns->map(fn ($column) => ProjectBoardPresenter::column($column))->values(),
+            'abilities' => [
+                // Structural mutation (quick-add, move, reorder): the policy alone, exactly
+                // what the structural task routes authorize (D1). No route middleware gate.
+                'manage' => Gate::allows('manage', $project),
+                // The Settings link: what projects.edit actually admits today (manage policy
+                // AND the projects.manage route middleware, A9), so a projects.admin holder
+                // without projects.manage is never offered a link that answers 403 (EPIC-011E
+                // §7, Amendment 4 W6).
+                'openSettings' => Gate::allows('manage', $project) && auth()->user()->can('projects.manage'),
+            ],
+        ]);
     }
 }

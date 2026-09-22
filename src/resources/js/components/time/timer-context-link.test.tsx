@@ -22,9 +22,11 @@ afterEach(() => {
     resetInertiaMock();
 });
 
-it('links every kind with a plain document anchor until its destination is a React page', () => {
+it('links a still-Blade kind with a plain document anchor, and a migrated kind with Inertia', () => {
+    // WP5: the board (project) is a React page, so its default flipped to Inertia. task and
+    // ticket destinations are still Blade until WP7 / EPIC-011F.
     expect(contextLinkModes).toEqual({
-        project: 'document',
+        project: 'inertia',
         task: 'document',
         ticket: 'document',
     });
@@ -37,7 +39,11 @@ it('links every kind with a plain document anchor until its destination is a Rea
         </>,
     );
 
-    for (const link of screen.getAllByRole('link')) {
+    expect(screen.getByRole('link', { name: 'Portal' })).toHaveAttribute('data-router', 'inertia');
+    for (const link of [
+        screen.getByRole('link', { name: 'Task' }),
+        screen.getByRole('link', { name: 'Ticket' }),
+    ]) {
         expect(link).not.toHaveAttribute('data-router');
     }
     expect(screen.getByRole('link', { name: 'Portal' })).toHaveAttribute(
@@ -47,7 +53,7 @@ it('links every kind with a plain document anchor until its destination is a Rea
 });
 
 it('uses an Inertia link only for a kind that has been flipped, and matches type case-insensitively', () => {
-    contextLinkModes.project = 'inertia';
+    contextLinkModes.task = 'inertia';
 
     render(
         <>

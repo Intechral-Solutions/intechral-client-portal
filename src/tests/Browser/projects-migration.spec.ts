@@ -62,7 +62,11 @@ test('index to create, and the create page as projects.admin adds a member and l
     await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
     const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
     cleanup.trackProject(projectId);
-    await expect(page.getByRole('alert')).toContainText('Project created successfully.');
+    // The board is a React page as of WP5, so this landed as an ordinary Inertia navigation
+    // (no more Inertia::location() full-page-visit workaround, EPIC-011E §21); the shared
+    // FlashRegion renders a success message with role="status", not "alert" (that was the old
+    // Blade board's own markup, reached via the pre-WP5 location-visit fallback).
+    await expect(page.getByRole('status')).toContainText('Project created successfully.');
 });
 
 test('edit-page safety regression: saving renames without deleting, and delete needs confirmation and works', async ({
