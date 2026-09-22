@@ -161,7 +161,7 @@ it('deletes a task', function () {
     ]);
 
     $this->actingAs($operator)->delete(route('projects.tasks.destroy', [$project, $task]))
-        ->assertRedirect();
+        ->assertRedirect(route('projects.board', $project));
 
     expect(Task::find($task->id))->toBeNull();
 });

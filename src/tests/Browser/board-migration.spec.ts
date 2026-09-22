@@ -182,8 +182,8 @@ test('a plain project member gets a read-only board and can still open, comment 
         await expect(memberPage.getByRole('button', { name: /Move "/ })).toHaveCount(0);
         await expect(memberPage.getByRole('link', { name: 'Settings' })).toHaveCount(0);
 
-        // Task detail is still a document destination (WP7): a plain navigation away from the
-        // React board.
+        // Task detail is a React page as of WP7: an Inertia navigation from the React board,
+        // not a document load.
         await memberPage.getByRole('link', { name: 'E2E D1 task' }).click();
         await expect(memberPage).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
         await expect(memberPage.getByText('Edit Task')).toHaveCount(0);

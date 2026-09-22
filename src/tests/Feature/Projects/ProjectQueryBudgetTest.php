@@ -82,6 +82,25 @@ it('does not run per-task queries on the board', function () {
     expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "board queries: 3 tasks={$small}, 30 tasks={$large}");
 });
 
+it('does not run per-comment or per-checklist-item queries on the task page (WP7)', function () {
+    $admin = makeUser('operator');
+    $project = makeProject($admin);
+    $task = makeTask($project->columns[1]);
+    $grow = function (int $n) use ($task, $admin) {
+        for ($i = 0; $i < $n; $i++) {
+            $task->comments()->create(['user_id' => $admin->id, 'body' => "Comment {$i}"]);
+            TaskChecklistItem::factory()->create(['task_id' => $task->id, 'position' => $i]);
+        }
+    };
+
+    $grow(3);
+    $small = warmQueries(fn () => $this->actingAs($admin)->get(route('projects.tasks.show', [$project, $task]))->assertOk());
+    $grow(27);
+    $large = warmQueries(fn () => $this->actingAs($admin)->get(route('projects.tasks.show', [$project, $task]))->assertOk());
+
+    expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "task page queries: 3 rows={$small}, 30 rows={$large}");
+});
+
 it('does not run per-milestone queries on the milestones page', function () {
     $admin = makeUser('operator');
     $project = makeProject($admin);

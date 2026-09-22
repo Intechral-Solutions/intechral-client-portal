@@ -9,11 +9,12 @@ type LinkMode = 'inertia' | 'document';
  * How each context destination is reached. Inertia `Link` may only point at a page that is
  * already a React page; pointing it at a Blade route would make Inertia show its error modal
  * (EPIC-011E §21). Flip an entry in the work package that migrates that destination:
- * `project` (the board) flipped in WP5, `task` in WP7. `ticket` stays `document` until EPIC-011F.
+ * `project` (the board) flipped in WP5, `task` (the task detail page) in WP7. `ticket` stays
+ * `document` until EPIC-011F.
  */
 export const contextLinkModes: Record<ContextKind, LinkMode> = {
     project: 'inertia',
-    task: 'document',
+    task: 'inertia',
     ticket: 'document',
 };
 

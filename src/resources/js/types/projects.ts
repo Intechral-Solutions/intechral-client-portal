@@ -77,3 +77,61 @@ export type BoardColumn = {
     isDone: boolean;
     tasks: BoardTask[];
 };
+
+/** A minimal user reference: id and display name only, never an email (D2/A3 minimisation). */
+export type UserRef = { id: number; name: string };
+
+/** A minimal milestone reference, as shown on a task. */
+export type MilestoneRef = { id: number; name: string };
+
+/**
+ * The status shared by the board, task detail, and `/tasks` (TaskStatusPresenter, EPIC-011E
+ * §15). `label`/`done` mirror `Task::effectiveStatus()`/`Task::isDone()` exactly; `source` says
+ * which field is authoritative for this task's kind. Never compare a raw `status` string.
+ */
+export type TaskStatusDto = {
+    label: string;
+    done: boolean;
+    source: 'column' | 'status';
+};
+
+/** The task detail page's own task DTO (ProjectTaskPresenter::detail). */
+export type TaskDetail = {
+    id: number;
+    title: string;
+    description: string | null;
+    priority: TaskPriority;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    dueDate: string | null;
+    overdue: boolean;
+    status: TaskStatusDto;
+    column: { id: number; name: string; isDone: boolean } | null;
+    assignee: UserRef | null;
+    /** False when the current assignee has since left the project (I8); they still show up
+     * here so a manager's unrelated save cannot silently unassign them. */
+    assigneeIsMember: boolean;
+    milestone: MilestoneRef | null;
+};
+
+/** One checklist item (ProjectTaskPresenter::checklistItem). */
+export type TaskChecklistItemData = {
+    id: number;
+    title: string;
+    completed: boolean;
+};
+
+/** One comment (ProjectTaskPresenter::comment). Plain text; never rendered as HTML. */
+export type TaskCommentData = {
+    id: number;
+    body: string;
+    createdAt: string;
+    author: UserRef | null;
+};
+
+/** Options for the manager-only edit form; present only when `abilities.manage` is true. */
+export type TaskEditOptions = {
+    /** Project members only (A3); the current assignee is added separately if departed. */
+    members: UserRef[];
+    milestones: MilestoneRef[];
+    priorities: { value: TaskPriority; label: string }[];
+};

@@ -68,7 +68,9 @@ it('PINNED: members, managers and admins may comment and toggle checklist items;
     foreach (['member', 'manager_role', 'project_manager', 'admin'] as $actor) {
         $user = projectActor($actor, $this->project);
         $this->actingAs($user)->post(route('projects.tasks.comments.store', [$this->project, $task]), ['body' => "hi {$actor}"])->assertRedirect();
-        $this->actingAs($user)->putJson(route('projects.tasks.checklist.toggle', [$this->project, $task, $item->id]))->assertOk();
+        // Redirect-back, not JSON (WP7): the React panel reconciles against the authoritative
+        // `checklist` prop via a partial reload, the same contract the board's move uses.
+        $this->actingAs($user)->putJson(route('projects.tasks.checklist.toggle', [$this->project, $task, $item->id]))->assertRedirect();
     }
 
     foreach (['outsider', 'assignee'] as $actor) {

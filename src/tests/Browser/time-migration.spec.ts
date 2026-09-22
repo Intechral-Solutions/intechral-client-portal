@@ -196,28 +196,23 @@ test('manual entries and server-owned allocation remain usable on mobile', async
 
 test('a timer started from the embedded Blade tracker is reconstructed by React', async ({
     page,
-    cleanup,
 }) => {
     await signIn(page, 'operator@intechral.test');
     await stopAllReactTimers(page);
 
-    // The embedded tracker lives on a still-Blade task page. Create a throwaway project and
-    // task for it; the fixture teardown deletes the timer entries and then the project.
-    // (The create and board pages are React as of WP3/WP5; the task page it lands on is still
-    // Blade until WP7.)
-    await page.goto('/projects/create');
-    await page.getByLabel('Project name').fill('E2E Blade tracker project');
-    await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
-    cleanup.trackProject(projectId);
-
-    await page.getByRole('button', { name: 'Add task to Backlog' }).click();
-    await page.getByLabel('New task title').fill('E2E Blade tracker task');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await page.getByRole('link', { name: 'E2E Blade tracker task' }).click();
-    await expect(page).toHaveURL(/\/projects\/\d+\/tasks\/\d+$/);
-    const taskUrl = page.url();
+    // The embedded tracker's only remaining host is a ticket page (EPIC-011E WP7, §21: the
+    // project task page it used to also live on is React as of this work package). Tickets have
+    // no delete route and DevSeeder seeds none per run, so this uses the seeder's idempotent
+    // fixture ticket (`TKT-E2E1`) rather than creating one here; teardown removes only the timer
+    // entries this test creates, never the ticket.
+    await page.goto('/tickets');
+    await page
+        .getByRole('row')
+        .filter({ hasText: 'TKT-E2E1' })
+        .getByRole('link', { name: 'View' })
+        .click();
+    await expect(page).toHaveURL(/\/tickets\/\d+$/);
+    const ticketUrl = page.url();
 
     // Start from the Blade tracker (the request passes the hardened context validation).
     await page.getByRole('button', { name: /Start Timer/ }).click();
@@ -228,21 +223,25 @@ test('a timer started from the embedded Blade tracker is reconstructed by React'
     // A document navigation into an Inertia page mounts React, which hydrates from Laravel.
     await page.goto('/time');
     const bar = page.getByRole('region', { name: 'Active timers' });
-    await expect(bar).toContainText('Task: E2E Blade tracker task');
+    await expect(bar).toContainText('TKT-E2E1');
     await expect(page.locator('#timer-overlay')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
 
     // And back to Blade: the same server record is shown by the legacy overlay.
-    await page.goto(taskUrl);
+    await page.goto(ticketUrl);
     await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
     await expect(page.getByText('Timer running')).toBeVisible();
 
-    // Stop through React so the timer is finished before the fixture is removed.
+    // Stop through React so the timer is finished before cleanup runs.
     await page.goto('/time');
     await page.getByRole('button', { name: 'Stop timer' }).click();
     await expect(page.getByRole('region', { name: 'Active timers' })).toHaveCount(0);
 
-    await page.goto(taskUrl);
+    await page.goto(ticketUrl);
     await expect(page.getByRole('button', { name: /Start Timer/ })).toBeVisible();
     await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(0);
+
+    // E2eCleanup already recorded this timer's entry id from the `/time/timer/start` response
+    // and removes it in teardown; the fixture ticket itself has no delete route and is not
+    // removed, so the next run's `firstOrCreate` finds it already there.
 });

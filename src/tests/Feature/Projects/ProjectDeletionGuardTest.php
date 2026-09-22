@@ -37,8 +37,10 @@ function entrySnapshot(TimeEntry $entry): array
 it('deletes an unreferenced task and project', function () {
     $task = makeTask($this->todo);
 
+    // Explicitly the board, never back(): the previous URL is the task's own page, which no
+    // longer exists once the task is deleted (EPIC-011E §11, WP7).
     $this->actingAs($this->manager)->delete(route('projects.tasks.destroy', [$this->project, $task]))
-        ->assertRedirect()->assertSessionHasNoErrors();
+        ->assertRedirect(route('projects.board', $this->project))->assertSessionHasNoErrors();
     expect(Task::find($task->id))->toBeNull();
 
     $this->actingAs($this->manager)->delete(route('projects.destroy', $this->project))

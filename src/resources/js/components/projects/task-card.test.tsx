@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { TaskCard, taskCardPropsAreEqual } from '@/components/projects/task-card';
 import type { BoardTask } from '@/types/projects';
 
+vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
+
 const columns = [
     { id: 1, name: 'To Do', isDone: false },
     { id: 2, name: 'Done', isDone: true },

@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { memo } from 'react';
 import type { ReactNode } from 'react';
 
@@ -66,14 +67,16 @@ function TaskCardImpl({
                 ) : null}
             </div>
 
-            {/* A plain anchor: task detail is still a Blade page (EPIC-011E §21) until WP7. */}
-            <a
+            {/* Task detail is a React page as of WP7 (EPIC-011E §21): an Inertia Link,
+                prefetched since it is the board's most common next destination. */}
+            <Link
                 id={titleId}
                 href={taskShowRoute.url({ project: projectId, task: task.id })}
+                prefetch
                 className="block text-sm leading-snug font-medium hover:underline"
             >
                 {task.title}
-            </a>
+            </Link>
 
             <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">

@@ -2,17 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectTaskPresenter;
+use App\Http\Presenters\TaskTimeSummaryPresenter;
 use App\Models\Project;
+use App\Models\ProjectMilestone;
 use App\Models\Task;
+use App\Models\TaskChecklistItem;
+use App\Models\TaskComment;
+use App\Models\User;
 use App\Services\ProjectService;
 use Closure;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectTaskController extends Controller
 {
@@ -21,14 +28,71 @@ class ProjectTaskController extends Controller
 
     public function __construct(private ProjectService $service) {}
 
-    public function show(Project $project, Task $task): View
+    public function show(Project $project, Task $task): Response
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
 
-        $task->load(['assignee', 'milestone', 'checklistItems', 'comments.user', 'column']);
+        // Everything the page renders is loaded up front: the assignee, milestone, and column
+        // for the DTO, and each comment's author, so the query count does not grow with the
+        // number of comments or checklist items (EPIC-011E §25).
+        $task->load([
+            'assignee:id,name',
+            'milestone:id,name',
+            'column:id,project_id,name,is_done_column',
+            'checklistItems',
+            'comments.user:id,name',
+        ]);
 
-        return view('projects.tasks.show', compact('project', 'task'));
+        $manage = Gate::allows('manage', $project);
+        $user = auth()->user();
+
+        // Saving a task unchanged is not a new assignment (I8): a departed assignee stays on
+        // the task and is shown with a "no longer a project member" indicator rather than a
+        // silent unassignment. This one query (bounded to a single task) is what decides that,
+        // not a re-derivation inside the presenter.
+        $assigneeIsMember = $task->assignee_id === null
+            || $project->members()->where('users.id', $task->assignee_id)->exists();
+
+        $options = null;
+        if ($manage) {
+            $options = [
+                'members' => $project->members()->orderBy('name')->get(['users.id', 'users.name'])
+                    ->map(fn (User $member) => ProjectTaskPresenter::userRef($member))
+                    ->values(),
+                'milestones' => $project->milestones()->get(['id', 'name'])
+                    ->map(fn (ProjectMilestone $milestone) => ['id' => $milestone->id, 'name' => $milestone->name])
+                    ->values(),
+                'priorities' => collect(Task::PRIORITIES)
+                    ->map(fn (string $priority) => ['value' => $priority, 'label' => ucfirst($priority)])
+                    ->values(),
+            ];
+        }
+
+        return Inertia::render('projects/tasks/show', [
+            'project' => ['id' => $project->id, 'name' => $project->name],
+            'task' => ProjectTaskPresenter::detail($task, $assigneeIsMember),
+            'checklist' => $task->checklistItems
+                ->map(fn (TaskChecklistItem $item) => ProjectTaskPresenter::checklistItem($item))
+                ->values(),
+            'comments' => $task->comments
+                ->map(fn (TaskComment $comment) => ProjectTaskPresenter::comment($comment))
+                ->values(),
+            'options' => $options,
+            'abilities' => [
+                // Structural mutation: edit fields, assign, milestone, delete, checklist
+                // add/remove (D1). The policy alone, no route middleware, exactly what the
+                // structural task routes below authorize.
+                'manage' => $manage,
+                // Comment and checklist toggle require only `view`, already enforced by the
+                // authorize() call above: anyone who can open this page may use both
+                // (EPIC-011E §13, §14) — unchanged from the page they replace.
+                'comment' => true,
+                'toggleChecklist' => true,
+                'logTime' => $user->can('time.log'),
+            ],
+            'timeSummary' => TaskTimeSummaryPresenter::summary($task, $user),
+        ]);
     }
 
     // ── Structural mutations: ProjectPolicy::manage (D1) ─────────────────────
@@ -66,7 +130,9 @@ class ProjectTaskController extends Controller
 
         $this->service->deleteTask($task);
 
-        return back()->with('success', 'Task deleted.');
+        // Explicitly the board, never back(): the previous URL is the task's own page (its last
+        // GET load), which no longer exists once the task is deleted (EPIC-011E §11).
+        return redirect()->route('projects.board', $project)->with('success', 'Task deleted.');
     }
 
     public function move(Request $request, Project $project, Task $task): RedirectResponse
@@ -143,7 +209,7 @@ class ProjectTaskController extends Controller
         return back()->with('success', 'Comment added.');
     }
 
-    public function toggleChecklistItem(Request $request, Project $project, Task $task, int $item): JsonResponse
+    public function toggleChecklistItem(Request $request, Project $project, Task $task, int $item): RedirectResponse
     {
         $this->authorize('view', $project);
         abort_unless($task->project_id === $project->id, 404);
@@ -156,7 +222,12 @@ class ProjectTaskController extends Controller
         // keeps the original toggle behaviour for any older caller.
         $checklistItem->update(['completed' => $data['completed'] ?? ! $checklistItem->completed]);
 
-        return response()->json(['completed' => $checklistItem->completed]);
+        // Redirect-back (WP7): the React panel's optimistic toggle reconciles against the
+        // authoritative `checklist` prop via a partial reload (`only: ['checklist']`), the same
+        // pattern the board's move contract already uses (EPIC-011E §8, §14). No flash message:
+        // a toggle is too frequent to announce. The old JSON contract's only consumer, the
+        // Blade `fetch` + `location.reload()` script, is deleted with this work package.
+        return back();
     }
 
     // ── Private ──────────────────────────────────────────────

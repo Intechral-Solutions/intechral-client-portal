@@ -23,6 +23,26 @@ export type TimerStartPayload = {
 
 export type ContextKind = 'project' | 'task' | 'ticket';
 
+/** One row in the task time panel (D6). `userName` is present only when `scope` is `'all'`. */
+export type TaskTimeSummaryEntry = {
+    id: number;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    date: string;
+    durationMinutes: number;
+    userName?: string;
+};
+
+/**
+ * The task detail page's time panel DTO (TaskTimeSummaryPresenter, EPIC-011E §11, D6). `'own'`
+ * when the viewer has only `time.log`; `'all'` when they also hold `time.view_all`. No
+ * description, billing/invoice flag, email, or unrelated user id — ever.
+ */
+export type TaskTimeSummary = {
+    scope: 'own' | 'all';
+    totalMinutes: number;
+    entries: TaskTimeSummaryEntry[];
+};
+
 export type ContextOption = {
     id: number;
     label: string;

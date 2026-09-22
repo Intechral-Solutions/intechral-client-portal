@@ -419,22 +419,27 @@ it('removes a checklist item for managers and 404s on another task', function ()
 });
 
 it('sets the checklist state idempotently when completed is supplied and still toggles otherwise', function () {
+    // Redirect-back, not JSON (WP7): the React panel's optimistic toggle reconciles against the
+    // authoritative `checklist` prop via a partial reload, exactly like the board's move
+    // contract (EPIC-011E §8, §14).
     $member = projectActor('member', $this->project);
     $task = makeTask($this->todo);
     $other = makeTask($this->todo);
     $item = TaskChecklistItem::factory()->create(['task_id' => $task->id, 'completed' => false]);
     $url = route('projects.tasks.checklist.toggle', [$this->project, $task, $item->id]);
 
-    $this->actingAs($member)->putJson($url, ['completed' => true])->assertOk()->assertJson(['completed' => true]);
-    $this->actingAs($member)->putJson($url, ['completed' => true])->assertOk()->assertJson(['completed' => true]);
+    $this->actingAs($member)->putJson($url, ['completed' => true])->assertRedirect();
+    $this->actingAs($member)->putJson($url, ['completed' => true])->assertRedirect();
     expect($item->fresh()->completed)->toBeTrue();
 
-    $this->actingAs($member)->putJson($url, ['completed' => false])->assertOk()->assertJson(['completed' => false]);
-    $this->actingAs($member)->putJson($url, ['completed' => false])->assertOk()->assertJson(['completed' => false]);
+    $this->actingAs($member)->putJson($url, ['completed' => false])->assertRedirect();
+    $this->actingAs($member)->putJson($url, ['completed' => false])->assertRedirect();
     expect($item->fresh()->completed)->toBeFalse();
 
-    $this->actingAs($member)->putJson($url)->assertOk()->assertJson(['completed' => true]);
-    $this->actingAs($member)->putJson($url)->assertOk()->assertJson(['completed' => false]);
+    $this->actingAs($member)->putJson($url)->assertRedirect();
+    expect($item->fresh()->completed)->toBeTrue();
+    $this->actingAs($member)->putJson($url)->assertRedirect();
+    expect($item->fresh()->completed)->toBeFalse();
 
     $this->actingAs($member)->putJson($url, ['completed' => 'maybe'])->assertUnprocessable();
     $this->actingAs($member)->putJson(route('projects.tasks.checklist.toggle', [$this->project, $other, $item->id]))->assertNotFound();
