@@ -273,6 +273,8 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 
 Detailed implementation plan: [EPIC-011E](./EPIC-011E-projects-kanban.md)
 
+**Status: Implemented.** WP0–WP9 are complete (see EPIC-011E for work-package detail); WP10 manual hardening/verification is outstanding. Project index/create/edit, the board, milestones, project task detail, and the unified `/tasks` list are all Inertia/React; no Blade view remains under `resources/views/projects` or `resources/views/tasks`.
+
 ### Scope
 
 - Project index/create/show/edit
@@ -461,12 +463,12 @@ The implementation phases must account for the current inline behavior identifie
 | `billing/invoices/_form.blade.php` | Dynamic line items and totals | G |
 | `billing/payment/show.blade.php` | Stripe Payment Element | G |
 | `operator/tickets/index.blade.php` | Bulk selection | F |
-| `projects/board.blade.php` | Native drag/drop | E |
-| `projects/create.blade.php` | Conditional form behavior | E |
-| `projects/edit.blade.php` | Conditional form behavior | E |
-| `projects/milestones/index.blade.php` | Editing modal | E |
-| `projects/tasks/show.blade.php` | Checklist mutation | E |
-| `tasks/index.blade.php` | New-task disclosure | E |
+| `projects/board.blade.php` | Native drag/drop | E — migrated (deleted; EPIC-011E WP5) |
+| `projects/create.blade.php` | Conditional form behavior | E — migrated (deleted; EPIC-011E WP3) |
+| `projects/edit.blade.php` | Conditional form behavior | E — migrated (deleted; EPIC-011E WP3) |
+| `projects/milestones/index.blade.php` | Editing modal | E — migrated (deleted; EPIC-011E WP4) |
+| `projects/tasks/show.blade.php` | Checklist mutation | E — migrated (deleted; EPIC-011E WP7) |
+| `tasks/index.blade.php` | New-task disclosure | E — migrated (deleted; EPIC-011E WP8) |
 
 Each phase must re-inventory its own views before implementation because this table is a planning baseline, not permission to ignore code added later.
 
@@ -478,7 +480,7 @@ Each phase must re-inventory its own views before implementation because this ta
 | B | Dashboard, profile |
 | C | Login, forgot/reset password, confirm password, 2FA challenge, invitation registration, invalid invitation |
 | D | Personal time, allocation, operator time reports, timer UI |
-| E | Projects, board, milestones, project tasks, unified tasks |
+| E | *(none — migrated to Inertia, EPIC-011E WP3–WP8)* Projects, board, milestones, project tasks, and unified tasks are no longer Blade-rendered |
 | F | User tickets, operator queue/show/reports/bulk/replies |
 | G | Operator invoices, client invoices, Stripe payment |
 | H | Companies, contacts, organizations/memberships |

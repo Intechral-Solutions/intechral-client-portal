@@ -1,6 +1,6 @@
 # EPIC-011E: Projects and Kanban Migration
 
-**Status:** Planned
+**Status:** Implemented (WP0–WP9 complete; WP10 hardening/verification outstanding)
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
@@ -393,6 +393,56 @@ The first full `./dev test:e2e` run's own "the suite may have leaked fixtures" w
 - **`ProjectPolicy` and `TicketPolicy` are unchanged.** D2 continues to be enforced by intersecting with `Project::visibleTo()` (WP1) and `Gate::allows('view', $ticket)`, both already proven equal to their policies; this work package added no new visibility rule of its own.
 - **Timer context for a standalone task is untouched.** `AccessibleTimeContext`/`contextOptions` (WP1) already exclude a standalone task's timer-context `url`, independent of this page; `/tasks` and the timer bar's context link are separate concerns that happen to share no code that needed touching here.
 - **`time.view_own` remains unenforced permission-model debt**, unchanged from every prior work package's note.
+
+---
+
+## Amendment 10: WP9 Results (2026-09-22)
+
+WP9 (documentation reconciliation and test consolidation) is **implemented** on `epic-011e-projects-kanban`, uncommitted. A read-only audit preceding this work package established that the code-level cleanup §22 originally assigned to WP9 had already happened incrementally in WP3–WP8: `resources/views/projects/` and `resources/views/tasks/` were already gone, no HTML5 drag/drop or stale `view('projects.`/`view('tasks.` reference existed, and dnd-kit remained correctly isolated. WP9 therefore touched **no runtime application file**: no route, controller, service, model, migration, or dependency changed. Its scope was documentation and one test consolidation.
+
+### Documentation reconciliation
+
+| Document | Change |
+|---|---|
+| `docs/epics/EPIC-011-react-frontend-migration.md` | Phase E: added a status line ("Implemented... WP10 outstanding"); the six Phase-E rows in the Blade/Inline JavaScript Migration Inventory marked `migrated (deleted; EPIC-011E WPn)`; the Route/View Coverage Matrix's Phase E row rewritten to state none of those areas are Blade-rendered any more |
+| `docs/architecture/adr/ADR-007-inertia-react-frontend.md` | New "Kanban board interaction layer (EPIC-011E)" subsection: dnd-kit as pointer/touch enhancement only, pinned exact versions, Move menu as the canonical path, no `KeyboardSensor`, drag and menu share one server move path |
+| `docs/epics/EPIC-010B-tenant-scoping.md` | Tenant-Scoping Matrix `Project` row footnoted; new note below the table explaining D2 supersedes "linked company" as a visibility grant, with the A5 defect history preserved |
+| `docs/architecture/adr/ADR-005-organization-multitenancy.md` | Decision paragraph's ambiguous "project/company membership" phrase replaced with a direct current-state statement: company link is visibility metadata only |
+| `docs/architecture/rbac-design.md` | Same clarification added inline to the Data Scoping section; new "Known gap — `time.view_own`" note added after the permission catalogue |
+| `docs/architecture/database-schema.md` | Same D2 clarification appended to the existing data-scoping callout |
+| `docs/epics/EPIC-005-projects.md` | STORY-005-02 gets a current-state note pointing at D1 (manager-only structural mutation); the original user story text is untouched |
+| `docs/epics/README.md` | EPIC-011E status: `Planned` → `Implemented` |
+| `docs/epics/EPIC-011E-projects-kanban.md` (this document) | Top status line: `Planned` → `Implemented (WP0–WP9 complete; WP10 outstanding)`; WP9's own §29 entry rewritten to describe what actually happened instead of the original pre-audit plan |
+
+No historical amendment or user story was rewritten; every change is either a direct edit to a still-current architecture statement or a dated supersession note next to the original text.
+
+### Test consolidation: `ProjectBladeRegressionTest.php`
+
+Its three assertions were each resolved individually, not dropped as a block:
+
+| Old assertion | Disposition | Replacement |
+|---|---|---|
+| "shows the recorded-time error on the task page" (`assertSee` against a followed redirect) | Superseded, removed | `ProjectDeletionGuardTest.php` → "blocks deleting a task that has time" (`assertSessionHasErrors(['delete' => TASK_TIME_MESSAGE])`), plus that file's adjacent race/FK-backstop/billed-entry cases the old test never covered |
+| "still renders every project page for an administrator with tasks present" (loop of `assertOk()` over all 7 routes) | Superseded, removed | One `assertInertia(...)->component(...)` case per route, already present and stronger (proves the actual component, not just HTTP 200): `ProjectInertiaPagesTest.php` (index, create, edit), `ProjectBoardInertiaTest.php` (board), `ProjectMilestoneInertiaTest.php` (milestones), `ProjectTaskDetailInertiaTest.php` (task detail), `TaskListInertiaTest.php` (`/tasks`) |
+| "leaves the ticket time panel untouched" | Retained, relocated | Moved verbatim (actor construction updated to the plain `User::factory()->create()->assignRole('user')` pattern `tests/Feature/Tickets/*` already uses) to `tests/Feature/Tickets/TicketEmbeddedTimeTrackerTest.php`, with a docblock explaining why a Ticket-only regression lives outside `Projects/` |
+
+`ProjectBladeRegressionTest.php` is deleted; nothing in it lacked a replacement.
+
+### Validation
+
+Focused: the new `TicketEmbeddedTimeTrackerTest.php` and `ProjectDeletionGuardTest.php`, plus every Inertia page-contract file named above — 107 tests, 727 assertions, all green. Full Pest: **820 passed, 0 failed** (822 from WP8, net −2: −3 for the deleted file, +1 for the relocated test). Pint clean. Full `npm run check` (Wayfinder, typecheck, ESLint, Prettier, Vitest **374/374** across 54 files, build) exit 0. `git diff --check` clean. No root-owned generated file.
+
+Full `./dev test:e2e`: 44 of 46 passed on the first run. Two non-passes, both pre-existing and unrelated to any file this work package touched:
+- `milestones-migration.spec.ts` "a plain project member sees milestones read-only..." failed on a Fortify rate-limit exhaustion (`sign-in.ts`'s own retry loop hit its cap); re-run alone at 2 workers, **passed**. Host contention, matching the exact class Amendments 7–9 documented.
+- `auth-migration.spec.ts` "React login reports invalid credentials and logout returns to the auth shell" failed both in the full run and re-run alone at 1 worker — the same spec Amendment 8 already named as pre-existing "Fortify/shared-database flakiness" independent of project/task code. This test does not use the shared `signIn()` retry helper the rest of the suite relies on, so repeated validation runs against the same seeded email during this session's own testing plausibly exhausted its throttle window. Left as-is: fixing Fortify rate-limit test infrastructure is explicitly out of this work package's scope.
+
+Fixture count drifted from `tasks=7` to `tasks=8` across the full run, the same "leaked fixture under host contention" class Amendment 9 traced and documented; this work package's diff touches no Playwright spec or fixture code, so it is not a new instance of that hazard.
+
+### Observations and non-goals, deliberately not changed
+
+- **No product behavior changed.** Every edit in this work package is to a Markdown file plus one test file move; `git diff` against `app/`, `routes/`, `database/migrations/`, and `package.json` is empty.
+- **`time.view_own` is recorded, not implemented.** The new rbac-design.md note describes the gap; no permission, policy, or controller changed.
+- **Tickets and every other still-Blade module are untouched.** `tickets/show.blade.php`, `components/time-tracker.blade.php`, `timer-overlay.js`, and every Admin/Billing/CMS/CRM/Operator/Organization Blade view remain exactly as WP8 left them.
 
 ---
 
@@ -1668,9 +1718,11 @@ Where the result differs from, or adds to, the plan:
 `tasks/index`: tabs as links, D2-safe links, D3 behavior (standalone unlinked, no actions), kind-aware status DTO, form errors, pagination; `tasks` nav flip; both Blade view directories removed.
 **Exit (met):** no dead org links; standalone surface unchanged; Pest (822 passed) and Vitest (400/400) green; `tests/Browser/tasks-migration.spec.ts` 5/5, confirmed twice.
 
-### WP9: Cleanup, coexistence, and documentation
-Run the verification greps (§22); mark the parent inventory rows migrated; ADR-007 note (measured dnd-kit comparison, Move-menu rule, version policy); corrective notes for the D2 change in `EPIC-010B`, `ADR-005`, `rbac-design.md`, and `database-schema.md` (C2); correct EPIC-005's stale statement that a generic project member manages tasks so it reflects D1's manager-only structural mutations; record `time.view_own` as still-unenforced permission-model debt rather than wiring it in this epic; update `docs/epics/README.md` status.
-**Exit:** no dead scripts, views, or globals remain; no document still describes company link as a project boundary.
+### WP9: Documentation reconciliation and test consolidation
+**Status: complete (2026-09-22).** Results are recorded in [Amendment 10](#amendment-10-wp9-results-2026-09-22). Not committed. No runtime application code, route, controller, service, model, migration, or dependency changed.
+
+The code-level Blade/JS cleanup §22 originally assigned to WP9 was already carried out incrementally by WP3–WP8 (each phase deleted its own Blade view in the work package that flipped its controller action); a read-only audit preceding this work package confirmed the §22 verification greps already pass against the live repository. WP9 itself was therefore documentation reconciliation and one test consolidation: the parent EPIC-011 inventory/coverage tables marked migrated; an ADR-007 note on the Kanban drag layer; corrective notes for the D2 change (company link is visibility metadata only) in `EPIC-010B`, `ADR-005`, `rbac-design.md`, and `database-schema.md`; a supersession note on EPIC-005's STORY-005-02 pointing at D1; `time.view_own` recorded as unenforced permission-model debt in `rbac-design.md`; `docs/epics/README.md` and this document's own status line moved off `Planned`; and `ProjectBladeRegressionTest.php` retired in favor of its stronger Inertia-era replacements, with its one still-load-bearing Ticket assertion relocated to `tests/Feature/Tickets/TicketEmbeddedTimeTrackerTest.php`.
+**Exit (met):** the §22 verification greps pass; no document still describes a project's linked CRM company as a visibility grant; full Pest, Vitest, Pint, and build gates green; `ProjectBladeRegressionTest.php`'s three assertions are each either superseded by a named stronger test or relocated, never merely dropped.
 
 ### WP10: Hardening and verification
 Full Playwright suite including mixed navigation; mobile and responsive pass; keyboard and screen-reader walkthrough (NVDA or VoiceOver) of board, menu, dialogs, checklist; real-device touch check; performance measurements (§25); full gates. Status moves to Implemented, then Verified, per the lifecycle.

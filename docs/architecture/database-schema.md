@@ -70,7 +70,7 @@ Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is
 
 > **Note:** A separate `organization_roles` table is planned but not yet built. Org role management is currently handled via the `role` column on `organization_members`.
 
-> **Data scoping:** `crm_companies.organization_id` is the direct tenant key. Organizations are scoped through `organization_members`, and CRM contacts are scoped through their company. Tickets, projects, invoices, and time entries do not contain `organization_id`; they retain their existing ownership, company/project membership, client, and policy boundaries. Platform operators bypass tenant scopes.
+> **Data scoping:** `crm_companies.organization_id` is the direct tenant key. Organizations are scoped through `organization_members`, and CRM contacts are scoped through their company. Tickets, projects, invoices, and time entries do not contain `organization_id`; they retain their existing ownership, membership, client, and policy boundaries. Platform operators bypass tenant scopes. `Project` visibility specifically is `project_members` membership or `projects.admin`; `project_company` is visibility metadata only and never grants access on its own (EPIC-011E D2).
 
 ## Module Tables
 

@@ -21,10 +21,12 @@ Correct organization scoping against the implemented membership schema and add M
 | `CrmContact` | No | `company.organization_id` | Dedicated indirect scope; fixed |
 | `Organization` | No | Organization primary key through membership pivot | Dedicated membership scope; fixed |
 | `Ticket` | No | Owner or ticket company, plus policy/controller logic | Existing own/org access preserved; company input now tenant-validated |
-| `Project` | No | Project membership or linked company | Existing policy/index scoping preserved; company inputs now tenant-validated |
+| `Project` | No | Project membership or linked company¹ | Existing policy/index scoping preserved; company inputs now tenant-validated |
 | `Invoice` | No | Invoice client and policy | Existing own-record policy preserved; no generic scope applied |
 | `TimeEntry` | No | User ownership plus project/ticket context | Existing ownership/service logic preserved; no generic scope applied |
 | Child models | No | Parent resource and policy | No direct scope applied |
+
+¹ **Superseded by EPIC-011E D2 (2026-09):** at the time of this epic, the index query surfaced company-linked projects to non-members, but `ProjectPolicy::view` still denied them, so those rows appeared and 403'd (a defect EPIC-011E's Amendment 1 identified as A5). D2 made the boundary explicit: the company link is visibility **metadata only** and never grants `Project` access on its own. Access is project membership or `projects.admin`, full stop; the index query and every task/milestone link are now intersected with that same policy so no company-linked-but-non-member row is ever rendered.
 
 Unauthenticated/background queries remain unscoped because there is no acting tenant. Operators bypass all three tenant scopes. Non-operators with no memberships match no tenant records.
 

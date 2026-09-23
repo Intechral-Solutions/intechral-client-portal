@@ -21,7 +21,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-011B](./EPIC-011B-dashboard-profile.md) | Dashboard and Profile Migration (EPIC-011 Phase B) | **Implemented** |
 | [EPIC-011C](./EPIC-011C-authentication-invitations.md) | Authentication and Invitation Migration (EPIC-011 Phase C) | **Verified** |
 | [EPIC-011D](./EPIC-011D-time-tracking-timer.md) | Time Tracking and Persistent Timer Migration (EPIC-011 Phase D) | **Verified** |
-| [EPIC-011E](./EPIC-011E-projects-kanban.md) | Projects and Kanban Migration (EPIC-011 Phase E) | **Planned** |
+| [EPIC-011E](./EPIC-011E-projects-kanban.md) | Projects and Kanban Migration (EPIC-011 Phase E) | **Implemented** |
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 
 ## Epic Lifecycle
