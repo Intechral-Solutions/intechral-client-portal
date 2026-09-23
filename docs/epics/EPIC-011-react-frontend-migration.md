@@ -273,7 +273,7 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 
 Detailed implementation plan: [EPIC-011E](./EPIC-011E-projects-kanban.md)
 
-**Status: Implemented.** WP0–WP9 are complete (see EPIC-011E for work-package detail); WP10 manual hardening/verification is outstanding. Project index/create/edit, the board, milestones, project task detail, and the unified `/tasks` list are all Inertia/React; no Blade view remains under `resources/views/projects` or `resources/views/tasks`.
+**Status: Verified (2026-09-23).** WP0–WP10 are complete (see EPIC-011E for work-package detail and Amendment 11 for the verification record). Project index/create/edit, the board, milestones, project task detail, and the unified `/tasks` list are all Inertia/React; no Blade view remains under `resources/views/projects` or `resources/views/tasks`. Device-matrix and exhaustive assistive-technology testing for this phase are deliberately deferred to final platform-level QA.
 
 ### Scope
 
@@ -439,6 +439,7 @@ PDF generation/download is not part of this phase. It belongs to [EPIC-012](./EP
 - Accessibility pass across converted application shell and critical workflows.
 - Cross-browser validation.
 - Remove migration-only compatibility code.
+- **Assistive-technology and device matrix, deferred here from the individual phases.** Per-phase verification covers keyboard operation and accessibility-tree semantics in a real browser, plus a screen-reader smoke test where one was available (EPIC-011E's WP10 had an owner-run NVDA smoke walkthrough on Windows, 2026-09-23). Exhaustive screen-reader certification across NVDA, JAWS and VoiceOver, and validation on real iOS Safari and Android Chrome devices, are deliberately held until this phase so they run once against the finished surface rather than being repeated per phase. Phases carrying this deferral: **E** (board drag/touch and the Move menu, dialogs, checklist).
 
 ### Exit criteria
 
@@ -446,6 +447,7 @@ PDF generation/download is not part of this phase. It belongs to [EPIC-012](./EP
 - No obsolete page scripts or dead Blade pages remain.
 - Any remaining Blade views are intentional and documented.
 - Full backend/frontend/critical-browser CI gates pass.
+- The deferred assistive-technology and real-device matrix above has been executed, and every phase that deferred into it is cleared.
 
 ## Blade / Inline JavaScript Migration Inventory
 
