@@ -104,6 +104,23 @@ async function dragTo(
     await endDrag(page);
 }
 
+/**
+ * Waits until no move is in flight. A drop's optimistic transform paints the card in its new
+ * column immediately, so asserting on the moved card only proves the guess landed, not that the
+ * server accepted it — reloading at that point aborts the still-pending PUT and the move is lost.
+ * `aria-busy` on the board region is exactly the single-flight guard's own signal: it is cleared
+ * in the move's `onFinish`, i.e. once the authoritative response has arrived (EPIC-011E §8).
+ * Every test that reloads to prove persistence must await this first (found in WP10: the two
+ * reload tests below failed under full-suite host contention for this reason alone, and passed
+ * whenever the request happened to win the race).
+ */
+async function expectMoveSettled(page: Page) {
+    await expect(page.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'false',
+    );
+}
+
 test.describe('pointer drag (EPIC-011E WP6)', () => {
     test('drags a card upward within a column by its handle', async ({ page, cleanup }) => {
         await signIn(page, 'operator@intechral.test');
@@ -117,6 +134,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         await dragTo(page, handleFor(page, 'E2E drag second'), cardByTitle(page, 'E2E drag first'));
 
         await expect(backlog.getByRole('link')).toHaveText(['E2E drag second', 'E2E drag first']);
+        await expectMoveSettled(page);
         await page.reload();
         await expect(backlog.getByRole('link')).toHaveText(['E2E drag second', 'E2E drag first']);
     });
@@ -147,6 +165,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         await dragTo(page, handleFor(page, 'E2E cross column task'), toDo);
 
         await expect(toDo.getByRole('link', { name: 'E2E cross column task' })).toBeVisible();
+        await expectMoveSettled(page);
         await page.reload();
         await expect(toDo.getByRole('link', { name: 'E2E cross column task' })).toBeVisible();
     });
@@ -354,6 +373,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
 
         await expect(toDo.getByRole('link', { name: 'E2E reconcile task' })).toBeVisible();
         await expect(backlog.getByRole('link', { name: 'E2E reconcile task' })).toHaveCount(0);
+        await expectMoveSettled(page);
         await page.reload();
         await expect(toDo.getByRole('link', { name: 'E2E reconcile task' })).toBeVisible();
     });

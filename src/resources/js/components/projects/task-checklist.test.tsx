@@ -132,6 +132,83 @@ it('removes an item through a server-confirmed delete', async () => {
     );
 });
 
+// ── WP10 focus/labelling regressions ────────────────────────────────────────
+// Every control here is disabled while its own request is in flight. Restoring focus from the
+// request's own `onFinish` ran before React had committed the re-enable, so `.focus()` on a still
+// disabled element was silently dropped and focus was stranded on <body> — reproduced in a real
+// browser during the WP10 walkthrough, for both the add field and the toggled checkbox.
+
+it('gives the add field a real accessible name, not just a placeholder', () => {
+    renderChecklist({ canAuthor: true });
+
+    expect(screen.getByRole('textbox', { name: 'Add a checklist item' })).toBe(
+        screen.getByPlaceholderText('Add an item…'),
+    );
+});
+
+it('returns focus to the toggled checkbox once it is re-enabled', async () => {
+    const user = userEvent.setup();
+    renderChecklist();
+
+    const first = screen.getByRole('checkbox', { name: 'Write tests' });
+    first.focus();
+    await user.click(first);
+
+    expect(first).toBeDisabled();
+    // jsdom keeps focus on an element that becomes `disabled` (and ignores blur() on one); every
+    // real browser moves focus to <body>, which is what stranded it before this fix and why only
+    // the WP10 browser walkthrough caught it. Move focus away explicitly so this test exercises
+    // the restore path instead of passing on jsdom's more forgiving behaviour.
+    screen.getByRole('checkbox', { name: 'Ship it' }).focus();
+    expect(first).not.toHaveFocus();
+
+    optimisticSubmitted()[0]!.options.onFinish?.();
+
+    await waitFor(() => expect(first).toBeEnabled());
+    await waitFor(() => expect(first).toHaveFocus());
+});
+
+it('returns focus to the add field once the add finishes', async () => {
+    const user = userEvent.setup();
+    let finish: (() => void) | undefined;
+    inertiaSpies.router.post.mockImplementation((_url, _data, options) => {
+        finish = () => (options as { onFinish?: () => void }).onFinish?.();
+    });
+    renderChecklist({ canAuthor: true });
+
+    const field = screen.getByPlaceholderText('Add an item…');
+    await user.type(field, 'Review PR');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(field).toBeDisabled();
+    // See the note above: real browsers move focus off a control that becomes disabled.
+    screen.getByRole('checkbox', { name: 'Ship it' }).focus();
+    expect(field).not.toHaveFocus();
+    finish!();
+
+    await waitFor(() => expect(field).toBeEnabled());
+    await waitFor(() => expect(field).toHaveFocus());
+});
+
+it('moves focus to the neighbouring item after a remove, and to the add field for the last one', async () => {
+    const user = userEvent.setup();
+    let success: (() => void) | undefined;
+    inertiaSpies.router.delete.mockImplementation((_url, options) => {
+        success = () => {
+            (options as { onSuccess?: () => void }).onSuccess?.();
+            (options as { onFinish?: () => void }).onFinish?.();
+        };
+    });
+    const { rerender } = renderChecklist({ canAuthor: true });
+
+    await user.click(screen.getByRole('button', { name: 'Remove "Write tests"' }));
+    success!();
+    // The server's authoritative checklist prop arrives without the removed row.
+    rerender(<TaskChecklist projectId={7} taskId={1} items={[items[1]!]} canAuthor={true} />);
+
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Ship it' })).toHaveFocus());
+});
+
 it('shows an empty state with the add input for a manager when there are no items', () => {
     renderChecklist({ items: [], canAuthor: true });
 

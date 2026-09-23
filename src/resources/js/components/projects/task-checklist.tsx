@@ -1,10 +1,11 @@
 import { router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { destroy, store, toggle } from '@/routes/projects/tasks/checklist';
 import type { TaskChecklistItemData } from '@/types/projects';
@@ -34,8 +35,31 @@ export function TaskChecklist({ projectId, taskId, items, canAuthor }: TaskCheck
     const done = items.filter((item) => item.completed).length;
     const total = items.length;
 
+    // The id of the control that should hold focus once the request that took focus away has
+    // settled. A disabled element cannot receive focus, and every control here is disabled while
+    // its own request is in flight, so focusing from inside `onFinish` is too early: React has
+    // not yet committed the re-enable at that point and the `.focus()` call is silently dropped,
+    // stranding focus on <body>. The effect below runs after that commit instead (EPIC-011E WP10).
+    const refocusIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        const id = refocusIdRef.current;
+        if (id === null) return;
+
+        const target = document.getElementById(id);
+        // Still disabled: a later commit will re-run this effect and restore focus then.
+        if (target === null || (target as HTMLInputElement).disabled) return;
+
+        refocusIdRef.current = null;
+        target.focus();
+    });
+
     function toggleItem(item: TaskChecklistItemData) {
         if (pendingIds.includes(item.id) || removingId === item.id) return;
+
+        // Keyboard users toggle from the checkbox itself; it is disabled for the duration of the
+        // request, so focus has to be put back deliberately once it is enabled again.
+        refocusIdRef.current = `checklist-item-${item.id}`;
 
         const nextCompleted = !item.completed;
         setPendingIds((ids) => [...ids, item.id]);
@@ -64,6 +88,9 @@ export function TaskChecklist({ projectId, taskId, items, canAuthor }: TaskCheck
         event.preventDefault();
         setAdding(true);
         setAddError(undefined);
+        // The field is disabled while the add is in flight; put focus back on it afterwards so a
+        // keyboard user can type the next item without re-tabbing.
+        refocusIdRef.current = 'checklist-add-title';
 
         router.post(
             store.url({ project: projectId, task: taskId }),
@@ -73,10 +100,7 @@ export function TaskChecklist({ projectId, taskId, items, canAuthor }: TaskCheck
                 only: ['checklist', 'flash'],
                 onSuccess: () => setTitle(''),
                 onError: (errors) => setAddError(errors.title),
-                onFinish: () => {
-                    setAdding(false);
-                    document.getElementById('checklist-add-title')?.focus();
-                },
+                onFinish: () => setAdding(false),
             },
         );
     }
@@ -88,9 +112,11 @@ export function TaskChecklist({ projectId, taskId, items, canAuthor }: TaskCheck
             preserveScroll: true,
             only: ['checklist', 'flash'],
             onSuccess: () => {
+                // The removed row's own controls are gone, so focus moves to its neighbour (or
+                // the add field when it was the last item). Routed through the same effect as the
+                // other two paths so a neighbour that happens to be mid-request is not skipped.
                 const next = items[index + 1] ?? items[index - 1];
-                const targetId = next ? `checklist-item-${next.id}` : 'checklist-add-title';
-                document.getElementById(targetId)?.focus();
+                refocusIdRef.current = next ? `checklist-item-${next.id}` : 'checklist-add-title';
             },
             onFinish: () => setRemovingId(null),
         });
@@ -164,6 +190,9 @@ export function TaskChecklist({ projectId, taskId, items, canAuthor }: TaskCheck
             {canAuthor ? (
                 <form onSubmit={submitAdd} className="mt-3 flex items-start gap-2">
                     <div className="flex-1">
+                        <Label htmlFor="checklist-add-title" className="sr-only">
+                            Add a checklist item
+                        </Label>
                         <Input
                             id="checklist-add-title"
                             placeholder="Add an item…"

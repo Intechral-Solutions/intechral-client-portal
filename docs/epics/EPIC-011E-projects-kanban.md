@@ -1,11 +1,11 @@
 # EPIC-011E: Projects and Kanban Migration
 
-**Status:** Implemented (WP0–WP9 complete; WP10 hardening/verification outstanding)
+**Status:** Implemented (WP0–WP10 executed; **not** Verified — two environment-blocked manual accessibility checks remain, see [Amendment 11](#amendment-11-wp10-results-2026-09-22))
 **Parent epic:** [EPIC-011: React Frontend Migration](./EPIC-011-react-frontend-migration.md)
 **Prerequisites:** [EPIC-011A: React Foundation and Coexistence Contract](./EPIC-011A-react-foundation-coexistence.md), [EPIC-011B: Dashboard and Profile Migration](./EPIC-011B-dashboard-profile.md), [EPIC-011C: Authentication and Invitation Migration](./EPIC-011C-authentication-invitations.md), [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md)
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 **Related:** [EPIC-005: Project Management](./EPIC-005-projects.md), [EPIC-010B: Tenant Scoping](./EPIC-010B-tenant-scoping.md), [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
-**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements; [Amendment 4 (2026-09-21)](#amendment-4-wp1-results-2026-09-21): WP1 implemented and gated, S1/S2 browser-confirmed, lock protocol refined by the stress test, implementation decisions and observations; [Amendment 5 (2026-09-22)](#amendment-5-wp5-results-2026-09-22): WP5 implemented and gated, board flipped Blade→React, move contract switched to redirect-back, structural memo proven, deviations and observations; [Amendment 6 (2026-09-22)](#amendment-6-wp5-remediation-2026-09-22): independent review remediation — reconciliation-reload sequencing, quick-add duplicate-submit guard, requestMove synchronous-throw hardening; [Amendment 7 (2026-09-22)](#amendment-7-wp6-results-2026-09-22): WP6 implemented and gated, dnd-kit pointer/touch drag layered over the WP5 board, drag-time board projection removed after a real-browser render-loop crash, deviations and observations; [Amendment 8 (2026-09-22)](#amendment-8-wp7-results-2026-09-22): WP7 implemented and gated, task detail flipped Blade→React, a pre-existing task-delete redirect defect found and fixed, checklist toggle contract switched to redirect-back, deviations and observations; [Amendment 9 (2026-09-22)](#amendment-9-wp8-results-2026-09-22): WP8 implemented and gated, `/tasks` flipped Blade→React as a kind-aware unified list, a ticket eager-load regression caught and fixed before commit, both Blade view directories removed, deviations and observations
+**Amendments:** [Amendment 1 (2026-09-21)](#amendment-1-locked-decisions-and-clarifications-2026-09-21): locked decisions D1 to D6, D7 finding, status contract, drag accessibility, optimistic-move spike, dnd-kit policy; [Amendment 2 (2026-09-21)](#amendment-2-d7-resolution-and-final-implementation-clarifications-2026-09-21): D7-B locked, member-data minimization, EPIC-005 reconciliation, C5/C6 final clarifications, implementation-branch gate; [Amendment 3 (2026-09-21)](#amendment-3-wp0-results-2026-09-21): WP0 executed, optimistic design passed unchanged, dnd-kit spike passed with implementation requirements; [Amendment 4 (2026-09-21)](#amendment-4-wp1-results-2026-09-21): WP1 implemented and gated, S1/S2 browser-confirmed, lock protocol refined by the stress test, implementation decisions and observations; [Amendment 5 (2026-09-22)](#amendment-5-wp5-results-2026-09-22): WP5 implemented and gated, board flipped Blade→React, move contract switched to redirect-back, structural memo proven, deviations and observations; [Amendment 6 (2026-09-22)](#amendment-6-wp5-remediation-2026-09-22): independent review remediation — reconciliation-reload sequencing, quick-add duplicate-submit guard, requestMove synchronous-throw hardening; [Amendment 7 (2026-09-22)](#amendment-7-wp6-results-2026-09-22): WP6 implemented and gated, dnd-kit pointer/touch drag layered over the WP5 board, drag-time board projection removed after a real-browser render-loop crash, deviations and observations; [Amendment 8 (2026-09-22)](#amendment-8-wp7-results-2026-09-22): WP7 implemented and gated, task detail flipped Blade→React, a pre-existing task-delete redirect defect found and fixed, checklist toggle contract switched to redirect-back, deviations and observations; [Amendment 9 (2026-09-22)](#amendment-9-wp8-results-2026-09-22): WP8 implemented and gated, `/tasks` flipped Blade→React as a kind-aware unified list, a ticket eager-load regression caught and fixed before commit, both Blade view directories removed, deviations and observations; [Amendment 10 (2026-09-22)](#amendment-10-wp9-results-2026-09-22): WP9 documentation reconciliation and test consolidation, no runtime code changed; [Amendment 11 (2026-09-22)](#amendment-11-wp10-results-2026-09-22): WP10 verification pass — acceptance-contract matrix, authorization/privacy/board-architecture review, real-browser accessibility walkthrough, three checklist accessibility defects found and fixed, one browser-test race fixed, four candidate findings disproved, lifecycle decision (stays Implemented pending a screen-reader and real-device pass)
 
 ---
 
@@ -443,6 +443,103 @@ Fixture count drifted from `tasks=7` to `tasks=8` across the full run, the same 
 - **No product behavior changed.** Every edit in this work package is to a Markdown file plus one test file move; `git diff` against `app/`, `routes/`, `database/migrations/`, and `package.json` is empty.
 - **`time.view_own` is recorded, not implemented.** The new rbac-design.md note describes the gap; no permission, policy, or controller changed.
 - **Tickets and every other still-Blade module are untouched.** `tickets/show.blade.php`, `components/time-tracker.blade.php`, `timer-overlay.js`, and every Admin/Billing/CMS/CRM/Operator/Organization Blade view remain exactly as WP8 left them.
+
+---
+
+## Amendment 11: WP10 Results (2026-09-22)
+
+WP10 (hardening and verification) was executed on `epic-011e-projects-kanban` against the committed WP0–WP9 state (`c6eadd4`, clean tree). It is a verification pass, not a feature work package: no route, controller, service, model, policy, migration, presenter, or dependency changed. The only production change is three small accessibility fixes in one React component (`task-checklist.tsx`), each covered by a new Vitest regression; the only test change is a latent race fixed in `board-drag.spec.ts`.
+
+**Lifecycle outcome: EPIC-011E stays `Implemented`.** Every automated gate is green and every acceptance contract traced in this pass is supported, but WP10 as written requires a screen-reader walkthrough (NVDA or VoiceOver) and a real-device touch check, and **neither is possible in this environment** (see "Environment-blocked" below). The epic is not marked Verified on the strength of a substitute. Nothing else is outstanding.
+
+### Gates (2026-09-22, after the fixes below)
+
+| Gate | Result |
+|---|---|
+| Pest (MariaDB, container PHP 8.3) | **820 passed, 3257 assertions**, 0 failed |
+| `npm run check` (Wayfinder, typecheck, ESLint, Prettier, Vitest, build) | exit 0; **Vitest 378/378 across 54 files** (was 374; +4 from this pass) |
+| Pint | clean over the whole repository |
+| `git diff --check` | clean |
+| Build isolation | `@dnd-kit` appears in **exactly one** built chunk (`board-*.js`); versions pinned exactly (`6.3.1`/`10.0.0`/`3.2.2`, no caret) |
+| Playwright, full suite, 2 workers | **46 of 46 passed** |
+| Playwright, full suite, default (8) workers | 44 of 46; both non-passes in `auth-migration.spec.ts`, Fortify login throttling — **4/4 pass in isolation** once the rate-limit window clears |
+
+### Defects found and fixed
+
+All three product defects are in `task-checklist.tsx` and share one root cause; all were invisible to the existing Vitest suite and surfaced only in a real browser.
+
+| # | Severity | Defect | Fix |
+|---|---|---|---|
+| V1 | Minor (WCAG 3.3.2 / 4.1.2 A) | The checklist "Add an item…" field had **no accessible name** — a placeholder only, no `<label>` and no `aria-label`. Every other text input in this epic's pages has one | `<Label htmlFor="checklist-add-title" className="sr-only">Add a checklist item</Label>`, matching the existing `task-comments.tsx` and `quick-add-task.tsx` pattern |
+| V2 | Minor (focus management) | **Toggling a checklist item stranded focus on `<body>`.** The checkbox is `disabled` while its own request is in flight, which blurs it in every real browser; nothing put focus back. A keyboard user had to re-Tab after every toggle | Focus restored to the toggled checkbox once it is re-enabled |
+| V3 | Minor (focus management) | **Adding a checklist item also stranded focus on `<body>`** — despite an existing `document.getElementById('checklist-add-title')?.focus()` in the add request's `onFinish`. That call was a silent no-op: React had not yet committed `setAdding(false)`, so the field was **still `disabled`** at the moment `.focus()` ran, and a disabled element cannot take focus | Same mechanism as V2 |
+
+**Shared fix.** A `refocusIdRef` records which control should regain focus, and one `useEffect` (running after every commit) restores it as soon as that element exists and is no longer disabled. Restoring from a request's own `onFinish` is structurally too early; the effect runs after the re-enable commit. `removeItem` — which already worked, because it focuses a *different*, non-disabled element — was routed through the same mechanism so a neighbour that happens to be mid-request is not skipped either. No API, contract, or optimistic-toggle behavior changed.
+
+Verified afterwards in a real browser: add → focus on `#checklist-add-title`; toggle → focus retained on the toggled checkbox; remove → focus on the neighbouring item.
+
+**Test defect (V4, browser-suite race).** Three `board-drag.spec.ts` tests asserted a card's new position and then called `page.reload()`. The assertion is satisfied by the **optimistic** transform, before the move PUT returns, so the reload aborted a still-pending request and the move was legitimately lost — a test race, not a product fault (the server is authoritative by design). It passed whenever the request won the race and failed under full-suite contention; it was the `board-drag` non-pass in this session's first full run. Fixed with `expectMoveSettled()`, which waits for `aria-busy="false"` on the board region — the single-flight guard's own signal, cleared in the move's `onFinish`, i.e. once the authoritative response has landed. `board-migration.spec.ts`'s equivalent reload test was already safe: it waits on the live-region announcement, which is published in `onSuccess`.
+
+### Candidate findings investigated and disproved
+
+Recorded because each looked like a defect under a first measurement and would otherwise be re-reported by the next reviewer:
+
+| Candidate | Why it was not a defect |
+|---|---|
+| "Projects index cards show no focus ring" | The card carries `transition-shadow` (150 ms). Reading computed style immediately after a real `Tab` caught the ring at **0.066 px / 3 % opacity** — the first frame. Re-measured after the transition settles: `rgb(79, 70, 229) 0 0 0 2px`, a full 2 px ring. The `<a>` itself carries `outline-none` with a stretched `::after` on purpose; the ring belongs to the card, which is the visible target |
+| "Dark mode has 1.08:1 body contrast" | The probe's luminance parser did not understand `oklch()`. Actual values are `oklch(0.13 …)` background against `oklch(0.985 …)` text — a correct, high-contrast dark theme |
+| "Focus is lost after submitting a comment" | Measured before `onSuccess` ran. With a settle wait, focus returns correctly to `textarea#task-comment-body` |
+| "Move up announces the wrong position" | A stale live-region read: the previous announcement also contained the task title, so the wait matched immediately. Waiting for the text to *change* gives the correct sequence (down → "position 2 of 3", up → "position 1 of 3") |
+
+### What was verified, and how
+
+**Authorization (real browser, forged requests as a plain project member and cross-project as an administrator).** Every probe refused server-side, never by a React ability flag: forged move `403`, forged task delete `403`, forged `projects.members.sync` `403`; project A's task on project B's move route `404` and on B's show route `404`; project B's real column id on A's move endpoint `422` and on A's task-create endpoint `422`; unknown milestone `422`; non-member assignee `422`; foreign checklist item `404`; negative position `422`. A plain member's board renders zero Add-task buttons, zero Move buttons, no Settings link, no edit form, no delete button and no checklist authoring — but keeps the comment box (D1 exactly as locked).
+
+**Privacy.** All seven presenters read end to end. No email, OAuth/provider field, password/security data, billing or invoice flag, time-entry description, or raw Eloquent serialization reaches any page, at any nesting depth. `memberCandidates()` is the only carrier of emails and is gated by `ProjectPolicy::manageMembers` (`projects.admin`) at both call sites, with the prop **absent** rather than empty otherwise — confirmed in the browser. `TaskTimeSummaryPresenter` returns `null` without `time.log`/`time.view_all`, `own` scope otherwise, and adds `userName` only under `time.view_all`; a project member saw no other user's name on the task page.
+
+**Board state architecture.** `board.tsx` holds no copy of `columns`; its only state is `pendingTaskId`, `quickAddColumnId` and two live-region strings. The Move menu and dnd-kit both call the identical `requestMove` (`onMove={requestMove}` in both places), so single-flight, generation guarding, reconciliation and failure handling cover drag and menu equally. No move queue, no second board store, no stale-callback publication, no duplicated server ordering logic (the client clamp in `applyMove` is presentation-only; the server clamps authoritatively under the column lock).
+
+**dnd-kit boundary.** Imported by exactly two files, enforced by `no-restricted-imports`; no `KeyboardSensor` anywhere; one `PointerSensor` with a 6 px activation distance; the handle is `aria-hidden="true"` with `tabIndex={-1}` and dnd-kit's `attributes` never spread. A 45-press Tab sweep across the board never entered an `aria-hidden` subtree.
+
+**Move-menu parity (keyboard only, real browser).** Every operation drag can perform is reachable from the menu, each with a correct announcement and focus returning to the moved card's own Move button: same-column down (`position 2 of 3`), same-column up (`position 1 of 3`), cross-column into an empty column (`1 of 1`), append to a populated column (`2 of 2`), the Done column (`… to Done (done), position 1 of 1`), and end-of-column no-ops correctly `aria-disabled`. Moves persisted across a full reload.
+
+**Coexistence and the timer.** Task detail → Board → Milestones → `/tasks` → Projects all preserved an injected `window` value, proving four genuine Inertia visits with no layout remount; Projects → Tickets did not, proving the intended document visit. A timer started from the task page stayed present across all four Inertia visits, reconstructed as the Blade tracker on Tickets (**exactly one** Stop control — no duplicate surface), and reconstructed again on return to React. Browser back/forward is correct across migrated pages and across the React↔Blade boundary.
+
+**Responsive (390 px) and theme.** No document-level horizontal overflow on any of the six pages; the board region is the only horizontal scroller (1504/358 px, intentional); the Move menu performs a complete move at phone width; every button is ≥ 24 px; the milestone dialog fits (358×487 in 390×844). Dark mode renders correct semantic tokens on all pages, dialogs, and disabled menu items; no inline literal colours were found on any page.
+
+**Dialogs and focus.** `role="dialog"` with `aria-labelledby` and `aria-describedby`; focus lands inside on open; 8 consecutive Tabs stayed trapped inside; focus returns to the correct opener after a successful save, after Escape, and after Cancel — never to `<body>`. Note: Radix renders no `aria-modal` attribute here, but everything outside the dialog is `aria-hidden="true"` (including `main`), which confines assistive technology equivalently.
+
+**Query and frontend performance.** `ProjectQueryBudgetTest` pins all five pages (index, board, task detail, milestones, `/tasks`) as query-count-independent of row count, plus milestone-count equality. No polling, no `setInterval`, and no `fetch` anywhere in the projects/tasks React tree; no per-card request. The per-second timer clock lives in `RunningTimerBar`, a sibling of `{children}` in the layout, so it never re-renders the page tree, and its interval only runs while a timer exists.
+
+**Data integrity and schema.** `ProjectMoveConcurrencyTest` passes unmodified in the full suite (parallel cross-column moves stay dense and lossless; creates racing stale indexes; deletes racing moves). The D4 guards are intact in `ProjectService` (app check, plus `QueryException` 1451 mapped to the same friendly refusal), and `2026_09_21_120000_restrict_time_entry_project_and_task_deletes` is reversible (`down()` restores `SET NULL`, both columns stay nullable). It is applied to the development database (batch 3) with nothing pending, and `projects:audit-integrity` reports 0 across all six checks there.
+
+> **Production prerequisite (unchanged, restated):** a populated production database **must** run `php artisan projects:audit-integrity` — read-only — and resolve any non-zero count **before** `2026_09_21_120000_restrict_time_entry_project_and_task_deletes` is applied there. This pass re-confirmed it is the **only** EPIC-011E migration with a data prerequisite; no other migration in the repository carries one.
+
+**Cleanup and documentation.** The WP9 closeout still holds: `resources/views/projects` and `resources/views/tasks` do not exist; no `view('projects.`/`view('tasks.` call remains; no HTML5 drag/drop, `draggable`, or `dataTransfer` anywhere; the two surviving `location.reload()` calls are EPIC-011D session-expiry recovery (401/419), not the retired checklist script; no TODO/FIXME/WP markers in the projects or tasks code; no unreferenced React component in either directory; navigation visit modes and `contextLinkModes` are `inertia` for project and task, `document` for ticket. Documentation agrees across D1, D2, D4, D5, D6, board status source of truth, React renderer state, dnd-kit architecture, and the `time.view_own` debt; no contradiction was found.
+
+### Environment-blocked (the reason this epic is not Verified)
+
+| Required by WP10 | Status |
+|---|---|
+| Screen-reader walkthrough (NVDA or VoiceOver) of board, menu, dialogs, checklist | **Not performed — impossible here.** No screen reader exists on the WSL2 host, in `portal_app`, or reachable from either (no NVDA, no VoiceOver, no Orca); Chromium runs headless in the container. What was done instead, and is reported as such: a keyboard-only walkthrough plus accessibility-tree inspection — computed accessible names, roles, `aria-hidden` subtrees, live-region text content, heading outline, landmarks, focus order, focus trap, and `progressbar` semantics (`aria-valuenow/min/max` with an accessible name). **No screen reader was used, and none of the above is claimed as screen-reader verification** |
+| Real-device touch check (iOS Safari, Android Chrome) | **Not performed — no devices available.** CDP touch emulation is covered by `board-drag.spec.ts` (a body swipe scrolls, a handle drag moves) and the phone-viewport Move-menu flow passes, but neither is a real device, exactly as §9/§24 and Amendment 7 (Y9) already anticipated |
+
+Both are one-session tasks on a machine with a screen reader and a phone; nothing else blocks Verified.
+
+### Debt confirmed as *not* EPIC-011E
+
+- **Fortify login rate limiting under parallel Playwright load** — shared test infrastructure. Fortify allows five attempts per minute per email and the suite signs in repeatedly as two seeded accounts; at 8 workers the window is exhausted. Evidence: the only two non-passes in the default-concurrency run were both in `auth-migration.spec.ts` (one reporting `Sign in as operator@intechral.test stayed rate limited` verbatim), that file passed **4/4 in isolation** after the window cleared, the full suite passed **46/46 at 2 workers**, and no EPIC-011E file is in its call path. `auth-migration.spec.ts` also bypasses the shared `signIn()` retry helper, which is why it is usually first to fail. **Non-blocking for EPIC-011E; should be tracked as a separate test-infrastructure item** (give that spec the retry helper, or relax the throttle in the testing environment).
+- **Standalone-task fixture accumulation** — the development database gained exactly one row per full-suite run (8 → 9 → 10 → 11), and every leftover is an `E2E WP8 standalone task*` row with null project, column and ticket. This is the accepted, disclosed D3/AA10 trade-off: D3 forbids a standalone-task delete route, so the fixture cannot be removed through the application. Projects stayed at 4 and time entries at 0 across every run, so ordinary cleanup is working. Not a leak.
+- **`time.view_own`** — unenforced permission-model debt, recorded in `rbac-design.md` by WP9 and untouched here.
+- **EPIC-005 STORY-005-02** still checks "Custom columns configurable per project", which no route or UI provides. Column management is explicitly out of scope (§27), so this is a pre-existing EPIC-005 documentation inaccuracy, not an EPIC-011E gap. Left for EPIC-005 to correct rather than edited from here.
+
+### Files changed by WP10
+
+| File | Change |
+|---|---|
+| `resources/js/components/projects/task-checklist.tsx` | V1–V3: the `sr-only` label and the `refocusIdRef` + effect focus restoration |
+| `resources/js/components/projects/task-checklist.test.tsx` | Four new regressions (accessible name; focus after toggle, after add, after remove), each documenting why jsdom cannot reproduce the original defect |
+| `tests/Browser/board-drag.spec.ts` | V4: `expectMoveSettled()` and its three call sites |
 
 ---
 
@@ -1725,46 +1822,55 @@ The code-level Blade/JS cleanup §22 originally assigned to WP9 was already carr
 **Exit (met):** the §22 verification greps pass; no document still describes a project's linked CRM company as a visibility grant; full Pest, Vitest, Pint, and build gates green; `ProjectBladeRegressionTest.php`'s three assertions are each either superseded by a named stronger test or relocated, never merely dropped.
 
 ### WP10: Hardening and verification
+**Status: executed (2026-09-22), verification incomplete.** Results are recorded in [Amendment 11](#amendment-11-wp10-results-2026-09-22). Not committed. No route, controller, service, model, policy, migration, presenter, or dependency changed.
+
 Full Playwright suite including mixed navigation; mobile and responsive pass; keyboard and screen-reader walkthrough (NVDA or VoiceOver) of board, menu, dialogs, checklist; real-device touch check; performance measurements (§25); full gates. Status moves to Implemented, then Verified, per the lifecycle.
+
+**Done:** acceptance-contract matrix; independent authorization/IDOR review including forged cross-project and plain-member requests in a real browser; privacy/DTO review of all seven presenters; board state/concurrency and dnd-kit boundary review; Move-menu/drag parity for every direction; keyboard-only and accessibility-tree walkthrough; focus/dialog closeout; 390 px responsive pass; light/dark theme pass; navigation coexistence and timer continuity across the React↔Blade boundary; task-kind review; query-budget and frontend-performance review; data-integrity and migration-readiness review; cleanup and documentation consistency; all automated gates (Pest 820, Vitest 378, Pint, build, `git diff --check`, Playwright 46/46 at 2 workers). Three accessibility defects (V1–V3) and one browser-test race (V4) were found and fixed; four candidate findings were investigated and disproved.
+
+**Outstanding (blocks Verified):** the screen-reader walkthrough (NVDA or VoiceOver) and the real-device touch check. Neither is possible in this environment — no screen reader exists on the WSL2 host or in the container, and no physical device is available. Both are explicitly required by this work package, so the epic **stays `Implemented`** rather than being marked Verified on a substitute. See Amendment 11, "Environment-blocked".
 
 ---
 
 ## 30. Acceptance Criteria
 
+Checked boxes were confirmed by the WP10 verification pass ([Amendment 11](#amendment-11-wp10-results-2026-09-22)); the method is named per item. The two unchecked items are blocked by the environment, not by the implementation.
+
 **Scope and cleanup**
-- [ ] All seven pages in §2 are Inertia/React pages; `resources/views/projects` and `resources/views/tasks` no longer exist
-- [ ] No project/task inline script, `draggable`, `dataTransfer`, or `location.reload()` remains; `x-time-tracker` and `timer-overlay.js` remain only for tickets
-- [ ] Every URL uses Wayfinder; route names and URIs unchanged apart from the two D5 checklist routes
+- [x] All seven pages in §2 are Inertia/React pages; `resources/views/projects` and `resources/views/tasks` no longer exist — *code inspection + one `assertInertia` component test per route*
+- [x] No project/task inline script, `draggable`, `dataTransfer`, or `location.reload()` remains; `x-time-tracker` and `timer-overlay.js` remain only for tickets — *WP10 cleanup greps; the two surviving `location.reload()` calls are EPIC-011D 401/419 session-expiry recovery*
+- [x] Every URL uses Wayfinder; route names and URIs unchanged apart from the two D5 checklist routes — *code inspection; `wayfinder:generate` runs clean in `npm run check`*
 
 **Locked decisions**
-- [ ] D1: every structural task mutation is refused for non-managers by the server, proven by the actor-by-route matrix; members retain comments and checklist toggling; the board is read-only for them
-- [ ] D2: the project index equals the set `ProjectPolicy::view` allows; no rendered link is one the destination policy denies; `ProjectPolicy` unchanged; no document describes company link as access
-- [ ] D1 documentation: EPIC-005 no longer states that every project member may manage tasks; current documentation reflects manager-only structural mutation
-- [ ] D3: `/tasks` shows standalone tasks accurately with no new mutation route or control
-- [ ] D4: all seven required deletion tests pass; historical time entries are never nulled or modified; the FK backstop is in place and reversible
-- [ ] D5: manager/admin can add and remove checklist items; members can toggle; native checkboxes; backend, Vitest, and Playwright coverage
-- [ ] D6: the time panel shows own time to the viewer and all users' time only with `time.view_all`
-- [ ] D7-B: only `projects.admin` can add/remove members, change member roles, or provide extra initial members; non-admin project managers receive no candidate-user directory/email data and can still create/edit projects without membership controls
+- [x] D1: every structural task mutation is refused for non-managers by the server, proven by the actor-by-route matrix; members retain comments and checklist toggling; the board is read-only for them — *`ProjectAuthorizationMatrixTest` (25 routes × 8 actors) + real-browser forged requests: move 403, delete 403; member board has no Add/Move/Settings/edit/delete but keeps comments*
+- [x] D2: the project index equals the set `ProjectPolicy::view` allows; no rendered link is one the destination policy denies; `ProjectPolicy` unchanged; no document describes company link as access — *`ProjectVisibilityTest` + documentation review of EPIC-010B, ADR-005, `rbac-design.md`, `database-schema.md`*
+- [x] D1 documentation: EPIC-005 no longer states that every project member may manage tasks; current documentation reflects manager-only structural mutation — *STORY-005-02 current-state note verified in place*
+- [x] D3: `/tasks` shows standalone tasks accurately with no new mutation route or control — *`TaskListInertiaTest`, `tasks-migration.spec.ts`, route-surface inspection*
+- [x] D4: all seven required deletion tests pass; historical time entries are never nulled or modified; the FK backstop is in place and reversible — *`ProjectDeletionGuardTest`, `TimeEntryForeignKeyMigrationTest`; migration `down()` restores `SET NULL`*
+- [x] D5: manager/admin can add and remove checklist items; members can toggle; native checkboxes; backend, Vitest, and Playwright coverage — *plus the WP10 accessibility fixes V1–V3*
+- [x] D6: the time panel shows own time to the viewer and all users' time only with `time.view_all` — *`ProjectTaskDetailInertiaTest` per actor; browser-confirmed that a member sees no other user's name*
+- [x] D7-B: only `projects.admin` can add/remove members, change member roles, or provide extra initial members; non-admin project managers receive no candidate-user directory/email data and can still create/edit projects without membership controls — *`ProjectMemberManagementTest`; forged `projects.members.sync` by a member returns 403; `memberCandidates` prop absent, not empty*
 
 **Defects**
-- [ ] A1 to A3: foreign column, milestone, and assignee IDs rejected on every write path with tests
-- [ ] S1 and S2 fixed in Blade (WP1) and covered by regression tests, and absent in React
-- [ ] I1 to I3, I6: moves locked and dense, concurrency stress green on MariaDB, Done-column tasks not offered to the timer, uniform overdue rule
-- [ ] I4, I5, I8: milestone assignable, checklist usable, ex-member assignee preserved
-- [ ] P1 to P3: query counts independent of row count
+- [x] A1 to A3: foreign column, milestone, and assignee IDs rejected on every write path with tests — *`ProjectIntegrityTest` + real-browser probes: foreign column 422 on both move and create, unknown milestone 422, non-member assignee 422, foreign checklist item 404, cross-project task 404*
+- [x] S1 and S2 fixed in Blade (WP1) and covered by regression tests, and absent in React — *the Blade views no longer exist; `ProjectInertiaPagesTest` and Vitest hostile-name coverage*
+- [x] I1 to I3, I6: moves locked and dense, concurrency stress green on MariaDB, Done-column tasks not offered to the timer, uniform overdue rule — *`ProjectMoveConcurrencyTest` passes in the full suite; `ProjectIntegrityTest` "offers timer context by kind and never a Done-column board task"*
+- [x] I4, I5, I8: milestone assignable, checklist usable, ex-member assignee preserved — *`ProjectTaskDetailInertiaTest`, `task-detail-migration.spec.ts`*
+- [x] P1 to P3: query counts independent of row count — *`ProjectQueryBudgetTest` across all five pages*
 
 **Board and accessibility**
-- [x] Tasks move across and within columns by keyboard through the Move menu alone (every other column, up, down), with focus return and live-region announcements (WP5)
-- [ ] The drag handle is not focusable and exposes no keyboard instructions (no drag handle exists yet; WP6)
-- [ ] Pointer drag works by handle and persists after reload; touch users can move tasks (menu required; handle drag verified on real devices) (WP6)
+- [x] Tasks move across and within columns by keyboard through the Move menu alone (every other column, up, down), with focus return and live-region announcements (WP5) — *re-verified in WP10 for every direction, including empty-column, append, Done and disabled no-op ends*
+- [x] The drag handle is not focusable and exposes no keyboard instructions (WP6) — *`aria-hidden="true"`, `tabIndex={-1}`, `attributes` never spread; a 45-press Tab sweep never entered an `aria-hidden` subtree*
+- [ ] Pointer drag works by handle and persists after reload; touch users can move tasks (menu required; handle drag verified on real devices) (WP6) — *pointer drag, persistence and CDP touch emulation all pass (`board-drag.spec.ts` 14/14); **the real-device half (iOS Safari, Android Chrome) is not done — no device available***
 - [x] Failed, forbidden, stale, and offline moves revert with a visible alert; no move can be issued while another is pending (WP5)
 - [x] The optimistic-move spike results are recorded and the chosen design matches them (WP0/WP5)
 - [x] Column counts, progress, and overdue indicators always reflect the current state (WP5)
+- [ ] Screen-reader walkthrough (NVDA or VoiceOver) of board, menu, dialogs and checklist — ***not performed: no screen reader exists on this host or in the container.*** Keyboard-only and accessibility-tree verification were done instead and are reported as exactly that (Amendment 11)
 
 **Quality gates**
-- [ ] Pest: new suites plus the converted baseline pass on MariaDB
-- [ ] `npm run check` passes (wayfinder, typecheck, ESLint, Prettier, Vitest, build)
-- [ ] Playwright flows 1 to 9 pass in the agreed environment; test data is cleaned up; the corrected 011D coexistence tests pass
-- [ ] `@dnd-kit` versions are pinned in the lockfile, imported only by the two adapter files, and present only in the board chunk
-- [ ] ADR-007 note added; corrective documentation notes added
-- [ ] EPIC-011E status updated and the parent roadmap Phase E marked complete
+- [x] Pest: new suites plus the converted baseline pass on MariaDB — *820 passed, 3257 assertions*
+- [x] `npm run check` passes (wayfinder, typecheck, ESLint, Prettier, Vitest, build) — *exit 0; Vitest 378/378 across 54 files*
+- [x] Playwright flows 1 to 9 pass in the agreed environment; test data is cleaned up; the corrected 011D coexistence tests pass — *46/46 at 2 workers; the only residue is the documented D3/AA10 standalone-task row, one per run, which no route can delete*
+- [x] `@dnd-kit` versions are pinned in the lockfile, imported only by the two adapter files, and present only in the board chunk — *exact pins, `no-restricted-imports` boundary, and one built chunk confirmed in the build output*
+- [x] ADR-007 note added; corrective documentation notes added — *verified present and mutually consistent*
+- [ ] EPIC-011E status updated and the parent roadmap Phase E marked complete — *deliberately not done: the epic stays `Implemented` until the two blocked accessibility checks above are performed*
