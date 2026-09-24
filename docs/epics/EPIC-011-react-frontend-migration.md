@@ -3,6 +3,15 @@
 **Status:** In Progress
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 
+> **Strategic note (2026-09-24): product priority has been rebased.**
+>
+> - The React/Inertia migration remains valid. Its architecture, migration principles, and completed phases A–E continue to inform all implementation.
+> - This epic is no longer the source of product priority. The governing strategic sequence is now the [Product Roadmap](../product/product-roadmap.md), with direction in [Platform Product & UX Direction](../product/platform-product-ux-direction.md) and [Information Architecture](../product/information-architecture.md).
+> - Remaining phases (F–K) are not executed in letter order. Renderer migration may be combined with redesign and product work instead of faithfully recreating legacy screens; the roadmap maps each remaining phase to the product work that now delivers it ([mapping](../product/product-roadmap.md#relationship-to-epic-011-and-its-remaining-phases)).
+> - Phase F (Tickets) has not begun and has no implementation document. Critical Ticket authorization/integrity fixes are sequenced first as a separate hardening package; Helpdesk implementation sequencing is revisited under the roadmap and new design system.
+>
+> The phase sequence below is preserved unchanged as the historical plan and implementation record.
+
 ---
 
 ## Goal

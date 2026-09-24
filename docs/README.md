@@ -19,6 +19,7 @@ The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 13 
 
 | Section | Description |
 |---------|-------------|
+| [Product](./product/README.md) | Product/UX direction, information architecture, and the governing product roadmap |
 | [Architecture](./architecture/README.md) | System design, ADRs, database schema |
 | [Epics](./epics/README.md) | Development epics and story breakdowns |
 | [Progress](./progress/README.md) | Sprint-by-sprint progress log |

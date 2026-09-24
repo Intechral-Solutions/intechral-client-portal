@@ -41,3 +41,5 @@ Planned → In Progress → Implemented → Verified → Done
 All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. EPIC-010B (2026-06-30) corrected membership-based tenant scoping and added regression coverage. EPIC-010C (2026-06-30) made billed and invoice-linked time entries immutable across ordinary mutation paths. The current phase is formal hardening: closing the remaining product-level gaps documented in each epic file.
 
 Major milestone records are tracked in [docs/progress/](../progress/).
+
+As of 2026-09-24, strategic sequencing comes from the [Product Roadmap](../product/product-roadmap.md); epics remain the implementation contracts for the work it sequences.
