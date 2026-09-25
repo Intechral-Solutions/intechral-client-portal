@@ -113,23 +113,29 @@ LATER items are listed in their recommended order but are separable; see [Depend
 
 **Class:** UX foundation.
 
+**Vehicle:** [EPIC-013: Direction D Application Shell and Design System Foundation](../epics/EPIC-013-direction-d-shell-design-system.md) (**Planned** 2026-09-25) delivers this item together with [Design system](#design-system) below, against the approved [Direction D design contract](../design/direction-d-design-system.md).
+
 - Full-viewport shell; workspace-based navigation (Home, Projects, Tasks, Helpdesk, Time, Directory, Finance, System) driven by the server `NavigationBuilder`
 - Workspace layout primitives: wide canvas, reading width, split/side regions
 - Account menu per [Information Architecture → Account menu](./information-architecture.md#account-menu)
 - Capability-aware structure; Home as a role-aware landing surface (initial version may be modest)
 - Global timer presence redesigned to fit the shell (full timer UX work follows under [Timer UX improvement](#timer-ux-improvement))
 
-**Coexistence (provisional approach):** remaining Blade pages keep the legacy Blade layout until their module is redesigned. They adopt shared semantic tokens only where cheap, and do not receive new Blade shell work. Navigation between renderers stays a full document visit, as today.
+**Coexistence (superseded in part).** This item originally proposed that remaining Blade pages keep the legacy Blade layout, adopt shared semantic tokens only where cheap, and receive **no** new Blade shell work. The later [Direction D design contract](../design/direction-d-design-system.md) (approved 2026-09-25, §19 step 5) instead **requires Blade shell parity** — the same rail, utility bar, token system and navigation data — so the product does not look like two unrelated applications during migration. Direction D governs: Blade receives new *shell chrome* work in [EPIC-013](../epics/EPIC-013-direction-d-shell-design-system.md). The provisional note still holds for Blade **page bodies**, which are not redesigned until their module's product epic. Navigation between renderers stays a full document visit, as today.
 
 ### Design system
 
-**Class:** UX foundation. Semantic tokens; typography; spacing; surfaces and elevation; tables (compact and comfortable); dialogs and drawers; forms; alerts and toasts; status language; motion; Light/Dark; responsive rules; empty/loading/error states. Built on the existing shadcn/ui + Tailwind 4 foundation ([ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)), restyled, not replaced wholesale. Existing React pages (dashboard, profile, time, projects, tasks) are migrated onto the new system as their redesign slices land.
+**Class:** UX foundation.
+
+**Vehicle:** [EPIC-013](../epics/EPIC-013-direction-d-shell-design-system.md), jointly with [New application shell](#new-application-shell) above — the token layer and the shell are built as one foundation because neither is verifiable without the other.
+
+Semantic tokens; typography; spacing; surfaces and elevation; tables (compact and comfortable); dialogs and drawers; forms; alerts and toasts; status language; motion; Light/Dark; responsive rules; empty/loading/error states. Built on the existing shadcn/ui + Tailwind 4 foundation ([ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)), restyled, not replaced wholesale. Existing React pages (dashboard, profile, time, projects, tasks) are migrated onto the new system as their redesign slices land.
 
 ### Lightweight CI baseline
 
 **Class:** Platform capability.
 
-**Timing:** introduced **alongside or immediately after the first merged slice of the shell/design system**, and **required before the Tasks overhaul begins**. Early enough to protect the redesign; late enough that the build it verifies has settled.
+**Timing:** introduced **alongside or immediately after the first merged slice of the shell/design system**, and **required before the Tasks overhaul begins**. Early enough to protect the redesign; late enough that the build it verifies has settled. [EPIC-013 → CI handoff](../epics/EPIC-013-direction-d-shell-design-system.md#30-ci-handoff) records this explicitly so it is not skipped when the shell foundation closes.
 
 **Scope, deliberately simple:**
 
