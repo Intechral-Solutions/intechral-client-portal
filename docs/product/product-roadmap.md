@@ -71,7 +71,7 @@ LATER items are listed in their recommended order but are separable; see [Depend
 
 **Provenance.** The earlier Ticket/Helpdesk discovery audit is not stored in this repository. The register below was **re-verified by reading the live code on 2026-09-24** and is the authoritative starting list. The implementing epic should reconcile it against the original audit register if the owner still has it, and add any further high-impact findings from that audit.
 
-**Proposed vehicle:** a dedicated hardening epic following the EPIC-010A–C pattern (provisional ID **EPIC-010D**), with characterization tests first and Pest regression coverage for each finding.
+**Vehicle:** [EPIC-010D: Helpdesk Security and Integrity Hardening](../epics/EPIC-010D-helpdesk-security-hardening.md) (**Planned**), following the EPIC-010A–C pattern with characterization tests first and Pest regression coverage for each finding. EPIC-010D re-verifies H1–H6 below, adds H7–H9 (CSV formula injection, Ticket-number collision, role-name policy check), and locks the visibility and assignment decisions; it is the authoritative register from here on.
 
 | ID | Severity (provisional) | Finding | Evidence (live code) |
 |----|------------------------|---------|----------------------|
@@ -82,9 +82,9 @@ LATER items are listed in their recommended order but are separable; see [Depend
 | **H5** | Medium | **Assignment integrity.** Single and bulk assignment validate `assignee_id` only as `exists:users,id`, so a ticket can be assigned to any user, including a customer account, which then receives assignee notifications | `Operator\TicketController::assign`; `Operator\TicketBulkController::update` |
 | **H6** | Low | **Bulk status without a status errors.** `action=status` with no `status` passes `null` into `safeTransition(string $newStatus)`, a `TypeError` (HTTP 500) rather than a validation error | `Operator\TicketBulkController::update` / `safeTransition` |
 
-**Related debt, not in this package unless trivially adjacent:** `TicketPolicy` tests the hard-coded `operator` role name while operator routes gate on `tickets.assign`; capability-based checks are the target ([Information Architecture → User](./information-architecture.md#user)).
+**Related debt:** `TicketPolicy` tests the hard-coded `operator` role name while operator routes gate on `tickets.assign`; capability-based checks are the target ([Information Architecture → User](./information-architecture.md#user)). EPIC-010D includes this for `TicketPolicy` (H9) because it sits in the seam H2 rewrites; role-name checks outside Ticket code are not in the package.
 
-**Exit criteria (direction):** H1–H3 fixed with regression tests proving the negative cases; H4 resolved by an explicit visibility decision; H5–H6 fixed or explicitly deferred with rationale; no UI redesign; full Pest suite green.
+**Exit criteria (direction):** H1–H3 fixed with regression tests proving the negative cases; H4 resolved by an explicit visibility decision (made: own Tickets only, EPIC-010D D1); H5–H6 fixed or explicitly deferred with rationale; no UI redesign; full Pest suite green.
 
 **Why first:** Helpdesk is a customer-facing, multi-tenant surface with a cross-tenant write path (H1) and two confidentiality leaks (H2, H3). These are independent of every design decision below and should not wait for them.
 
