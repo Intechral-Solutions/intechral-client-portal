@@ -4,10 +4,15 @@
 **Roadmap bucket:** NOW → [Critical Helpdesk hardening](../product/product-roadmap.md#critical-helpdesk-hardening)
 **Series:** hardening epics [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) · [EPIC-010B](./EPIC-010B-tenant-scoping.md) · [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) · **EPIC-010D**
 **Planned:** 2026-09-24, against `epic-011e-projects-kanban` at `a09c723`
+**Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
+**Work packages:** WP0 **Complete** (2026-09-24) · WP1 Not started · WP2 Not started
+**Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections
 
 ---
 
 ## Contents
+
+- [Amendment 1: WP0 Results (2026-09-24)](#amendment-1-wp0-results-2026-09-24)
 
 1. [Status and parent context](#1-status-and-parent-context)
 2. [Goal](#2-goal)
@@ -29,6 +34,208 @@
 18. [Work packages](#18-work-packages)
 19. [Exit criteria](#19-exit-criteria)
 20. [Deferred Helpdesk work](#20-deferred-helpdesk-work)
+
+---
+
+## Amendment 1: WP0 Results (2026-09-24)
+
+WP0 ran on `hardening/epic-10d-helpdesk-security`, branched from `804ae6f` (the committed plan). It added tests and test support only: **no application, route, policy, migration, configuration, dependency, or frontend file changed.** Every H1–H9 finding reproduced as planned. Where this amendment conflicts with the body, the amendment wins. The body corrections it requires are applied in place (§8 F-6, §17, §18 WP0).
+
+### A1.1 Suites added
+
+All suites are in `src/tests/Feature/Tickets/`. Each test name starts with one of these prefixes:
+
+- **BASELINE**: correct behavior that must survive WP1/WP2.
+- **DEFECT Hn (WPx flips …)**: *current broken behavior*, pinned only as evidence. The named WP flips or replaces it.
+- **GUARD**: a contract WP1 must not break while fixing Hn.
+- **ORDER**: current order of operations.
+- **CHARACTERIZATION**: a recorded fact.
+
+| File | Covers | Tests |
+|------|--------|-------|
+| `TicketSecurityCharacterizationTest.php` | H1, H2, H3 | 20 |
+| `TicketVisibilityCharacterizationTest.php` | H4, H9, F-1 | 11 |
+| `TicketAssignmentCharacterizationTest.php` | H5, reply notifications, stale assignee | 15 |
+| `TicketBulkCharacterizationTest.php` | H6 | 16 |
+| `TicketExportCharacterizationTest.php` | H7, F-6 | 17 |
+| `TicketNumberCharacterizationTest.php` | H8, including a real concurrency probe | 7 |
+| `TicketTestHelpers.php` | Shared fixtures (actors `owner`, `customer`, `operator`, and `agent` = custom role with `tickets.view` + `tickets.assign` + `time.log` but no `operator` role). Attachment fixtures refuse to write unless `Storage::fake('local')` is active; CSV parsing uses RFC-4180 (`escape: ''`) | — |
+| `src/tests/Support/ticket_number_worker.php` | Child process for the H8 probe (pattern of `project_task_worker.php`); forces `APP_ENV=testing` and `MAIL_MAILER=array` | — |
+
+Total: 86 new tests. The full suite is 906 passed (3567 assertions). No `todo` placeholders were added. Target tests are written red at the start of WP1/WP2 (§16).
+
+### A1.2 Confirmed behavior
+
+| ID | Confirmed | Key facts established |
+|----|-----------|-----------------------|
+| H1 | Yes | An unrelated `user`-role account, and even an account with **no role or permission at all**, posts a public reply to any ticket: the response is 302 with "Reply added.". The reply row is authored by the attacker, the attachment row and file are stored under `tickets/{ticket_id}/`, and `TicketRepliedNotification` goes to the owner and the assignee. `is_internal=1` from a non-operator is coerced to public, so it is not a gate. The operator reply route already refuses customers (403, nothing written). A missing ticket is 404 |
+| H1 order | — | 1. `auth` middleware only. 2. Validation (an unauthorized request with an empty body gets `body` errors, **not** 403). 3. `is_internal` coercion. 4. Reply row insert. 5. For each file: disk write, then attachment row. 6. Owner notification. 7. Assignee notification. There is no transaction, so a failure after step 4 leaves the reply. WP1 must put `authorize('reply')` before step 2 |
+| H2 | Yes | The owner downloads an internal-note attachment by id (200, bytes returned) although the show page hides it. The decision never reads `reply_id`/`is_internal`, including for a row whose reply belongs to another ticket (0 such rows in dev, P4b). An unrelated user gets 403 for every attachment of a foreign ticket. Answers: 403 for an existing foreign id, 404 for an unknown id, and 404 for an authorized row whose file is gone. So an attachment id's existence is observable, which is acceptable because ids are sequential. `Content-Disposition` carries the filename only, never the path. The `local` disk has `serve => true`, but unsigned `/storage/{path}` requests are refused (403), and nothing generates signed URLs. So the download route is the only access path |
+| H3 | Yes | A term found only in an internal note makes the owner's ticket match, which changes the paginator total. A control ticket does not match. No snippet, note body or metadata is rendered: the list shows title, number, category, priority, status and age. Operator queue search matching internal text is pinned as BASELINE |
+| H4 | Yes (latent) | A same-company peer with `tickets.view_org` sees the title, number and a `tickets.show` link that 403s. The clause depends on `tickets.view_org`. The operator's `/tickets` lists own and company-linked tickets only. Reachable only for `company_id` set outside the app (F-1) |
+| F-1 | Yes | Neither an explicitly chosen company nor the single-organization auto-selection is persisted: `company_id` stays `NULL` |
+| H5 | Yes | Single and bulk assignment accept a `user`-role customer, a custom role without `tickets.assign`, or a role-less account. Unassign works. An unknown id is a validation error with no change and no activity-log row. Each successful assignment writes an activity-log entry (`assigned ticket`, causer, `assignee_id`). Owners of the paths: `Operator\TicketController::assign` (single) and `Operator\TicketBulkController::update` (bulk), both through `TicketService::assign` |
+| H6 | Yes | 500s with no mutation, from these exact throw sites: bulk `action=status` without the key (`ErrorException`: undefined array key "status"); bulk `status=''` (`TypeError`: `safeTransition()` string, null given); bulk `action=assign` without the key and single assign without the key (`ErrorException`: undefined array key "assignee_id"). Bulk `assign` with the empty placeholder **unassigns every selected ticket** and flashes success. An impossible transition is skipped per ticket, but the flash still counts every selected ticket. Invalid/missing action, empty selection and an unknown ticket id are validation errors with no mutation |
+| H7 | Yes | `fputcsv` with PHP's default `\` escape writes formula-leading titles (`=`, `+`, `-`, `@`, leading spaces, leading tab) and submitter/assignee names verbatim. A customer plants one through the ordinary create form. `\"` inside a value is written in PHP's escape dialect, which an RFC-4180 reader corrupts. The query orders by `created_at DESC` only. Comma, quote, newline and UTF-8 round-trip correctly. `Content-Type: text/csv`, no BOM, header row pinned. The Time export (`TimeInertiaTest` "exports filtered RFC-compatible CSV and neutralizes spreadsheet formulas") remains the WP2 reference |
+| H8 | Yes | See A1.5 |
+| H9 | Yes | See A1.3 |
+
+### A1.3 H9: route gate vs policy for the capability-only agent
+
+The actor is `agent`, a custom role with `tickets.view` + `tickets.assign` and no `operator` role. A second variant, the `user` role plus a direct `tickets.assign` grant, behaves the same under the policy.
+
+| Surface | Route gate | Policy / rule | Result for agent |
+|---------|------------|---------------|------------------|
+| `TicketPolicy::view` | — | `tickets.view && role operator` | **Denied** (owner ✓, operator ✓, customer ✗) |
+| Operator queue, show (including internal notes and attachment links), status, assign, operator reply (including internal) | `can:tickets.assign` ✓ | none | Allowed |
+| User show `/tickets/{id}` | `can:tickets.view` ✓ | `view` ✗ | **403** |
+| Attachment download (public or internal) linked from operator show | `auth` ✓ | `view` ✗ | **403** |
+| User reply route | `auth` ✓ | none (H1) | Allowed, and can post internal |
+| Timer start with `ticket_id` | `can:time.log` ✓ | `AccessibleTimeContext` → `view` ✗ | **422 `ticket_id`** |
+| Timer context options `type=ticket` | `can:time.log` ✓ | filtered by `view` ✗ | **Own assigned ticket not offered** |
+| Reply notification "View Ticket" link | — | links `/tickets/{id}` | **Link 403s** |
+| Dashboard recent tickets, navigation | keyed on `tickets.assign` | — | Operator links, Ticket Queue shown (consistent) |
+
+### A1.4 WP1 sequencing and `authorize()` placement
+
+**Sequencing rule (binding):** the H9 `TicketPolicy` correction (operator visibility = `tickets.assign`) lands **in the same commit as, or before,** any new `authorize('view')` / `authorize('reply')` call on an operator action. Adding those calls first would make the literal-role policy deny the agent the operator show, status, assign and reply actions it can use today. That would further restrict custom roles in an intermediate state. The **GUARD H9** test pins these as 200 and must stay green throughout WP1.
+
+| Location | Add in WP1 |
+|----------|------------|
+| `Operator\TicketController::show` (line 35), `::updateStatus` (52), `::assign` (63) | `authorize('view', $ticket)` |
+| `Operator\TicketReplyController::store` (12), serving both reply routes | `authorize('reply', $ticket)` as the first statement |
+| `TicketController::downloadAttachment` (102) | attachment policy (§11) |
+| `TicketController::show` (86) | unchanged `authorize('view')`; reply filter via `viewInternal` |
+| `Operator\TicketBulkController::update`, `Operator\TicketController::index`, `Operator\TicketReportController::index`/`export` | none: bulk, list and aggregate actions stay route-gated, because once H9 lands the gate and the policy agree for every ticket |
+
+### A1.5 H8: ticket number evidence
+
+- Numbers are `TKT-` + `MAX(id)+1`. Nothing reserves the value between computing it and inserting (reflection: two reads return the same number).
+- A taken number makes `create` throw `UniqueConstraintViolationException` with no ticket, attachment, file or mail. Over HTTP the customer gets a 500.
+- Deleting the highest ticket makes the next create **re-issue its number**. No route deletes tickets or users today; `TKT-{id}` removes this too.
+- `TicketFactory` numbers (`TKT-0001`…`TKT-9999`) share the service namespace.
+- **Concurrency probe** (testing DB only; committed rows removed in `finally`; testing DB left with 0 tickets and 0 users):
+
+  | Workers × creates | Attempts | Succeeded | Lost to unique violation | Other errors |
+  |---|---|---|---|---|
+  | 4 × 10 (suite default, 4 runs) | 40 | 29–30 | 10–11 | 0 |
+  | 8 × 25 | 200 | 103 | 97 | 0 |
+  | 8 × 50 | 400 | 193 | 207 | 0 |
+
+  The committed probe asserts only what holds before and after WP2: every attempt either succeeds or loses with a unique violation, and committed numbers are distinct. WP2 tightens it to "every attempt succeeds". `TICKET_RACE_WORKERS`, `TICKET_RACE_CREATES` and `TICKET_RACE_REPORT=1` are honored when set inside the app container.
+
+### A1.6 Notifications and stale assignees (input to WP2 §13)
+
+- `TicketRepliedNotification` is `ShouldQueue` and mail only. It contains the ticket number and title (subject), a greeting with the recipient name, the author name, a 200-character body preview, and a "View Ticket" link to `/tickets/{id}`.
+- Recipients:
+  - the owner, on a public reply by someone else;
+  - the assignee, on a public reply by someone other than the assignee;
+  - nobody, for internal notes.
+- There is **no visibility check** on either recipient.
+- **When the owner is also the assignee, they receive two copies.** WP2 preserves this unless the owner approves de-duplication; it is not a confidentiality issue.
+- Confirmed today:
+  - a customer assignee receives reply previews for a ticket they cannot view;
+  - an assignee who lost `tickets.assign` keeps the assignment and keeps receiving previews.
+- WP2 therefore needs:
+  1. no auto-unassign (confirmed: nothing reacts to role changes);
+  2. an assignee-notification gate on `view` at send time in `TicketService::addReply`;
+  3. eligibility re-validated on every assignment write, including re-submitting the same stale id;
+  4. explicit unassign still allowed (BASELINE pinned).
+
+### A1.7 `company_id` evidence
+
+- No application write path persists `company_id` (F-1 test).
+- Factories can set it directly, which is how H4 is reproduced.
+- Dev has 0 company-linked tickets (P1).
+- `ProjectVisibilityTest` "renders no ticket link that TicketPolicy would deny" also sets it directly for the dormant `/tasks` ticket rows. Its actor is a plain `user`, so WP1's policy change leaves it green: a guard, not a test to flip.
+
+### A1.8 Plan corrections
+
+1. **§17 query 3** would treat non-numeric numbers as `0` with a cast warning. Dev holds `TKT-E2E1`, an intentional `DevSeeder` fixture for the Playwright time spec. The invariant is restated over numeric-form numbers only (A1.10 P3a/P3b). Non-numeric numbers cannot collide with `TKT-{id}`.
+2. **F-6** was mis-stated. `$request->date(…, 'Y-m-d')` keeps the current time of day, so **both** window edges sit at "now" on the given dates: part of the first day and part of the last day are excluded. Report and export share the window. Still deferred.
+3. **H6** now names its four throw sites (A1.2), which the WP2 target tests must cover.
+4. **H8** also covers re-issue of a deleted highest ticket's number, which is removed by the same fix.
+5. **§16 "Tests encoding obsolete behavior"** is extended by the flip lists in A1.9.
+
+### A1.9 Tests WP1/WP2 will flip or replace
+
+- **WP1:**
+  - Security suite: all `DEFECT H1` (3), `ORDER H1`, `DEFECT H2` (2), `DEFECT H3`.
+  - Visibility suite: `DEFECT H4` and all `DEFECT H9` (4).
+  - Assignment suite: `DEFECT H9 consequence` (mail link).
+  - `BASELINE H4` "company clause is driven by tickets.view_org" stays true but loses its premise; reword or remove it with the clause.
+- **WP2:**
+  - Assignment suite: `DEFECT H5` (single ×3 dataset, bulk, customer-assignee preview) and `DEFECT stale assignee`.
+  - Bulk suite: all `DEFECT H6`, including the throw-site dataset, which is replaced by validation tests.
+  - Export suite: all `DEFECT H7`.
+  - Number suite: all `DEFECT H8`, the re-issue and factory-namespace characterizations, and the probe tightened to all-succeed.
+  - Existing tests: `TicketOperatorQueueTest` "allows operator to assign a ticket" and "bulk-assigns tickets to an operator" (role-less assignees).
+- **Must stay green:**
+  - every `BASELINE` and `GUARD` test;
+  - the existing Ticket suites;
+  - `ProjectVisibilityTest` "renders no ticket link that TicketPolicy would deny";
+  - `TimeTrackingTest` ticket-context tests.
+
+### A1.10 Production preflight procedure
+
+Run before deploying WP1, and again before WP2. Rules:
+
+- read-only, with a user that has `SELECT` only where possible;
+- **never** from a development workstation against production without the operator's explicit go-ahead;
+- record the counts in this epic.
+
+1. Connect to the production database. Run `START TRANSACTION READ ONLY;` so any write attempt errors.
+2. Run the queries below, which make no schema or data change.
+3. Run `ROLLBACK;` and record every count with the date.
+
+```sql
+-- P0 total tickets (context)
+SELECT COUNT(*) FROM tickets;
+-- P1 H4 reachability: company-linked tickets
+SELECT COUNT(*) FROM tickets WHERE company_id IS NOT NULL;
+-- P2 stale/ineligible assignees (no tickets.assign directly or via any role)
+SELECT COUNT(*) FROM tickets t
+WHERE t.assignee_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM model_has_permissions mhp JOIN permissions p ON p.id = mhp.permission_id
+                  WHERE mhp.model_type = 'App\\Models\\User' AND mhp.model_id = t.assignee_id
+                    AND p.name = 'tickets.assign' AND p.guard_name = 'web')
+  AND NOT EXISTS (SELECT 1 FROM model_has_roles mhr JOIN role_has_permissions rhp ON rhp.role_id = mhr.role_id
+                  JOIN permissions p ON p.id = rhp.permission_id
+                  WHERE mhr.model_type = 'App\\Models\\User' AND mhr.model_id = t.assignee_id
+                    AND p.name = 'tickets.assign' AND p.guard_name = 'web');
+-- P3a numbers not in service form (informational; e.g. seeded fixtures)
+SELECT COUNT(*) FROM tickets WHERE ticket_number NOT REGEXP '^TKT-[0-9]{4,}$';
+-- P3b H8 invariant for WP2's TKT-{id}: MUST be 0
+SELECT COUNT(*) FROM tickets
+WHERE ticket_number REGEXP '^TKT-[0-9]{4,}$'
+  AND CAST(SUBSTRING(ticket_number, 5) AS UNSIGNED) > (SELECT COALESCE(MAX(id), 0) FROM tickets);
+-- P4 H2 exposure: internal-note attachments
+SELECT COUNT(*) FROM ticket_attachments a JOIN ticket_replies r ON r.id = a.reply_id WHERE r.is_internal = 1;
+-- P4b integrity: attachment and parent reply on different tickets (expected 0)
+SELECT COUNT(*) FROM ticket_attachments a JOIN ticket_replies r ON r.id = a.reply_id WHERE r.ticket_id <> a.ticket_id;
+```
+
+**Gates:**
+
+- **P3b ≠ 0 blocks WP2's numbering change** until investigated.
+- **P4b ≠ 0** is investigated before WP1 ships the reply→ticket guard.
+- **P1 and P2** decide how loudly the release notes mention list and notification changes; they do not block.
+
+**Development results** (database `portal`, 2026-09-24, same SQL inside `START TRANSACTION READ ONLY … ROLLBACK`):
+
+| P0 | P1 | P2 | P3a | P3b | P4 | P4b |
+|---|---|---|---|---|---|---|
+| 2 | 0 | 0 | 1 (`TKT-E2E1`) | 0 | 0 | 0 |
+
+The rest of the dev data: max id 5, `AUTO_INCREMENT` 6, 0 internal replies. Dev data is too small to say anything about production.
+
+### A1.11 Hygiene
+
+- The development database `portal` was checksummed before and after (all 41 tables, `CHECKSUM TABLE … EXTENDED`): identical.
+- Development storage (`storage/app`) file listing is identical.
+- All Ticket characterization tests use `Storage::fake('local')` and clean it in `afterEach`; the fake disk holds only its `.gitignore` afterwards.
+- Mail is faked in tests (`Notification::fake()`, `MAIL_MAILER=array` in `phpunit.xml`) and probe workers use the `array` mailer. By construction, no test path can deliver to Mailpit.
+- The probe ran only against `intechral_client_portal_testing`, which `TestDatabaseSafety` enforces in each worker.
 
 ---
 
@@ -177,9 +384,9 @@ Severities are for this code base's threat model (multi-tenant, customer-facing,
 | F-3 | Reply/Ticket notification mail renders user-authored `title` and body preview through Laravel's Markdown mail template, so Markdown syntax (e.g. links) in a reply renders in the email | B / platform notifications | After H1 only legitimate participants can author replies; revisit in the notifications capability. Does not conflict with D4 (reply storage and display stay plain text) |
 | F-4 | Search `LIKE` terms do not escape `%` / `_` | B | Values are bound (no injection); search semantics belong to Helpdesk MVP / global search |
 | F-5 | `OrganizationScope`, `OrganizationMembershipScope`, `OrganizationThroughCompanyScope` test `hasRole('operator')` | D — shared infrastructure | Not Ticket code; Tickets are not tenant-scoped models. Belongs with Directory/tenancy consolidation |
-| F-6 | Ticket reports: a supplied `date_to` is parsed to midnight, so the last day is excluded; a malformed date may throw instead of validating | B — reporting | Report/export filters are consistent with each other; correctness belongs to the Helpdesk reporting successor |
+| F-6 | Ticket reports: supplied dates keep the current time of day, so both window edges sit at "now" on the given dates and part of the first and last day is excluded (corrected in [Amendment 1](#a18-plan-corrections)); a malformed date may throw instead of validating | B — reporting | Report/export filters are consistent with each other; correctness belongs to the Helpdesk reporting successor |
 | F-7 | Attachments accept any file type; ticket create/reply file storage is not transactional with the row insert | B | Served only as downloads from a private disk, after authorization; upload policy is Helpdesk MVP |
-| F-8 | Operator controller actions rely on the route gate only | — | Acceptable once the policy agrees with the gate (H9). EPIC-010D adds `authorize('view')` to operator show/status/assign/reply as defense-in-depth because it is one line each and uses the same seam; no new abilities |
+| F-8 | Operator controller actions rely on the route gate only | — | Acceptable once the policy agrees with the gate (H9). EPIC-010D adds `authorize('view')` to operator show/status/assign and `authorize('reply')` to replies as defense-in-depth because it is one line each and uses the same seam; no new abilities. **Must land with or after the H9 policy correction** ([A1.4](#a14-wp1-sequencing-and-authorize-placement)) |
 | F-9 | Product doc says no activity-log implementation exists; `spatie/laravel-activitylog` is installed and used by `TicketService::assign` and admin controllers | Documentation | Noted for the next product-doc revision; not changed here |
 
 Checked and **not** defective: the dashboard ticket count and recent list already use owner-only for non-operators; operator queue search including internal notes is intended; attachment downloads force `Content-Disposition: attachment` from a private disk; cross-tenant `company_id` on create is already rejected (EPIC-010B); `ticket_ids.*` are `exists`-validated.
@@ -363,22 +570,20 @@ Lock behavior that must survive the fixes: owner reply; operator public reply no
 
 - **No schema migration.** Every fix is policy, query, validation, or service logic. The temporary-number approach (§15) fits the existing `ticket_number` column.
 - **No backfill** of `company_id` (D3) and no data rewrite of assignees (§13).
-- **Read-only production preflight** (WP0 records the queries; run before WP1/WP2 deploy, results noted in the epic):
-  1. `SELECT COUNT(*) FROM tickets WHERE company_id IS NOT NULL` — whether H4 was ever reachable.
-  2. Count Tickets whose assignee lacks `tickets.assign` (directly or via role) — how many stale assignees the notification gate will silence.
-  3. `SELECT COUNT(*) FROM tickets WHERE CAST(SUBSTRING(ticket_number, 5) AS UNSIGNED) > (SELECT MAX(id) FROM tickets)` must be `0` — the H8 non-collision invariant.
-  4. Count internal-reply attachments — scale of H2 exposure (informational).
+- **Read-only production preflight:** the exact procedure, SQL, gates and development results are in [Amendment 1 → A1.10](#a110-production-preflight-procedure). The checks are: company-linked tickets (H4 reachability); assignees without `tickets.assign` (stale assignees the notification gate will silence); the H8 non-collision invariant over numeric-form numbers, which must be `0`; internal-note attachments (H2 exposure) and the attachment/reply ticket-mismatch integrity count.
 - Deploy is code-only and reversible by reverting the commits.
 
 ## 18. Work packages
 
 Three packages. WP1 and WP2 are separable: WP1 changes who may read/write; WP2 changes what valid writes look like. WP1 lands first because it contains the critical and high findings and rewrites the policy seam WP2's notification gate uses.
 
-### WP0 — Characterization and preflight
+### WP0 — Characterization and preflight — **Complete (2026-09-24)**
 
 - Add missing characterization tests (§16), green on current code.
 - Record the §17 preflight queries in this document.
 - No application change.
+
+Results: [Amendment 1](#amendment-1-wp0-results-2026-09-24).
 
 ### WP1 — Authorization and confidentiality (H1, H2, H3, H4, H9)
 
