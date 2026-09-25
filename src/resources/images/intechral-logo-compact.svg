@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Intechral compact logo icon</title>
+  <desc id="desc">A simplified triangular icon with stepped inner side geometry and a subtle fade toward the top.</desc>
+
+  <defs>
+    <linearGradient id="strokeFadeCompact" x1="0" y1="54" x2="0" y2="462" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#19E7F2" stop-opacity="0.2"/>
+      <stop offset="20%" stop-color="#19E7F2" stop-opacity="0.5"/>
+      <stop offset="45%" stop-color="#19E7F2" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#19E7F2" stop-opacity="1"/>
+    </linearGradient>
+
+    <style>
+      .s{
+        fill:none;
+        stroke:url(#strokeFadeCompact);
+        stroke-width:8;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+      }
+    </style>
+  </defs>
+
+  <path class="s" d="M256 54 L474 462 H38 Z"/>
+
+  <path class="s" d="M202 154 H310"/>
+  <path class="s" d="M159 234 H353"/>
+
+  <!-- inner T-forming lines remain -->
+  <path class="s" d="M112.5 322 H206 V462"/>
+  <path class="s" d="M81.5 380 H160 V462"/>
+
+  <path class="s" d="M399.5 322 H306 V462"/>
+  <path class="s" d="M430.5 380 H352 V462"/>
+
+  <!-- outer lower-most corner boxes pushed outward -->
+  <path class="s" d="M50.5 436 H112 V462"/>
+  <path class="s" d="M461.5 436 H400 V462"/>
+</svg>

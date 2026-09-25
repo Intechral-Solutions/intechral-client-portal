@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Intechral full logo</title>
+  <desc id="desc">A geometric triangular mark with horizontal divisions and stepped inner lines, fading slightly toward the top.</desc>
+
+  <defs>
+    <linearGradient id="strokeFadeFull" x1="0" y1="46" x2="0" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#19E7F2" stop-opacity="0.22"/>
+      <stop offset="18%" stop-color="#19E7F2" stop-opacity="0.55"/>
+      <stop offset="42%" stop-color="#19E7F2" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#19E7F2" stop-opacity="1"/>
+    </linearGradient>
+
+    <style>
+      .s{
+        fill:none;
+        stroke:url(#strokeFadeFull);
+        stroke-width:8;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        vector-effect:non-scaling-stroke;
+      }
+    </style>
+  </defs>
+
+  <!-- Outer triangle -->
+  <path class="s" d="M256 46 L476 470 H36 Z"/>
+
+  <!-- Horizontal divisions extended to triangle edges -->
+  <path class="s" d="M229.0 96 H283.0"/>
+  <path class="s" d="M205.1 142 H306.9"/>
+  <path class="s" d="M180.2 190 H331.8"/>
+  <path class="s" d="M155.3 238 H356.7"/>
+  <path class="s" d="M130.4 286 H381.6"/>
+
+  <!-- Lower stepped structure extended fully to edges -->
+  <path class="s" d="M105.5 334 H228 V470"/>
+  <path class="s" d="M80.6 382 H192 V470"/>
+  <path class="s" d="M55.7 430 H158 V470"/>
+  <path class="s" d="M41.2 458 H90 V470"/>
+
+  <path class="s" d="M406.5 334 H284 V470"/>
+  <path class="s" d="M431.4 382 H320 V470"/>
+  <path class="s" d="M456.3 430 H354 V470"/>
+  <path class="s" d="M470.8 458 H422 V470"/>
+</svg>
