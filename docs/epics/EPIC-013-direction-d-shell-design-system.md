@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17)
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green
 
 ---
 
@@ -53,6 +53,7 @@
 - [Amendment 2: WP1a Results (2026-09-25)](#amendment-2-wp1a-results-2026-09-25)
 - [Amendment 3: WP1b Results (2026-09-25)](#amendment-3-wp1b-results-2026-09-25)
 - [Amendment 4: WP1c Results (2026-09-25)](#amendment-4-wp1c-results-2026-09-25)
+- [Amendment 5: WP1d Results (2026-09-25)](#amendment-5-wp1d-results-2026-09-25)
 
 ---
 
@@ -1350,7 +1351,7 @@ Four independently revertible slices.
 - **WP1a — Complete (2026-09-25) — results in [Amendment 2](#amendment-2-wp1a-results-2026-09-25).** Rename the thirteen legacy utilities to a `legacy-` prefix; values unchanged. Resolves F1.
 - **WP1b — Complete (2026-09-25) — results in [Amendment 3](#amendment-3-wp1b-results-2026-09-25).** Define the six orphan variables (A1.3's `--accent-success` included). Resolves F2.
 - **WP1c — Complete (2026-09-25) — results in [Amendment 4](#amendment-4-wp1c-results-2026-09-25).** Add the Direction D token blocks (light + dark) via `@theme inline` on the existing `data-theme` contract; apply the safe alias remappings; **hold `primary`**.
-- **WP1d** — self-host the three families per G1; delete the bunny.net `<link>` and `preconnect` from both root views; add the `@font-face` block and preloads.
+- **WP1d — Complete (2026-09-25) — results in [Amendment 5](#amendment-5-wp1d-results-2026-09-25).** Self-host the three families per G1; delete the bunny.net `<link>` and `preconnect` from both root views; add the `@font-face` block and preloads.
 
 **Exit:** `./dev check` green after each slice; the ten-screen compatibility matrix passes in both themes; no Direction D component exists yet.
 
@@ -2659,3 +2660,247 @@ WP1d may start. Its committed scope ([§28 WP1](#wp1--semantic-tokens-and-typogr
 - run the density gate on `/admin/roles/{id}/edit` and `/operator/tickets` (C7) and the matrix again.
 
 WP1d does **not** own the shared theme bootstrap (WP4/WP5, A1.7), BrandMark (WP4, C9), or any primitive. WP1c leaves it an unobstructed `@theme` block (fonts untouched) and a theme layer whose Direction D values need no change for typography.
+
+---
+
+## Amendment 5: WP1d Results (2026-09-25)
+
+WP1d ran on `feature/epic-013-direction-d-shell` at `707a560` (WP1c), working tree clean at start. **WP1d is now Complete.** The production change is the Direction D font delivery: ten self-hosted WOFF2 faces with their SIL OFL licences under `src/resources/fonts/`, an `@font-face` block and three font roles in `app.css`, the fonts.bunny.net `<link>` and `preconnect` removed from both root views, and one shared preload partial. No route, migration, permission, dependency, package manifest, colour token, primitive, shell, brand or bootstrap file changed. `./dev check` is green from the main checkout. **Where this amendment conflicts with the body or with prior amendments, this amendment wins for WP1d-scoped facts.** EPIC-013 remains **Planned**.
+
+### A5.1 Committed scope, as executed
+
+The scope is exactly [A4.21](#a421-wp1d-handoff), which restates [§28 WP1](#wp1--semantic-tokens-and-typography) as corrected by G1/[A1.4](#a14-g1--self-hosted-woff2-confirmed-with-the-budget-arithmetic-corrected) (C5, C6, C7):
+
+| Committed item | Result |
+|---|---|
+| Self-host Plex Sans 400/500/600, Plex Mono 400/500, **static** Newsreader 400/500 as latin WOFF2 under `src/resources/fonts/` | Done, 7 files, **146,724 B (143.3 KiB)** |
+| Plex Sans latin-ext declared by `unicode-range`, not counted against the budget | Done, 3 files (48,884 B), fetched only when a latin-ext glyph renders (A5.6) |
+| `@font-face` block in `app.css`, `font-display: swap`; replace `--font-sans`/`--font-mono`, add the display family in `@theme` | Done (A5.3) |
+| Delete the bunny.net `<link>` and `preconnect` from **both** root views; preload Plex Sans 400 and 500 only | Done (A5.4) |
+| Density gate on `/admin/roles/{id}/edit` and `/operator/tickets` (C7), then the matrix again | Done: 0 px (A5.8, A5.9) |
+
+Not owned, and not touched: the shared theme bootstrap (WP4/WP5, A1.7), BrandMark (WP4, C9), every primitive (WP2), and any adoption of Newsreader or of mono on existing screens.
+
+### A5.2 Font assets, source and licences
+
+**Source.** The same Fontsource builds WP0 measured ([A1.4](#a14-g1--self-hosted-woff2-confirmed-with-the-budget-arithmetic-corrected)): `@fontsource/ibm-plex-sans@5.3.0` (Google Fonts `v23`), `@fontsource/ibm-plex-mono@5.3.0` (`v20`) and `@fontsource/newsreader@5.3.0` (`v26`), each package `license: OFL-1.1`, fetched as registry tarballs into the session scratchpad (npm `sha512` integrity verified) and the needed files copied unmodified. **No package was added**; `package.json`, `package-lock.json` and `composer.json` are untouched. The files are byte-identical to WP0's measurement: every size matches A1.4, and Vite emits the Plex Sans 400 face as `ibm-plex-sans-latin-400-normal-CDDApCn2.woff2` — the same content hash as WP0's spike output.
+
+| File (`src/resources/fonts/`) | Family | Weight | Subset | Bytes | Preloaded | sha256 |
+|---|---|---:|---|---:|---|---|
+| `ibm-plex-sans-latin-400-normal.woff2` | IBM Plex Sans | 400 | latin | 22,588 | **yes** | `3b646991d30055a93a4ecc499713d4347953a74a947ecab435ab72070cbdab0e` |
+| `ibm-plex-sans-latin-500-normal.woff2` | IBM Plex Sans | 500 | latin | 24,184 | **yes** | `0717336fb31fcdcde4b8deb3675bb4a0f7f6d484864afcd6751ac29975962203` |
+| `ibm-plex-sans-latin-600-normal.woff2` | IBM Plex Sans | 600 | latin | 24,252 | no | `8960851d691c054ed38e259bdcf1a6190d157b4203ed5bb32c632a863fb8ec2f` |
+| `ibm-plex-mono-latin-400-normal.woff2` | IBM Plex Mono | 400 | latin | 14,708 | no | `08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7` |
+| `ibm-plex-mono-latin-500-normal.woff2` | IBM Plex Mono | 500 | latin | 14,888 | no | `01d285447409c8a588692162439a038b8cbd7871309ee20267b0d2d91c6e8e22` |
+| `newsreader-latin-400-normal.woff2` | Newsreader | 400 | latin | 22,480 | no | `e66067814f1c672d33a457e4f4d102c818b481420e2234cf685ebdbf2f443904` |
+| `newsreader-latin-500-normal.woff2` | Newsreader | 500 | latin | 23,624 | no | `5613e2fc8377392c02e8ac9d55014689fb5320a5f2a7be55e8088a314728ac2c` |
+| `ibm-plex-sans-latin-ext-400-normal.woff2` | IBM Plex Sans | 400 | latin-ext | 15,980 | no | `c93d2a12aaa280f68b9ab7b726ff8dfedda67c99ef9abed047c1847a1cc6d583` |
+| `ibm-plex-sans-latin-ext-500-normal.woff2` | IBM Plex Sans | 500 | latin-ext | 16,456 | no | `2846035d85100f84c79393f80f1442d4ee720129ab8b3ffa8969aae281db8c6c` |
+| `ibm-plex-sans-latin-ext-600-normal.woff2` | IBM Plex Sans | 600 | latin-ext | 16,448 | no | `b25dfd4f979e442ae1e25cd0894463434cf01ba21ac1a35d39f4a82bd4cc060e` |
+
+**Licences.** Both families are SIL Open Font License 1.1, which permits bundling and redistribution with software provided each copy carries the copyright notice and the licence (OFL §2). The repository carries the **upstream** licence texts from `google/fonts` (`main` @ `23e54b51`), not Fontsource's generated ones, because Fontsource's header omits the Plex Reserved Font Name line:
+
+| File | Upstream | Upstream sha256 | Committed sha256 |
+|---|---|---|---|
+| `OFL-IBM-Plex.txt` (covers Sans and Mono; the two upstream files are byte-identical) | `ofl/ibmplexsans/OFL.txt` — "Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"" | `7e6b2818…adb07da` | `d741e57d…c9fc5fb4f` |
+| `OFL-Newsreader.txt` | `ofl/newsreader/OFL.txt` — "Copyright 2020 The Newsreader Project Authors" | `fdfad381…d4ded8` | `865f0949…d40adc25` |
+
+The only difference from upstream is whitespace (CRLF → LF, one trailing space removed, final newline added) so the files pass `git diff --check` and the repository's `eol=lf`; the wording is unchanged. Nothing else from the packages (CSS, `.woff`, other subsets/weights, metadata) was copied.
+
+**Reserved Font Name note.** The OFL FAQ (2.6–2.8) treats a subsetted webfont as a Modified Version, which may keep a Reserved Font Name only where it preserves *functional equivalence* or the provider has the author's agreement. These are Google Fonts' own unicode-range subsets of IBM Plex (the family IBM publishes on Google Fonts), redistributed unmodified; IBM itself ships Plex in the same unicode-range split form under the Plex name (`IBM/plex`, `packages/plex-sans/fonts/split/`). The repository does not modify or re-subset the files. Recorded so a future re-subset (e.g. a custom glyph set) is recognised as a naming question, not done silently.
+
+### A5.3 Tailwind / type wiring
+
+```css
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-display: swap;
+             src: url('../fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+             unicode-range: U+0000-00FF, …; }                     /* ×10 faces */
+@theme {
+  --font-sans:    'IBM Plex Sans', system-ui, sans-serif, <emoji families>;
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif;
+  …brand palette unchanged
+}
+```
+
+- **Three roles, one utility each:** `font-sans` (UI; the page default, because `body` and Tailwind's preflight both read `--font-sans`), `font-mono` (data; also the preflight default for `code`/`kbd`/`samp`/`pre`), `font-display` (Newsreader; entity names and customer voice only, Direction D §3.3). Fallbacks are exactly Direction D §3.1's. The four emoji families that the previous stack carried are kept after the generic family because they only extend glyph coverage; removing them was not WP1d's business. JetBrains Mono's extra `'Cascadia Code'` fallback is dropped, since the contract's mono fallback is `ui-monospace, monospace`.
+- **No type scale, no tracking tokens, no typography utility framework.** Sizes, line heights and weights are untouched everywhere.
+- **Tabular numerals.** Plex Mono is a fixed-pitch face, so its figures are tabular by construction; no `font-feature-settings` was added. Components that need `tabular-nums` on proportional text keep using the utility.
+- `font-sans` and `font-mono` compile to `var(--font-sans|mono)` as before. `font-display` compiles on first use to `.font-display{font-family:var(--font-display)}` (verified with a throwaway probe build). In this tree it is already emitted, because Tailwind's automatic source detection also scans the new contract test, which names it — a benign artefact of the kind A4.4 recorded for `fill-rule` (≈70 bytes, no consumer).
+- **No adoption.** No page, layout or primitive uses `font-display`; existing `font-mono` sites (22 in 18 files, all pre-existing) now render Plex Mono instead of the never-loaded JetBrains Mono fallback chain. No ID, timestamp or money field was converted.
+
+### A5.4 External-font removal and the preload seam
+
+Both root views replace the two bunny.net lines with one include, at the same position (before `@vite`), so neither theme script moved:
+
+```blade
+@include('layouts.partials.font-preloads')
+```
+
+`resources/views/layouts/partials/font-preloads.blade.php` holds the only preloads:
+
+```blade
+<link rel="preload" href="{{ Vite::asset('resources/fonts/ibm-plex-sans-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ Vite::asset('resources/fonts/ibm-plex-sans-latin-500-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+```
+
+`Vite::asset()` resolves the fingerprinted file from the manifest (Vite registers every CSS-referenced font there), so the preload URL is the exact URL the `@font-face` rule requests, and `crossorigin` matches the CORS mode of a font fetch — the two conditions for the browser to reuse the preload instead of fetching twice. One partial means React/Inertia, Blade and the auth pages cannot drift. The partial is not the WP4 `partials/shell/bootstrap.blade.php` and does not pre-empt it.
+
+**Remaining third-party font references in `src/`:** none rendered. `welcome.blade.php` (the Laravel starter page, unrouted, excluded since A1.2) still links bunny.net for Instrument Sans; no route renders it. Left for the owner to delete rather than edited here.
+
+### A5.5 Browser / network evidence
+
+Real Chromium 1243 (Playwright 1.63, container-installed as in WP0–WP1c), cold contexts, CDP network log. Run on the `base` (`707a560`) and `post` copies served by `php artisan serve` (A4.1 method), and again on the **live stack** (`nginx`, the main checkout's final build after `./dev check`).
+
+| Scenario (live stack) | Font requests (URL · status · initiator) | Bytes on the wire | External hosts |
+|---|---|---:|---|
+| Guest cold `login` | Sans 400 · 200 · preload; Sans 500 · 200 · preload; Sans 600 · 200 · `app.css` | 72,071 | **0** |
+| Guest cold `forgot-password` | same three | 72,071 | **0** |
+| React cold `/dashboard` | same three | 72,071 | **0** |
+| Blade cold `/operator/tickets` | same three | 72,071 | **0** |
+| Blade cold `/crm/companies/2` (contact "Łukasz Wójcik") | the three + **Sans latin-ext 500** · `app.css` | 88,876 | **0** |
+| React → Blade → React by real links (`/dashboard` → `/billing/invoices` → `/dashboard`) | first document: the three from network; Blade and return documents: every face from cache (0 B); Plex Mono 500 fetched once for the invoice number | 87,308 total | **0** |
+
+- **Each face is requested exactly once per document**; the two preloads are consumed by the `@font-face` rules (no second request, and no "preloaded but not used" console warning after a 3.5 s wait). **No 404** and no failed font request anywhere.
+- **Cross-renderer reuse:** nginx serves the fonts `Cache-Control: public, immutable, max-age=31536000` with `Content-Type: font/woff2`, so React and Blade documents share one cached copy. (Under `php artisan serve`, which sends no validators, every document re-fetched — an artefact of that server, not of the change.)
+- **Base, for comparison:** 1 preconnect + 1 render-blocking CSS request + 3–4 Inter files to `fonts.bunny.net` on every page (76,031 B React/auth, 101,102 B Blade, where Inter 700 was also fetched).
+- **Plex Mono and Newsreader load on first use only.** `/billing/invoices` and `/billing/invoices/3` fetch Mono 500, `/time` Mono 400; no audited page fetches Newsreader. Injecting a Newsreader element in the browser fetched exactly Newsreader 400 and 500, and `document.fonts.check()` confirmed both.
+- **latin-ext is conditional:** no ordinary page fetched a latin-ext face; the CRM fixture fetched only the latin-ext weight its name renders in, and injecting "Łódź Škoda Dvořák" into `/dashboard` fetched latin-ext 400 and nothing else.
+
+### A5.6 Payload budget
+
+| | WP0 (A1.4) | WP1d final |
+|---|---:|---:|
+| Plex Sans 400/500/600 latin | 69.4 KB | 71,024 B = **69.4 KiB** |
+| Plex Mono 400/500 latin | 28.9 KB | 29,596 B = **28.9 KiB** |
+| Newsreader static 400/500 latin | 45.1 KB | 46,104 B = **45.0 KiB** |
+| **Total latin (budget ≤ 180 KB)** | 143.4 KB | **146,724 B = 143.3 KiB** |
+| Preload (Sans 400 + 500) | 45.7 KB | **46,772 B = 45.7 KiB** |
+| Plex Sans latin-ext 400/500/600 (conditional, uncounted) | 47.8 KB | 48,884 B = 47.7 KiB |
+| Typical first document (Sans 400/500/600, measured transfer) | — | **72,071 B**, vs 76,031 (React/auth) / 101,102 (Blade) before |
+
+WP0's "KB" figures are KiB; the files are identical to WP0's.
+
+### A5.7 Fallback, swap and metric behaviour
+
+- `font-display: swap` on every face. With every font request **aborted**, all 21 routes × 2 themes render in the fallback stack (DejaVu Sans is the container's `system-ui`) with **0 clipped elements and 0 horizontal overflow**, and every page height matches `base`'s own fallback render (42/42 route-theme pairs, Δ 0). The largest fallback→loaded reflow is on `/profile` (146 px shorter once Plex arrives), because DejaVu is much wider than Plex; `base` had the same reflow to Inter.
+- **CLS with every font response delayed 800 ms** (base → post, live stack identical to post): login 0.0000 → 0.0002, dashboard 0.0003 → 0.0004, tasks 0.0006 → 0.0057, profile 0.0003 → 0.0004, operator/tickets 0.0037 → 0.0088, roles edit 0.0003 → 0.0004, invoice edit 0.0005 → 0.0006. All far below the 0.1 "good" threshold; not chased.
+- **No metric adjustment was needed.** No `size-adjust`/`ascent-override`, no line-height or spacing change. The one metric-driven difference is that native `<select>` elements, whose height Chromium derives from the font's own ascent/descent, grow **37 → 38 px** (Plex's 1.30 em content area vs Inter's 1.21 em); it moves nothing but the content under those selects by 1 px (A5.9). Recorded as a compatible normalisation; WP2's `NativeSelect`/control restyle owns control heights.
+- **Weights.** Direction D ships 400/500/600 only. Everything that previously resolved to Inter 700 — browser-default bold `<th>` headers (`/tasks`, `/time`), `<strong>`, and the two `font-bold` sites (`billing/payment/show`, `errors/403`) — now renders Plex 600, the nearest face, without synthetic bolding. Deliberate, per the contract; no header height changed.
+
+### A5.8 Dense-screen gate (C7)
+
+`base` vs `post`, element-by-element (every rendered element's box, matched by DOM path), both themes, 1360 px:
+
+| Screen | Theme | Page height Δ | Elements with changed height | Wrap changes | New clipping | Overflow |
+|---|---|---:|---:|---:|---|---|
+| `/admin/roles/1/edit` (190 elements, 41 checkboxes) | light / dark | **0 / 0** | 0 / 0 | 0 | none | none |
+| `/admin/roles/2/edit` | light / dark | **0 / 0** | 0 / 0 | 0 | none | none |
+| `/operator/tickets` | light / dark | **0 / 0** | 2 inline boxes (+1 px, no layout effect) | 0 | none | none |
+
+Row heights, nav height (65 px), buttons (−4 px width, same height), inline controls and the long ticket/assignee values are unchanged. At 768 px the queue's cramped cells wrap *less* (two rows 95 → 85 and 134.5 → 118.5 px), because Plex sets narrower than Inter here. **Gate passes.** The single sr-only `View` label is the same pre-existing one WP0 recorded.
+
+### A5.9 Legacy compatibility matrix
+
+A4.9's route set plus both role pages, `/operator/tickets`, each in light and dark at 1360 px, `operator@intechral.test` (guest for auth), `base` vs `post`, on the fixtures in A5.12. Every route returned 200 with the correct `data-theme`; **0 horizontal overflow, 0 clipped elements, 0 increased row heights, 0 new wraps** on every route and theme.
+
+| Route | Renderer | Result (both themes) | Classification |
+|---|---|---|---|
+| `projects.create` | React | page Δ 0; button widths −4…−5 px | compatible normalisation |
+| `tasks.index` | React | page Δ 0; bold `<th>` 700 → 600 | deliberate Direction D change |
+| `projects.board` (#468) | React | 0 height changes | unchanged geometry |
+| `profile.show` | React | page Δ 0 | compatible normalisation |
+| `dashboard` | React | 0 height changes | unchanged geometry |
+| `time.index` | React | page Δ 0; bold `<th>`/`<strong>` 700 → 600 | deliberate Direction D change |
+| `tickets.show` (#4) | Blade | description 2 → 1 lines (narrower face), page Δ 0 | compatible normalisation |
+| `operator.tickets.index` | Blade | A5.8 | unchanged geometry |
+| `operator.tickets.show` (#4) | Blade | two native selects 37 → 38 px, page Δ 0 | compatible normalisation |
+| `roles.edit` (#1, #2) | Blade | A5.8 | unchanged geometry |
+| `billing.invoices.index` (fixture, draft badge) | Blade | page Δ 0; invoice number now Plex Mono | compatible normalisation (debt A4.8 unchanged) |
+| `billing.invoices.edit` (fixture) | Blade | three native selects 37 → 38 px, page +1 px | compatible normalisation |
+| `billing.invoices.show` (fixture) | Blade | page Δ 0; mono heading now Plex Mono | compatible normalisation |
+| `crm.companies.show` (fixture, long name, latin-ext contact) | Blade | page Δ 0; latin-ext 500 loads for the contact | compatible normalisation |
+| `cms.show` (fixture) | Blade | body 8 → 7 lines, page Δ 0 | compatible normalisation |
+| `cms.index`, `operator.cms.index`, `users.show` (#1) | Blade | 0 height changes | unchanged geometry |
+| `login`, `forgot-password` | React (guest) | page Δ 0; wordmark inline box +3 px, no layout effect | compatible normalisation |
+
+Every route's face changed from Inter to Plex Sans by design; "unchanged geometry" means no element box height changed. **Regressions: none.**
+
+### A5.10 Responsive and accessibility
+
+- **Widths 1280, 1024, 768, 390** (dashboard, tasks, time, profile, operator/tickets, roles edit, invoice edit, tickets/4, CRM company, login), both themes: no new overflow, clipping or wrap anywhere. **The pre-existing 768 px React overflow (771 > 768, A1.13) disappears** on `/dashboard`, `/tasks`, `/time` and `/profile` — the narrower face lets the desktop nav fit. Not a fix WP1d claims: WP4 must still confirm the shell has no such overflow on its own.
+- **320 CSS px reflow (≈ 400 % of 1280) / 200 % zoom spot check** on dashboard, tasks, operator/tickets, roles edit, invoice edit, login, forgot-password, profile: no horizontal overflow before or after, no clipped label or truncated button.
+- **Focus:** the WP1c focus ring is byte-identical before and after (`rgb(11,106,115) 0 0 0 2px` on the login field); Blade links keep the UA `auto` outline. Fonts cannot affect either.
+- Text is legible in both the fallback and loaded states (A5.7); no content depends on Newsreader (unused); mono only replaces an already-mono presentation. Contrast is a colour property and is unchanged: the two A4.8 legacy debts measure the same.
+
+### A5.11 First paint and theme bootstrap
+
+Real Chromium, 20 cold loads per server — stored preference and OS preference × light/dark × {auth `login`, React `/dashboard`, Blade `/operator/tickets`, React → Blade by a real link (`/dashboard` → `/billing/invoices`), Blade → React by a real link}. On the first animation frame `data-theme` and the `<html>` background were already correct and no later flip occurred: **base 20/20, post 20/20, live stack 20/20.** The only difference is that the Blade root's theme script no longer waits for a third-party stylesheet (A1.7 item 2): `document.styleSheets` on the first frame is 1 (our `app.css`) where it was 2. **Neither theme script was edited or moved**; consolidation remains WP4/WP5.
+
+### A5.12 Fixtures and data
+
+The dev database again held 0 invoices, 0 CRM companies and 0 CMS pages. Created through the existing factories, pinned to existing users, deleted after the runs: invoice #3 `INV-WP1D` (draft, client 2, created by 1) with 2 items; CRM company #2 (a long 61-character name) with contact #2 "Łukasz Wójcik" (the real-content latin-ext check); CMS page #2 `wp1d-fixture-page` (published). Baseline and final counts: users 3, invoices 0, invoice_items 0, crm_companies 0, crm_contacts 0, cms_pages 0, tickets 2, projects 4, tasks 12, roles 2, organizations 0, time_entries 3, sessions 50 — the 126 sessions the browser harness created (`127.0.0.1` via `artisan serve`, `172.22.0.5` via nginx) and the 8 that the two `./dev check` runs' host `curl` probes create were deleted, leaving exactly the baseline session ids. Pre-existing residue untouched, as in A4.10.
+
+### A5.13 Build and bundle
+
+Clean view cache, same procedure for both trees (A4.1):
+
+| Asset | Before (`707a560`) | After | Delta |
+|---|---:|---:|---:|
+| `app.css` | 80,294 B / 15,956 gzip-9 | 83,672 / 16,507 | **+3,378 / +551** — the ten `@font-face` rules (mostly their `unicode-range` lists) plus the three family variables |
+| `app.tsx` entry, `app-layout` (shell), `app.js` (Blade), `wayfinder`, `board`, `allocation` | — | — | **0 — identical file hashes** |
+| Emitted font assets | 0 (third-party) | 10 files, 195,608 B | self-hosted |
+
+The live dev-tree stylesheet (with view-cache residue, A4.19 finding 3) is 85,029 / 16,695.
+
+### A5.14 WP1a / WP1b / WP1c regression check
+
+The compiled stylesheets were compared rule-by-rule: the **only** differences are the ten `@font-face` rules, the `--font-*` theme variables and the `.font-display` utility.
+
+- **WP1a:** the thirteen `.legacy-*` rules are byte-identical (md5 match); `@layer utilities` untouched.
+- **WP1b:** the six orphan mappings are unchanged (source, compiled CSS and `DirectionDThemeContractTest`).
+- **WP1c:** all 80 `--ds-*` declarations (37 × 2 themes + 6 motion) are byte-identical; `primary` still `var(--accent)`; `ring → var(--ds-focus)` and `destructive → var(--ds-danger)` hold; `DirectionDThemeContractTest` (39 cases) green. The two A4.8 contrast debts are unchanged and were not fixed.
+
+### A5.15 Tests / static guards
+
+New: `tests/Unit/Configuration/DirectionDTypographyContractTest.php` (5 cases, 69 assertions), in the style of the WP1c test — wiring, never glyphs or pixels:
+
+- the three roles are the `@theme` font families with the contract fallbacks;
+- exactly the ten committed (family, weight, subset) faces are declared, each `font-display: swap`, each with a `unicode-range`, each pointing at a committed `../fonts/*.woff2`, none remote;
+- no stylesheet, root view or the preload partial references a third-party font host or `preconnect`;
+- both root views include the one preload partial, which preloads exactly Plex Sans 400 and 500 latin (via `Vite::asset`, `as="font"`, `type="font/woff2"`, `crossorigin`), and each preloaded file is a file an `@font-face` requests;
+- every committed `.woff2` is referenced (no stray weight), and both OFL files ship with their copyright holders.
+
+Mutation-checked in the container copy: `swap` → `block` on one face, adding a Plex Sans 600 preload, restoring the bunny.net link in the Inertia root, dropping `crossorigin`, adding a stray Newsreader 700 file, and changing the mono stack each failed the suite; restored byte-identically. No Playwright spec was added or changed (the two existing specs that locate `span.font-mono` are unaffected: the class is unchanged).
+
+### A5.16 Validation results
+
+- **`./dev check` from the main checkout: all five steps green, run twice (before and after this amendment)** — CLI self-tests, `git diff --check`, Pint, `npm run check` (Wayfinder, `tsc`, ESLint, Prettier, Vitest, production build), Pest **977 passed / 4069 assertions** (972 + 5 new). The A4.17 environment blockers are gone (`dev` executable, `public/build` host-owned).
+- `git diff --check`: clean.
+
+### A5.17 Cleanup / ownership
+
+Fixtures deleted and counts verified (A5.12); harness and gate-probe sessions deleted (A5.12). Both `artisan serve` processes stopped and `/tmp/wp1d` removed from the container. Tarballs, harness scripts and screenshots lived only in the session scratchpad. No tracked build output; `src/public/build` and every other generated path are host-owned; no package or manifest change.
+
+### A5.18 Deviations / findings
+
+1. **Plex Sans 600 is fetched on every audited page** (headings and nav use `font-semibold`), CSS-discovered after `app.css` parses. The committed plan preloads 400/500 only, and a first document still moves less font data than before (72 KB vs 76–101 KB), so the plan was followed. Whether to preload 600 is a measured question for WP8, not a WP1d change.
+2. **Fontsource's licence files are incomplete for Plex** (no Reserved Font Name line); the upstream `google/fonts` texts were shipped instead (A5.2).
+3. **`font-display` is emitted before it has a consumer** because Tailwind's automatic source detection scans the contract test (A5.3). Benign; it disappears or stays harmlessly as the test changes.
+4. **Native `<select>` +1 px** (A5.7) — the only metric-driven box change; accepted, owned by WP2's control restyle.
+5. **The 768 px React overflow no longer reproduces** (A5.10) — an incidental consequence of narrower glyphs, not a fix. WP4 still verifies it.
+6. **Vite dev-server (HMR) mode was not exercised**; `Vite::asset()` resolves through the hot server there by design. All evidence is from production builds.
+7. `welcome.blade.php` still references bunny.net but is unrouted (A5.4).
+
+### A5.19 Files changed
+
+`src/resources/css/app.css` · `src/resources/views/app.blade.php` · `src/resources/views/layouts/app.blade.php` · `src/resources/views/layouts/partials/font-preloads.blade.php` (new) · `src/resources/fonts/` (new: 10 `.woff2`, `OFL-IBM-Plex.txt`, `OFL-Newsreader.txt`) · `src/tests/Unit/Configuration/DirectionDTypographyContractTest.php` (new) · this document.
+
+### A5.20 WP2 handoff
+
+WP2 may start. It inherits:
+
+- **Type roles ready to consume:** `font-sans` (default everywhere), `font-mono` (Plex Mono; pair with `tabular-nums` only on proportional text), `font-display` (Newsreader — entity names and customer voice only, §3.3; WP2 primitives should not use it). Available weights are 400/500/600; `font-bold` and default-bold elements resolve to 600.
+- **Control metrics:** native `<select>` height tracks font metrics (A5.7); the `Input`/`NativeSelect`/`Button` restyle should fix control heights explicitly rather than inherit them.
+- **Unchanged obligations:** the `primary` flip with the Button restyle (A4.6), 1.4.11 control identity (A4.19 finding 5), `success` text placement (finding 6), and the two A4.8 legacy contrast debts via `Status`.
+- **Not WP2's:** the theme bootstrap consolidation (WP4/WP5), BrandMark (WP4, C9), the Plex Sans 600 preload question (WP8).

@@ -8,9 +8,7 @@
     <title>{{ $title ?? config('app.name') }} &mdash; {{ config('app.name') }}</title>
     <meta name="description" content="{{ $description ?? '' }}">
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700&family=jetbrains-mono:400,500" rel="stylesheet" />
+    @include('layouts.partials.font-preloads')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
