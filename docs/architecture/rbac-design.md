@@ -57,6 +57,8 @@ settings.view
 settings.manage
 ```
 
+**Known gap — `time.view_own`:** this permission exists in the catalogue and is granted by default to the `user` role (see below), but nothing in the live application currently checks it as an enforcement boundary. Implemented Time behavior is gated by `time.log` (may log/see one's own entries) and `time.view_all` (may see every user's entries); there is no code path where holding or lacking `time.view_own` changes what a request can do. EPIC-011E (Projects and Kanban Migration) reviewed this while auditing Time-adjacent contracts and deliberately did not reinterpret or wire it — that was out of its scope. Future permission-model work should either give `time.view_own` a real enforcement meaning or retire it from the catalogue; until then, treat `time.log` as the operative "see your own time" gate.
+
 ## Built-in Roles
 
 ### `operator` (Platform Operator)
@@ -144,7 +146,7 @@ $query->whereIn('organization_id', $user->organizations()->select('organizations
 // CrmContact   -> company.organization_id
 ```
 
-Operators bypass these scopes. A non-operator with no memberships receives an empty tenant view. Tickets, projects, invoices, and time entries have no `organization_id` column and continue to use ownership, company/project membership, invoice-client, and policy logic instead of the direct scope.
+Operators bypass these scopes. A non-operator with no memberships receives an empty tenant view. Tickets, projects, invoices, and time entries have no `organization_id` column and continue to use ownership, membership, invoice-client, and policy logic instead of the direct scope. For `Project` specifically that means `project_members` membership or `projects.admin`: a project's linked CRM company (`project_company`) is visibility metadata only and never grants access on its own (EPIC-011E D2).
 
 ### Organization Permissions
 

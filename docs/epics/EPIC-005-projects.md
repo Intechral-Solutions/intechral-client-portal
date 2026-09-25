@@ -29,6 +29,8 @@ Provide lightweight project management with tasks, milestones, and team assignme
 **I want** a Kanban-style board to visualize and manage tasks,
 **So that** the team can track work in progress at a glance.
 
+> **Current-state note (EPIC-011E D1, 2026-09):** "manage tasks" here is superseded, not retracted. Structural task mutation — create, edit, delete, move/reorder — requires Project management authority (`projects.admin`, or `projects.manage` with a `manager` membership on that project); ordinary membership alone does not grant it. Collaborative actions (commenting, toggling a checklist item) remain open to any member, following EPIC-011E's separate rules for those.
+
 **Acceptance Criteria:**
 - [x] Default columns: Backlog, To Do, In Progress, In Review, Done
 - [x] Custom columns configurable per project

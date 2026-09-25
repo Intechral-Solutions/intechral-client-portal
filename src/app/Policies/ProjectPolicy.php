@@ -35,4 +35,15 @@ class ProjectPolicy
 
         return false;
     }
+
+    /**
+     * Who may add or remove project members, change member roles, or supply extra initial
+     * members (EPIC-011E D7-B). Deliberately narrower than manage(): only projects.admin, and
+     * independent of projects.manage. Called with a Project for an existing project and with
+     * the class name when a project is being created.
+     */
+    public function manageMembers(User $user, Project|string|null $project = null): bool
+    {
+        return $user->can('projects.admin');
+    }
 }

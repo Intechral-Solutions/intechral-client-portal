@@ -14,9 +14,10 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         $operators = User::permission('tickets.assign')->orderBy('name')->get();
+        $includeInternal = $request->user()->can('viewInternal', Ticket::class);
 
         $tickets = Ticket::with(['user', 'assignee'])
-            ->when($request->filled('search'), fn ($q) => $q->search($request->search))
+            ->when($request->filled('search'), fn ($q) => $q->search($request->search, $includeInternal))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('priority'), fn ($q) => $q->where('priority', $request->priority))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category))
@@ -34,6 +35,8 @@ class TicketController extends Controller
 
     public function show(Ticket $ticket, TicketService $service)
     {
+        $this->authorize('view', $ticket);
+
         $ticket->load([
             'user',
             'assignee',
@@ -51,6 +54,8 @@ class TicketController extends Controller
 
     public function updateStatus(Request $request, Ticket $ticket, TicketService $service)
     {
+        $this->authorize('view', $ticket);
+
         $validated = $request->validate([
             'status' => ['required', 'in:open,in_progress,pending_user,resolved,closed'],
         ]);
@@ -62,11 +67,15 @@ class TicketController extends Controller
 
     public function assign(Request $request, Ticket $ticket, TicketService $service)
     {
+        $this->authorize('view', $ticket);
+
+        // `present` makes an absent key a validation error; an explicit blank value is the
+        // intentional single-ticket unassign. Eligibility is enforced by TicketService::assign.
         $validated = $request->validate([
-            'assignee_id' => ['nullable', 'exists:users,id'],
+            'assignee_id' => ['present', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $service->assign($ticket, $validated['assignee_id'] ?: null, auth()->user());
+        $service->assign($ticket, $validated['assignee_id'] === null ? null : (int) $validated['assignee_id'], auth()->user());
 
         return back()->with('status', 'Ticket assignment updated.');
     }

@@ -21,6 +21,11 @@
          style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
          role="alert">{{ session('status') }}</div>
     @endif
+    @if ($errors->any())
+    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
+         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
+         role="alert">{{ $errors->first() }}</div>
+    @endif
 
     {{-- Filters --}}
     <form method="GET" action="{{ route('operator.tickets.index') }}" class="mb-6 flex flex-wrap gap-2">

@@ -2,21 +2,45 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectBoardPresenter;
 use App\Models\Project;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectBoardController extends Controller
 {
-    public function show(Project $project): View
+    public function show(Project $project): Response
     {
         $this->authorize('view', $project);
 
+        // Everything a card renders is loaded up front: the assignee and milestone names, the
+        // task's own column (for the overdue rule), and checklist totals as aggregates, so the
+        // query count does not grow with the number of cards.
         $project->load([
-            'columns.tasks' => fn ($q) => $q->with(['assignee', 'milestone'])->orderBy('position'),
-            'members',
-            'milestones',
+            'columns.tasks' => fn ($q) => $q
+                ->with(['assignee:id,name', 'milestone:id,name', 'column'])
+                ->withCount([
+                    'checklistItems',
+                    'checklistItems as done_checklist_items_count' => fn ($items) => $items->where('completed', true),
+                ])
+                ->orderBy('position')
+                ->orderBy('id'),
         ]);
 
-        return view('projects.board', compact('project'));
+        return Inertia::render('projects/board', [
+            'project' => ProjectBoardPresenter::project($project),
+            'columns' => $project->columns->map(fn ($column) => ProjectBoardPresenter::column($column))->values(),
+            'abilities' => [
+                // Structural mutation (quick-add, move, reorder): the policy alone, exactly
+                // what the structural task routes authorize (D1). No route middleware gate.
+                'manage' => Gate::allows('manage', $project),
+                // The Settings link: what projects.edit actually admits today (manage policy
+                // AND the projects.manage route middleware, A9), so a projects.admin holder
+                // without projects.manage is never offered a link that answers 403 (EPIC-011E
+                // §7, Amendment 4 W6).
+                'openSettings' => Gate::allows('manage', $project) && auth()->user()->can('projects.manage'),
+            ],
+        ]);
     }
 }

@@ -15,7 +15,9 @@ This requires a lightweight multi-tenancy layer without a full multi-tenant fram
 
 ## Decision
 
-Implement lightweight organization scoping in the shared database using the relationship actually present for each resource. `crm_companies.organization_id` is the direct tenant key; organizations scope through `organization_members`; contacts scope through their CRM company. Models without `organization_id` use ownership, project/company membership, invoice-client, or policy logic and must not receive the direct-column global scope.
+Implement lightweight organization scoping in the shared database using the relationship actually present for each resource. `crm_companies.organization_id` is the direct tenant key; organizations scope through `organization_members`; contacts scope through their CRM company. Models without `organization_id` use ownership, membership, invoice-client, or policy logic and must not receive the direct-column global scope.
+
+**Current state (EPIC-011E D2, 2026-09):** for `Project`, that mechanism is `project_members` membership or `projects.admin` — never the project's linked CRM company. A project-to-company link (`project_company`) is visibility **metadata only**; it does not, by itself, grant a user in that company's organization access to the project.
 
 ## Architecture
 

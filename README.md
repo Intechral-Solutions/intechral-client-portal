@@ -32,22 +32,60 @@ open http://localhost:8025
 
 See [docs/architecture/docker-setup.md](docs/architecture/docker-setup.md) for full documentation.
 
-## Dev Scripts
+## Developer CLI: `./dev`
 
-All developer commands are npm scripts defined in the root `package.json`:
+`./dev` is the one entry point for routine environment work. It is plain Bash (no host PHP/Node, no Laravel boot, no new dependencies), so it works while the containers are stopped. Run `./dev help` (or `./dev` with no arguments) for the list.
+
+| Command | What it does | Database it uses |
+|---------|--------------|------------------|
+| `./dev up` / `./dev down` / `./dev restart` | Start / stop the Compose stack; `restart` is `down` then `up`. Never removes volumes, never rebuilds images. | none |
+| `./dev shell` | Bash in `portal_app` as your host UID:GID | none |
+| `./dev doctor` | Read-only diagnostics: Docker, services, resolved DBs, pending migrations, tool versions, Playwright/Chromium launch check, ports, root-owned files | reads dev + testing |
+| `./dev db:status` | Migration status | **development** (`portal`) |
+| `./dev db:backup` | Dump to `backups/dev/<db>-<YYYY-MM-DD_HHMMSS>.sql` | **development** |
+| `./dev db:migrate` | Show pending, back up, ask for `yes`, run `php artisan migrate`, show status | **development** |
+| `./dev test:php [pest args]` | Pest, e.g. `./dev test:php --filter=ProjectAuthorizationMatrixTest` | **testing** (`intechral_client_portal_testing`) |
+| `./dev test:e2e [playwright args]` | Playwright (Chromium baked into the image) in `portal_app`, as your host user | **development**, see below |
+| `./dev check [--no-php]` | CLI self-tests, `git diff --check`, Pint, `npm run check` (wayfinder, tsc, eslint, prettier, vitest, build), then the full Pest suite (~4 min; `--no-php` skips it) | testing (Pest only) |
+
+**Safety.** Nothing trusts the command name to say which database it touches. Before acting, `./dev` boots Laravel inside the container and reads the database it actually resolves, then refuses (exit 1, nothing changed) unless it matches the contract:
+
+- Development commands need `APP_ENV=local`, database `portal`, host `db` (and the `db` service must have been created with that database).
+- `test:php` needs `APP_ENV=testing` and *exactly* `intechral_client_portal_testing`. It resolves through `tests/bootstrap.php`, so the existing `TestDatabaseSafety` guard applies, and it never falls back to development.
+- `db:migrate` always backs up first, prints the backup path, then asks you to type `yes`. It runs plain `migrate` (no `--force`), never `migrate:fresh`. There is intentionally no `db:fresh`, `db:restore` or volume removal yet.
+
+**E2E runs against the development database.** The Playwright suite drives the real app on `http://nginx` (inside the container), which uses `portal`. `test:e2e` prints project/task/time-entry counts before and after and warns if they differ; it never deletes anything (the tests' own fixture cleanup is authoritative). `--list` skips the database entirely.
+
+**Playwright is part of the dev image.** Chromium and its Linux libraries are installed when the image is built (`.docker/php/Dockerfile`), into `/opt/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`), readable by any UID. The Playwright version is read from `src/package-lock.json` at build time, and the build fails if `playwright-core` and `@playwright/test` are missing or differ. Recreating the container (`./dev down`, `./dev restart`) therefore keeps E2E working; nothing is downloaded at start or by `test:e2e`. If the browser is missing, `test:e2e` stops with a rebuild hint and `./dev doctor` reports a failure. This Dockerfile is development-only (production targets cPanel/PHP-FPM), so no production image is affected.
+
+**Rebuilding the image** is needed only when `.docker/php/Dockerfile` changes or the locked Playwright version is bumped:
+
+```bash
+docker compose build && ./dev restart   # cached rebuild, then recreate ALL containers from it
+npm run build && ./dev restart          # from scratch (docker compose build --no-cache)
+```
+
+Use `./dev restart` (not just `./dev up`) afterwards: `up` only recreates containers whose image changed, so the long-running `nginx` would keep a stale address for the new `app` container and answer 502.
+
+**Backups** live in `backups/dev/` (gitignored, mode 0600, written as your host user). Credentials come from the `db` container's own environment and are never printed. A dump is only kept if it is non-empty and ends with mariadb-dump's completion marker.
+
+**File ownership.** Every container command, including `test:e2e`, runs as your host UID:GID, so build output, caches and Wayfinder files stay yours. `test:e2e` sends Playwright's output (traces, `.last-run.json`) to a container-local directory (`/tmp/dev-e2e-results`) rather than the mounted `test-results/`. `./dev doctor` reports any root-owned files under the generated directories and prints a one-time repair command; no `./dev` command runs `chown`.
+
+**Adding a command.** Write `cmd_<name>` in `scripts/dev/commands.sh` (`db:status` maps to `cmd_db_status`) and add a `name|usage|description` line to `DEV_COMMANDS` (it drives both help and dispatch). Anything touching a database must call `resolve_or_die`, `print_target`, `enforce_contract` before acting. Container work goes through `app_exec`. Add a case to `scripts/dev/tests/run.sh` (`bash scripts/dev/tests/run.sh`; also run by `./dev check`).
+
+### npm scripts
+
+The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` and `test` delegate to the matching `./dev` command; the `fresh` alias (`migrate:fresh --seed` against the development database) was removed because it bypassed these guards.
 
 | Script | Description |
 |--------|-------------|
 | `npm run setup` | First-time setup: build Docker image, install deps, migrate & seed |
-| `npm run up` | Start all containers |
-| `npm run down` | Stop all containers |
-| `npm run restart` | Stop and restart all containers |
+| `npm run up` / `down` / `restart` | Same as `./dev up` / `./dev down` / `./dev restart` |
 | `npm run build` | Rebuild Docker images (no cache) |
 | `npm run dev` | Start Vite HMR dev server inside the container |
-| `npm run fresh` | Reset the database and re-seed |
-| `npm run test` | Run the full Pest test suite |
+| `npm run test` | Same as `./dev test:php` (extra args pass through) |
 | `npm run lint` | Run Laravel Pint (PHP code style) |
-| `npm run shell` | Open a bash shell in the app container |
+| `npm run shell` | Same as `./dev shell` |
 | `npm run logs` | Tail logs from all containers |
 
 ## Tech Stack

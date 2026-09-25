@@ -17,7 +17,10 @@ class TicketFactory extends Factory
         $hours = Ticket::SLA_HOURS[$priority];
 
         return [
-            'ticket_number' => 'TKT-'.str_pad($this->faker->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
+            // Factory numbers are 'TKT-F' + six digits. TicketService numbers are 'TKT-' + digits
+            // (its ticket's id), so the two namespaces can never collide, and the seeded
+            // fixture 'TKT-E2E1' stays outside both. Tests that need a specific value pass one.
+            'ticket_number' => 'TKT-F'.str_pad($this->faker->unique()->numberBetween(1, 999999), 6, '0', STR_PAD_LEFT),
             'user_id' => User::factory(),
             'assignee_id' => null,
             'title' => $this->faker->sentence(6),

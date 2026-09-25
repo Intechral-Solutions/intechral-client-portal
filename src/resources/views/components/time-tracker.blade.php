@@ -13,7 +13,12 @@
 
     $col = $contextType . '_id';
 
+    // D6: on a task, a viewer sees their own time; everyone's only with time.view_all. Being a
+    // project manager grants nothing extra. Ticket and project contexts are unchanged.
+    $ownTimeOnly = $contextType === 'task' && ! auth()->user()->can('time.view_all');
+
     $recentEntries = TimeEntry::where($col, $contextId)
+        ->when($ownTimeOnly, fn ($q) => $q->where('user_id', auth()->id()))
         ->whereNull('timer_started_at')
         ->with('user:id,name')
         ->orderByDesc('date')
@@ -22,6 +27,7 @@
         ->get();
 
     $totalMinutes = TimeEntry::where($col, $contextId)
+        ->when($ownTimeOnly, fn ($q) => $q->where('user_id', auth()->id()))
         ->whereNull('timer_started_at')
         ->sum('duration_minutes');
 

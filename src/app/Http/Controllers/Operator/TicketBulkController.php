@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TicketBulkController extends Controller
 {
@@ -15,23 +16,37 @@ class TicketBulkController extends Controller
             'ticket_ids' => ['required', 'array', 'min:1'],
             'ticket_ids.*' => ['integer', 'exists:tickets,id'],
             'action' => ['required', 'in:assign,close,resolve,status'],
-            'assignee_id' => ['nullable', 'exists:users,id'],
-            'status' => ['nullable', 'in:open,in_progress,pending_user,resolved,closed'],
+            // A real assignee is required to assign: a blank placeholder is invalid input, never an
+            // implicit bulk unassign (EPIC-010D D4). Single-ticket unassign is a separate route.
+            'assignee_id' => ['required_if:action,assign', 'nullable', 'integer', 'exists:users,id'],
+            'status' => ['required_if:action,status', 'nullable', 'in:open,in_progress,pending_user,resolved,closed'],
         ]);
 
-        $tickets = Ticket::whereIn('id', $validated['ticket_ids'])->get();
         $actor = auth()->user();
+        $action = $validated['action'];
 
-        foreach ($tickets as $ticket) {
-            match ($validated['action']) {
-                'assign' => $service->assign($ticket, $validated['assignee_id'] ?: null, $actor),
-                'close' => $this->safeTransition($service, $ticket, $actor, 'closed'),
-                'resolve' => $this->safeTransition($service, $ticket, $actor, 'resolved'),
-                'status' => $this->safeTransition($service, $ticket, $actor, $validated['status']),
-            };
-        }
+        // Everything that can reject the request runs before the first mutation, and the batch
+        // commits or rolls back as one.
+        $count = DB::transaction(function () use ($validated, $action, $service, $actor) {
+            if ($action === 'assign') {
+                $service->assertAssignable((int) $validated['assignee_id']);
+            }
 
-        return back()->with('status', "Bulk action applied to {$tickets->count()} ticket(s).");
+            $tickets = Ticket::whereIn('id', $validated['ticket_ids'])->get();
+
+            foreach ($tickets as $ticket) {
+                match ($action) {
+                    'assign' => $service->assign($ticket, (int) $validated['assignee_id'], $actor),
+                    'close' => $this->safeTransition($service, $ticket, $actor, 'closed'),
+                    'resolve' => $this->safeTransition($service, $ticket, $actor, 'resolved'),
+                    'status' => $this->safeTransition($service, $ticket, $actor, $validated['status']),
+                };
+            }
+
+            return $tickets->count();
+        });
+
+        return back()->with('status', "Bulk action applied to {$count} ticket(s).");
     }
 
     private function safeTransition(TicketService $service, Ticket $ticket, $actor, string $newStatus): void

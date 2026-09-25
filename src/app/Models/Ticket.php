@@ -97,13 +97,18 @@ class Ticket extends Model
             ->whereNotIn('status', ['resolved', 'closed']);
     }
 
-    public function scopeSearch($query, string $term)
+    /**
+     * Internal notes never influence matches unless the caller opts in with $includeInternal,
+     * which it derives from TicketPolicy::viewInternal (EPIC-010D H3).
+     */
+    public function scopeSearch($query, string $term, bool $includeInternal = false)
     {
-        return $query->where(function ($q) use ($term) {
+        return $query->where(function ($q) use ($term, $includeInternal) {
             $q->where('title', 'like', "%{$term}%")
                 ->orWhere('description', 'like', "%{$term}%")
                 ->orWhere('ticket_number', 'like', "%{$term}%")
-                ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', "%{$term}%"));
+                ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', "%{$term}%")
+                    ->when(! $includeInternal, fn ($r) => $r->where('is_internal', false)));
         });
     }
 

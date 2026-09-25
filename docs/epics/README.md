@@ -16,11 +16,13 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) | MariaDB Test Parity | **Implemented** |
 | [EPIC-010B](./EPIC-010B-tenant-scoping.md) | Tenant Scoping Correctness & Regression Coverage | **Implemented** |
 | [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) | Billed Time-Entry Locking | **Implemented** |
+| [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) | Helpdesk Security and Integrity Hardening | **Verified** |
 | [EPIC-011](./EPIC-011-react-frontend-migration.md) | React Frontend Migration | **In Progress** |
 | [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) | React Foundation and Coexistence Contract (EPIC-011 Phase A) | **Implemented** |
 | [EPIC-011B](./EPIC-011B-dashboard-profile.md) | Dashboard and Profile Migration (EPIC-011 Phase B) | **Implemented** |
 | [EPIC-011C](./EPIC-011C-authentication-invitations.md) | Authentication and Invitation Migration (EPIC-011 Phase C) | **Verified** |
-| [EPIC-011D](./EPIC-011D-time-tracking-timer.md) | Time Tracking and Persistent Timer Migration (EPIC-011 Phase D) | **Planned** |
+| [EPIC-011D](./EPIC-011D-time-tracking-timer.md) | Time Tracking and Persistent Timer Migration (EPIC-011 Phase D) | **Verified** |
+| [EPIC-011E](./EPIC-011E-projects-kanban.md) | Projects and Kanban Migration (EPIC-011 Phase E) | **Verified** |
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 
 ## Epic Lifecycle
@@ -37,6 +39,8 @@ Planned → In Progress → Implemented → Verified → Done
 
 ## Notes
 
-All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. EPIC-010B (2026-06-30) corrected membership-based tenant scoping and added regression coverage. EPIC-010C (2026-06-30) made billed and invoice-linked time entries immutable across ordinary mutation paths. The current phase is formal hardening: closing the remaining product-level gaps documented in each epic file.
+All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (2026-06-26) restored the full test suite by switching from SQLite to MariaDB. EPIC-010B (2026-06-30) corrected membership-based tenant scoping and added regression coverage. EPIC-010C (2026-06-30) made billed and invoice-linked time entries immutable across ordinary mutation paths. EPIC-010D (2026-09-24) closed the Helpdesk/Ticket authorization and integrity defects (reply authorization, internal-note attachment and search boundaries, owner-only customer visibility, assignee eligibility, safe CSV export, collision-free Ticket numbers); it is **Verified** (full Pest suite and concurrency probe green; the read-only production preflight is a first-production-release gate, since no customer production data exists yet), and `Done` follows the normal merge lifecycle. The current phase is formal hardening: closing the remaining product-level gaps documented in each epic file.
 
 Major milestone records are tracked in [docs/progress/](../progress/).
+
+As of 2026-09-24, strategic sequencing comes from the [Product Roadmap](../product/product-roadmap.md); epics remain the implementation contracts for the work it sequences.

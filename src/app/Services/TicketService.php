@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class TicketService
@@ -19,16 +22,24 @@ class TicketService
         $priority = $data['priority'];
         $hours = Ticket::SLA_HOURS[$priority];
 
-        $ticket = Ticket::create([
-            'ticket_number' => $this->nextTicketNumber(),
-            'user_id' => $user->id,
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'category' => $data['category'],
-            'priority' => $priority,
-            'status' => 'open',
-            'sla_due_at' => now()->addHours($hours),
-        ]);
+        // The database reserves the row identity first; the public number is derived from it
+        // (EPIC-010D H8). Both writes commit together, so no temporary number is ever visible.
+        $ticket = DB::transaction(function () use ($user, $data, $priority, $hours) {
+            $ticket = Ticket::create([
+                'ticket_number' => 'TMP-'.bin2hex(random_bytes(6)),
+                'user_id' => $user->id,
+                'title' => $data['title'],
+                'description' => $data['description'],
+                'category' => $data['category'],
+                'priority' => $priority,
+                'status' => 'open',
+                'sla_due_at' => now()->addHours($hours),
+            ]);
+
+            $ticket->update(['ticket_number' => $this->ticketNumberFor($ticket)]);
+
+            return $ticket;
+        });
 
         foreach ($files as $file) {
             $this->storeAttachment($ticket, null, $user, $file);
@@ -51,14 +62,8 @@ class TicketService
             $this->storeAttachment($ticket, $reply, $user, $file);
         }
 
-        // Notify the ticket owner on public replies (not internal notes)
-        if (! $isInternal && $ticket->user_id !== $user->id) {
-            $ticket->user->notify(new TicketRepliedNotification($ticket, $reply));
-        }
-
-        // Notify the assignee if they didn't write the reply
-        if ($ticket->assignee_id && $ticket->assignee_id !== $user->id && ! $isInternal) {
-            $ticket->assignee->notify(new TicketRepliedNotification($ticket, $reply));
+        foreach ($this->replyRecipients($ticket, $user, $isInternal) as $recipient) {
+            $recipient->notify(new TicketRepliedNotification($ticket, $reply));
         }
 
         return $reply;
@@ -101,6 +106,8 @@ class TicketService
 
     public function assign(Ticket $ticket, ?int $assigneeId, User $actor): void
     {
+        $this->assertAssignable($assigneeId);
+
         $ticket->update(['assignee_id' => $assigneeId]);
 
         activity()->causedBy($actor)
@@ -131,13 +138,53 @@ class TicketService
         return $tickets->count();
     }
 
+    /**
+     * The one assignment-eligibility rule (EPIC-010D H5): a Ticket may be assigned only to a user
+     * who currently holds `tickets.assign`. Unassigning (null) is always allowed. There is no
+     * exemption for the current assignee, so a stale assignee who lost the capability cannot be
+     * re-selected. Bulk callers run this before touching any Ticket.
+     *
+     * @throws ValidationException
+     */
+    public function assertAssignable(?int $assigneeId): void
+    {
+        if ($assigneeId === null) {
+            return;
+        }
+
+        if (! User::find($assigneeId)?->can('tickets.assign')) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'The selected assignee cannot be assigned tickets.',
+            ]);
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────
 
-    private function nextTicketNumber(): string
+    private function ticketNumberFor(Ticket $ticket): string
     {
-        $last = Ticket::max('id') ?? 0;
+        return 'TKT-'.str_pad((string) $ticket->id, 4, '0', STR_PAD_LEFT);
+    }
 
-        return 'TKT-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+    /**
+     * Who is emailed about a reply: nobody for an internal note; otherwise the owner and the
+     * assignee, except the author, only users who can currently view the Ticket (a stale assignee
+     * who lost `tickets.assign` cannot, so receives no preview), and each user at most once.
+     *
+     * @return Collection<int, User>
+     */
+    private function replyRecipients(Ticket $ticket, User $author, bool $isInternal)
+    {
+        if ($isInternal) {
+            return collect();
+        }
+
+        return collect([$ticket->user, $ticket->assignee])
+            ->filter()
+            ->reject(fn (User $recipient) => $recipient->is($author))
+            ->unique('id')
+            ->filter(fn (User $recipient) => Gate::forUser($recipient)->allows('view', $ticket))
+            ->values();
     }
 
     private function storeAttachment(Ticket $ticket, ?TicketReply $reply, User $user, UploadedFile $file): TicketAttachment

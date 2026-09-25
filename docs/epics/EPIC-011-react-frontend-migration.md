@@ -3,6 +3,15 @@
 **Status:** In Progress
 **Decision record:** [ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)
 
+> **Strategic note (2026-09-24): product priority has been rebased.**
+>
+> - The React/Inertia migration remains valid. Its architecture, migration principles, and completed phases A–E continue to inform all implementation.
+> - This epic is no longer the source of product priority. The governing strategic sequence is now the [Product Roadmap](../product/product-roadmap.md), with direction in [Platform Product & UX Direction](../product/platform-product-ux-direction.md) and [Information Architecture](../product/information-architecture.md).
+> - Remaining phases (F–K) are not executed in letter order. Renderer migration may be combined with redesign and product work instead of faithfully recreating legacy screens; the roadmap maps each remaining phase to the product work that now delivers it ([mapping](../product/product-roadmap.md#relationship-to-epic-011-and-its-remaining-phases)).
+> - Phase F (Tickets) has not begun and has no implementation document. Critical Ticket authorization/integrity fixes are sequenced first as a separate hardening package; Helpdesk implementation sequencing is revisited under the roadmap and new design system.
+>
+> The phase sequence below is preserved unchanged as the historical plan and implementation record.
+
 ---
 
 ## Goal
@@ -271,6 +280,10 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 
 ## Phase E: Projects and Tasks
 
+Detailed implementation plan: [EPIC-011E](./EPIC-011E-projects-kanban.md)
+
+**Status: Verified (2026-09-23).** WP0–WP10 are complete (see EPIC-011E for work-package detail and Amendment 11 for the verification record). Project index/create/edit, the board, milestones, project task detail, and the unified `/tasks` list are all Inertia/React; no Blade view remains under `resources/views/projects` or `resources/views/tasks`. Device-matrix and exhaustive assistive-technology testing for this phase are deliberately deferred to final platform-level QA.
+
 ### Scope
 
 - Project index/create/show/edit
@@ -287,6 +300,8 @@ Do not pre-commit to `react-chartjs-2`. First determine whether a direct Chart.j
 - Use local optimistic state for drag movement and Laravel for authoritative mutation.
 - Revert or refresh cleanly on failed movement.
 - Convert inline form/modals/disclosure JavaScript to React components.
+
+The live assessment in [EPIC-011E](./EPIC-011E-projects-kanban.md) refines this direction: optimistic movement is planned around Inertia 3 `router.optimistic()` (provisional until the EPIC-011E WP0 spike proves it, with a no-state-library fallback) rather than a separate local copy of the board, `@dnd-kit` is narrowed to `core` + `sortable` as a pointer/touch enhancement over a library-independent keyboard Move menu, and a backend-hardening package precedes the page conversions.
 
 ### Risks
 
@@ -433,6 +448,7 @@ PDF generation/download is not part of this phase. It belongs to [EPIC-012](./EP
 - Accessibility pass across converted application shell and critical workflows.
 - Cross-browser validation.
 - Remove migration-only compatibility code.
+- **Assistive-technology and device matrix, deferred here from the individual phases.** Per-phase verification covers keyboard operation and accessibility-tree semantics in a real browser, plus a screen-reader smoke test where one was available (EPIC-011E's WP10 had an owner-run NVDA smoke walkthrough on Windows, 2026-09-23). Exhaustive screen-reader certification across NVDA, JAWS and VoiceOver, and validation on real iOS Safari and Android Chrome devices, are deliberately held until this phase so they run once against the finished surface rather than being repeated per phase. Phases carrying this deferral: **E** (board drag/touch and the Move menu, dialogs, checklist).
 
 ### Exit criteria
 
@@ -440,6 +456,7 @@ PDF generation/download is not part of this phase. It belongs to [EPIC-012](./EP
 - No obsolete page scripts or dead Blade pages remain.
 - Any remaining Blade views are intentional and documented.
 - Full backend/frontend/critical-browser CI gates pass.
+- The deferred assistive-technology and real-device matrix above has been executed, and every phase that deferred into it is cleared.
 
 ## Blade / Inline JavaScript Migration Inventory
 
@@ -457,12 +474,12 @@ The implementation phases must account for the current inline behavior identifie
 | `billing/invoices/_form.blade.php` | Dynamic line items and totals | G |
 | `billing/payment/show.blade.php` | Stripe Payment Element | G |
 | `operator/tickets/index.blade.php` | Bulk selection | F |
-| `projects/board.blade.php` | Native drag/drop | E |
-| `projects/create.blade.php` | Conditional form behavior | E |
-| `projects/edit.blade.php` | Conditional form behavior | E |
-| `projects/milestones/index.blade.php` | Editing modal | E |
-| `projects/tasks/show.blade.php` | Checklist mutation | E |
-| `tasks/index.blade.php` | New-task disclosure | E |
+| `projects/board.blade.php` | Native drag/drop | E — migrated (deleted; EPIC-011E WP5) |
+| `projects/create.blade.php` | Conditional form behavior | E — migrated (deleted; EPIC-011E WP3) |
+| `projects/edit.blade.php` | Conditional form behavior | E — migrated (deleted; EPIC-011E WP3) |
+| `projects/milestones/index.blade.php` | Editing modal | E — migrated (deleted; EPIC-011E WP4) |
+| `projects/tasks/show.blade.php` | Checklist mutation | E — migrated (deleted; EPIC-011E WP7) |
+| `tasks/index.blade.php` | New-task disclosure | E — migrated (deleted; EPIC-011E WP8) |
 
 Each phase must re-inventory its own views before implementation because this table is a planning baseline, not permission to ignore code added later.
 
@@ -474,7 +491,7 @@ Each phase must re-inventory its own views before implementation because this ta
 | B | Dashboard, profile |
 | C | Login, forgot/reset password, confirm password, 2FA challenge, invitation registration, invalid invitation |
 | D | Personal time, allocation, operator time reports, timer UI |
-| E | Projects, board, milestones, project tasks, unified tasks |
+| E | *(none — migrated to Inertia, EPIC-011E WP3–WP8)* Projects, board, milestones, project tasks, and unified tasks are no longer Blade-rendered |
 | F | User tickets, operator queue/show/reports/bulk/replies |
 | G | Operator invoices, client invoices, Stripe payment |
 | H | Companies, contacts, organizations/memberships |

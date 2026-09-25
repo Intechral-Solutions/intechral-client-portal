@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\TimeEntryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -113,13 +114,16 @@ it('keeps locked entries visible to their owner and in operator reports', functi
     $this->actingAs($user)
         ->get(route('time.index'))
         ->assertOk()
-        ->assertSee('Visible locked entry')
-        ->assertSee('Locked');
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.description', 'Visible locked entry')
+            ->where('entries.data.0.locked', true));
 
     $this->actingAs($operator)
         ->get(route('operator.time.index'))
         ->assertOk()
-        ->assertSee('Visible locked entry');
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.description', 'Visible locked entry')
+            ->where('entries.data.0.locked', true));
 });
 
 it('rejects description and stop mutations for an inconsistent locked running timer', function () {

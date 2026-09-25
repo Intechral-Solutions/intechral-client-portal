@@ -1,18 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-async function signIn(
-    page: import('@playwright/test').Page,
-    email = 'operator@intechral.test',
-) {
-    await page.goto('/login');
-    await page.getByLabel('Email address').fill(email);
-    await page.getByLabel('Password').fill('password');
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
-}
+import { signIn } from './support/sign-in';
 
 test('Dashboard and Profile coexist with Blade pages and a persistent theme', async ({ page }) => {
-    await signIn(page);
+    await signIn(page, 'operator@intechral.test');
 
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
     await page.getByRole('link', { name: 'My Profile' }).click();
@@ -32,6 +23,29 @@ test('Dashboard and Profile coexist with Blade pages and a persistent theme', as
     await page.getByRole('link', { name: 'Intechral Client Portal home' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Open user menu' }).click();
+    await page.getByRole('menuitem', { name: 'Time Reports' }).click();
+    await page.getByLabel('Billing').selectOption('0');
+    await page.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page).toHaveURL(/billable=0/);
+    await expect(page.getByRole('link', { name: 'Export CSV' })).toHaveAttribute(
+        'href',
+        /billable=0/,
+    );
+
+    // Draft controls do not change the export target until Apply is executed.
+    await page.getByLabel('Billing').selectOption('1');
+    await expect(page.getByRole('link', { name: 'Export CSV' })).toHaveAttribute(
+        'href',
+        /billable=0/,
+    );
+    await page.getByLabel('Billing').selectOption('0');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^time-export-\d{4}-\d{2}-\d{2}\.csv$/);
 });
 
 test('mobile navigation renders permission-aware links', async ({ page }) => {
@@ -46,7 +60,7 @@ test('mobile navigation renders permission-aware links', async ({ page }) => {
 });
 
 test('profile information reports validation and saves through Inertia', async ({ page }) => {
-    await signIn(page);
+    await signIn(page, 'operator@intechral.test');
     await page.getByRole('link', { name: 'My Profile' }).click();
 
     const name = page.getByLabel('Name');

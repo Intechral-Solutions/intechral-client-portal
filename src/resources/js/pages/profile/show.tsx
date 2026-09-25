@@ -23,6 +23,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AppLayout } from '@/layouts/app-layout';
+import { formatTimestamp } from '@/lib/dates';
 import { confirmation as passwordConfirmation } from '@/routes/password';
 import { confirm as confirmProfilePassword } from '@/routes/profile/password';
 import { destroy as destroySessions } from '@/routes/profile/sessions';
@@ -640,10 +641,7 @@ function SessionsSection({ sessions }: { sessions: BrowserSession[] }) {
                                 </div>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     {session.ipAddress ?? 'Unknown IP'} ·{' '}
-                                    {new Intl.DateTimeFormat(undefined, {
-                                        dateStyle: 'medium',
-                                        timeStyle: 'short',
-                                    }).format(new Date(session.lastActiveAt))}
+                                    {formatTimestamp(session.lastActiveAt)}
                                 </p>
                             </div>
                         </li>

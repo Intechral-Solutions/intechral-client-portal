@@ -11,6 +11,9 @@ class TicketReplyController extends Controller
 {
     public function store(Request $request, Ticket $ticket, TicketService $service)
     {
+        // First, before validation, file handling, persistence or notification (EPIC-010D H1).
+        $this->authorize('reply', $ticket);
+
         $validated = $request->validate([
             'body' => ['required', 'string'],
             'is_internal' => ['boolean'],
@@ -20,8 +23,8 @@ class TicketReplyController extends Controller
 
         $isInternal = (bool) ($validated['is_internal'] ?? false);
 
-        // Non-operators may only post public replies
-        if ($isInternal && ! auth()->user()->can('tickets.assign')) {
+        // Actors without internal visibility may only post public replies
+        if ($isInternal && $request->user()->cannot('viewInternal', $ticket)) {
             $isInternal = false;
         }
 

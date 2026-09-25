@@ -40,23 +40,20 @@ npm run setup
 
 That's it. `npm run setup` handles everything. Open `http://localhost:4242`.
 
-## Dev Scripts
+## Developer CLI
 
-All commands are npm scripts defined in the root `package.json`:
+Routine environment work goes through `./dev` at the repository root (`./dev help`). It resolves and verifies the actual database before any database or test command, runs container commands as the host UID:GID, and backs up before migrating. Command reference, safety rules, backup location and how to add commands are in the [README](../../README.md#developer-cli-dev).
 
 ```bash
-npm run setup    # First-time setup (build + install + migrate + seed)
-npm run up       # Start containers
-npm run down     # Stop containers
-npm run restart  # Stop and restart
-npm run build    # Rebuild Docker images (no cache)
-npm run dev      # Start Vite HMR dev server
-npm run fresh    # Reset database and re-seed
-npm run test     # Run Pest test suite
-npm run lint     # Run Laravel Pint
-npm run shell    # Open bash in the app container
-npm run logs     # Tail container logs
+./dev up               # Start containers
+./dev doctor           # Read-only diagnostics
+./dev db:migrate       # Back up, confirm, then run pending migrations (development DB)
+./dev test:php         # Pest against the testing DB
+./dev test:e2e         # Playwright (runs against the development DB)
+./dev check            # Full non-browser validation
 ```
+
+Root `npm run` aliases (`setup`, `up`, `down`, `restart`, `build`, `dev`, `test`, `lint`, `shell`, `logs`) still work; `up`, `down`, `restart`, `shell` and `test` delegate to `./dev`. The former `npm run fresh` alias was removed: it ran `migrate:fresh --seed` against the development database without any check.
 
 ## Frontend Tooling
 
@@ -77,7 +74,29 @@ docker compose exec app npm run build
 - PHP 8.3 with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `opcache`, `exif`
 - Composer 2.7 installed globally
 - Node.js 22 LTS + npm installed
+- Playwright Chromium + its OS libraries, baked in at build time (see [End-to-end browser tests](#end-to-end-browser-tests))
 - Working directory: `/var/www/app`
+
+### End-to-end browser tests
+
+`./dev test:e2e` runs the Playwright suite inside `portal_app`, as the host UID:GID like every other `./dev` container command, against `PLAYWRIGHT_BASE_URL=http://nginx`. The suite exercises the **development** database.
+
+Chromium comes from the image, not from the running container:
+
+- `.docker/php/Dockerfile` runs `playwright-core install --with-deps chromium` during the build, so the browser and its apt libraries are image layers. Recreating the container (`./dev down`, `./dev restart`, `docker compose down`) keeps them.
+- Browsers live in `/opt/ms-playwright` (`ENV PLAYWRIGHT_BROWSERS_PATH`), world-readable, so no root-only `/root/.cache` and no need to run E2E as root.
+- The version is not hard-coded: a build stage reads `playwright-core` from `src/package-lock.json` and fails the build if it is missing or differs from `@playwright/test`. After bumping Playwright, rebuild the image so the browser revision matches.
+- The Dockerfile is development-only (used by the `app` and `queue` services; production targets cPanel/PHP-FPM), so browser tooling does not reach production. The `queue` image shares the same layers.
+- `test:e2e` never installs anything. If Chromium cannot launch it stops and points at the rebuild; `./dev doctor` reports the same as a failure.
+
+Rebuild after Dockerfile or Playwright-version changes:
+
+```bash
+docker compose build && ./dev restart     # cached rebuild, then recreate ALL containers from it
+npm run build && ./dev restart            # from scratch (docker compose build --no-cache)
+```
+
+Use `./dev restart`, not just `./dev up`, after a rebuild: `up` recreates only the containers whose image changed, and the long-running `nginx` container would keep a stale address for the recreated `app` and answer 502.
 
 ### Nginx (`nginx`)
 - Config at `.docker/nginx/default.conf`
@@ -88,12 +107,20 @@ docker compose exec app npm run build
 ### MariaDB (`db`)
 - Version: `10.11`
 - Dev credentials: `root/root`, database `portal`, user `portal/portal`
-- Data volume: `.docker/data/mysql/` (gitignored)
+- Persistence: the Compose named volume `dbdata`, mounted at `/var/lib/mysql`. It is managed by Docker, not stored in the repository; see [Data persistence](#data-persistence).
 
 ### Redis (`redis`)
 - Version: `7-alpine`
 - No auth in dev
-- Persistent data volume: `.docker/data/redis/`
+- Persistence: the Compose named volume `redisdata`, mounted at `/data` (append-only file enabled). See [Data persistence](#data-persistence).
+
+### Data persistence
+
+`docker-compose.yml` declares two top-level named volumes (`driver: local`): `dbdata` (MariaDB, mounted at `/var/lib/mysql`) and `redisdata` (Redis, mounted at `/data`). They live inside Docker's storage, not under `.docker/` or the repository. Docker prefixes the runtime volume name with the Compose project name (set by `name:` in `docker-compose.yml`, or overridden by `-p` / `COMPOSE_PROJECT_NAME`), so confirm the exact name with `docker volume ls` rather than assuming it.
+
+- `./dev down`, `./dev restart` and `docker compose down` keep both volumes; the databases survive.
+- Only `docker compose down -v` (or `docker volume rm`) deletes them. That destroys the development `portal` database *and* the testing database, and no `./dev` command does it. Take a `./dev db:backup` first if you ever need to.
+- `.docker/mysql/init-testing.sql` runs only when `dbdata` is first created (empty).
 
 ### Mailpit
 - SMTP on port `1025` — configure `MAIL_HOST=mailpit`, `MAIL_PORT=1025` in `.env`
@@ -122,7 +149,10 @@ docker compose exec db mariadb -u root -proot -e "
 ### Running Pest
 
 ```bash
-# Run the full suite (recommended — same command used by npm run test)
+# Run the full suite (recommended: ./dev test:php verifies the test DB target first,
+# runs Pest as your host user and forwards extra arguments)
+./dev test:php
+# ...or directly:
 docker compose exec app ./vendor/bin/pest
 
 # Run a single test file
@@ -178,6 +208,7 @@ docker compose exec app ./vendor/bin/pest --coverage
 docker compose exec db mariadb -u root -proot -e "DROP DATABASE IF EXISTS \`intechral_client_portal_testing\`;"
 docker compose exec db mariadb -u root -proot < .docker/mysql/init-testing.sql
 
-# Stop and remove volumes (destroys all database data — requires test DB recreation)
+# DESTRUCTIVE, raw Docker only (no ./dev equivalent): also removes the dbdata and redisdata
+# volumes, destroying the development AND testing databases. Run ./dev db:backup first.
 docker compose down -v
 ```

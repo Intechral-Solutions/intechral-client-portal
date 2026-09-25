@@ -114,6 +114,12 @@ During coexistence:
 
 This avoids duplicate React roots/providers while retaining the existing recovery model.
 
+### Kanban board interaction layer (EPIC-011E)
+
+The project board's drag-and-drop is a pointer/touch **enhancement layer**, not the board's architecture. The canonical, always-available way to move a task between columns or positions is a keyboard- and screen-reader-operable **Move menu**; drag calls the exact same authoritative move endpoint the menu does, so there is one server-side move path regardless of input method.
+
+`@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, and `@dnd-kit/utilities` 3.2.2 are adopted for this layer, pinned to exact versions (`--save-exact`) rather than caret ranges, and their imports are confined by an ESLint `no-restricted-imports` rule to the board's drag adapter components. No `KeyboardSensor` is configured: keyboard movement goes through the Move menu, not a simulated drag. Inertia props remain the durable, server-authoritative board state; dnd-kit holds no state of its own beyond the in-progress gesture. See [EPIC-011E](../../epics/EPIC-011E-projects-kanban.md) §8–§10 for the full design and work-package history.
+
 ### Authentication and invitations
 
 All user-facing Fortify and invitation views are ultimately in scope for migration to React, including:

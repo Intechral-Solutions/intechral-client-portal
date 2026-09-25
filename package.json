@@ -3,15 +3,14 @@
     "private": true,
     "description": "Developer scripts for the Intechral Client Portal dev environment",
     "scripts": {
-        "up": "docker compose up -d",
-        "down": "docker compose down",
-        "restart": "docker compose down && docker compose up -d",
+        "up": "./dev up",
+        "down": "./dev down",
+        "restart": "./dev restart",
         "build": "docker compose build --no-cache",
         "setup": "npm run build && docker compose up -d && docker compose exec app cp .env.example .env && docker compose exec app chmod -R 777 storage bootstrap/cache && docker compose exec app composer install && docker compose exec app php artisan key:generate && docker compose exec app php artisan migrate --seed && docker compose exec app npm install && docker compose exec app chmod -R 755 node_modules/.bin && docker compose exec app npm run build && echo \"\n  Setup complete. Open http://localhost:4242\n\"",
-        "fresh": "docker compose exec app php artisan migrate:fresh --seed",
-        "test": "docker compose exec app php artisan test",
+        "test": "./dev test:php",
         "lint": "docker compose exec app ./vendor/bin/pint",
-        "shell": "docker compose exec app bash",
+        "shell": "./dev shell",
         "logs": "docker compose logs -f",
         "dev": "docker compose up -d && docker compose exec app bash -c 'test -f .env || cp .env.example .env' && docker compose exec app chmod -R 777 storage bootstrap/cache && docker compose exec app npm install && docker compose exec app chmod -R 755 node_modules/.bin && docker compose exec app npm run dev"
     }

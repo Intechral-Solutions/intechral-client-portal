@@ -2,23 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectMilestonePresenter;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectMilestoneController extends Controller
 {
-    public function index(Project $project): View
+    public function index(Project $project): Response
     {
         $this->authorize('view', $project);
 
         $milestones = $project->milestones()
-            ->withCount('tasks')
-            ->get();
+            ->withTaskCounts()
+            ->get()
+            ->map(fn (ProjectMilestone $milestone) => ProjectMilestonePresenter::item($milestone))
+            ->values();
 
-        return view('projects.milestones.index', compact('project', 'milestones'));
+        return Inertia::render('projects/milestones/index', [
+            'project' => ['id' => $project->id, 'name' => $project->name],
+            'milestones' => $milestones,
+            // What the mutation routes actually admit: they require projects.manage (A9), which
+            // ProjectPolicy::manage() alone does not, so a projects.admin-only actor must not be
+            // offered New Milestone / Edit / Delete only to have them 403 (EPIC-011E §7 note).
+            'abilities' => [
+                'manage' => Gate::allows('manage', $project) && auth()->user()->can('projects.manage'),
+            ],
+        ]);
     }
 
     public function store(Request $request, Project $project): RedirectResponse

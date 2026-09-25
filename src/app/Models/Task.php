@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +37,13 @@ class Task extends Model
     public const STATUSES = ['todo', 'in_progress', 'done'];
 
     public const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
+    /** The three shapes that share the table (EPIC-011E §15). */
+    public const KIND_BOARD = 'board';
+
+    public const KIND_TICKET = 'ticket';
+
+    public const KIND_STANDALONE = 'standalone';
 
     // ── Relationships ────────────────────────────────────────
 
@@ -101,7 +109,45 @@ class Task extends Model
         );
     }
 
+    // ── Scopes ───────────────────────────────────────────────
+
+    /**
+     * SQL equivalent of isDone(): a board column decides when the task has one, the raw
+     * status decides otherwise. Every query that needs "done" goes through here so the rule
+     * cannot be re-invented (EPIC-011E §15).
+     */
+    public function scopeDone(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereHas('column', fn (Builder $column) => $column->where('is_done_column', true))
+                ->orWhere(fn (Builder $q) => $q->whereNull('column_id')->where('status', 'done'));
+        });
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNot(fn (Builder $q) => $q->done());
+    }
+
+    /** Due before today (application timezone) and not done. */
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query->whereNotNull('due_date')
+            ->where('due_date', '<', today())
+            ->open();
+    }
+
     // ── Helpers ──────────────────────────────────────────────
+
+    /** Which of the three task shapes this row is. */
+    public function kind(): string
+    {
+        if ($this->project_id !== null) {
+            return self::KIND_BOARD;
+        }
+
+        return $this->ticket_id !== null ? self::KIND_TICKET : self::KIND_STANDALONE;
+    }
 
     public function isDone(): bool
     {
@@ -115,7 +161,7 @@ class Task extends Model
     public function isOverdue(): bool
     {
         return $this->due_date !== null
-            && $this->due_date->isPast()
+            && $this->due_date->lt(today())
             && ! $this->isDone();
     }
 

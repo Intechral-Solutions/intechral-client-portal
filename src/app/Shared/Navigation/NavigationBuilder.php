@@ -19,9 +19,9 @@ final class NavigationBuilder
 
         $primary = array_values(array_filter([
             $user->can('tickets.view') ? $this->item($request, 'tickets', 'Tickets', 'tickets.index', ['tickets.*']) : null,
-            $user->can('projects.view') ? $this->item($request, 'projects', 'Projects', 'projects.index', ['projects.*']) : null,
-            $this->item($request, 'tasks', 'Tasks', 'tasks.index', ['tasks.*']),
-            $user->can('time.log') ? $this->item($request, 'time', 'Time', 'time.index', ['time.*']) : null,
+            $user->can('projects.view') ? $this->item($request, 'projects', 'Projects', 'projects.index', ['projects.*'], 'inertia') : null,
+            $this->item($request, 'tasks', 'Tasks', 'tasks.index', ['tasks.*'], 'inertia'),
+            $user->can('time.log') ? $this->item($request, 'time', 'Time', 'time.index', ['time.*'], 'inertia') : null,
             $this->billingItem($request),
             $user->can('crm.manage') ? $this->item($request, 'crm', 'CRM', 'crm.companies.index', ['crm.*']) : null,
             $user->can('cms.view') ? $this->item($request, 'pages', 'Pages', 'cms.index', ['cms.*']) : null,
@@ -29,7 +29,7 @@ final class NavigationBuilder
 
         $management = array_values(array_filter([
             $user->can('tickets.assign') ? $this->item($request, 'ticket-queue', 'Ticket Queue', 'operator.tickets.index', ['operator.tickets.*']) : null,
-            $user->can('time.view_all') ? $this->item($request, 'time-reports', 'Time Reports', 'operator.time.index', ['operator.time.*']) : null,
+            $user->can('time.view_all') ? $this->item($request, 'time-reports', 'Time Reports', 'operator.time.index', ['operator.time.*'], 'inertia') : null,
             $user->can('crm.manage') ? $this->item($request, 'organizations', 'Organizations', 'organizations.index', ['organizations.*']) : null,
             $user->can('cms.edit') ? $this->item($request, 'cms-pages', 'CMS Pages', 'operator.cms.index', ['operator.cms.*']) : null,
             $user->can('users.view') ? $this->item($request, 'users', 'Users', 'users.index', ['users.*']) : null,
@@ -70,13 +70,14 @@ final class NavigationBuilder
         string $label,
         string $routeName,
         array $activePatterns,
+        string $visit = 'document',
     ): array {
         return [
             'key' => $key,
             'label' => $label,
             'href' => route($routeName),
             'method' => 'get',
-            'visit' => 'document',
+            'visit' => $visit,
             'activePatterns' => $activePatterns,
             'isActive' => $request->routeIs(...$activePatterns),
             'children' => [],
