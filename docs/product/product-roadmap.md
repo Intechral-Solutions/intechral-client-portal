@@ -47,6 +47,9 @@ Each item becomes one or more implementation epics before work begins, consisten
 5. **Design before build for new surfaces.** A surface covered by the design exploration is implemented after its design direction is agreed.
 6. **Foundations earn their keep.** Platform capabilities are built when a real consumer needs them, with the second consumer validating the shape.
 7. **Deferred QA is scheduled, not forgotten.** Exhaustive device/AT/cross-browser work is concentrated in final hardening.
+8. **Data policy around the first production release.**
+   - **Before the first customer production release,** development and testing business data is disposable unless explicitly marked otherwise. It may be cleared, reseeded, rebuilt or normalized whenever that materially simplifies development, migrations, fixtures or validation; do not spend engineering effort preserving arbitrary development history (Tickets included).
+   - **After the first production release,** production data is authoritative history. Migrations must preserve it unless explicitly reviewed otherwise; production Ticket numbers must be preserved; destructive resets are not an acceptable migration strategy; and release preflights and backups become operational requirements (see [Deployment / release engineering](#future--deployment--release-engineering)).
 
 ## Sequence at a glance
 
@@ -71,7 +74,9 @@ LATER items are listed in their recommended order but are separable; see [Depend
 
 **Provenance.** The earlier Ticket/Helpdesk discovery audit is not stored in this repository. The register below was **re-verified by reading the live code on 2026-09-24** and is the authoritative starting list. The implementing epic should reconcile it against the original audit register if the owner still has it, and add any further high-impact findings from that audit.
 
-**Vehicle:** [EPIC-010D: Helpdesk Security and Integrity Hardening](../epics/EPIC-010D-helpdesk-security-hardening.md) (**Planned**), following the EPIC-010A–C pattern with characterization tests first and Pest regression coverage for each finding. EPIC-010D re-verifies H1–H6 below, adds H7–H9 (CSV formula injection, Ticket-number collision, role-name policy check), and locks the visibility and assignment decisions; it is the authoritative register from here on.
+**Vehicle:** [EPIC-010D: Helpdesk Security and Integrity Hardening](../epics/EPIC-010D-helpdesk-security-hardening.md) (**Verified** 2026-09-24), following the EPIC-010A–C pattern with characterization tests first and Pest regression coverage for each finding. EPIC-010D re-verifies H1–H6 below, adds H7–H9 (CSV formula injection, Ticket-number collision, role-name policy check), and locks the visibility and assignment decisions; it is the authoritative register from here on.
+
+*The register below is the original pre-fix record; all findings in it are now fixed (EPIC-010D).*
 
 | ID | Severity (provisional) | Finding | Evidence (live code) |
 |----|------------------------|---------|----------------------|
@@ -82,9 +87,11 @@ LATER items are listed in their recommended order but are separable; see [Depend
 | **H5** | Medium | **Assignment integrity.** Single and bulk assignment validate `assignee_id` only as `exists:users,id`, so a ticket can be assigned to any user, including a customer account, which then receives assignee notifications | `Operator\TicketController::assign`; `Operator\TicketBulkController::update` |
 | **H6** | Low | **Bulk status without a status errors.** `action=status` with no `status` passes `null` into `safeTransition(string $newStatus)`, a `TypeError` (HTTP 500) rather than a validation error | `Operator\TicketBulkController::update` / `safeTransition` |
 
-**Related debt:** `TicketPolicy` tests the hard-coded `operator` role name while operator routes gate on `tickets.assign`; capability-based checks are the target ([Information Architecture → User](./information-architecture.md#user)). EPIC-010D includes this for `TicketPolicy` (H9) because it sits in the seam H2 rewrites; role-name checks outside Ticket code are not in the package.
+**Related debt (resolved for Tickets):** `TicketPolicy` used to test the hard-coded `operator` role name while operator routes gate on `tickets.assign`. EPIC-010D fixed this (H9): Ticket authorization is now capability-based ([Information Architecture → User](./information-architecture.md#user)). Role-name checks outside Ticket code (the tenancy scopes) remain and were not in the package.
 
 **Exit criteria (direction):** H1–H3 fixed with regression tests proving the negative cases; H4 resolved by an explicit visibility decision (made: own Tickets only, EPIC-010D D1); H5–H6 fixed or explicitly deferred with rationale; no UI redesign; full Pest suite green.
+
+**Status (2026-09-24):** EPIC-010D is **Verified** and critical Helpdesk hardening is **complete**: H1–H9 are fixed with regression tests and the full Pest suite passes (`Done` follows the normal merge lifecycle). Because there is no customer production data yet, the read-only Ticket preflight in the epic's [Closeout](../epics/EPIC-010D-helpdesk-security-hardening.md#first-production-release--deployment-gate) is a **release-safety gate for the first production release** (or any populated production deployment), not an open verification item. The remaining NOW and NEXT work (Claude Design exploration, new application shell, design system) may proceed. The [Helpdesk MVP](#later--helpdesk-mvp) and any Helpdesk product redesign remain later work.
 
 **Why first:** Helpdesk is a customer-facing, multi-tenant surface with a cross-tenant write path (H1) and two confidentiality leaks (H2, H3). These are independent of every design decision below and should not wait for them.
 

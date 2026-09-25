@@ -107,7 +107,7 @@ The goal is **not** one interface with controls hidden. An operator looking at a
 
 **Architectural guardrails:**
 
-- **No "operator mode" / "customer mode" authorization primitive.** Surfaces are selected by capability. (Current debt: `TicketPolicy` tests a hard-coded `operator` role name; target is capability-based checks. See [Information Architecture → User](./information-architecture.md#user).)
+- **No "operator mode" / "customer mode" authorization primitive.** Surfaces are selected by capability. (Ticket authorization is already capability-based after EPIC-010D: `tickets.assign` identifies operator Ticket work and no role name is checked. A few tenancy scopes still test the `operator` role name; see [Information Architecture → User](./information-architecture.md#user).)
 - Keep room for **role-specific dashboards**, **cross-role collaboration** (operators and customers acting on the same artifact, e.g. an approval), and a possible **Future** "view as customer" preview for operators. "View as" must be a read-only rendering aid, never an impersonation that bypasses authorization.
 
 ## Product domains
@@ -174,7 +174,7 @@ Tasks become a **first-class workspace**, not a by-product of project boards. Th
 
 **Current:** Tickets (user list/create/show; operator queue/show/status/assign/bulk/reports/CSV), public replies, internal notes, attachments, status history, reply notifications, embedded Blade time tracker. No Incidents, no Knowledge, no SLA engine.
 
-**Before any Helpdesk product work:** the known Ticket authorization and integrity defects are fixed as a separate, small hardening package. See [Product Roadmap → Critical Helpdesk hardening](./product-roadmap.md#critical-helpdesk-hardening).
+**Before any Helpdesk product work:** the known Ticket authorization and integrity defects were fixed as a separate, small hardening package, [EPIC-010D](../epics/EPIC-010D-helpdesk-security-hardening.md) (Verified 2026-09-24; see [Product Roadmap → Critical Helpdesk hardening](./product-roadmap.md#critical-helpdesk-hardening)). Organization-level visibility, Incidents, Knowledge and the redesign below remain future work.
 
 **ITIL posture.** The long-term direction may evolve toward fuller ITIL-inspired capability, but the starting point is deliberately small. **Future** concepts, introduced only when operational need appears: Problem, Change, SLA, service catalog, escalation, routing, automation, service ownership.
 

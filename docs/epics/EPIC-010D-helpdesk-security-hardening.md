@@ -1,17 +1,19 @@
 # EPIC-010D: Helpdesk Security and Integrity Hardening
 
-**Status:** Planned
+**Status:** Verified (2026-09-24); `Done` is reserved for the normal merge lifecycle. A first-production-release preflight gate remains (see the [Closeout](#closeout-2026-09-24))
 **Roadmap bucket:** NOW → [Critical Helpdesk hardening](../product/product-roadmap.md#critical-helpdesk-hardening)
 **Series:** hardening epics [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) · [EPIC-010B](./EPIC-010B-tenant-scoping.md) · [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) · **EPIC-010D**
-**Planned:** 2026-09-24, against `epic-011e-projects-kanban` at `a09c723`
+**Planned:** 2026-09-24 (**Implemented** and **Verified:** 2026-09-24), against `epic-011e-projects-kanban` at `a09c723`
 **Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
 **Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 **Complete** (2026-09-24)
+**Closeout:** [Closeout (2026-09-24)](#closeout-2026-09-24): lifecycle, what is verified now, first-production-release gate, final security and integrity contract
 **Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision; [Amendment 3 (2026-09-24)](#amendment-3-wp2-results-2026-09-24): WP2 results, assignment eligibility, notification gating and de-duplication, bulk validation, CSV policy, id-derived Ticket numbers, concurrency results, lifecycle assessment
 
 ---
 
 ## Contents
 
+- [Closeout (2026-09-24)](#closeout-2026-09-24)
 - [Amendment 1: WP0 Results (2026-09-24)](#amendment-1-wp0-results-2026-09-24)
 - [Amendment 2: WP1 Results (2026-09-24)](#amendment-2-wp1-results-2026-09-24)
 - [Amendment 3: WP2 Results (2026-09-24)](#amendment-3-wp2-results-2026-09-24)
@@ -36,6 +38,90 @@
 18. [Work packages](#18-work-packages)
 19. [Exit criteria](#19-exit-criteria)
 20. [Deferred Helpdesk work](#20-deferred-helpdesk-work)
+
+---
+
+## Closeout (2026-09-24)
+
+**EPIC-010D is Verified.** All three work packages are complete and committed on `hardening/epic-10d-helpdesk-security`, the full Pest suite (933 tests) and `./dev check` pass, and every acceptance contract below has been exercised. **`Done` is not reached:** it is reserved for the normal integration and merge lifecycle.
+
+There is currently no customer production data (the platform has had no production release), so a production preflight cannot add verification evidence today. It is recorded below as a **release-safety gate for the first production release**, not as an outstanding EPIC-010D criterion.
+
+### Lifecycle
+
+The repository lifecycle is `Planned → In Progress → Implemented → Verified → Done` ([epic index](./README.md#epic-lifecycle)). For this epic:
+
+| Status | Meaning here | State |
+|--------|--------------|-------|
+| **Implemented** | Code complete, committed and locally validated (WP0–WP2, full suite, Pint, `./dev check`) | Reached 2026-09-24 |
+| **Verified** | All acceptance criteria checked and passing (the list below) | **Reached 2026-09-24** |
+| **Done** | Merged to `main` via review with the definition of done fully met, per repository convention | Not reached |
+
+### Verified now
+
+Each contract below was exercised by tests written red first and now passing, with side-effect-absence assertions for every refusal (WP0 characterization, WP1 and WP2 target suites, 933 tests in all):
+
+- authorization boundaries: reply, view, operator capability (`tickets.assign`, no role names);
+- internal-note boundaries: display, attachment download, and search;
+- owner-only customer Ticket visibility, with no dead list links;
+- assignment eligibility, including stale assignees;
+- notification privacy and de-duplication;
+- validation robustness for bulk and single assignment and status input;
+- transactional bulk mutation;
+- CSV formula neutralization, RFC 4180 escaping, and deterministic order;
+- concurrency-safe id-derived Ticket numbers (0 failures in 1,320 parallel create attempts on the testing MariaDB; the old algorithm lost 25–52%);
+- database and storage hygiene (development database and storage unchanged, testing database left empty).
+
+### First production release / deployment gate
+
+This is a **future release-safety requirement**, not unfinished security or product implementation and not a Verified criterion. Until real production data exists there is nothing to audit. It applies **before the first customer-facing production release, or before deploying EPIC-010D into any populated production database**:
+
+1. Run the documented read-only Ticket preflight ([A1.10](#a110-production-preflight-procedure): `START TRANSACTION READ ONLY … ROLLBACK`, never from a development workstation without the operator's explicit go-ahead).
+2. Record every count and the date in the table below.
+3. **P3b must be 0** before the id-derived Ticket-number allocator (`TKT-{id}`, A3.5) is enabled against populated historical data; otherwise a future id could reach a legacy numeric number above the highest id and collide. If it is not 0, stop and investigate.
+4. **Investigate and resolve or document P4b if it is non-zero.** An attachment whose parent reply belongs to another ticket is now refused to everyone, operators included; such files would become undownloadable.
+5. **Do not infer, backfill or rewrite historical company provenance** (D3). P1 informs release-note wording only.
+6. **Preserve real production Ticket numbers** once production data exists; the allocator affects only new tickets, and non-numeric values such as the seeded `TKT-E2E1` are left alone (P3a is informational).
+
+P2 (stale or ineligible assignees) is informational. Because WP1 and WP2 ship together, one run before that release covers both; the packages' separate gates in A1.10 apply only if they were ever released separately. The pre-release data policy that frames this gate is in the [Product Roadmap](../product/product-roadmap.md#roadmap-principles) (principle 8).
+
+| Check | Development (`portal`, 2026-09-24) | Production |
+|-------|------------------------------------|------------|
+| P0 total tickets | 2 | record at first production release |
+| P1 company-linked tickets | 0 | record at first production release |
+| P2 stale or ineligible assignees | 0 | record at first production release |
+| P3a numbers not in `TKT-nnnn` form (informational) | 1 (`TKT-E2E1`) | record at first production release |
+| **P3b numeric numbers above `MAX(id)`, must be 0** | 0 | **record at first production release** |
+| P4 internal-note attachments (informational) | 0 | record at first production release |
+| **P4b attachment and parent reply on different tickets** | 0 | **record at first production release** |
+
+### Final security and integrity contract
+
+This is the authoritative summary of what EPIC-010D established. The amendments (A1–A3) hold the evidence; this section is the contract.
+
+**WP1: authorization and information boundaries** ([Amendment 2](#amendment-2-wp1-results-2026-09-24))
+
+- **Reply authorization.** Both reply routes call `authorize('reply')` first, before validation, file handling, persistence and notification. An unauthorized actor gets 403 and no side effect.
+- **Internal-note attachment boundary.** Download authorization follows Ticket → Reply → Attachment: the actor must see the Ticket, the attachment must belong to it, and an attachment on an internal note needs internal visibility. An owner without `tickets.assign` cannot fetch one by guessing its id.
+- **Internal-note search boundary.** Search excludes internal notes unless the caller opts in from the same internal-visibility rule, so hidden text cannot change a customer's results or counts.
+- **Owner-only customer visibility.** A customer lists and opens only their own Tickets; the list and the detail policy are one universe. Company membership and `tickets.view_org` grant nothing (D1).
+- **Capability-based operator authorization.** `TicketPolicy` (`view`, `reply`, `viewInternal`, `downloadAttachment`) keys operator work on `tickets.assign`, never on a role name. A custom role or a direct grant behaves as an operator for visibility, attachments, time context and email links.
+
+**WP2: integrity and robustness** ([Amendment 3](#amendment-3-wp2-results-2026-09-24))
+
+- **Assignee eligibility.** Only a user who currently holds `tickets.assign` can be assigned, through one check in `TicketService::assign` for single and bulk assignment.
+- **Stale-assignee notification protection.** A stale assignee is not auto-unassigned but cannot be re-selected, and receives no reply preview unless they can still view the Ticket.
+- **Notification de-duplication.** One user gets at most one notification per reply; the author is never notified; internal notes notify nobody.
+- **Malformed input hardening.** Bulk and single assignment and status input that used to raise exceptions is now ordinary validation, with no mutation. A blank bulk assignee is invalid, not an implicit unassign (D4).
+- **Transactional bulk mutation.** The batch runs in one transaction, and eligibility is checked before any Ticket is touched.
+- **CSV hardening.** The Ticket export uses `escape: ''`, neutralizes leading formula characters with the same helper as the Time export, and orders rows `created_at DESC, id DESC`.
+- **Concurrency-safe Ticket numbers.** A Ticket is inserted with a temporary number and finalized to `TKT-{id}` in one transaction, so its number derives from the database-reserved id. Parallel creates all succeed (0 failures in 1,320 attempts across the post-fix probes, up to 12 workers; the old algorithm lost 25–52%). Historical numbers are untouched.
+
+**Not changed:** no migration, no backfill, no `company_id` writes, no new dependency, no route change, no UI change beyond an error block on the operator queue.
+
+### Deferred Helpdesk work
+
+Everything intentionally left out of EPIC-010D is listed in [§20](#20-deferred-helpdesk-work). It belongs to the [Product Roadmap](../product/product-roadmap.md) ([Helpdesk MVP](../product/product-roadmap.md#later--helpdesk-mvp) and later platform work), not to this epic.
 
 ---
 
@@ -180,7 +266,7 @@ The actor is `agent`, a custom role with `tickets.view` + `tickets.assign` and n
 
 ### A1.10 Production preflight procedure
 
-Run before deploying WP1, and again before WP2. Rules:
+Run before the first customer-facing production release, or before deploying into any populated production database (the gate is in the [Closeout](#closeout-2026-09-24)). Rules:
 
 - read-only, with a user that has `SELECT` only where possible;
 - **never** from a development workstation against production without the operator's explicit go-ahead;
@@ -219,8 +305,8 @@ SELECT COUNT(*) FROM ticket_attachments a JOIN ticket_replies r ON r.id = a.repl
 
 **Gates:**
 
-- **P3b ≠ 0 blocks WP2's numbering change** until investigated.
-- **P4b ≠ 0** is investigated before WP1 ships the reply→ticket guard.
+- **P3b ≠ 0 blocks enabling the id-derived Ticket-number allocator** against populated historical data until investigated.
+- **P4b ≠ 0** is investigated before the reply→ticket attachment guard runs against populated data.
 - **P1 and P2** decide how loudly the release notes mention list and notification changes; they do not block.
 
 **Development results** (database `portal`, 2026-09-24, same SQL inside `START TRANSACTION READ ONLY … ROLLBACK`):
@@ -371,7 +457,7 @@ Notification content, queueing (`ShouldQueue`, mail only) and templates are unch
 - The temporary value is inside an uncommitted transaction, so it is never visible. A failure while finalizing rolls the ticket back (tested: no row, no `TMP-` value, no file, no mail).
 - The format stays `TKT-` + zero-padded id (at least four digits). Historical numbers, including `TKT-E2E1`, are untouched.
 - Deleting the highest ticket cannot re-issue its number: the new id is above it. This relies on InnoDB keeping the auto-increment counter across restarts, which MariaDB does since 10.2.4 (the stack runs 10.11.19).
-- **Deploy invariant unchanged:** preflight P3b (numeric-form numbers above `MAX(id)`) must be 0 before WP2 ships, because a legacy number that a future id would reach would then collide. Non-numeric numbers cannot collide.
+- **Deploy invariant unchanged:** preflight P3b (numeric-form numbers above `MAX(id)`) must be 0 before the allocator is enabled against populated historical data, because a legacy number that a future id would reach would then collide. Non-numeric numbers cannot collide.
 
 ### A3.6 Concurrency results (testing database only)
 
@@ -417,8 +503,7 @@ Before the fix (Amendment 1, A1.5): 25–52% of the same shapes lost. Each run c
 
 Against §19: H1–H9 are fixed with the §16 tests (including side-effect-absence assertions); `TicketPolicy` has no role-name check; the customer list matches customer detail; internal content is unreachable to non-operators; there is no schema migration, backfill, dependency or UI change beyond §14's error block; the full Pest suite passes on MariaDB and `./dev check` passes (its non-Pest steps plus Pint were run alongside the separate full Pest run); §17 results are recorded for development.
 
-Open before the epic can be **Verified**: run the A1.10 production preflight (P3b must be 0; P4b investigated) before deploying, and record the counts; update the roadmap item and epic index to the final status. Following the EPIC-011E precedent (implementation commits, then a separate verification/close-out commit), the recommended sequence is: **Implemented** when the WP2 commit lands, **Verified** after the production preflight is recorded, and **Done** on merge. The header status is left unchanged in this amendment.
-
+At the time of this amendment the recommendation was to hold **Verified** until a production preflight was recorded, then merge. **That was superseded by the owner's clarification that there is no customer production data** (the platform has had no production release; development and test data are disposable). The epic is **Verified**, and the preflight is the first-production-release gate in the [Closeout](#closeout-2026-09-24). `Done` still follows the normal merge lifecycle.
 ---
 
 ## 1. Status and parent context
@@ -506,7 +591,7 @@ Ticket-derived task creation stays dormant. No Ticket → Task workflow here.
 
 ## 7. Current authorization model
 
-As read from live code at `a09c723`. Paths are relative to the repository root.
+As read from live code at `a09c723` (the pre-fix baseline). Paths are relative to the repository root. Line-number fragments were removed from links to files that WP1 and WP2 later changed, because they no longer point at the code described; open the baseline with `git show a09c723:src/<path>`. Links to `routes/web.php` and `AccessibleTimeContext.php`, which did not change, keep their line anchors.
 
 ### Routes
 
@@ -522,7 +607,7 @@ Source: [`src/routes/web.php:77-108`](../../src/routes/web.php#L77-L108). Both r
 
 ### Policy
 
-[`TicketPolicy::view`](../../src/app/Policies/TicketPolicy.php#L10-L19): owner, **or** `can('tickets.view') && hasAnyRole(['operator'])`. It is the only Ticket policy ability. It is also used by [`AccessibleTimeContext`](../../src/app/Rules/AccessibleTimeContext.php#L63-L66) (time against a ticket) and the `/tasks` link check.
+[`TicketPolicy::view`](../../src/app/Policies/TicketPolicy.php): owner, **or** `can('tickets.view') && hasAnyRole(['operator'])`. It is the only Ticket policy ability. It is also used by [`AccessibleTimeContext`](../../src/app/Rules/AccessibleTimeContext.php#L63-L66) (time against a ticket) and the `/tasks` link check.
 
 ### Capability facts
 
@@ -533,7 +618,7 @@ Source: [`src/routes/web.php:77-108`](../../src/routes/web.php#L77-L108). Both r
 
 ### Content visibility
 
-- User show page loads replies filtered to `is_internal = false` unless `can('tickets.assign')` ([`TicketController::show`](../../src/app/Http/Controllers/TicketController.php#L86-L100)).
+- User show page loads replies filtered to `is_internal = false` unless `can('tickets.assign')` ([`TicketController::show`](../../src/app/Http/Controllers/TicketController.php)).
 - `Ticket::attachments()` returns ticket-level attachments only (`reply_id IS NULL`); reply attachments load through the (filtered) replies.
 - Operator show loads all replies and attachments.
 
@@ -543,19 +628,19 @@ Source: [`src/routes/web.php:77-108`](../../src/routes/web.php#L77-L108). Both r
 
 ## 8. Defect register
 
-Severities are for this code base's threat model (multi-tenant, customer-facing, invitation-only accounts). "Code-read" means established by reading live code; WP0 characterization tests confirm each before its fix.
+Severities are for this code base's threat model (multi-tenant, customer-facing, invitation-only accounts). "Code-read" means established by reading live code; WP0 characterization tests confirm each before its fix. The evidence column describes the **pre-fix** code at `a09c723`; the status of every finding is now **fixed** (see the [Closeout](#closeout-2026-09-24) and Amendments 2 and 3).
 
 | ID | Severity | Finding | Evidence | Target | WP |
 |----|----------|---------|----------|--------|----|
-| **H1** | Critical | Any authenticated user can post a public reply (with attachments) to any Ticket; owner and assignee are emailed a preview | Route `auth` only ([`web.php:94-96`](../../src/routes/web.php#L94-L96)); no authorization in [`TicketReplyController::store`](../../src/app/Http/Controllers/Operator/TicketReplyController.php#L12-L37); notifications in [`TicketService::addReply`](../../src/app/Services/TicketService.php#L42-L65); sequential ids | Policy `reply` authorized first; refusal persists nothing, stores no file, sends nothing (§10) | WP1 |
-| **H2** | High | Ticket owner can download an internal-note attachment by id | [`TicketController::downloadAttachment`](../../src/app/Http/Controllers/TicketController.php#L102-L109) checks Ticket `view` only, never `reply.is_internal` | Attachment decision over Ticket → Reply → Attachment (§11) | WP1 |
-| **H3** | High | Internal-note search oracle on the customer list | [`Ticket::scopeSearch`](../../src/app/Models/Ticket.php#L100-L108) matches all `replies.body`; used by [`TicketController::index`](../../src/app/Http/Controllers/TicketController.php#L30) | Internal-note text never influences non-operator results (§12) | WP1 |
-| **H4** | Medium | Customer list includes same-company Tickets that `view` refuses (dead 403 links, metadata disclosure) | `orWhereIn('company_id', …)` for `tickets.view_org` in [`TicketController::index`](../../src/app/Http/Controllers/TicketController.php#L18-L37) vs owner-or-operator policy; EPIC-011E C8. **Currently latent:** no application path writes `company_id` (F-1), so only rows set outside the app are exposed | Customer list universe == customer detail universe (D1, §9) | WP1 |
-| **H5** | Medium | Assignee can be any user, including a customer | `assignee_id` validated only `exists:users,id` in [`Operator\TicketController::assign`](../../src/app/Http/Controllers/Operator/TicketController.php#L63-L72) and [`TicketBulkController::update`](../../src/app/Http/Controllers/Operator/TicketBulkController.php#L12-L35); [`TicketService::assign`](../../src/app/Services/TicketService.php#L102-L110) writes blindly | One eligibility seam: `tickets.assign` (D2, §13) | WP2 |
+| **H1** | Critical | Any authenticated user can post a public reply (with attachments) to any Ticket; owner and assignee are emailed a preview | Route `auth` only ([`web.php:94-96`](../../src/routes/web.php#L94-L96)); no authorization in [`TicketReplyController::store`](../../src/app/Http/Controllers/Operator/TicketReplyController.php); notifications in [`TicketService::addReply`](../../src/app/Services/TicketService.php); sequential ids | Policy `reply` authorized first; refusal persists nothing, stores no file, sends nothing (§10) | WP1 |
+| **H2** | High | Ticket owner can download an internal-note attachment by id | [`TicketController::downloadAttachment`](../../src/app/Http/Controllers/TicketController.php) checks Ticket `view` only, never `reply.is_internal` | Attachment decision over Ticket → Reply → Attachment (§11) | WP1 |
+| **H3** | High | Internal-note search oracle on the customer list | [`Ticket::scopeSearch`](../../src/app/Models/Ticket.php) matches all `replies.body`; used by [`TicketController::index`](../../src/app/Http/Controllers/TicketController.php) | Internal-note text never influences non-operator results (§12) | WP1 |
+| **H4** | Medium | Customer list includes same-company Tickets that `view` refuses (dead 403 links, metadata disclosure) | `orWhereIn('company_id', …)` for `tickets.view_org` in [`TicketController::index`](../../src/app/Http/Controllers/TicketController.php) vs owner-or-operator policy; EPIC-011E C8. **Currently latent:** no application path writes `company_id` (F-1), so only rows set outside the app are exposed | Customer list universe == customer detail universe (D1, §9) | WP1 |
+| **H5** | Medium | Assignee can be any user, including a customer | `assignee_id` validated only `exists:users,id` in [`Operator\TicketController::assign`](../../src/app/Http/Controllers/Operator/TicketController.php) and [`TicketBulkController::update`](../../src/app/Http/Controllers/Operator/TicketBulkController.php); [`TicketService::assign`](../../src/app/Services/TicketService.php) writes blindly | One eligibility seam: `tickets.assign` (D2, §13) | WP2 |
 | **H6** | Low | Malformed bulk/assign input errors instead of validating, or mutates unexpectedly | Code-read: `action=status` without `status` reads an absent `validated` key and would pass `null` to `safeTransition(string)`; `action=assign` or single assign without `assignee_id` reads an absent key; bulk `assign` with an empty assignee **silently unassigns every selected Ticket** (the bulk UI's placeholder option is empty) | Conditional required fields; 422/redirect-with-errors; no mutation (§14) | WP2 |
-| **H7** | Medium | Ticket CSV export is open to spreadsheet formula injection | [`TicketReportController::export`](../../src/app/Http/Controllers/Operator/TicketReportController.php#L57-L96) writes customer-controlled `title` and user-controlled names raw, with PHP's default `\` escape character; order is `created_at` only (ties non-deterministic). Time export already does this safely ([`TimeEntryService::exportCsv`](../../src/app/Services/TimeEntryService.php#L357-L392), `safeCsvText`) | Same safe pattern as Time export (§15) | WP2 |
-| **H8** | Low | Ticket number can collide under concurrent creation | [`TicketService::nextTicketNumber`](../../src/app/Services/TicketService.php#L136-L141) is `MAX(id) + 1`, outside any transaction; `ticket_number` is `UNIQUE`, so two parallel creates compute the same number and the second fails with a 500 after the user submitted | Number derived collision-free (§15) | WP2 |
-| **H9** | Medium | Literal `operator` role in `TicketPolicy::view` disagrees with the `tickets.assign` gate everywhere else | [`TicketPolicy.php:18`](../../src/app/Policies/TicketPolicy.php#L18). A custom role holding `tickets.assign` can open the operator queue and operator show (route gate) but gets 403 on every attachment link there, cannot open the same Ticket on `/tickets/{id}`, and cannot log time against it. Not a leak (it over-restricts), but it is an authorization inconsistency and blocks custom operator roles; it also sits inside the seam H2 rewrites | Operator Ticket visibility is `tickets.assign` (§9) | WP1 |
+| **H7** | Medium | Ticket CSV export is open to spreadsheet formula injection | [`TicketReportController::export`](../../src/app/Http/Controllers/Operator/TicketReportController.php) writes customer-controlled `title` and user-controlled names raw, with PHP's default `\` escape character; order is `created_at` only (ties non-deterministic). Time export already does this safely ([`TimeEntryService::exportCsv`](../../src/app/Services/TimeEntryService.php), `safeCsvText`) | Same safe pattern as Time export (§15) | WP2 |
+| **H8** | Low | Ticket number can collide under concurrent creation | [`TicketService::nextTicketNumber`](../../src/app/Services/TicketService.php) is `MAX(id) + 1`, outside any transaction; `ticket_number` is `UNIQUE`, so two parallel creates compute the same number and the second fails with a 500 after the user submitted | Number derived collision-free (§15) | WP2 |
+| **H9** | Medium | Literal `operator` role in `TicketPolicy::view` disagrees with the `tickets.assign` gate everywhere else | [`TicketPolicy.php:18`](../../src/app/Policies/TicketPolicy.php). A custom role holding `tickets.assign` can open the operator queue and operator show (route gate) but gets 403 on every attachment link there, cannot open the same Ticket on `/tickets/{id}`, and cannot log time against it. Not a leak (it over-restricts), but it is an authorization inconsistency and blocks custom operator roles; it also sits inside the seam H2 rewrites | Operator Ticket visibility is `tickets.assign` (§9) | WP1 |
 
 ### Rediscovery findings outside the defect register
 
@@ -798,7 +883,7 @@ Suggested branch: `hardening/epic-10d-helpdesk-security` (matching the EPIC-010C
 - Internal-note content is unreachable to non-operators through show, download, and search.
 - No schema migration, no backfill, no new dependency, no UI change beyond §14's error block.
 - Full Pest suite green on MariaDB; `./dev check` passes; Pint clean.
-- §17 preflight results recorded.
+- §17 preflight results recorded for development; the production preflight is the first-production-release gate (see the [Closeout](#closeout-2026-09-24)), not a criterion for verifying this epic.
 - Roadmap item [Critical Helpdesk hardening](../product/product-roadmap.md#critical-helpdesk-hardening) and the [epic index](./README.md) updated to the final status.
 
 ## 20. Deferred Helpdesk work
@@ -813,6 +898,12 @@ Carried to the [Helpdesk MVP](../product/product-roadmap.md#later--helpdesk-mvp)
 - Tenancy-scope role-name checks (F-5, Directory/tenancy)
 - Report date-range correctness and validation (F-6)
 - Attachment type policy and transactional uploads (F-7)
-- Surfacing stale (ineligible) assignees and skipped bulk rows in the operator UI (§13, §14)
+- Surfacing stale (ineligible) assignees in the operator UI (§13)
+- Richer bulk-result reporting: skipped-ticket reporting and an accurate applied count (§14; the flash still counts every selected ticket)
+- Attachment and reply transaction redesign: atomic reply, file and attachment writes, and attachment type policy (F-7)
 - Ticket-derived tasks (D5)
 - React migration of all Ticket surfaces (EPIC-011 Phase F within Helpdesk MVP)
+- Helpdesk visual redesign, on the new application shell and design system
+- Incident model and Knowledge model (Helpdesk MVP baselines)
+- SLA, routing, escalation and automation, and rich-text replies (D4)
+- Broader Helpdesk product workflows: operator queue, reporting successor, time on tickets, Ticket → Knowledge

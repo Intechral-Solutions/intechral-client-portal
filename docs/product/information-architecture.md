@@ -73,9 +73,9 @@ The capability names in the table above are the closest existing permissions, us
 
 ### User
 
-- **Current:** `users` table; authentication via Fortify (local credentials, 2FA) and Socialite SSO (Google, Microsoft); invitation-only onboarding; Spatie roles (`operator` with all permissions, `user` for clients, plus custom roles); membership in `organizations` via `organization_members` (admin/member). Customers are Users. `TicketPolicy` tests the hard-coded `operator` role name, while most other checks use permissions.
+- **Current:** `users` table; authentication via Fortify (local credentials, 2FA) and Socialite SSO (Google, Microsoft); invitation-only onboarding; Spatie roles (`operator` with all permissions, `user` for clients, plus custom roles); membership in `organizations` via `organization_members` (admin/member). Customers are Users. Ticket authorization is capability-based (`tickets.assign` identifies operator Ticket work; no role name is checked, EPIC-010D); a few tenancy scopes still test the `operator` role name.
 - **Target:** a User is an **account identity** that can log in. It links to exactly one Person. Authorization is capability-based; role names are groupings of capabilities, not checks in code.
-- **Open:** User ↔ Person linkage mechanics; whether invitations target a Person; retiring hard-coded role-name checks (a hardening or shell-epic task).
+- **Open:** User ↔ Person linkage mechanics; whether invitations target a Person; retiring the remaining hard-coded role-name checks in the tenancy scopes (a Directory or shell-epic task).
 
 ### Person
 
@@ -133,7 +133,7 @@ The capability names in the table above are the closest existing permissions, us
 
 ### Ticket
 
-- **Current:** `tickets` (TKT number, title, description, category, priority, status, assignee, owner, optional `company_id` → CRM company), replies with `is_internal`, attachments (ticket-level or reply-level), status history, CSV reports, bulk actions, reply notifications. Blade. Access: owner or an `operator`-role user with `tickets.view`; the list additionally includes same-company tickets for `tickets.view_org`, which the show policy then denies. **Known authorization/integrity defects exist** — see [Product Roadmap → Critical Helpdesk hardening](./product-roadmap.md#critical-helpdesk-hardening).
+- **Current:** `tickets` (TKT number, title, description, category, priority, status, assignee, owner, optional `company_id` → CRM company), replies with `is_internal`, attachments (ticket-level or reply-level), status history, CSV reports, bulk actions, reply notifications. Blade. Access is owner-only for customers and `tickets.assign` (the operator capability) for operator work; the customer list and the detail policy are the same universe, and company membership grants no Ticket visibility (`tickets.view_org` is reserved, unused). Internal notes, their attachments and search matches are operator-only; assignees must hold `tickets.assign`; the CSV export is formula-safe; Ticket numbers are `TKT-{id}`. The authorization and integrity defects found in the earlier audit were fixed by [EPIC-010D](../epics/EPIC-010D-helpdesk-security-hardening.md) (Verified 2026-09-24); see [Product Roadmap → Critical Helpdesk hardening](./product-roadmap.md#critical-helpdesk-hardening).
 - **Target:** one requester's request/conversation, linked to a Person (requester) and, where relevant, an Organization; optionally linked to an Incident, Knowledge, Tasks, and Time.
 - **Open:** requester as Person (non-User requesters, e.g. email-originated); organization-level ticket visibility for customers; category/priority/SLA model.
 
