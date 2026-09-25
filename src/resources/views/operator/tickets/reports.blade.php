@@ -14,7 +14,7 @@
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Reports</h1>
         </div>
         <a href="{{ route('operator.tickets.export', request()->query()) }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
            style="border-color: var(--border-base); color: var(--text-secondary);">
             Export CSV
         </a>
@@ -34,7 +34,7 @@
                    class="rounded-lg border px-3 py-2 text-sm"
                    style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
         </div>
-        <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-surface"
+        <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium hover:legacy-bg-surface"
                 style="border-color: var(--border-base); color: var(--text-secondary);">Apply</button>
     </form>
 

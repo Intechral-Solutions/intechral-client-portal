@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green
 
 ---
 
@@ -50,6 +50,8 @@
 34. [Implementation model guidance](#34-implementation-model-guidance)
 
 - [Amendment 1: WP0 Results (2026-09-25)](#amendment-1-wp0-results-2026-09-25)
+- [Amendment 2: WP1a Results (2026-09-25)](#amendment-2-wp1a-results-2026-09-25)
+- [Amendment 3: WP1b Results (2026-09-25)](#amendment-3-wp1b-results-2026-09-25)
 
 ---
 
@@ -1344,8 +1346,8 @@ Small and largely disposable. No production code ships except the brand-asset mo
 
 Four independently revertible slices.
 
-- **WP1a** — rename the eight legacy utilities to a `legacy-` prefix across 45 Blade views; values unchanged. Resolves F1.
-- **WP1b** — define the five orphan variables. Resolves F2.
+- **WP1a — Complete (2026-09-25) — results in [Amendment 2](#amendment-2-wp1a-results-2026-09-25).** Rename the thirteen legacy utilities to a `legacy-` prefix; values unchanged. Resolves F1.
+- **WP1b — Complete (2026-09-25) — results in [Amendment 3](#amendment-3-wp1b-results-2026-09-25).** Define the six orphan variables (A1.3's `--accent-success` included). Resolves F2.
 - **WP1c** — add the Direction D token blocks (light + dark) via `@theme inline` on the existing `data-theme` contract; apply the safe alias remappings; **hold `primary`**.
 - **WP1d** — self-host the three families per G1; delete the bunny.net `<link>` and `preconnect` from both root views; add the `@font-face` block and preloads.
 
@@ -1988,3 +1990,374 @@ WP1a may start. It is smaller and more contained than planned, and it carries on
 4. WP1b then defines **six** variables (A1.3), using `var(--bg-surface)` for `--surface-elevated`.
 
 G1, G2, G3, S1 and S2 are closed and none of them blocks WP1a.
+
+---
+
+## Amendment 2: WP1a Results (2026-09-25)
+
+WP1a ran on `feature/epic-013-direction-d-shell` at `3601bea` (the committed WP0 baseline), working tree clean at start. **WP1a is now Complete.** The only production changes are the rename itself: the thirteen `@layer utilities` definitions in `app.css`, their thirteen Blade/React consumer sites, and the deliberate resolution of the ten React `text-primary` sites. No route, migration, permission, dependency or package-manifest file changed. `./dev check` is green. **Where this amendment conflicts with the body or with Amendment 1, this amendment wins for WP1a-scoped facts.**
+
+### A2.1 Method
+
+The F1 census was re-run from the live tree exactly as instructed, before any edit, using a word-boundary raw-text scan (not an attribute-regex parse) across every `.blade.php`, `.tsx` and `.ts` file under `src/resources` (excluding `welcome.blade.php`, which carries its own self-contained Tailwind build). The scan excluded `var(--*)` references and `-foreground`-suffixed shadcn classes, and classified every hit as **base** or **variant** by scanning backward from the match to the nearest whitespace/quote boundary for a `:`. Findings were cross-verified against the actual compiled Tailwind output (`npm run build`, inspecting `public/build/assets/app-*.css`), not inferred from source alone — this is what caught the live `text-primary` collision behaviour and, new in this amendment, the `bg-surface` variant behaviour.
+
+### A2.2 The aggregate reproduces exactly; the per-utility breakdown does not — a second F1 correction
+
+**The nine-utility total reproduces Amendment 1's headline number exactly: 59 (32/16/5/1/1/1/1/1/1 → `bg-surface`/`text-primary`/`text-secondary`/`bg-base`/`border-subtle`/`border-base`/`text-muted`/`shadow-theme-sm`/`shadow-theme-lg`).** A first pass using an attribute-scoped regex (mirroring what Amendment 1's methodology appears to have used) reproduced these nine numbers precisely. **That reproduction is itself the defect.** A full manual read of `nav.blade.php` and a corrected raw scan show the attribute-regex approach silently drops every occurrence embedded in a Blade `{{ $x ? '…' : '…' }}` PHP ternary — the closing quote of the outer `class="…"` swallows the inner single-quoted PHP string literal as one token, so `'bg-surface` (with the stray leading quote attached) never equals `bg-surface`. `nav.blade.php` carries five such ternary/closure constructs (the `$navLink` closure at lines 9–14, and inline ternaries at lines 85, 97 and 147), so it is undercounted by both tools in the same direction, which is why the two independently-flawed methods agree with each other rather than with the ground truth.
+
+**Corrected base/variant breakdown, verified against the compiled CSS:**
+
+| Utility | True base | True variant | Where |
+|---|---:|---:|---|
+| `bg-surface` | **3** | 32 (`hover:`) | Base: `footer.blade.php`, `nav.blade.php` ×2. Variant: `nav.blade.php` ×6 + 12 other Blade files ×26 |
+| `text-primary` | **15** (5 Blade + 10 React) | 10 (9 `hover:` Blade + 1 `group-hover:` React) | Base/variant both concentrated in `nav.blade.php`; React base per A1.2's ten sites |
+| `text-secondary` | **9** | 0 | All in `nav.blade.php` |
+| `bg-base`, `border-subtle`, `border-base`, `text-muted`, `shadow-theme-sm`, `shadow-theme-lg` | 1 each | 0 | `nav.blade.php` (four of these) / `footer.blade.php` (two) — these five reproduce Amendment 1 exactly, since none sits inside a ternary |
+| `bg-elevated`, `text-inverse`, `btn-accent`, `shadow-theme-md` | 0 | 0 | Unused, as Amendment 1 found |
+
+**True total: 34 base + 42 variant = 76 raw occurrences**, against Amendment 1's 59. The **34 base** occurrences are the ones WP1a's "values unchanged, mechanical rename" promise applies to; the **42 variant** occurrences needed the same per-site audit A1.2 already required for `text-primary`, extended here to `bg-surface` (A2.3).
+
+This changes the shape of the slice, not its soundness: every one of the 34 base sites and all 42 variant sites were located, individually classified and (where safe) renamed — see A2.4–A2.6. Nothing in F1's substance (the `surface`/`text-primary`/`text-muted`/etc. namespace must be vacated before Direction D lands) is affected.
+
+### A2.3 A second live-collision-in-waiting found: `hover:bg-surface` is inert today, but is not neutral to a future `surface` token
+
+Amendment 1 analysed `hover:text-primary`'s live collision in detail (A1.2) but did not separately analyse `bg-surface`'s 32 `hover:bg-surface` sites, which its own table folds into the "32" total as if they were base occurrences.
+
+**Verified in the compiled CSS, before any WP1a edit:**
+
+```css
+.bg-surface{background-color:var(--bg-surface)}   /* the only bg-surface rule that exists */
+```
+
+No `.hover\:bg-surface:hover` rule is generated at all — unlike `text-primary`, `surface` is not registered as a Tailwind colour token anywhere in `app.css` today (no `--color-surface` exists), so Tailwind's JIT engine cannot synthesise *any* variant for it, live or otherwise. **All 32 `hover:bg-surface` sites across 13 Blade files (`admin/roles/{create,edit,index}`, `admin/users/{index,show}`, `errors/403`, `nav.blade.php`, `operator/tickets/{index,reports,show}`, `tickets/{create,index,show}`) are currently dead — they produce no visual effect on hover, today, before and after this slice.**
+
+This matters for WP1c, not WP1a: the moment Direction D registers `surface` as a semantic token (§8.2's planned `@theme inline` entry), Tailwind will begin generating `.hover\:bg-surface:hover` against the new value, and these 32 sites — none of them reviewed for that outcome, several inside chrome that WP5 deletes — would silently gain a hover interaction they were never designed to have. That is exactly the class of "accidental appearance change caused by source-order/token differences" WP1a exists to prevent ([§8.1](#81-resolving-f1--the-utility-name-collision), Option C's rationale), just deferred one slice.
+
+**Decision:** rename all 32 to `hover:legacy-bg-surface`. Confirmed in the compiled CSS after the rename that this remains inert (no rule generated for `hover:legacy-bg-surface` either, since `legacy-bg-surface` is equally not a Tailwind colour token) — so the rename is exactly appearance-preserving today, and fully vacates `bg-surface` (base **and** variant) for WP1c to claim without inheriting an unreviewed interaction. This is recorded as a plan addition, not a contradiction: [§8.1](#81-resolving-f1--the-utility-name-collision) already requires the namespace be "completely vacated," and 32 of the 76 live sites were the part of that vacating Amendment 1's own table did not surface.
+
+### A2.4 Legacy utility rename map
+
+All thirteen definitions in `app.css`'s `@layer utilities`, values byte-identical:
+
+| Old | New |
+|---|---|
+| `.bg-base` | `.legacy-bg-base` |
+| `.bg-surface` | `.legacy-bg-surface` |
+| `.bg-elevated` | `.legacy-bg-elevated` |
+| `.border-subtle` | `.legacy-border-subtle` |
+| `.border-base` | `.legacy-border-base` |
+| `.text-primary` | `.legacy-text-primary` |
+| `.text-secondary` | `.legacy-text-secondary` |
+| `.text-muted` | `.legacy-text-muted` |
+| `.text-inverse` | `.legacy-text-inverse` |
+| `.btn-accent` | `.legacy-btn-accent` |
+| `.shadow-theme-sm` | `.legacy-shadow-theme-sm` |
+| `.shadow-theme-md` | `.legacy-shadow-theme-md` |
+| `.shadow-theme-lg` | `.legacy-shadow-theme-lg` |
+
+Verified post-rename in the compiled CSS: every `legacy-*` selector resolves to its pre-rename value; `text-primary`, `text-secondary` and `text-muted` are now free and Tailwind generates them against the live shadcn tokens (`var(--primary)`, `var(--secondary)`, `var(--muted)` respectively — none of these three has a remaining unprefixed consumer in the tree); `bg-surface`, `bg-base`, `bg-elevated`, `border-subtle`, `border-base`, `text-inverse`, `btn-accent` and `shadow-theme-{sm,md,lg}` generate no rule at all (no colliding hand-written definition and no matching Tailwind token), i.e. fully unoccupied for WP1c.
+
+### A2.5 The ten React `text-primary` sites — audited individually, not blanket-renamed
+
+Contrary to A1.2's "recommended option 2" (rewrite all ten to an explicit accent utility), each site was read in context and its rendering intent classified. Two distinct patterns emerged, and they got opposite treatment:
+
+| # | File:line | Component/surface | Semantic intent | Prior/current computed colour | Decision | Reason |
+|---|---|---|---|---|---|---|
+| 1 | `pages/auth/login.tsx:52` | "Forgot password?" link | Quiet inline link (`hover:underline`, no colour-change affordance) | Ink (`--text-primary`) | → `legacy-text-primary` | Ink link pattern, unchanged appearance |
+| 2 | `pages/auth/forgot-password.tsx:52` | "Back to sign in" link | Same pattern | Ink | → `legacy-text-primary` | Same |
+| 3 | `pages/dashboard/index.tsx:177` | "View all" (tickets) link | Same pattern | Ink | → `legacy-text-primary` | Same |
+| 4 | `pages/dashboard/index.tsx:265` | "Open CRM" link | Same pattern | Ink | → `legacy-text-primary` | Same |
+| 5 | `pages/projects/index.tsx:52` | "Create your first project" link | Same pattern | Ink | → `legacy-text-primary` | Same |
+| 6 | `components/tasks/task-title-cell.tsx:18` | Task title link (list/board rows) | Same pattern; its own non-link fallback (`task.url` absent) already renders `text-foreground` — the same ink value | Ink | → `legacy-text-primary` | Matches the ink of its own sibling `<span className="… text-foreground">` fallback |
+| 7 | `pages/time/index.tsx:481` | `TimerContextLink` (time-entry context) | Same pattern, conditional (`entry.context.url ? '…' : undefined`) | Ink | → `legacy-text-primary` | Same |
+| 8 | `pages/tasks/index.tsx:32` | `ViewTab` active state (`cn(active ? 'border-primary text-primary' : …)`) | Selected/active tab: paired with `border-primary`, which already resolves to the shadcn accent (no collision) | Ink text + indigo border (mismatched) | **Left as `text-primary`** | Active-state semantic; freeing the base makes text match its own border — a deliberate fix, not an accidental one |
+| 9 | `pages/time/index.tsx:378` | "Entries" tab, statically active | Same active-tab pattern (`border-b-2 border-primary … text-primary`) | Ink text + indigo border | **Left as `text-primary`** | Same |
+| 10 | `pages/time/allocation.tsx:219` | "Allocation" tab, statically active | Same active-tab pattern | Ink text + indigo border | **Left as `text-primary`** | Same |
+
+Sites 1–7 all follow one recognizable idiom (ink-coloured text, `hover:underline` is the only interactive affordance) and got the same treatment; sites 8–10 all follow the opposite idiom (accent-coloured active state paired with an already-accent border) and got the opposite treatment. Verified post-rename in Chromium, both themes: sites 1–7 render byte-identical computed colour to pre-WP1a (`oklch(0.21 0.034 264.665)` light / `oklch(0.985 0.002 247.839)` dark — unchanged `--text-primary`); sites 8–10 now render `rgb(79, 70, 229)` light / `rgb(99, 102, 241)` dark for **both** text and border (previously text was ink while the border was already indigo — the mismatch A1.2 documented is resolved).
+
+One additional site was found and deliberately left alone: `pages/dashboard/index.tsx:154`, `group-hover:text-primary` on the "View all" chevron icon. Confirmed in the compiled CSS to resolve live to `var(--primary)` (indigo) both before and after this slice — it intends the accent, not the legacy value, so it was not touched, for the same reason as sites 8–10's border pairing.
+
+### A2.6 Variant audit — complete
+
+Every variant-prefixed occurrence of the nine collision-prone utilities was found and classified (A2.2's table), verified against the compiled CSS rather than assumed:
+
+| Variant | Sites | Live behaviour (before = after, verified) | Action |
+|---|---:|---|---|
+| `hover:text-primary` | 9 (`nav.blade.php`) | `color: var(--primary)` (indigo) — live accent, generated regardless of the base rename | **Left unchanged.** Renaming to `legacy-*` would generate no rule and silently remove the hover-colour affordance across the whole legacy nav chrome — a real regression |
+| `group-hover:text-primary` | 1 (React, A2.5) | Same, live accent | **Left unchanged** |
+| `hover:bg-surface` | 32 (13 Blade files) | No rule generated, either name (A2.3) | **Renamed** to `hover:legacy-bg-surface` — appearance-preserving, vacates the namespace before WP1c |
+
+No `dark:`, `focus:` or responsive-prefixed occurrence of any of the nine utilities exists anywhere in the tree (confirmed by the same raw scan). No `legacy-legacy-*` or other malformed name was produced (checked by regex post-edit).
+
+### A2.7 Blade migration
+
+Twenty files changed. `nav.blade.php` (14 edit locations: the `$navLink` closure, six plain attributes, three ternaries) and `footer.blade.php` (1 location, 3 classes) received the base renames plus the six `hover:legacy-bg-surface` renames that live inside `nav.blade.php`'s own hover states. The other twelve files (`admin/roles/{create,edit,index}`, `admin/users/{index,show}`, `errors/403`, `operator/tickets/{index,reports,show}`, `tickets/{create,index,show}`) each received only `hover:bg-surface` → `hover:legacy-bg-surface`, mechanically, no other class touched. `nav.blade.php` and `footer.blade.php` remain WP5-deleted chrome ([§14.4](#144-files)) but are left fully correct now, per the instruction not to skip them.
+
+### A2.8 Generated-CSS verification
+
+Confirmed by inspecting `public/build/assets/app-*.css` after `npm run build`, not by source inspection alone:
+
+- Every `legacy-*` selector resolves to its pre-WP1a value (checked all thirteen).
+- `text-primary`, `text-secondary`, `text-muted` are unoccupied by any hand-written rule and now resolve through Tailwind to the live shadcn tokens (`--primary`, `--secondary`, `--muted`) — free for WP1c.
+- `bg-surface`, `bg-base`, `bg-elevated`, `border-subtle`, `border-base`, `text-inverse`, `btn-accent`, `shadow-theme-{sm,md,lg}` generate no rule at all — fully unoccupied.
+- `hover:text-primary` / `group-hover:text-primary` still resolve to `var(--primary)`, unchanged.
+- `hover:legacy-bg-surface` (all 32 sites) generates no rule, matching its pre-rename inertness.
+- No `legacy-legacy-*` selector exists.
+
+CSS bundle: **78,358 bytes raw / 15,305 bytes gzip**, against the WP0 baseline of 78.2 KB / 15.6 KB (A1.12) — no meaningful change (the `legacy-` prefix's extra characters are offset by gzip's handling of the now-repetitive prefix).
+
+### A2.9 Visual compatibility result
+
+Verified in real Chromium (Playwright, the same container-installed browser as WP0), both themes, signed in as `operator@intechral.test`:
+
+| Surface | Check | Result |
+|---|---|---|
+| `/dashboard` (React) | "View all", "Open CRM" links | Ink in both themes, byte-identical computed colour to pre-WP1a |
+| `/tasks` (React) | Active/inactive `ViewTab` | Active tab: text now matches its own border (indigo, both themes) — the deliberate fix |
+| `/time`, `/time/allocation` (React) | Active "Entries"/"Allocation" tab | Same deliberate fix, confirmed both themes |
+| `/projects` (React) | Empty-state "Create your first project" link | Not exercised directly (fixture data has projects; source-verified instead, A2.5 site 5) |
+| `login`, `forgot-password` (React, guest) | "Forgot password?", "Back to sign in" links | Ink in both themes, confirmed with a fresh browser context per theme to rule out a localStorage/reload race |
+| `/admin/roles` (Blade) | Nav bg/border, brand link, footer, user-menu "Profile"/"Sign out" | All render the pre-WP1a legacy values in both themes; `hover:legacy-bg-surface` on an action link confirmed inert before and after hover (identical computed background) |
+| `/operator/tickets` (Blade) | Row `hover:legacy-bg-surface` present, F2 orphan variables untouched | Confirmed present in the DOM; F2 sites out of WP1a's scope per the brief, unaffected |
+
+No accidental change was found anywhere. The two deliberate changes (React sites 8–10's text colour, and the ten React sites' explicit resolution generally) are exactly the ones the brief asked to be made explicit.
+
+### A2.10 Accessibility result
+
+No regression: every `legacy-*` renamed site carries forward its exact prior computed colour, so AA contrast, focus visibility and dark-mode readability are unchanged from pre-WP1a. The two deliberate `border-primary`/`text-primary` matches (A2.5, sites 8–10) improve rather than harm accessibility — a sighted user previously saw an indigo underline with ink text on the active tab; both signal channels now agree. No skip link, `aria-current` or focus-management work was touched (correctly out of scope for this slice).
+
+### A2.11 Tests / static guards
+
+No new automated test was added, consistent with [§28 WP0](#wp0--characterization-and-architecture-spikes)/[§25](#25-test-strategy) assigning this kind of CSS-namespace migration a static/source-search verification rather than a snapshot-test suite, and with the brief's explicit instruction to avoid brittle full-class-string assertions. Verification instead relied on:
+
+- A raw word-boundary source scan (base vs. variant, per utility) re-run after every edit, converging to zero unprefixed occurrences of the nine collision-prone utilities except the thirteen deliberately-preserved live-accent variant sites (A2.6).
+- A `legacy-legacy-*` malformed-name regex sweep (zero matches).
+- Direct inspection of the compiled Tailwind output, both before and after, for every renamed and preserved selector (A2.8).
+- A Chromium visual pass across the ten-screen-adjacent compatibility set, both themes (A2.9).
+
+### A2.12 Documentation changes
+
+This amendment; the `Amendments` line and Contents entry at the top of the epic; WP1a's line in [§28](#28-work-packages) marked Complete with a cross-reference.
+
+### A2.13 Deviations / findings
+
+1. **A2.2** — Amendment 1's per-utility F1 breakdown undercounts Blade `text-primary` and `text-secondary` base sites and folds 32 `hover:bg-surface` variant sites into the `bg-surface` "base" total, all traceable to Blade-ternary-embedded PHP string literals that attribute-scoped regexes silently drop. The aggregate 59 was reproduced by the same flawed method and does not represent the true 76 raw occurrences (34 base, 42 variant). This did not block WP1a — the true set was located and handled — but WP1b/WP1c should not reuse Amendment 1's per-utility table as a call-site list without the same caveat.
+2. **A2.3** — `hover:bg-surface` is a second, previously undocumented namespace hazard of the same shape as `hover:text-primary`, except inert today rather than live. Neutralized in this slice so WP1c does not inherit it as a silent side effect.
+3. No other deviation from the brief. WP1b's ownership (six orphan variables, `--surface-elevated → var(--bg-surface)`) was not touched.
+
+### A2.14 Files changed
+
+`src/resources/css/app.css` · `src/resources/js/components/tasks/task-title-cell.tsx` · `src/resources/js/pages/auth/{login,forgot-password}.tsx` · `src/resources/js/pages/dashboard/index.tsx` · `src/resources/js/pages/projects/index.tsx` · `src/resources/js/pages/time/index.tsx` · `src/resources/views/admin/roles/{create,edit,index}.blade.php` · `src/resources/views/admin/users/{index,show}.blade.php` · `src/resources/views/errors/403.blade.php` · `src/resources/views/layouts/partials/{nav,footer}.blade.php` · `src/resources/views/operator/tickets/{index,reports,show}.blade.php` · `src/resources/views/tickets/{create,index,show}.blade.php` — 20 files, plus this documentation update. No dependency, font, route, migration or CI file touched.
+
+### A2.15 Validation results
+
+`./dev check` (via `bash dev` — see A2.16): CLI self-tests fail, `git diff --check` passes, Pint passes with no changes written, `npm run check` passes (wayfinder generate, `tsc --noEmit`, ESLint `--max-warnings=0`, Prettier check, 378 Vitest tests, production build), Pest passes (933 tests / 3749 assertions). Production build re-run standalone: `npm run build` green, CSS bundle 78,358 B raw / 15,305 B gzip (A2.8).
+
+### A2.16 Cleanup / ownership
+
+- **The `./dev` launcher file itself is not executable** (`-rw-r--r--`, no `+x`) at the start of this session, before any WP1a edit — confirmed by the very first command of the session failing with `Permission denied`, and by `git log -1 -- dev` showing no WP1a-authored commit. This is a pre-existing host/checkout condition, not a WP1a regression, and is left untouched (out of scope; fixing it is not a namespace-isolation change). `bash dev check` was used as the equivalent invocation throughout.
+- One Vitest flake reproduced during the full-suite `npm run check` run (`milestone-form-dialog.test.tsx`, a 5000ms timeout under full-suite jsdom load) and passed cleanly in isolation on retry. The file is untouched by this slice; recorded as pre-existing flakiness, not a WP1a regression.
+- All temporary Playwright verification scripts were written to the container's project directory and the session scratchpad, and removed before finishing; none is tracked by git.
+- No dependency, font, or generated-artefact file was added or is tracked. `git status` shows exactly the 20 source files plus this documentation file.
+- No business data was mutated (read-only Chromium visual pass, signed in as the existing `operator@intechral.test` fixture).
+
+### A2.17 WP1b handoff
+
+WP1b may start. It owns, and WP1a did not touch:
+
+- Defining the **six** orphan variables (A1.3): `--surface-base`, `--surface-muted`, `--surface-elevated`, `--border-muted`, `--surface-accent`, and the sixth found in Amendment 1, `--accent-success`.
+- The accepted mapping `--surface-elevated → var(--bg-surface)` (A1.3's correction from the original plan's `--bg-elevated`), and the deliberate-in-dark visual change that mapping causes for `<thead>` rows and the `closed` status badge.
+- The pre-existing `--surface-muted` / `--text-muted` badge contrast failure (A1.3) — confirmed still present, unrelated to and unworsened by WP1a; hand forward to WP8/Finance, not fixed in WP1b.
+- Seeding an invoice, a CRM company and a published CMS page before running the legacy-compatibility matrix (A1.15/C13) — the dev database still holds zero of each, confirmed unchanged in this session.
+
+WP1a additionally hands forward one namespace fact WP1c needs: **`text-primary`, `text-secondary`, `text-muted`, `bg-surface`, `bg-base`, `bg-elevated`, `border-subtle`, `border-base`, `text-inverse`, `btn-accent` and `shadow-theme-{sm,md,lg}` are all now fully unoccupied**, base and variant alike (A2.8), so WP1c's `@theme inline` registration is unobstructed for all of them, not only the five Amendment 1 analysed in depth.
+
+---
+
+## Amendment 3: WP1b Results (2026-09-25)
+
+WP1b ran on `feature/epic-013-direction-d-shell` at `8af256c` (the committed WP1a result), working tree clean at start. **WP1b is now Complete.** The only production change is additive: twelve new lines in `app.css` (six variables × light/dark), each a `var()` reference to an existing raw variable. No route, migration, permission, dependency, package-manifest, Blade, or React file changed. `./dev check` is green. **Where this amendment conflicts with the body or with prior amendments, this amendment wins for WP1b-scoped facts.**
+
+### A3.1 Method
+
+The F2 census was re-run from the live tree exactly as instructed, counting `var(--x)` references (not utility classes, so WP1a's Blade-ternary undercount issue, A2.2, does not apply here — `style="…var(--x)…"` attributes are plain HTML attributes, not Blade PHP string literals). Findings were verified against the compiled CSS after the edit, and against representative consumers rendered in real Chromium (the same container-installed browser used by WP0/WP1a), signed in as `operator@intechral.test`, both themes. WCAG contrast was computed from actual rendered pixels (via an off-screen canvas reading back each computed color as sRGB), not estimated from theme values.
+
+### A3.2 F2 census reproduces exactly
+
+| Variable | Amendment 1 (WP0) | This session | Match |
+|---|---:|---:|---|
+| `--surface-base` | 24 | 24 | ✅ |
+| `--surface-muted` | 10 | 10 | ✅ |
+| `--surface-elevated` | 9 | 9 | ✅ |
+| `--border-muted` | 4 | 4 | ✅ |
+| `--surface-accent` | 3 | 3 | ✅ |
+| `--accent-success` | 1 (`board-column.tsx:59`) | 1 (same site) | ✅ |
+
+**No material difference.** Fifty F2 sites plus the one `--accent-success` site, fifty-one total, exactly as A1.3 and this task's brief state. All thirteen consuming files identified in A1.3 confirmed still current: `operator/tickets/{index,reports,show}`, `admin/{roles/{index,edit},users/{index,show}}`, `tickets/{index,show,_status_badge}`, `billing/{invoices/{index,show},client/{index,show}}`, plus `board-column.tsx`. No definition for any of the six variables existed anywhere in the repository before this slice (confirmed by source search across `src/resources/css/`, the only CSS file in the project).
+
+### A3.3 Final compatibility mappings
+
+Defined once per theme block (`:root,[data-theme="light"]` and `[data-theme="dark"]`), grouped under one new "Compatibility orphans (EPIC-013 WP1b)" comment per block, placed immediately before the existing "Shadows" group — the same layer §8.2 assigns them, alongside the pre-existing raw variable families, not a second token source:
+
+```css
+--surface-base:     var(--bg-base);
+--surface-muted:    var(--bg-surface);
+--surface-elevated: var(--bg-surface);
+--border-muted:     var(--border-subtle);
+--surface-accent:   var(--surface-info);
+--accent-success:   var(--success);
+```
+
+Identical right-hand sides in both theme blocks — each resolves differently per theme only because the *referenced* variable (`--bg-base`, `--bg-surface`, etc.) is itself theme-scoped, exactly matching the existing file's convention for indirection variables (e.g. `--primary: var(--accent)`, `--muted: var(--bg-surface)`, both already duplicated per-theme in the same way).
+
+### A3.4 Variable census
+
+| Variable | Use count | Representative consumers | Pre-WP1b computed behaviour | Final mapping |
+|---|---:|---|---|---|
+| `--surface-base` | 24 | Card/panel containers on `admin/{roles,users}`, `operator/tickets`, `tickets/{index,show}` — always paired with `border-color: var(--border-base)` | `background-color` invalid → initial value `transparent`; card showed the plain page background underneath | `var(--bg-base)` — **strictly appearance-preserving** (page bg and `--bg-base` are the same colour) |
+| `--surface-muted` | 10 | `draft`/`cancelled` invoice status badges, `billing/{invoices,client}` | `transparent`; badge showed the enclosing `--surface-card` colour (white light / gray-800 dark) through it | `var(--bg-surface)` — **visible, deliberate tint** now appears (gray-50 light / gray-900 dark) |
+| `--surface-elevated` | 9 | `<thead>` rows on four list tables; the ticket `closed` status badge; the role `Custom` type badge | `transparent`; identical to the surrounding card, so **no boundary at all** | `var(--bg-surface)` — **corrected from the plan's `--bg-elevated`** (A3.5) |
+| `--border-muted` | 4 | Same `draft`/`cancelled` invoice badges' border | `border-color` invalid → falls through to its own initial value **`currentcolor`**, i.e. the badge's own text colour (`--text-muted`, already defined) — verified empirically (A3.6), not merely reasoned from spec | `var(--border-subtle)` — a distinct, intentionally softer border shade, no longer text-coloured |
+| `--surface-accent` | 3 | `open` ticket status badge; `Built-in` role badge (×2 files) | `transparent`; showed the enclosing card colour, text-only accent-coloured label with no visible pill | `var(--surface-info)` — the only defined tinted surface that reads legibly with `--accent` text (A1.3), **with a dark-mode contrast caveat, A3.7** |
+| `--accent-success` | 1 | Board "Done" column indicator dot, `board-column.tsx:59` | Tailwind arbitrary-value inline fallback `#22c55e` (Tailwind `green-500`) — solid, **theme-invariant** (same hex in both themes) | `var(--success)` — now theme-aware: `green-600` light / `green-400` dark |
+
+### A3.5 `--surface-elevated` correction — verified in Chromium
+
+Confirmed live, both themes, on `/admin/users` (card = `--surface-base`, `<thead>` row = `--surface-elevated`):
+
+| | Card (`--surface-base`) | Header row (`--surface-elevated`) | Boundary contrast (bg-vs-bg) | Header text vs. row | Verdict |
+|---|---|---|---:|---:|---|
+| Light | `rgb(255,255,255)` | `rgb(249,250,251)` | **1.05:1** — a faint, genuine tint | `7.23:1` | Distinguishable but subtle, as designed — the rejected `--bg-elevated` alternative would have measured **1.00:1**, i.e. zero distinction |
+| Dark | `rgb(3,7,18)` | `rgb(16,24,40)` | **1.13:1** — a subtle lift | `6.82:1` | Present without reading as a "raised band"; the rejected `--bg-elevated` alternative would have jumped two full Tailwind steps (A1.3) |
+
+This matches every condition the brief asked to verify: distinguishable from the base layer, not excessively strong in dark, an acceptable header boundary, readable header text, no lost borders (the table's own `border-color: var(--border-subtle)` is untouched by this slice). **This is the accepted deliberate correction from the plan's `--bg-elevated`, confirmed working exactly as A1.3 predicted, not a regression.**
+
+### A3.6 `--accent-success` result
+
+The board "Done"-column dot at `board-column.tsx:59` (`bg-[var(--accent-success,#22c55e)]`) was inspected on a real project board, both themes:
+
+| Theme | Prior (hardcoded fallback) | Now (`var(--success)`) |
+|---|---|---|
+| Light | `#22c55e` (Tailwind `green-500`, fixed) | `oklch(0.627 0.194 149.214)` = Tailwind `green-600` — confirmed by rendering |
+| Dark | `#22c55e` (identical — the fallback never varied by theme) | `oklch(0.792 0.209 151.711)` = Tailwind `green-400` — confirmed by rendering |
+
+`--success` was the narrowest existing match: it is the raw "solid accent" success token already driving `--color-success` (used nowhere else directly as a raw `var(--success)` reference in the tree, but it is exactly the semantic register a small solid indicator dot belongs to — the *other* existing success family, `--text-success`/`--border-success`/`--surface-success`, is a three-part badge trio (border + tinted surface + text) meant for bordered status badges, not a single-value accent fill, and pairing any one piece of that trio alone would misuse the family). This is a deliberate, sanctioned, minor colour shift (A1.3's own recommendation), not an accident: the dot goes from a fixed hex to a theme-aware value, correctly darkening in light and lightening in dark the same way every other success-toned element in the app already does.
+
+### A3.7 Contrast / accessibility result — two debts, not one
+
+**The known debt, confirmed with final WP1b values, not worsened.** `--surface-muted` badge background against the pre-existing `--text-muted` text (invoice `draft`/`cancelled` badges), computed from real rendered pixels via canvas readback:
+
+| Theme | Pre-WP1b (text vs. inherited `--surface-card` ancestor) | Post-WP1b (text vs. `--surface-muted`) | Delta |
+|---|---:|---:|---|
+| Light | 2.60:1 | 2.49:1 | −0.11 — both deep in FAIL territory; not a perceptible change |
+| Dark | 1.94:1 | 2.35:1 | **+0.41 — WP1b measurably improves this one**, still FAIL |
+
+Both readings fail WCAG AA (4.5:1 normal text) before and after. **WP1b does not create this failure and does not meaningfully worsen it** (light moves within noise; dark improves) — confirmed with actual final values, not assumed. Recorded, again, for WP1c/WP2/Finance's `Status` component (A1.3 already flagged this; this session re-confirms it with post-WP1b numbers rather than pre-WP1b estimates).
+
+**A second, previously undocumented debt, found in this slice.** The `--surface-accent`/`--accent` pairing (`open` ticket badge, `Built-in` role badge) was not contrast-checked by Amendment 1 — A1.3's "Confirmed" verdict for `--surface-info` was evidenced in light mode only. Checked here in both themes:
+
+| Theme | `--surface-accent` bg | `--accent` text | Contrast | Verdict |
+|---|---|---|---:|---|
+| Light | `rgb(239,246,255)` | `rgb(79,70,229)` | 5.78:1 | PASS AA |
+| Dark | `rgb(22,37,86)` | `rgb(99,102,241)` | **3.28:1** | **FAIL AA** (12px, weight 500 — too small/light to qualify for the large-text 3:1 exemption) |
+
+This did **not** exist as a passing, functioning badge before WP1b — `--surface-accent` was `transparent`, so the badge had no visible pill at all, only accent-coloured text floating on the page (measured at 4.51:1 against the ultimate inherited page background, which reads as a technical "pass" but for a component that was not rendering its designed shape). Per this task's own instruction not to treat "preserve the accident of transparent" as success, the fair comparison is not transparent-vs-real; it is that **making the intended pill real reveals a genuine, previously-latent AA failure in dark mode**, on the only two consumers of `--surface-accent`. No compatibility-safe alternative exists within the current raw-variable family: `--surface-info` is, as A1.3 found, the only tinted surface that pairs *semantically* with `--accent`, and the sibling tint families (`success`/`danger`/`warning`) are equally deep `-950`-scale dark shades with no reason to expect a materially better ratio against the same `--accent` text. **Decision: keep `var(--surface-info)` — the correct and only compatible mapping — and record this as a second contrast debt of the same shape as A1.3's, handed forward undisguised rather than silently accepted.** No badge redesign, no Direction D semantic, and no alternate token were introduced to chase this number; that repair belongs to WP1c/WP2 alongside the `--surface-muted` one.
+
+**No focus-visibility, control-boundary or dark-mode-legibility regression elsewhere.** Every other measured pairing (header text 7.23:1/6.82:1, `Custom` chip 7.23:1/6.82:1, `Closed` badge 7.23:1/6.82:1) comfortably passes AA in both themes.
+
+### A3.8 Consumer audit
+
+Grouped by semantic use, confirming no variable is doing two incompatible jobs:
+
+| Group | Variable(s) | Consistent? |
+|---|---|---|
+| Page/card surfaces | `--surface-base` | Yes — every one of the 24 sites is a card/panel container paired with `--border-base` |
+| Table headers + two status-type badges | `--surface-elevated` | Yes in *mechanism* (a one-step lift above the card), used identically for `<thead>` rows, the `closed` ticket badge and the `Custom` role badge — all three are "the subdued/neutral state" of their respective component, which is exactly what a one-step lift communicates |
+| Status badges (muted) | `--surface-muted`, `--border-muted`, paired with existing `--text-muted` | Yes — both `draft` and `cancelled` invoice states, one shared visual treatment for "inactive/non-current" |
+| Status/type chips (accent) | `--surface-accent`, paired with existing `--accent` | Yes — `open` ticket and `Built-in` role are both "the notable/current state" of their component |
+| Board status accent | `--accent-success` | Single consumer, no conflict |
+
+No sprawling redesign was needed and none was found necessary: each variable maps to exactly one coherent semantic role across all its consumers.
+
+### A3.9 Visual compatibility result
+
+Real Chromium, both themes, signed in as `operator@intechral.test`:
+
+| Surface | Variable(s) exercised | Light | Dark |
+|---|---|---|---|
+| `/admin/users` | `--surface-base`, `--surface-elevated` | Card white, header faintly tinted, boundary present | Card near-black, header one step up, subtle lift |
+| `/admin/roles` | `--surface-base`, `--surface-elevated`, `--surface-accent` | `Built-in`/`Custom` chips both legible | `Built-in` chip contrast-thin (A3.7); `Custom` chip fine |
+| `/operator/tickets` | `--surface-accent` (`open`), `--surface-elevated` (`closed`, via a temporarily flipped fixture ticket, A3.10) | Both badges legible | `open` badge contrast-thin (A3.7); `closed` badge fine |
+| `/billing/invoices` | `--surface-muted`, `--border-muted` (via a temporary fixture invoice, A3.10) | `Draft` badge present, border visibly distinct from text colour, contrast weak (known debt, A3.7, not worsened) | Same, contrast weak but improved vs. pre-WP1b |
+| `/projects/{id}/board` | `--accent-success` | "Done" column dot now `green-600` (was fixed `#22c55e`) | "Done" column dot now `green-400` |
+
+### A3.10 Fixture/data handling
+
+Per A1.15/C13, the dev database held zero invoices, zero CRM companies and zero CMS pages. **None of the six WP1b variables is consumed on a CRM/company or CMS/page screen** (confirmed by source search — only `billing/*`, `admin/*`, `operator/tickets/*`, `tickets/*` and one React component reference them), so only an invoice fixture was needed for WP1b; CRM/CMS fixtures remain a WP1c/WP8 concern per A2.17, untouched here.
+
+Three temporary, disposable fixtures were created through normal application mechanisms and deleted immediately after the visual pass:
+
+| Fixture | Mechanism | Purpose | Cleanup |
+|---|---|---|---|
+| One `draft`-status invoice (id 1), `client_id`/`created_by` pointing at existing users | `Invoice::factory()->draft()->create()` | Only way to exercise `--surface-muted`/`--border-muted` — zero invoices existed | Deleted via `Invoice::find(1)->delete()`, confirmed `Invoice::count() === 0` afterward |
+| One custom role (id 12, `wp1b-temp-custom-role`) | `Role::create()` (Spatie) | Both existing roles (`operator`, `user`) are built-in by name; no non-built-in role existed to exercise the `Custom` badge / `--surface-elevated` | Deleted via `Role::find(12)->delete()`, confirmed `Role::count() === 2` afterward |
+| One ticket (id 4) temporarily flipped `open → closed` | Direct model update on an existing fixture ticket | No closed ticket existed to exercise the `closed` badge / `--surface-elevated` | Restored `open`, confirmed via fresh query afterward |
+
+No new permanent seed data was added. No factory or seeder file was modified. All three actions ran through ordinary Eloquent/factory calls against the existing dev database, verified counts before, during and after.
+
+### A3.11 Compiled CSS verification
+
+Inspected `public/build/assets/app-*.css` after `npm run build`, not source alone:
+
+- All twelve lines present (six variables × two theme blocks); each resolves to its intended `var()` target in both scopes.
+- No duplicate later definition overrides any of the six — confirmed by regex search of the compiled output for each variable name (each appears exactly twice: once per theme block).
+- No consumer of the six variables computes `transparent`/invalid any more — spot-checked via the rendered pages in A3.9.
+- WP1a's freed semantic names (`text-primary`, `text-secondary`, `text-muted`, `bg-surface`, etc.) remain free of hand-written collisions — re-verified: `.legacy-*` still the only thirteen defined utilities in `@layer utilities`, byte-identical to the WP1a commit (`git diff --stat` on `app.css` shows only additions, zero deletions).
+
+CSS bundle: **78,770 bytes raw / 15,346 bytes gzip**, against the WP1a baseline of 78,358 / 15,305 (A2.8) — a **412-byte / 41-byte** delta, exactly proportionate to twelve short `var()` declarations. No unexpected size change.
+
+### A3.12 WP1a regression check
+
+- `git diff --stat` on `app.css`: **18 insertions, 0 deletions** — the thirteen `.legacy-*` utility definitions are untouched.
+- All six React files WP1a touched (`login.tsx`, `forgot-password.tsx`, `dashboard/index.tsx`, `projects/index.tsx`, `time/index.tsx`, `task-title-cell.tsx`) and the two additional files carrying the three deliberately-preserved `text-primary` sites (`tasks/index.tsx`, `time/allocation.tsx`) show **zero diff** in this session — the ten React `text-primary` decisions are unchanged.
+- No `dark:`/`focus:`/hover variant of any of the nine WP1a-renamed utilities was touched or reintroduced.
+- No Direction D semantic token (`--canvas`, `--rail`, `--drawer`, Direction D `--surface`/`--text`/`--accent`, `--live`, etc.) was added.
+
+### A3.13 Tests / static guards
+
+No new automated test was added, consistent with the brief's preference for durable static/compiled-output verification over brittle snapshots for this kind of CSS-value slice, and because no clean existing seam protects "a CSS custom property resolves to X" more durably than reading the compiled output directly (a Vitest/Pest test asserting a specific `getComputedStyle` value would need jsdom, which doesn't implement CSS custom property cascade resolution — a real gap, not a shortcut taken here — so it was verified in real Chromium instead, per the brief's explicit allowance). Verification relied on: the compiled-CSS regex sweep (A3.11), the Chromium visual/contrast pass (A3.5, A3.7, A3.9), and the source-search-based F2 census and WP1a regression checks (A3.2, A3.12).
+
+### A3.14 Documentation changes
+
+This amendment; the `Amendments` line and Contents entry at the top of the epic; WP1b's line in [§28](#28-work-packages) marked Complete with a cross-reference.
+
+### A3.15 Validation results
+
+`./dev check` (via `bash dev`, the `./dev` launcher itself still lacking `+x` — pre-existing, A2.16, unrelated to WP1b): Pest green (933 passed, 3749 assertions), Pint green, `git diff --check` clean. The first full run's `npm run check` step reported 14 Vitest failures across 11 unrelated component-test files, all `Test timed out in 5000ms` under heavy load (`jsdom` created 54 times per run, ~45–48% of run time per Vitest's own diagnostic) — a resource-contention pattern, not a code regression: `app.css` is inert to `jsdom`-rendered component tests (jsdom does not load or resolve real compiled CSS), and none of the failing files touch anything WP1b changed. A standalone re-run reproduced only one of the fourteen (`milestone-form-dialog.test.tsx`, the same pre-existing flake noted in A2.16), which then passed cleanly in isolation. A final full `npm run check` (wayfinder, typecheck, lint, format, all 378 Vitest tests, production build) ran clean.
+
+### A3.16 Cleanup / ownership
+
+- All three temporary fixtures deleted/restored, counts verified back to baseline (A3.10).
+- All temporary Playwright verification scripts written to the container project directory, removed before finishing; none tracked by git.
+- No dependency, font, or generated-artefact file was added or is tracked.
+- `git status` shows exactly one changed file (`app.css`) plus this documentation file.
+- No root-owned files; no business data mutated beyond the disposable, fully-cleaned-up fixtures above.
+
+### A3.17 Deviations / findings
+
+1. **A3.7** — a second contrast debt, on `--surface-accent`/`--accent` in dark mode (3.28:1, FAIL AA), not documented by Amendment 1 because A1.3's verification appears to have been light-mode only. Handled the same way as the known `--surface-muted` debt: kept the only compatible mapping, documented, handed forward — not silently fixed, not silently hidden, and not blocking, since no compatibility-safe alternative exists and the failure is inherent to pairing any available tinted-surface token with the existing `--accent` text colour at 12px/500-weight, not a symptom of choosing the wrong variable.
+2. No other deviation. The F2 census matched exactly; the accepted `--surface-elevated` and `--accent-success` mappings both verified as specified; WP1a's namespace and React decisions confirmed fully intact.
+
+### A3.18 Files changed
+
+`src/resources/css/app.css` (18 insertions, 0 deletions) — plus this documentation update. No other source file touched.
+
+### A3.19 WP1c handoff
+
+WP1c may start. It owns, and WP1b did not touch:
+
+- The Direction D semantic token layer (`--canvas`, `--rail`, `--drawer`, `--surface` and its `-sunken`/`-hover`/`-selected` states, `--rule`/`--rule-control`/`--rule-strong`, Direction D `--text`, `--accent`/`--accent-hover`/`--accent-soft`/`--accent-line`, `--live`, `--ink`/`--on-ink`, `--danger`/`--warning`/`--success` restyles, `--focus`, `--scrim`) via `@theme inline`, and the safe alias remappings from [§8.3](#83-alias-mapping).
+- Two contrast debts to hand to WP2/Finance's `Status`/badge component work, not to fix inline in WP1c: `--surface-muted`/`--text-muted` (A1.3, re-confirmed A3.7) and the newly found `--surface-accent`/`--accent` dark-mode pairing (A3.7). Both are pre-existing-pattern failures that become visible, not created, once their variables are real.
+- Seeding an invoice, a CRM company and a published CMS page before running the full legacy-compatibility matrix (A1.15/C13, A2.17) — still zero of each in the dev database; this session's invoice fixture was created and deleted, not left behind.
+- WP1c's own token registration is unobstructed: all six WP1b variables and all thirteen WP1a `legacy-*` utilities are stable, defined once each, at the correct existing theme layer, with no competing second token source introduced.

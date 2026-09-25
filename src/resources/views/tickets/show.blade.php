@@ -47,7 +47,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($ticket->attachments as $att)
                         <a href="{{ route('tickets.attachment.download', $att) }}"
-                           class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors hover:bg-surface"
+                           class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors hover:legacy-bg-surface"
                            style="border-color: var(--border-base); color: var(--text-secondary);">
                             <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
@@ -84,7 +84,7 @@
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($reply->attachments as $att)
                     <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:bg-surface"
+                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:legacy-bg-surface"
                        style="border-color: var(--border-base); color: var(--text-secondary);">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
                     </a>

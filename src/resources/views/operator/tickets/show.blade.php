@@ -55,7 +55,7 @@
                 <div class="mt-4 pt-4 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($ticket->attachments as $att)
                     <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:bg-surface"
+                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:legacy-bg-surface"
                        style="border-color: var(--border-base); color: var(--text-secondary);">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
                     </a>
@@ -82,7 +82,7 @@
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($reply->attachments as $att)
                     <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs hover:bg-surface"
+                       class="inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs hover:legacy-bg-surface"
                        style="border-color: var(--border-base); color: var(--text-secondary);">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
                     </a>

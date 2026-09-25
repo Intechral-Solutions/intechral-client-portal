@@ -110,7 +110,7 @@
                 Submit Ticket
             </button>
             <a href="{{ route('tickets.index') }}"
-               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:bg-surface"
+               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                style="color: var(--text-secondary);">Cancel</a>
         </div>
 

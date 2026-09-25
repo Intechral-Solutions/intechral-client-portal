@@ -10,7 +10,7 @@
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ route('operator.tickets.reports') }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                style="border-color: var(--border-base); color: var(--text-secondary);">Reports</a>
         </div>
     </div>
@@ -60,11 +60,11 @@
                class="rounded-lg border px-3 py-2 text-sm outline-none"
                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
         <button type="submit"
-                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                 style="border-color: var(--border-base); color: var(--text-secondary);">Filter</button>
         @if (request()->hasAny(['search', 'status', 'priority', 'assignee', 'date_from', 'date_to']))
         <a href="{{ route('operator.tickets.index') }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
            style="border-color: var(--border-base); color: var(--text-secondary);">Clear</a>
         @endif
     </form>
@@ -92,7 +92,7 @@
             </thead>
             <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 @forelse ($tickets as $ticket)
-                <tr class="transition-colors hover:bg-surface {{ $ticket->isOverdue() ? 'bg-red-50' : '' }}">
+                <tr class="transition-colors hover:legacy-bg-surface {{ $ticket->isOverdue() ? 'bg-red-50' : '' }}">
                     <td class="px-4 py-3">
                         <input type="checkbox" name="ticket_ids[]" value="{{ $ticket->id }}" class="h-4 w-4 rounded accent-accent ticket-cb">
                     </td>

@@ -42,13 +42,13 @@
             @endforeach
         </select>
         <button type="submit"
-                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                 style="border-color: var(--border-base); color: var(--text-secondary);">
             Filter
         </button>
         @if (request()->hasAny(['search', 'status']))
         <a href="{{ route('tickets.index') }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
            style="border-color: var(--border-base); color: var(--text-secondary);">Clear</a>
         @endif
     </form>
@@ -67,7 +67,7 @@
             </thead>
             <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 @forelse ($tickets as $ticket)
-                <tr class="transition-colors hover:bg-surface">
+                <tr class="transition-colors hover:legacy-bg-surface">
                     <td class="px-6 py-4">
                         <p class="font-medium text-sm" style="color: var(--text-primary);">{{ $ticket->title }}</p>
                         <p class="text-xs mt-0.5" style="color: var(--text-secondary);">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }}</p>

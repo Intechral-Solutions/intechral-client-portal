@@ -53,7 +53,7 @@
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($permissions as $permission)
                     @php $checked = in_array($permission, old('permissions', $assigned)); @endphp
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface"
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
                            style="border-color: var(--border-base);">
                         <input type="checkbox" name="permissions[]" value="{{ $permission }}"
                                {{ $checked ? 'checked' : '' }}
@@ -74,7 +74,7 @@
                 Save Changes
             </button>
             <a href="{{ route('roles.index') }}"
-               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:bg-surface"
+               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                style="color: var(--text-secondary);">
                 Cancel
             </a>
@@ -86,7 +86,7 @@
                 @csrf
                 @method('DELETE')
                 <button type="submit"
-                        class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                        class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                         style="color: var(--text-danger);">
                     Delete Role
                 </button>

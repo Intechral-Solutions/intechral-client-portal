@@ -174,7 +174,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                                 <DestinationLink
                                     href={ticketsMetric.href}
                                     visit="document"
-                                    className="text-sm font-medium text-primary hover:underline"
+                                    className="legacy-text-primary text-sm font-medium hover:underline"
                                 >
                                     View all
                                 </DestinationLink>
@@ -262,7 +262,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                                     <DestinationLink
                                         href={crmSummary.href}
                                         visit={crmSummary.visit}
-                                        className="text-sm font-medium text-primary hover:underline"
+                                        className="legacy-text-primary text-sm font-medium hover:underline"
                                     >
                                         Open CRM
                                     </DestinationLink>

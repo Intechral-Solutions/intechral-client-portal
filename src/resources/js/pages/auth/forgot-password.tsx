@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
                         {form.processing ? 'Sending...' : 'Send reset link'}
                     </Button>
                     <p className="text-center text-sm">
-                        <Link className="text-primary hover:underline" href={login.url()}>
+                        <Link className="legacy-text-primary hover:underline" href={login.url()}>
                             Back to sign in
                         </Link>
                     </p>

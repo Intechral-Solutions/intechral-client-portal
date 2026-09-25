@@ -53,7 +53,7 @@
             <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 @forelse ($roles as $role)
                 @php $builtIn = in_array($role->name, ['operator', 'user']); @endphp
-                <tr class="transition-colors hover:bg-surface">
+                <tr class="transition-colors hover:legacy-bg-surface">
                     <td class="px-6 py-4">
                         <span class="font-medium" style="color: var(--text-primary);">{{ $role->name }}</span>
                     </td>

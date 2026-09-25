@@ -117,6 +117,16 @@
     --warning:       theme(colors.amber.500);
     --info:          theme(colors.blue.600);
 
+    /* Compatibility orphans (EPIC-013 WP1b) — six variables already referenced by
+       live Blade/React markup with no prior definition. Explicit now; unchanged
+       from Direction D's own values later, this register is retired, not replaced. */
+    --surface-base:     var(--bg-base);
+    --surface-muted:    var(--bg-surface);
+    --surface-elevated: var(--bg-surface);
+    --border-muted:     var(--border-subtle);
+    --surface-accent:   var(--surface-info);
+    --accent-success:   var(--success);
+
     /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -186,6 +196,14 @@
     --warning:       theme(colors.amber.400);
     --info:          theme(colors.blue.400);
 
+    /* Compatibility orphans (EPIC-013 WP1b) — see the light block for rationale */
+    --surface-base:     var(--bg-base);
+    --surface-muted:    var(--bg-surface);
+    --surface-elevated: var(--bg-surface);
+    --border-muted:     var(--border-subtle);
+    --surface-accent:   var(--surface-info);
+    --accent-success:   var(--success);
+
     /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
@@ -205,23 +223,26 @@ body {
     line-height: 1.6;
 }
 
-/* ── Semantic utility layer ───────────────────────────────── */
+/* ── Legacy utility layer (EPIC-013 WP1a) ─────────────────────
+   Prefixed so Direction D can register `surface`, `text-primary`,
+   etc. as semantic utilities later without a name collision.
+   Values unchanged from the pre-WP1a names. ────────────────── */
 @layer utilities {
-    .bg-base       { background-color: var(--bg-base); }
-    .bg-surface    { background-color: var(--bg-surface); }
-    .bg-elevated   { background-color: var(--bg-elevated); }
-    .border-subtle { border-color: var(--border-subtle); }
-    .border-base   { border-color: var(--border-base); }
-    .text-primary  { color: var(--text-primary); }
-    .text-secondary{ color: var(--text-secondary); }
-    .text-muted    { color: var(--text-muted); }
-    .text-inverse  { color: var(--text-inverse); }
-    .btn-accent {
+    .legacy-bg-base       { background-color: var(--bg-base); }
+    .legacy-bg-surface    { background-color: var(--bg-surface); }
+    .legacy-bg-elevated   { background-color: var(--bg-elevated); }
+    .legacy-border-subtle { border-color: var(--border-subtle); }
+    .legacy-border-base   { border-color: var(--border-base); }
+    .legacy-text-primary  { color: var(--text-primary); }
+    .legacy-text-secondary{ color: var(--text-secondary); }
+    .legacy-text-muted    { color: var(--text-muted); }
+    .legacy-text-inverse  { color: var(--text-inverse); }
+    .legacy-btn-accent {
         background-color: var(--accent);
         color: var(--accent-text);
         &:hover { background-color: var(--accent-hover); }
     }
-    .shadow-theme-sm { box-shadow: var(--shadow-sm); }
-    .shadow-theme-md { box-shadow: var(--shadow-md); }
-    .shadow-theme-lg { box-shadow: var(--shadow-lg); }
+    .legacy-shadow-theme-sm { box-shadow: var(--shadow-sm); }
+    .legacy-shadow-theme-md { box-shadow: var(--shadow-md); }
+    .legacy-shadow-theme-lg { box-shadow: var(--shadow-lg); }
 }

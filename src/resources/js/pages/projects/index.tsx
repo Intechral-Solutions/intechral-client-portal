@@ -49,7 +49,7 @@ export function ProjectsIndexPage({ projects, abilities }: ProjectsIndexProps) {
                         {abilities.create ? (
                             <Link
                                 href={create.url()}
-                                className="text-sm font-medium text-primary hover:underline"
+                                className="legacy-text-primary text-sm font-medium hover:underline"
                             >
                                 Create your first project
                             </Link>

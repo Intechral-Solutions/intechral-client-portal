@@ -49,7 +49,7 @@ export default function LoginPage() {
                         <div className="flex items-center justify-between gap-4">
                             <Label htmlFor="password">Password</Label>
                             <Link
-                                className="text-sm text-primary hover:underline"
+                                className="legacy-text-primary text-sm hover:underline"
                                 href={forgotPassword.url()}
                             >
                                 Forgot password?

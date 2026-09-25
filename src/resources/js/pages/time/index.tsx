@@ -478,7 +478,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                                                         label={entry.context.label}
                                                         className={
                                                             entry.context.url
-                                                                ? 'text-primary hover:underline'
+                                                                ? 'legacy-text-primary hover:underline'
                                                                 : undefined
                                                         }
                                                     />
