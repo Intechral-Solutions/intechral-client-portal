@@ -6,8 +6,9 @@
 **Product direction:** [Platform Product & UX Direction](../product/platform-product-ux-direction.md) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Decision record:** [ADR-007: Inertia/React Frontend](../architecture/adr/ADR-007-inertia-react-frontend.md) · [ADR-002: Tailwind v4](../architecture/adr/ADR-002-tailwind-v4.md) · [ADR-003: Spatie Permission](../architecture/adr/ADR-003-spatie-permission.md)
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
-**Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed (see [§10](#10-brand-asset-consumption) for the one path discrepancy to reconcile)
+**Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff
 
 ---
 
@@ -47,6 +48,8 @@
 32. [Risks and rollback](#32-risks-and-rollback)
 33. [Open questions and decision gates](#33-open-questions-and-decision-gates)
 34. [Implementation model guidance](#34-implementation-model-guidance)
+
+- [Amendment 1: WP0 Results (2026-09-25)](#amendment-1-wp0-results-2026-09-25)
 
 ---
 
@@ -493,8 +496,10 @@ Mono always carries `font-variant-numeric: tabular-nums`. Inter and JetBrains Mo
 
 The committed assets are:
 
-- `src/resources/images/intechral-logo.svg` — full logo
-- `src/resources/images/intechral-logo-compact.svg` — compact mark
+- `src/resources/images/brand/intechral-logo.svg` — full logo
+- `src/resources/images/brand/intechral-logo-compact.svg` — compact mark
+
+> **Resolved in WP0 (gate G2, 2026-09-25).** Both files were `git mv`'d into `brand/`, so the paths above are now the live ones and match the canonical contract. The discrepancy described in the rest of this section is historical. See [A1.5](#a15-g2--assets-moved-consumption-proven-one-defect-found-in-the-committed-full-logo).
 
 The design contract §17.1 and §19 cite them as `src/resources/images/brand/intechral-logo.svg` and `…/brand/intechral-logo-compact.svg`. **The `brand/` subdirectory does not exist.** This is a documentation/filesystem mismatch, not a missing asset — both files are present, committed in `6ea4135`, and authoritative.
 
@@ -1316,6 +1321,8 @@ Derived from the live code. Each package is an independently shippable slice tha
 
 ### WP0 — Characterization and architecture spikes
 
+**Status: Complete (2026-09-25) — results in [Amendment 1](#amendment-1-wp0-results-2026-09-25).**
+
 Small and largely disposable. No production code ships except the brand-asset move.
 
 | Item | Output |
@@ -1330,6 +1337,8 @@ Small and largely disposable. No production code ships except the brand-asset mo
 | **Current → target nav mapping** | Confirm the [§11.1 matrix](#111-current--target-matrix) against `route:list`; settle the Pages question (gate G3) |
 
 **Exit:** S1–S4 answered with evidence; G1–G3 decided; the register exists; the epic is amended with any decision that differs from the recommendation here.
+
+**Exit met.** S1–S4 answered in real Chromium; G1–G3 decided; the token, navigation, performance, responsive and compatibility registers exist; fourteen corrections recorded in [A1.16](#a116-plan-corrections-applied-by-this-amendment). No durable test was added — [§28 WP0](#wp0--characterization-and-architecture-spikes) assigns none, and the two gaps found are handed to WP3 and WP6 ([A1.14](#a114-tests--deliberately-none-added-and-why)).
 
 ### WP1 — Semantic tokens and typography
 
@@ -1504,15 +1513,15 @@ Entry conditions, so this is not started prematurely: the Focused shell exists a
 
 ### 33.1 Decision gates inside this epic (recommendation made; settled in WP0)
 
-| Gate | Question | Recommendation | Blocks |
-|---|---|---|---|
-| **G1** | Font delivery: self-host vs package vs external | **Self-host `woff2` subsets**, ≤ 180 KB latin budget ([§9](#9-typography-and-font-delivery)) | WP1d only |
-| **G2** | Brand assets live at `src/resources/images/`; the contract says `…/images/brand/` | **`git mv` into `brand/`** to match the canonical contract ([§10.1](#101-canonical-assets-and-one-path-discrepancy)) | WP4 only |
-| **G3** | Where viewer-facing CMS Pages (`cms.view`) lives under the eight-workspace IA | **Transitional ninth rail item**, gated `cms.view AND NOT cms.edit`, retired by the Knowledge/CMS epic ([§11.3](#113-the-viewer-facing-cms-problem)) | WP3 only |
-| **S1** | Drawer persistence mechanism | **Server-stamped workspace + localStorage + shared pre-paint bootstrap**; cookie is the fallback ([§15](#15-drawer-state-and-persistence)) | WP4 |
-| **S2** | Focus target after an Inertia visit | **Provisionally: no focus move + polite announcement**; decided by evidence ([§22.2](#222-q2--focus-on-inertia-navigation)) | WP4 |
+| Gate | Question | Recommendation | Blocks | **Outcome (WP0, 2026-09-25)** |
+|---|---|---|---|---|
+| **G1** | Font delivery: self-host vs package vs external | **Self-host `woff2` subsets**, ≤ 180 KB latin budget ([§9](#9-typography-and-font-delivery)) | WP1d only | **CLOSED — confirmed.** Self-host, latin subsets, **static** Newsreader 400/500: **7 files, 143.4 KB**. Vite fingerprinting verified; density gate passed with 0 px change. See [A1.4](#a14-g1--self-hosted-woff2-confirmed-with-the-budget-arithmetic-corrected) |
+| **G2** | Brand assets live at `src/resources/images/`; the contract says `…/images/brand/` | **`git mv` into `brand/`** to match the canonical contract ([§10.1](#101-canonical-assets-and-one-path-discrepancy)) | WP4 only | **CLOSED — done.** Both files moved; id-scoping and stop-override proven with four marks on one page. `BrandMark` must also strip `vector-effect`. See [A1.5](#a15-g2--assets-moved-consumption-proven-one-defect-found-in-the-committed-full-logo) |
+| **G3** | Where viewer-facing CMS Pages (`cms.view`) lives under the eight-workspace IA | **Transitional ninth rail item**, gated `cms.view AND NOT cms.edit`, retired by the Knowledge/CMS epic ([§11.3](#113-the-viewer-facing-cms-problem)) | WP3 only | **CLOSED — confirmed** across seven actor profiles; label should read "Resources". See [A1.6](#a16-g3--the-transitional-pages-item-is-confirmed-across-seven-actor-profiles) |
+| **S1** | Drawer persistence mechanism | **Server-stamped workspace + localStorage + shared pre-paint bootstrap**; cookie is the fallback ([§15](#15-drawer-state-and-persistence)) | WP4 | **CLOSED — confirmed unchanged.** No flash in any case, including React↔Blade; **cookie fallback not taken**. See [A1.7](#a17-s1--drawer-persistence-confirmed-unchanged-the-cookie-is-not-needed) |
+| **S2** | Focus target after an Inertia visit | **Provisionally: no focus move + polite announcement**; decided by evidence ([§22.2](#222-q2--focus-on-inertia-navigation)) | WP4 | **CLOSED — refined.** Announce always; repair focus to `main` **only when the visit destroyed it**. Plain (a) would leave a live in-page-control defect. See [A1.8](#a18-s2--the-provisional-preference-is-overturned-in-part-a-hybrid-is-locked) |
 
-None of these blocks the start of the epic. WP0 exists to close them.
+None of these blocks the start of the epic. **WP0 closed all five on 2026-09-25** ([Amendment 1](#amendment-1-wp0-results-2026-09-25)).
 
 ### 33.2 Approved open questions that this epic does not need answered
 
@@ -1550,3 +1559,432 @@ Preference: Sonnet for routine, well-scoped implementation; Opus for architectur
 | **WP8** | **Opus** | Cross-cutting verification, accessibility judgement, and the decision on whether exit criteria are genuinely met |
 
 Six Sonnet packages, six Opus packages. Fable is not recommended for any package.
+
+---
+
+## Amendment 1: WP0 Results (2026-09-25)
+
+WP0 ran on `main` at `f1476fb` (the committed plan). **The only production change it makes is the gate G2 brand-asset move** — a `git mv` of two SVGs with zero code consumers, which [§28 WP0](#wp0--characterization-and-architecture-spikes) names as a WP0 deliverable. No application, route, policy, migration, dependency, package-manifest, CSS or component file changed. Every spike was run against the live application in real Chromium and then removed.
+
+All five gates are closed: **G1 self-hosting confirmed with measured payloads · G2 moved and its consumption strategy proven, with one correction · G3 confirmed against seven actor profiles · S1 confirmed unchanged · S2 overturned in part by evidence.** Fourteen plan corrections are recorded in [A1.16](#a116-plan-corrections-applied-by-this-amendment); the decision registers ([§28 WP0](#wp0--characterization-and-architecture-spikes), [§33.1](#331-decision-gates-inside-this-epic-recommendation-made-settled-in-wp0)) and [§10.1](#101-canonical-assets-and-one-path-discrepancy) are updated in place, and the analytical sections are left as written. **Where this amendment conflicts with the body, the amendment wins.**
+
+Status is unchanged: EPIC-013 remains **Planned**. The status moves with the epic, not the work package.
+
+### A1.1 Method and environment
+
+| | |
+|---|---|
+| Repository state | `main` @ `f1476fb`, working tree clean at start |
+| Application | Live dev stack (`portal_nginx` → `http://nginx`), MariaDB dev data |
+| Browser | Chromium 1243 via Playwright 1.63, installed **into the container** at `/opt/ms-playwright`; the host WSL lacks Chromium's shared libraries. No repository or manifest change |
+| Spike location | `/tmp/spike` inside the container and the session scratchpad — never the repository |
+| Actor characterization | Executed inside a `DB::beginTransaction()` / `rollBack()` pair, so no role or user was persisted |
+
+**A note on two numbers in [§4.1](#41-theme-and-css).** The consumer census conflates two different things under one row. `text-primary` appears 203 times in Blade, but **198 of those are `var(--text-primary)`**, the CSS custom property, not the utility class. The distinction is the whole of finding F1, and correcting it changes the size of WP1a by an order of magnitude (A1.2).
+
+### A1.2 F1 — the utility-name collision is real, far smaller than planned, and already shipping a defect
+
+**Corrected call-site census.** Counted by parsing `class` / `className` attributes and stripping variant prefixes, so `hover:text-primary` and `--text-primary` are excluded. `welcome.blade.php` is excluded throughout: it carries a self-contained inlined Tailwind v4 build that defines its own variables and shares nothing with `app.css`.
+
+| Legacy utility | Blade | React | Total | Files |
+|---|---:|---:|---:|---|
+| `bg-surface` | 32 | 0 | **32** | 14 |
+| `text-primary` | 6 | 10 | **16** | 8 |
+| `text-secondary` | 5 | 0 | **5** | 1 |
+| `bg-base` | 1 | 0 | **1** | 1 |
+| `border-subtle` | 1 | 0 | **1** | 1 |
+| `border-base` | 1 | 0 | **1** | 1 |
+| `text-muted` | 1 | 0 | **1** | 1 |
+| `shadow-theme-sm` | 1 | 0 | **1** | 1 |
+| `shadow-theme-lg` | 1 | 0 | **1** | 1 |
+| `bg-elevated`, `text-inverse`, `btn-accent`, `shadow-theme-md` | 0 | 0 | **0** | — |
+| **Total** | **49** | **10** | **59** | — |
+
+**WP1a is 59 call sites, not 567.** The body's "567 Blade call sites" is the `var(--*)` count and is corrected here. Further, **31 of the 49 Blade sites (63%) live in `layouts/partials/nav.blade.php` (14) and `layouts/partials/footer.blade.php` (3)** plus the ticket/admin views; `nav.blade.php` and `footer.blade.php` are **deleted by WP5** ([§14.4](#144-files)), so a third of WP1a's surface is temporary by construction.
+
+**A live defect, found while verifying the collision.** Tailwind v4 does **not** generate a base `.text-primary` utility, because the hand-written `@layer utilities` rule already occupies that class name. It *does* generate the variant forms. The built stylesheet contains exactly:
+
+```css
+.text-primary            { color: var(--text-primary) }   /* hand-written legacy ink */
+.hover\:text-primary:hover      { color: var(--primary) }  /* Tailwind, indigo accent */
+.group-hover\:text-primary…     { color: var(--primary) }  /* Tailwind, indigo accent */
+```
+
+So in React, `className="text-primary"` renders **ink**, while `hover:text-primary` renders **indigo**. Confirmed in the browser on `/dashboard`: the "View all" link computes `oklch(0.21 0.034 264.665)` — exactly `--text-primary` — where `--primary` is `#4f46e5`. Same result in dark.
+
+All ten React call sites are links (`text-primary hover:underline`) or active tabs (`border-primary text-primary`) and unambiguously intend the accent. The active-tab case renders today as an **indigo underline with ink text**, because `border-primary` has no colliding hand-written rule and resolves correctly while `text-primary` does not.
+
+**Consequence for WP1a, which the plan does not currently account for:** renaming `.text-primary` → `.legacy-text-primary` frees the class name, so Tailwind will then generate `.text-primary { color: var(--color-primary) }` and **those ten React sites will change from ink to indigo in the same commit.** WP1a is therefore *not* "values unchanged, verifiable by diff" for React. Two options, and the second is recommended:
+
+1. Rename and accept the ten React sites flipping to indigo — which is what they were written to mean, and arguably a fix.
+2. **Recommended:** rename the legacy utilities (WP1a), and in the same slice rewrite the ten React call sites from `text-primary` to an explicit `text-[var(--primary)]` or the shadcn-intended utility, so the slice remains *intentional* rather than incidentally correcting a bug. Record the ink→indigo change as a deliberate fix in the WP1a commit message, and include `/dashboard`, `/tasks`, `/time`, `/projects` and the two auth pages in that slice's visual pass.
+
+**The `legacy-` prefix is free.** No class beginning `legacy-` exists anywhere in the repository (Blade, React or CSS).
+
+### A1.3 F2 — five orphans confirmed exactly, a sixth found, and one proposed mapping corrected
+
+The body's five counts reproduce **exactly**: `--surface-base` 24, `--surface-muted` 10, `--surface-elevated` 9, `--border-muted` 4, `--surface-accent` 3 — 50 sites, all Blade, every one inspected individually.
+
+**Confirmed mechanism.** In the browser, every element carrying one of these variables computes `background-color: rgba(0, 0, 0, 0)` and inherits its ancestor. On `/operator/tickets` the body is `#fff` in light and `oklch(13%)` in dark, and the "cards" are transparent against it.
+
+**A sixth orphan the plan missed:** `--accent-success`, used once in React at [`components/projects/board-column.tsx:59`](../../src/resources/js/components/projects/board-column.tsx#L59) as `bg-[var(--accent-success,#22c55e)]`. It has an inline fallback so nothing is broken today, but it belongs in the register. Recommended definition: `var(--success)`, which makes it theme-aware instead of pinned to `#22c55e`.
+
+**Mapping decisions, from the inspected call sites rather than the names:**
+
+| Variable | Sites | What the sites actually are | Plan proposed | WP0 verdict |
+|---|---:|---|---|---|
+| `--surface-base` | 24 | Card/panel/table containers, **always** paired with `border-color: var(--border-base)`; sit directly on the page background | `var(--bg-base)` | **Confirmed.** Strictly appearance-preserving |
+| `--border-muted` | 4 | Draft/cancelled invoice badge borders | `var(--border-subtle)` | **Confirmed** |
+| `--surface-accent` | 3 | Tinted accent chips (`open` ticket status, role chips), paired with `color: var(--accent)` | `var(--surface-info)` | **Confirmed.** The only defined tinted surface that pairs legibly with `--accent` |
+| `--surface-muted` | 10 | Draft/cancelled invoice badges, paired with `var(--text-muted)` | `var(--bg-surface)` | **Confirmed, with a contrast note** — see below |
+| `--surface-elevated` | 9 | `<thead>` rows and the `closed` status badge — a *subtle lift above the card*, not a page surface | `var(--bg-elevated)` | **Corrected → `var(--bg-surface)`** |
+
+**Why `--surface-elevated` is corrected.** The call sites sit *inside* the `--surface-base` cards, so the right value is one step above the card, not two. With `--surface-base` defined as `--bg-base`:
+
+| | `--bg-base` (the card) | `--bg-surface` (recommended) | `--bg-elevated` (plan) |
+|---|---|---|---|
+| Light | `#fff` | `oklch(98.5%)` — a faint tint | `#fff` — **no distinction at all** |
+| Dark | `oklch(13%)` | `oklch(21%)` — a subtle lift | `oklch(27.8%)` — a two-step jump that reads as a raised band |
+
+The plan's `--bg-elevated` gives table headers *no* boundary in light and an over-strong one in dark. `--bg-surface` is the smallest definition that makes the name honest in both themes. This is a **deliberate, visible change in dark** (headers gain a boundary they lack today) and must be verified in the WP1b pass rather than slipped in — it is an improvement, not a regression, and [§8.4](#84-resolving-f2--defining-the-five-orphans) explicitly sanctions choosing per site.
+
+**One pre-existing contrast failure to hand forward, not to fix in WP1b.** The `--surface-muted` / `--text-muted` badge pair is `gray-400` text on `gray-50` (≈2.6:1) once defined, against ≈2.8:1 on white today. Both fail AA. Defining the variable does not *create* the failure and WP1b must not be blamed for it, but the pair should be changed to `--text-secondary` when Finance adopts `Status`. Recorded for WP8 and the Finance epic.
+
+### A1.4 G1 — self-hosted WOFF2 confirmed, with the budget arithmetic corrected
+
+**Current payload, measured in the browser.** `/dashboard` fetches **3 files / 70.7 KB**; `/operator/tickets` fetches **4 files / 94.5 KB** — Inter latin only. **One third-party origin (`fonts.bunny.net`) is contacted on every authenticated page view**, confirming the privacy argument in [§9.3](#93-recommendation). **JetBrains Mono is declared but never fetched on either page**: no element resolves to it, so `--font-mono` is currently decorative on these surfaces.
+
+**Measured Direction D subsets** (fontsource WOFF2, latin unless stated):
+
+| Face | Size |
+|---|---:|
+| IBM Plex Sans 400 / 500 / 600 | 22.1 / 23.6 / 23.7 KB — **69.4 KB** |
+| IBM Plex Sans latin-ext 400/500/600 | 15.6 / 16.1 / 16.1 KB — 47.8 KB |
+| IBM Plex Mono 400 / 500 | 14.4 / 14.5 KB — **28.9 KB** |
+| Newsreader variable (`wght`) | **56.7 KB** |
+| Newsreader static 400 / 500 | 22.0 / 23.1 KB — **45.1 KB** |
+
+**Two corrections to [§9.3](#93-recommendation).**
+
+1. **Newsreader has no optical-size variable file.** `newsreader-latin-opsz-wght-normal.woff2` does not exist; only a `wght` axis is published. The body's rationale ("ships as a variable optical-size face, so one file covers 400/500") is wrong on both counts — and at 56.7 KB the variable face is **11.6 KB larger** than the two static weights it would replace. **Use static Newsreader 400 + 500.**
+2. **latin + latin-ext across all three families is 202.8 KB and breaks the 180 KB budget.** Latin-only is **143.4 KB**, comfortably inside it.
+
+**Locked G1 decision: self-host WOFF2, latin subsets, static Newsreader.**
+
+| | |
+|---|---|
+| Files | Plex Sans 400/500/600 · Plex Mono 400/500 · Newsreader 400/500 — **7 files, 143.4 KB**, against a 180 KB budget |
+| Location | `src/resources/fonts/`, referenced from `app.css` |
+| Preload | Plex Sans 400 and 500 only |
+| `font-display` | `swap` throughout |
+| latin-ext | **Declared with its own `unicode-range`, not counted against the budget.** Subsetted faces download only when a latin-ext glyph is actually rendered, which for a portal carrying European company and person names is the correct behaviour and costs nothing on an all-latin page. Adding Plex Sans latin-ext (+47.8 KB, conditional) is recommended; Mono and Newsreader stay latin-only |
+| Realistic first paint | Plex Sans 400+500 preloaded = **45.7 KB**, *better than today's 70.7–94.5 KB*, because Direction D drops the 700 weight and Mono/Newsreader load only when used |
+| Fallback if this fails | fontsource packages at the same subset budget (unchanged) |
+
+**Vite mechanics verified, not assumed.** A temporary `@font-face` block referencing `../fonts/*.woff2` was added to `app.css` and a production build run. Vite emitted `assets/plex-sans-400-CDDApCn2.woff2`, registered both files in `manifest.json`, and rewrote the CSS to `url(/build/assets/plex-sans-400-CDDApCn2.woff2)` — fingerprinted, immutable, same-origin, cPanel-compatible. **The spike was fully reverted**; `app.css` is byte-identical to `f1476fb` and `src/resources/fonts/` does not exist.
+
+**Dense-screen check (the §2.4 acceptance condition).** The two densest Blade screens were identified by measurement, not assumption:
+
+| Screen | Elements | Form controls | Table cells |
+|---|---:|---:|---:|
+| `/admin/roles/{id}/edit` — permission matrix | **173** | **43** (41 checkboxes) | 0 |
+| `/operator/tickets` — ticket queue | **90** | 12 | 24 |
+
+**This corrects [§9.3](#93-recommendation), which names "the operator ticket queue and the invoice form".** The invoice form is not dense (11 controls); the roles permission matrix is by a wide margin the densest Blade screen and replaces it in the gate.
+
+Both screens were rendered with the real Plex Sans/Mono faces injected over the live pages, in both themes:
+
+| Screen | Theme | Page height Δ | New clipping | Horizontal overflow |
+|---|---|---:|---|---|
+| `/admin/roles/1/edit` | light / dark | **0 px** / **0 px** | none | none |
+| `/operator/tickets` | light / dark | **0 px** / **0 px** | none | none |
+
+The single element reported as clipped on `/operator/tickets` is a pre-existing visually-hidden `View` label, present before and after. **G1 passes.**
+
+### A1.5 G2 — assets moved; consumption proven; one defect found in the committed full logo
+
+**The move is done.** `src/resources/images/{intechral-logo,intechral-logo-compact}.svg` → `src/resources/images/brand/`. Git records both as pure renames (`R`). Verified beforehand that **no file in the repository references either asset** — the only mentions are in `docs/`, and the design contract already cites the `brand/` path, so the move makes the filesystem match the canonical contract rather than the reverse.
+
+**Structure confirmed, with one correction.** Both files do carry `id="title"`, `id="desc"` and a global `.s` class. But the two gradient ids **differ** (`strokeFadeFull` vs `strokeFadeCompact`), so [§10.2](#102-the-technical-problem-with-theming-them)'s claim that `stroke:url(#strokeFadeFull)` "would resolve against whichever gradient won" is wrong as stated for two *different* files. The real collisions are: duplicate `title`/`desc` ids across both files, duplicate gradient ids when the **same** file is inlined twice, and the `.s` class, which genuinely does collide across both files because an SVG `<style>` inlined in HTML is document-global.
+
+**S4 result — the recommended approach works.** A `BrandMark`-shaped transform (strip `<title>`/`<desc>`, prefix every id and rewrite its `url(#…)` references, scope `.s`, add `class="brand-mark"` and `aria-label`) was applied to **four marks on one document**:
+
+| Check | Result |
+|---|---|
+| Duplicate ids | **none** — `bm1-strokeFadeCompact`, `bm2-strokeFadeFull`, `bm3-…`, `bm4-…` |
+| Gradient resolution | each mark resolves **its own** gradient; no cross-contamination |
+| Accessible name | `role="img"` preserved, `aria-label` on every instance, `<title>`/`<desc>` stripped |
+| Light override → solid ink | **confirmed**: all four stops compute `rgb(26, 27, 30)` at `stop-opacity: 1` |
+| Dark → canonical fade | **confirmed**: `rgb(25, 231, 242)` at 0.2 / 0.5 / 0.82 / 1, exactly the source artwork |
+
+CSS overriding SVG presentation attributes works exactly as [§10.3](#103-recommended-consumption) predicts. **No build-time generation step is needed**; the fallback is not taken.
+
+**The defect: `vector-effect: non-scaling-stroke` makes the full logo unusable below ~256 px.** `intechral-logo.svg` carries it in its `.s` rule; `intechral-logo-compact.svg` does not. It pins the stroke at **8 CSS pixels regardless of rendered size**, so the mark fills in. Measured ink coverage (a legible line mark is roughly 5–25%):
+
+| Size | compact (as committed) | full (as committed) | full, `vector-effect` removed |
+|---:|---:|---:|---:|
+| 28 px | 25.0% | **74.0%** | 30.9% |
+| 40 px | 20.0% | **65.7%** | 26.3% |
+| 96 px | 11.6% | **48.4%** | 14.0% |
+| 256 px | 8.3% | **20.0%** | 10.7% |
+
+Visually confirmed in both themes: at 28 px the committed full logo is a **solid filled triangle**, and at 96 px and 160 px its stepped interior closes up. This matters because [§10.3](#103-recommended-consumption) assigns `variant="full"` to **auth pages**, which render the mark at roughly 96–160 px — squarely inside the broken range.
+
+**Decision:** `BrandMark` **removes `vector-effect:non-scaling-stroke`** as part of the same transform that scopes the ids. This changes only a presentation attribute inside the embedded `<style>` and never touches path data, which [Direction D §17.1](../design/direction-d-design-system.md) explicitly permits. The canonical source files are **not** edited — L16 is respected, and the committed artwork stays authoritative.
+
+**Locked G2 consumption contract:**
+
+| | |
+|---|---|
+| Canonical paths | `src/resources/images/brand/intechral-logo.svg` · `…/intechral-logo-compact.svg` |
+| React | `BrandMark` imports the file with Vite `?raw`; strips `<title>`/`<desc>` and `aria-labelledby`; prefixes every id and its `url(#…)` refs with an instance-unique token; scopes `.s`; removes `vector-effect`; adds `class="brand-mark"` and an `aria-label` |
+| Blade | `partials/shell/brand-mark.blade.php` performs the identical transform server-side on the same canonical file |
+| Theming | Token layer overrides the stops: `[data-theme="light"] .brand-mark stop { stop-color: var(--ink); stop-opacity: 1 }`; dark inherits the source artwork untouched |
+| Variants | `compact` for the 28 px rail and the favicon; `full` for auth pages and horizontal contexts |
+| Not needed | Build-time asset generation; per-theme derivative files |
+
+### A1.6 G3 — the transitional Pages item is confirmed, across seven actor profiles
+
+`NavigationBuilder` output was captured for seven actors; the five non-seeded profiles were created and destroyed inside a rolled-back transaction.
+
+| Actor | Sees `Pages` today | `cms.view` | `cms.edit` | G3 rule → `Pages` | Target `System` | Target `Directory` |
+|---|---|---|---|---|---|---|
+| `operator` (all permissions) | yes (+ *CMS Pages*) | y | y | **no** | yes | yes |
+| `user` (role defaults) | **yes** | y | n | **YES** | no | no |
+| CMS editor (`cms.view`+`cms.edit`) | yes (+ *CMS Pages*) | y | y | **no** | yes | no |
+| CMS editor, no `cms.view` | no (only *CMS Pages*) | n | y | **no** | yes | no |
+| Helpdesk agent | no | n | n | no | no | no |
+| Billing operator | no | n | n | no | no | no |
+| CRM manager | no | n | n | no | no | yes |
+
+**The rule `cms.view AND NOT cms.edit` behaves correctly for every profile.** The regression it exists to prevent is real and confirmed: the built-in `user` role holds `cms.view` by default ([`PermissionCatalogue::userDefaults()`](../../src/app/Shared/Permissions/PermissionCatalogue.php)), and `/pages` is a read-only published-page viewer (`CmsController` filters `CmsPage::published()`), so dropping it would remove every customer's access to published content while leaking nothing.
+
+**The one gap the plan does not discuss, and why it is not a regression.** An actor with `cms.edit` loses the *viewer* entry: today they see both `Pages` and `CMS Pages`, and under G3 they see only System → Pages. This is acceptable because the editor index already links to the published view per page — [`operator/cms/index.blade.php:53`](../../src/resources/views/operator/cms/index.blade.php#L53) renders `route('cms.show', $page->slug)` with `target="_blank"` on every row. No navigation path is lost.
+
+**Two notes for WP3, neither blocking.**
+
+- **Label mismatch.** The nav item is labelled *Pages* but the surface's `<h1>` and title are **"Resources"**. The rail label should match the page ("Resources"), or the page should be relabelled. Recommend matching the page and leaving the route name alone.
+- **A `cms.edit`-only actor gets a `System` workspace containing one entry.** Correct under rule 7, but "System" is a heavy label for a content editor. Acceptable for the transitional period; the Knowledge/CMS epic retires it.
+
+**G3 is confirmed as recommended**, with the label correction above.
+
+### A1.7 S1 — drawer persistence confirmed unchanged; the cookie is not needed
+
+The recommended architecture ([§15.3](#153-recommended-architecture)) was prototyped by injecting the pre-paint bootstrap and a CSS-driven geometry rule into the real `<head>` of live pages, then recording the geometry on the **first animation frame** and the total layout-shift score.
+
+| Case | First frame | Settled | CLS | Verdict |
+|---|---|---|---:|---|
+| Inertia `/time`, cold, no stored preference | `312px / open` | `312px / open` | 0 | **no flash** |
+| Blade `/operator/tickets`, cold | `312px / open` | `312px / open` | 0 | **no flash** |
+| Inertia, stored `time: collapsed` | `64px / collapsed` | `64px / collapsed` | 0 | **no flash** |
+| Blade, stored `helpdesk: open` | `312px / open` | `312px / open` | 0 | **no flash** |
+| Hard reload | `312px / open` | `312px / open` | 0 | **no flash** |
+| **M width 1024, stored `open`** | `64px` while the attribute stays `open` | same | 0 | **CSS ignores the preference, no JS involved** — [§16](#16-responsive-behaviour) satisfied |
+| **`localStorage` throws** | `64px / collapsed` (server default) | same | 0 | **falls through, does not throw** |
+
+**Transitions**, with `{projects: open, time: collapsed, helpdesk: open}` stored:
+
+| Transition | Geometries observed | Verdict |
+|---|---|---|
+| cold → `/projects` (Inertia) | one | clean |
+| Inertia → Inertia (`/time`) | two: `248px/open/projects` → `0px/collapsed/time` | **correct** — same document, workspace genuinely changed; one transition, no intermediate wrong value |
+| Inertia → Inertia (`/tasks`) | two, same shape | correct |
+| **React → Blade** (`/tickets`) | **one** | **no flash across the renderer boundary** |
+| **Blade → React** (`/projects`) | **one** | **no flash across the renderer boundary** |
+| Browser Back (Blade document) | one | correct |
+
+**S1 confirms [§15.3](#153-recommended-architecture) unchanged. The cookie fallback in [§15.4](#154-why-not-the-cookie) is not taken.** The premise it rests on is verified: `inertia({ ssr: false })` is set, and the Inertia root ships `<body>` containing only the `data-page` JSON and an empty `<div id="app">` — nothing of the React shell paints before JavaScript runs.
+
+**Three implementation requirements for WP4, from the spike:**
+
+1. **On Inertia → Inertia, re-resolve during render, not in a post-navigate listener.** The spike used an `inertia:navigate` listener and showed no intermediate wrong frame, but that ordering is not guaranteed. Applying `data-workspace` / `data-drawer` while React renders the new page makes the geometry change atomic with the content change.
+2. **The bootstrap must be the first thing in `<head>`.** Today's two theme scripts are *not* identical, contrary to [§4.1](#41-theme-and-css): the Inertia root places it **before** `@vite`, the Blade root places it **after** both `@vite` and the render-blocking bunny.net stylesheet. A stylesheet blocks execution of any script that follows it, so the Blade root's theme application is currently gated behind a third-party font fetch. The shared `bootstrap.blade.php` must sit before `@vite` in both roots. (WP1d's removal of the bunny.net link independently improves this.)
+3. **Guard for a missing `documentElement`.** Not a production concern for an inline `<head>` script, but the `try/catch` in [§15.3](#153-recommended-architecture) should wrap the whole body, as specified.
+
+**Shared theme bootstrap seam — confirmed, and left for WP4.** One script can replace both, because the two differ only in variable naming and placement. [§14.4](#144-files) already assigns `partials/shell/bootstrap.blade.php` to WP4/WP5; **WP0 does not refactor it**, since the epic does not assign that permanent change to WP0.
+
+### A1.8 S2 — the provisional preference is overturned in part; a hybrid is locked
+
+**Current behaviour, characterized in Chromium.** The shell is persistent: a sentinel attribute set on `<header>` survives an Inertia visit, confirming `AppLayout` is not remounted.
+
+| Situation | Where focus lands today | Announced |
+|---|---|---|
+| Primary nav link, mouse | **stays on the activated link** | nothing |
+| Primary nav link, keyboard (Enter) | **stays on the activated link**; next Tab → the next nav link | nothing |
+| **In-page control** (`/time` view tabs, `/tasks` filter link) | **`<body>` — focus is destroyed** | nothing |
+| Browser Back / Forward | unchanged from before the visit | nothing |
+
+There is **no skip link** anywhere (zero in-page anchors), `#main-content` exists but nothing targets it, and **no nav link carries `aria-current`** — all three confirmed, as [§4.3](#43-react-shell) states.
+
+**This splits the question the plan treats as one.** [§22.2](#222-q2--focus-on-inertia-navigation)'s provisional preference (a) is justified by "focus remains on the rail link the user just activated, which is a coherent and non-destructive resting place". **That is true for nav links and false for in-page controls**, because those live inside the subtree Inertia replaces — so activating a view tab or a filter link silently drops focus to `<body>`. That is a real keyboard-accessibility defect today, not a hypothetical.
+
+**Candidates measured.** After a keyboard-activated **nav** visit:
+
+| Policy | Focus after visit | Next Tab | Cost |
+|---|---|---|---|
+| (a) no move | the activated nav link | the next nav link | **nothing announced** |
+| (b) focus `main` | `<main#main-content>` | `+ New task` | **destroys the user's place in the rail** |
+| (c) focus `h1` | `<h1>Tasks</h1>` | `+ New task` | **destroys the user's place in the rail** |
+
+**Locked decision for WP4 — (a) refined, not (a) as written:**
+
+> **Announce every page change politely. Move focus only when the visit destroyed it.**
+>
+> On each Inertia navigation, write the new page's `h1` text to a polite live region. Then, **if and only if** `document.activeElement` is `body` or `documentElement` — meaning the activating control was inside the replaced subtree — move focus to `#main-content` with `tabindex="-1"`.
+
+Measured against the contract:
+
+| Case | Focus after | Repaired? | Announced |
+|---|---|---|---|
+| Primary nav link (keyboard) | the activated link; next Tab → next nav link | **no** — rail position preserved | yes |
+| In-page view tab | `<main#main-content>` | **yes** — defect repaired | yes |
+| Browser Back | `<main#main-content>` | yes | yes — closes today's silent-back gap |
+
+This keeps (a)'s virtue (never destructive for a sighted keyboard user navigating the rail), fixes the defect (a) would leave in place, and gives screen-reader users an announcement in all three cases — which none of the three original candidates did on its own. Neither (b) nor (c) is adopted as a default; `main` is used only as the repair target, and the page `h1` is never focused.
+
+**Two WP4 implementation notes.** `inertia:navigate` is the hook, and it fires for back/forward as well. The live region must be **cleared before it is re-set** when consecutive pages share an `h1` (`/time` → `/time/allocation` both read "My Time"), or assistive technology will not re-announce identical text.
+
+**The skip link ([§22.1](#221-baseline-requirements-direction-d-14)) remains required and unchanged** — it is the deliberate jump into content and is genuinely absent today.
+
+### A1.9 Navigation and renderer baseline
+
+**Current output** is two flat groups; `/dashboard` matches **no** navigation item today, so Home is purely additive. Active state resolves to exactly one item on every route tested (`/projects`, `/tasks`, `/time`, `/tickets`, `/operator/tickets`, `/pages`, `/operator/cms`, `/admin/users`, `/billing/invoices`, `/crm/companies`, `/organizations`).
+
+**Consumers.** React reads the shared prop in `app-layout.tsx` only; no page imports a navigation component and **no page performs any permission check at all** (`auth.permissions` has zero page-level consumers). Blade calls the builder from inside `partials/nav.blade.php`.
+
+**Three declared fields are dead.** `NavigationItem` declares `method`, `activePatterns` and `children`; `NavigationLink` reads only `key`, `label`, `href`, `visit`, `isActive`, and nothing else reads them either. Dropping all three in the [§12.2](#122-target-shape) reshape is safe and additionally stops route-name patterns being serialized to the client.
+
+**Landmark divergence to fix in WP5.** React scopes `<nav aria-label="Primary navigation">` to the link list; Blade puts that label on the **entire sticky bar**, so the brand link, theme toggle and account menu sit inside the primary-navigation landmark. Direction D's `nav` "Workspaces" must contain workspace navigation only.
+
+### A1.10 Presentation-neutral contract — challenged against live data, one defect found
+
+The [§12.2](#122-target-shape) shape carries every field the live routes need, and the `context` / `presentation` split survives the real data: no live entry requires a presentation hint to express authorization, and dropping `presentation` entirely leaves the authorized model intact for every actor in A1.6. `entities` and `saved` correctly have no emitter. The Finance capability branch expresses cleanly as a per-actor `href` + `label`. Nothing was found that a future Focused projection would need and cannot get.
+
+**But the active-state rule cannot be satisfied with the pattern style the builder uses today.** [§12.3](#123-contract-rules) rule 3 requires at most one active context item; Direction D §8 allows at most one strip per screen. Carrying the current broad patterns into context items produces **three reproducible collisions**:
+
+| Route | Workspace | Context items reported active |
+|---|---|---|
+| `/operator/tickets/reports` | Helpdesk | **Queue *and* Reports** |
+| `/time/allocation` | Time | **My time *and* Allocation** |
+| `/projects/create` | Projects | **All projects *and* New project** |
+
+The cause is that `operator.tickets.*`, `time.*` and `projects.*` each match their sibling's routes. **Two requirements for WP3, neither currently in the plan:**
+
+1. **Context items use explicit route names, not wildcards**, and resolution is **most-specific-wins** when more than one matches. Workspace-level patterns may stay broad; context-level patterns may not.
+2. **`kind: 'actions'` items always emit `isActive => false`.** An action is not a destination, so "New project" should never carry a selected strip. This removes the third collision by design rather than by pattern-tuning.
+
+Both belong in the Pest assertions [§25.1](#251-pest) already plans, which should include a case per collision above.
+
+### A1.11 AppShell seam — verified cheap
+
+Every condition [§23.2](#232-the-three-seams) asks for already holds:
+
+| Seam requirement | Live state |
+|---|---|
+| 12 identical `Page.layout` lines | **confirmed** — all 12 are `(page) => <AppLayout>{page}</AppLayout>` |
+| No page branches on role for chrome | **confirmed** — zero pages reference `auth.permissions` or `can()` |
+| No page imports rail/drawer/nav components | **confirmed** — pages import only `AppLayout` or `AuthLayout` |
+| Navigation consumed in one place | **confirmed** — `app-layout.tsx` only |
+
+Renaming `AppLayout` in place ([§13.4](#134-coexistence-during-the-epic)) therefore requires **zero page edits**. Adding a Focused presentation later is one branch inside one component, as designed.
+
+### A1.12 Performance and bundle baseline
+
+Production build at `f1476fb`, for WP8 to compare against:
+
+| Asset | Raw | Gzip |
+|---|---:|---:|
+| `app.tsx` entry (React/Inertia) | 350.5 KB | 110.1 KB |
+| **`app-layout` (the shell chunk)** | **102.0 KB** | **34.2 KB** |
+| `app.js` entry (Blade) | 49.3 KB | 18.6 KB |
+| `app.css` (single stylesheet, both renderers) | 78.2 KB | 15.6 KB |
+| `wayfinder` | 39.3 KB | 13.5 KB |
+| `allocation` (chart.js) | 234.3 KB | 79.9 KB |
+| `board` (dnd-kit) | 61.3 KB | 19.9 KB |
+| Font payload (third-party) | 70.7 KB React / 94.5 KB Blade | — |
+
+**Isolation verified, not assumed.** `chart.js` appears **only** in `allocation-*.js`; `@dnd-kit` appears **only** in `board-*.js`; **neither is present in the shell chunk**.
+
+**Tick locality verified by inspection.** Exactly **one** `setInterval` exists in the entire React codebase — [`running-timer-bar.tsx:160`](../../src/resources/js/components/time/running-timer-bar.tsx#L160) — and it sets component-local state (`setBrowserNow`), so a tick re-renders only that subtree, never `TimerProvider` or `AppLayout`. **No test pins this**, which is a real gap: see A1.14.
+
+### A1.13 Responsive and theme baseline
+
+**Theme.** No-flash holds everywhere: the attribute is correct on the **first animation frame** on React, Blade and auth, in both themes, and survives React → Blade → React. No defect found.
+
+**Responsive**, operator, `/dashboard` (React) and `/operator/tickets` (Blade):
+
+| Width | React | Blade |
+|---:|---|---|
+| 1360 | desktop nav, no overflow, content 1280 (`max-w-7xl`) | desktop nav, no overflow, content 1280 |
+| 1280 | as above | as above |
+| 1024 | desktop nav, no overflow, content 1024 | as above |
+| **768** | desktop nav, **horizontal overflow: 771 > 768** | no overflow |
+| 390 | nav collapses to the menu button | menu button |
+
+**One pre-existing defect recorded:** the React dashboard overflows horizontally by 3 px at exactly 768 px. It is not caused by this epic and is not fixed here, but the full-viewport shell will make it more visible, so WP4 should confirm it is gone rather than inherit it.
+
+### A1.14 Tests — deliberately none added, and why
+
+[§28 WP0](#wp0--characterization-and-architecture-spikes) assigns **no test work** to WP0; its outputs are baselines, spikes, gate decisions and the register. Navigation tests belong to WP3 ([§25.1](#251-pest), and [R9](#32-risks-and-rollback) requires the leakage tests be written *before* the reshape), and the tick-locality guard belongs to WP6 ([§25.2](#252-vitest--rtl), [R10](#32-risks-and-rollback)). **No durable test was added in WP0.** Two gaps are handed forward explicitly:
+
+| Gap | Owner | Note |
+|---|---|---|
+| Nothing pins timer-tick locality | **WP6** | The sentinel assertion [§25.2](#252-vitest--rtl) already specifies. The property currently holds (A1.12) but is unguarded |
+| `NavigationBuilderTest` has 3 cases and no leakage assertion | **WP3** | Write the [§25.1](#251-pest) matrix, including the three A1.10 collision cases, **before** the reshape |
+
+### A1.15 Legacy-compatibility route set (locked)
+
+All ten resolve HTTP 200. "F2 sites" counts elements on the live page carrying one of the five orphan variables.
+
+| # | Surface | Route name | Renderer | F2 sites |
+|---|---|---|---|---:|
+| 1 | React form | `projects.create` | Inertia | 0 |
+| 2 | React dense list | `tasks.index` | Inertia | 0 |
+| 3 | React project surface | `projects.board` | Inertia | 0 |
+| 4 | React account | `profile.show` | Inertia | 0 |
+| 5 | Blade helpdesk (customer) | `tickets.show` | Blade | — |
+| 6 | Blade helpdesk (operator) | `operator.tickets.index` | Blade | **5** |
+| 7 | Blade admin/system | `roles.edit` | Blade | **1** |
+| 8 | Blade finance | `billing.invoices.show` | Blade | — |
+| 9 | Blade directory | `crm.companies.show` | Blade | — |
+| 10 | Auth | `login` | Inertia | 0 |
+
+**Fixture gap that blocks an honest matrix run.** The development database currently holds **0 invoices, 0 CRM companies and 0 CMS pages** (2 tickets, 4 projects, 2 roles). Screens **5, 8 and 9** cannot be checked against real content until those exist, and those are exactly the screens carrying the `--surface-muted` / `--border-muted` / `--surface-elevated` call sites. **WP1c and WP8 must seed an invoice, a CRM company and a published CMS page before running the matrix**, or three of the ten checks are vacuous.
+
+### A1.16 Plan corrections applied by this amendment
+
+| # | Section | Correction |
+|---|---|---|
+| C1 | [§4.1](#41-theme-and-css), [§8.1](#81-resolving-f1--the-utility-name-collision), [§28 WP1a](#wp1--semantic-tokens-and-typography) | WP1a is **59 call sites**, not 567. The 567/203/200/127 figures are `var(--*)` counts, not utility-class counts |
+| C2 | [§8.1](#81-resolving-f1--the-utility-name-collision), [§28 WP1a](#wp1--semantic-tokens-and-typography) | WP1a is **not value-neutral for React**: freeing `text-primary` lets Tailwind generate it, flipping 10 sites from ink to indigo. Handle deliberately (A1.2) |
+| C3 | [§8.4](#84-resolving-f2--defining-the-five-orphans) | `--surface-elevated` maps to **`var(--bg-surface)`**, not `var(--bg-elevated)` |
+| C4 | [§8.4](#84-resolving-f2--defining-the-five-orphans) | A **sixth** orphan exists: `--accent-success` → define as `var(--success)` |
+| C5 | [§9.3](#93-recommendation) | Newsreader has **no optical-size variable file**; use **static 400/500** (45.1 KB), which is smaller than the variable face (56.7 KB) |
+| C6 | [§9.3](#93-recommendation) | latin + latin-ext across all three families is **202.8 KB and breaks the budget**. Budget is met by latin-only (**143.4 KB**); latin-ext is declared conditionally and not counted |
+| C7 | [§9.3](#93-recommendation) | The density gate screens are `/admin/roles/{id}/edit` and `/operator/tickets` — **not the invoice form**, which is not dense |
+| C8 | [§10.2](#102-the-technical-problem-with-theming-them) | The two gradient ids **differ**; the cross-file collision is the `.s` class and the `title`/`desc` ids, not the gradient reference |
+| C9 | [§10.3](#103-recommended-consumption) | `BrandMark` must also **strip `vector-effect:non-scaling-stroke`**, or the full logo renders as a solid blob at every size an auth page would use |
+| C10 | [§12.3](#123-contract-rules), [§25.1](#251-pest) | Context items need **explicit route names + most-specific-wins**, and `kind: 'actions'` items must never be active. Three live collisions otherwise |
+| C11 | [§15.3](#153-recommended-architecture), [§4.1](#41-theme-and-css) | The two theme scripts are **not identical**: the Blade root's sits after `@vite` and the render-blocking font stylesheet. The shared bootstrap goes **before** `@vite` in both roots |
+| C12 | [§22.2](#222-q2--focus-on-inertia-navigation) | Candidate (a) is adopted **refined**: announce always, and repair focus to `main` only when the visit destroyed it. Plain (a) leaves a live defect on in-page controls |
+| C13 | [§25.4](#254-legacy-compatibility-screen-matrix) | Screens 5, 8 and 9 have **no fixtures** in the development database; seed before running the matrix |
+| C14 | [§11.3](#113-the-viewer-facing-cms-problem) | The `cms.index` surface is titled **"Resources"**, not "Pages"; the rail label should match |
+
+### A1.17 Hygiene
+
+- **Spikes removed.** No temporary route, component, CSS, Blade partial or test survives. The `app.css` font spike was reverted byte-for-byte and `src/resources/fonts/` does not exist.
+- **No dependency or manifest change.** `package.json`, `package-lock.json` and `composer.json` are untouched. Chromium was installed **into the container** at `/opt/ms-playwright`, not into the repository.
+- **No business data mutated.** The seven-actor characterization ran inside a rolled-back transaction; no role or user persisted. No fixture was created.
+- **No root-owned files in the repository.** The font spike's container-side copies were removed with the directory.
+- **Pre-existing observation, untouched:** `/projects` carries four leftover E2E fixture projects (`E2E WP5/WP6/WP7 …`) from earlier browser runs. Not created by WP0 and not removed by it.
+
+### A1.18 WP1a handoff
+
+WP1a may start. It is smaller and more contained than planned, and it carries one deliberate behaviour change:
+
+1. Rename the nine defined legacy utilities to a `legacy-` prefix across the **59 call sites** in A1.2 (the `legacy-` namespace is free). Four of the thirteen defined utilities have **zero** call sites and can simply be renamed with the rest.
+2. In the same slice, resolve the ten React `text-primary` sites deliberately (A1.2, option 2), so the ink→indigo change is intentional and reviewed rather than incidental.
+3. Gate: `./dev check`, plus a visual pass over the A1.15 route set in both themes — with particular attention to `/dashboard`, `/tasks`, `/time`, `/projects`, `login` and `forgot-password`, which contain the ten React sites.
+4. WP1b then defines **six** variables (A1.3), using `var(--bg-surface)` for `--surface-elevated`.
+
+G1, G2, G3, S1 and S2 are closed and none of them blocks WP1a.
