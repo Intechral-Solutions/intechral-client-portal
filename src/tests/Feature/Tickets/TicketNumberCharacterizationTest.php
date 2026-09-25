@@ -5,7 +5,6 @@ use App\Models\TicketAttachment;
 use App\Models\User;
 use App\Notifications\TicketCreatedNotification;
 use App\Services\TicketService;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -15,16 +14,19 @@ use Symfony\Component\Process\Process;
 require_once __DIR__.'/TicketTestHelpers.php';
 
 /*
- * EPIC-010D WP0 characterization: H8 (Ticket number generation).
+ * EPIC-010D: H8 (Ticket number generation). WP0 proved the old algorithm, 'TKT-' . (MAX(id) + 1)
+ * computed before the insert, lets parallel creates compute the same number (about half of 400
+ * attempts lost to the UNIQUE index at 8 workers) and re-issues a deleted highest ticket's number.
+ * WP2 converted every defect test into the TARGET contract (pre-fix evidence: EPIC-010D
+ * Amendment 1).
  *
- * TicketService::create computes 'TKT-' . str_pad(MAX(id) + 1, 4, '0') and then inserts, with no
- * transaction or lock; tickets.ticket_number is UNIQUE. Two creates that read the same MAX(id)
- * therefore compute the same number and the second insert fails. The deterministic tests below
- * reproduce that interleaving exactly; the probe at the end races real processes on the testing
- * MariaDB database.
+ * Target: TicketService::create reserves the row identity first, inside one transaction (insert
+ * with a unique temporary value, then set ticket_number to 'TKT-' . id zero-padded to at least four
+ * digits), so the number derives from the database-reserved auto-increment id and never from a
+ * scan. Historical numbers, including non-numeric fixtures such as TKT-E2E1, are never rewritten.
  *
- * Prefixes: BASELINE (keep), DEFECT H8 (CURRENT BROKEN behavior, WP2 flips it),
- * CHARACTERIZATION (current fact recorded for WP2's design).
+ * Prefixes: BASELINE (already correct, keep), TARGET (the WP2 contract), CHARACTERIZATION
+ * (a recorded fact).
  */
 
 function ticketCreatePayload(string $title = 'Numbered'): array
@@ -32,61 +34,75 @@ function ticketCreatePayload(string $title = 'Numbered'): array
     return ['title' => $title, 'description' => 'x', 'category' => 'General', 'priority' => 'low'];
 }
 
-function ticketNextNumber(): string
+function ticketExpectedNumber(int $id): string
 {
-    $method = new ReflectionMethod(TicketService::class, 'nextTicketNumber');
-
-    return $method->invoke(app(TicketService::class));
+    return 'TKT-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT);
 }
 
-it('BASELINE H8: a service-created number is TKT- plus MAX(id)+1, zero-padded to at least four digits', function () {
+it('TARGET H8: a created ticket is numbered from its own reserved id, zero-padded to at least four digits', function () {
     Notification::fake();
     $user = User::factory()->create();
-    $maxBefore = (int) Ticket::max('id');
+    $service = app(TicketService::class);
+
+    $tickets = collect(range(1, 3))->map(fn ($i) => $service->create($user, ticketCreatePayload("t{$i}")));
+
+    foreach ($tickets as $ticket) {
+        expect($ticket->ticket_number)->toBe(ticketExpectedNumber($ticket->id))
+            ->and($ticket->fresh()->ticket_number)->toBe($ticket->ticket_number)
+            ->and($ticket->ticket_number)->toMatch('/^TKT-\d{4,}$/');
+    }
+    expect($tickets->pluck('ticket_number')->unique())->toHaveCount(3);
+});
+
+it('TARGET H8: the number does not depend on which tickets exist, including non-numeric and low-numbered historical numbers', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-E2E1']);
+    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-0002']);
+    // A gap in the ids (a reserved id whose row is gone) must not shift the next number either.
+    Ticket::factory()->for($user, 'user')->create()->delete();
+    $before = Ticket::orderBy('id')->pluck('ticket_number', 'id')->all();
 
     $ticket = app(TicketService::class)->create($user, ticketCreatePayload());
 
-    expect($ticket->ticket_number)->toBe('TKT-'.str_pad((string) ($maxBefore + 1), 4, '0', STR_PAD_LEFT))
-        ->and($ticket->ticket_number)->toMatch('/^TKT-\d{4,}$/');
+    expect($ticket->ticket_number)->toBe(ticketExpectedNumber($ticket->id))
+        ->and(Ticket::whereKeyNot($ticket->id)->orderBy('id')->pluck('ticket_number', 'id')->all())->toBe($before);
 });
 
-it('CHARACTERIZATION H8: the number is derived from the highest surviving id, not the new row id, so it drifts from the id and can re-issue a deleted ticket\'s number', function () {
+it('TARGET H8: deleting the highest ticket never lets a later create re-issue its number', function () {
     Notification::fake();
     $user = User::factory()->create();
     $service = app(TicketService::class);
 
     $service->create($user, ticketCreatePayload('first'));
     $highest = $service->create($user, ticketCreatePayload('highest'));
-    $reissuedNumber = $highest->ticket_number;
 
     // No application route deletes tickets (or users); the cascade from a user delete is the only
-    // path, so this is reachable only outside the app today.
+    // path, so this is a direct test-database operation.
     $highest->delete();
     $next = $service->create($user, ticketCreatePayload('next'));
 
-    expect($next->ticket_number)->toBe($reissuedNumber)
-        ->and($next->id)->toBeGreaterThan($highest->id);
+    expect($next->id)->toBeGreaterThan($highest->id)
+        ->and($next->ticket_number)->not->toBe($highest->ticket_number)
+        ->and($next->ticket_number)->toBe(ticketExpectedNumber($next->id));
 });
 
-it('DEFECT H8 (WP2 flips to distinct numbers): two creates that read MAX(id) before either inserts compute the same number', function () {
-    // Nothing reserves the number between computing it and inserting the row.
-    expect(ticketNextNumber())->toBe(ticketNextNumber());
-});
-
-it('DEFECT H8 (WP2 flips to success): when the computed number is already taken, create throws a unique violation and persists nothing, stores no file and sends no mail', function () {
+it('TARGET H8: a failure while finalizing the number rolls the ticket back; no row, temporary number, file or mail survives', function () {
     Notification::fake();
     Storage::fake('local');
     $user = User::factory()->create();
-
-    // Stand-in for the losing side of the race: the winner already holds MAX(id)+1.
-    $winner = Ticket::factory()->for($user, 'user')->create();
-    $winner->update(['ticket_number' => ticketNextNumber()]);
     $countBefore = Ticket::count();
 
-    expect(fn () => app(TicketService::class)->create($user, ticketCreatePayload(), [UploadedFile::fake()->create('a.pdf', 1, 'application/pdf')]))
-        ->toThrow(UniqueConstraintViolationException::class);
+    Ticket::updating(function () {
+        throw new RuntimeException('simulated failure while numbering');
+    });
 
+    expect(fn () => app(TicketService::class)->create($user, ticketCreatePayload(), [UploadedFile::fake()->create('a.pdf', 1, 'application/pdf')]))
+        ->toThrow(RuntimeException::class, 'simulated failure while numbering');
+
+    Ticket::flushEventListeners();
     expect(Ticket::count())->toBe($countBefore)
+        ->and(Ticket::where('ticket_number', 'like', 'TMP-%')->count())->toBe(0)
         ->and(TicketAttachment::count())->toBe(0)
         ->and(Storage::disk('local')->allFiles())->toBe([]);
     Notification::assertNothingSent();
@@ -94,24 +110,32 @@ it('DEFECT H8 (WP2 flips to success): when the computed number is already taken,
     ticketCleanFakeStorage();
 });
 
-it('DEFECT H8 (WP2 flips to a redirect): over HTTP the losing create is a 500 after the customer submitted the form', function () {
+it('TARGET H8: over HTTP a customer submission always redirects to the final numbered ticket', function () {
     $this->seedRolesAndPermissions();
     Notification::fake();
     $customer = ticketUser();
-    $winner = Ticket::factory()->for(ticketUser(), 'user')->create();
-    $winner->update(['ticket_number' => ticketNextNumber()]);
 
-    $this->actingAs($customer)->post(route('tickets.store'), ticketCreatePayload('Lost the race'))
-        ->assertServerError();
+    $this->actingAs($customer)->post(route('tickets.store'), ticketCreatePayload('Over HTTP'))->assertRedirect();
 
-    expect(Ticket::where('title', 'Lost the race')->exists())->toBeFalse();
-    Notification::assertNotSentTo($customer, TicketCreatedNotification::class);
+    $ticket = Ticket::where('title', 'Over HTTP')->sole();
+    expect($ticket->ticket_number)->toBe(ticketExpectedNumber($ticket->id))
+        ->and($ticket->ticket_number)->not->toStartWith('TMP-');
+    Notification::assertSentTo($customer, TicketCreatedNotification::class,
+        fn (TicketCreatedNotification $n) => $n->ticket->ticket_number === $ticket->ticket_number);
 });
 
-it('CHARACTERIZATION H8: factory numbers share the service namespace (TKT-0001..TKT-9999), so a factory row can pre-empt a service number in tests', function () {
-    $numbers = Ticket::factory()->count(25)->make()->pluck('ticket_number');
+it('TARGET H8: factory numbers live outside the service namespace, so they can never collide with a created ticket', function () {
+    Notification::fake();
+    $user = User::factory()->create();
 
-    expect($numbers->every(fn ($n) => preg_match('/^TKT-\d{4}$/', $n) === 1))->toBeTrue();
+    $numbers = Ticket::factory()->count(40)->for($user, 'user')->create()->pluck('ticket_number');
+
+    expect($numbers->unique())->toHaveCount(40)
+        ->and($numbers->contains(fn ($n) => preg_match('/^TKT-\d+$/', $n) === 1))->toBeFalse()
+        ->and($numbers->every(fn ($n) => preg_match('/^TKT-F\d{6}$/', $n) === 1))->toBeTrue();
+
+    $ticket = app(TicketService::class)->create($user, ticketCreatePayload());
+    expect($ticket->ticket_number)->toBe(ticketExpectedNumber($ticket->id));
 });
 
 /*
@@ -120,12 +144,11 @@ it('CHARACTERIZATION H8: factory numbers share the service namespace (TKT-0001..
  * tickets through TicketService, and deletes the user (tickets cascade) in a finally block.
  * Workers run with APP_ENV=testing (TestDatabaseSafety) and MAIL_MAILER=array.
  *
- * The assertions hold today and after WP2: every attempt either succeeds or loses with a unique
- * violation (never another error), and committed numbers are distinct. WP2 tightens this to
- * "every attempt succeeds". TICKET_RACE_WORKERS / TICKET_RACE_CREATES turn the dial up for a
- * one-off soak; TICKET_RACE_REPORT=1 prints the tally to STDERR.
+ * Target: EVERY valid create succeeds and every saved number is unique and equals TKT-{id}.
+ * TICKET_RACE_WORKERS / TICKET_RACE_CREATES turn the dial up for a one-off soak;
+ * TICKET_RACE_REPORT=1 prints the tally to STDERR.
  */
-it('CHARACTERIZATION H8: parallel creates on MariaDB either succeed with distinct numbers or lose with a unique violation', function () {
+it('TARGET H8: parallel creates on MariaDB all succeed with unique id-derived numbers', function () {
     DB::commit();
     $user = User::factory()->create();
 
@@ -179,10 +202,15 @@ it('CHARACTERIZATION H8: parallel creates on MariaDB either succeed with distinc
                 $workers, $perWorker, $outcomes->count(), $ok->count(), $duplicates->count(), $errors->count()));
         }
 
+        $tickets = Ticket::where('user_id', $user->id)->get(['id', 'ticket_number']);
+
         expect($errors->values()->all())->toBe([])
-            ->and($outcomes)->toHaveCount($workers * $perWorker)
-            ->and($committed)->toHaveCount($ok->count())
-            ->and($committed->unique())->toHaveCount($committed->count());
+            ->and($duplicates->all())->toBe([])
+            ->and($ok)->toHaveCount($workers * $perWorker)
+            ->and($committed)->toHaveCount($workers * $perWorker)
+            ->and($committed->unique())->toHaveCount($committed->count())
+            ->and($ok->map(fn ($o) => substr($o, 3))->unique())->toHaveCount($ok->count())
+            ->and($tickets->every(fn ($t) => $t->ticket_number === ticketExpectedNumber($t->id)))->toBeTrue();
     } finally {
         User::whereKey($user->id)->delete();
     }

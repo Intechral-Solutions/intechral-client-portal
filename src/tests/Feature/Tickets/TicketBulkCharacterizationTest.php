@@ -7,13 +7,15 @@ use Illuminate\Support\Facades\Notification;
 require_once __DIR__.'/TicketTestHelpers.php';
 
 /*
- * EPIC-010D WP0 characterization: H6 (malformed bulk and single-assign input) on
- * POST /operator/tickets/bulk (Operator\TicketBulkController::update) and
- * PUT /operator/tickets/{ticket}/assign.
+ * EPIC-010D: H6 (malformed bulk and single-assign input) on POST /operator/tickets/bulk
+ * (Operator\TicketBulkController::update) and PUT /operator/tickets/{ticket}/assign. WP0
+ * characterized the four exception sites; WP2 converted them into validation contracts (pre-fix
+ * evidence: EPIC-010D Amendment 1).
  *
- * Every malformed-input test asserts the full current outcome: HTTP status, errors or flash, and
- * that no ticket, assignee or status history row changed. Prefixes: BASELINE (keep), DEFECT H6
- * (CURRENT BROKEN behavior, WP2 flips it to a validation error with no mutation).
+ * Every malformed-input test asserts the full outcome: a redirect with session validation errors
+ * (never a 500) and that no ticket, assignee or status-history row changed. Prefixes: BASELINE
+ * (already correct, keep), TARGET (the WP2 contract), CHARACTERIZATION (deferred behavior recorded
+ * as fact).
  */
 
 beforeEach(function () {
@@ -39,38 +41,22 @@ function ticketBulkState(array $tickets): array
     ];
 }
 
-it('DEFECT H6 (WP2 flips to a status error): action=status without a status key is a 500 and changes nothing', function () {
+it('TARGET H6: action=status without a valid status is a validation error, never a 500, and changes nothing', function (array $extra) {
     [$tickets] = ticketBulkPair();
     $before = ticketBulkState($tickets);
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status'])
-        ->assertServerError();
-
-    expect(ticketBulkState($tickets))->toBe($before);
-});
-
-it('DEFECT H6 (WP2 flips to a status error): action=status with an empty status is a 500 and changes nothing', function () {
-    [$tickets] = ticketBulkPair();
-    $before = ticketBulkState($tickets);
-
-    $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status', 'status' => ''])
-        ->assertServerError();
-
-    expect(ticketBulkState($tickets))->toBe($before);
-});
-
-it('BASELINE H6: an unknown status is a validation error and changes nothing', function () {
-    [$tickets] = ticketBulkPair();
-    $before = ticketBulkState($tickets);
-
-    $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status', 'status' => 'archived'])
+        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status', ...$extra])
+        ->assertRedirect()
         ->assertSessionHasErrors('status');
 
     expect(ticketBulkState($tickets))->toBe($before);
-});
+})->with([
+    'missing key' => [[]],
+    'empty string' => [['status' => '']],
+    'null' => [['status' => null]],
+    'unknown value' => [['status' => 'archived']],
+]);
 
 it('BASELINE H6: a valid backend-only action=status applies the transition', function () {
     [$tickets] = ticketBulkPair();
@@ -83,28 +69,25 @@ it('BASELINE H6: a valid backend-only action=status applies the transition', fun
     expect(Ticket::whereIn('id', array_map(fn ($t) => $t->id, $tickets))->pluck('status')->unique()->all())->toBe(['in_progress']);
 });
 
-it('DEFECT H6 (WP2 flips to an assignee_id error): action=assign without an assignee key is a 500 and changes nothing', function () {
+it('TARGET H6 (D4): action=assign without a real assignee is a validation error and never unassigns anything', function (array $extra) {
     [$tickets] = ticketBulkPair();
     $before = ticketBulkState($tickets);
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'assign'])
-        ->assertServerError();
-
-    expect(ticketBulkState($tickets))->toBe($before);
-});
-
-it('DEFECT H6 (WP2 flips to an assignee_id error, no bulk unassign): action=assign with the empty placeholder assignee silently unassigns every selected ticket', function () {
-    [$tickets, $assignee] = ticketBulkPair();
-
-    $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'assign', 'assignee_id' => ''])
+        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'assign', ...$extra])
         ->assertRedirect()
-        ->assertSessionHasNoErrors()
-        ->assertSessionHas('status', 'Bulk action applied to 2 ticket(s).');
+        ->assertSessionHasErrors('assignee_id')
+        ->assertSessionMissing('status');
 
-    expect(Ticket::whereIn('id', array_map(fn ($t) => $t->id, $tickets))->pluck('assignee_id')->all())->toBe([null, null]);
-});
+    expect(ticketBulkState($tickets))->toBe($before)
+        ->and(Ticket::whereIn('id', array_map(fn ($t) => $t->id, $tickets))->whereNull('assignee_id')->count())->toBe(0);
+})->with([
+    'missing key' => [[]],
+    'blank placeholder' => [['assignee_id' => '']],
+    'null' => [['assignee_id' => null]],
+    'not an id' => [['assignee_id' => 'abc']],
+    'unknown user' => [['assignee_id' => 999_999_999]],
+]);
 
 it('BASELINE H6: invalid action, empty selection and an unknown ticket id are validation errors with no mutation', function (array $payload, string $errorKey) {
     [$tickets] = ticketBulkPair();
@@ -139,30 +122,41 @@ it('CHARACTERIZATION H6: an impossible transition is skipped per ticket, yet the
         ->and(TicketStatusHistory::where('ticket_id', $closed->id)->count())->toBe(0);
 });
 
-it('DEFECT H6 (WP2 flips to an assignee_id error): single assign without an assignee key is a 500 and changes nothing', function () {
+it('TARGET H6: single assign without an assignee key is a validation error, while an explicit blank still unassigns', function () {
     $assignee = ticketUser('operator');
     $ticket = ticketFor(ticketUser(), ['assignee_id' => $assignee->id]);
 
     $this->actingAs($this->operator)
         ->put(route('operator.tickets.assign', $ticket), [])
-        ->assertServerError();
-
+        ->assertRedirect()
+        ->assertSessionHasErrors('assignee_id');
     expect($ticket->fresh()->assignee_id)->toBe($assignee->id);
+
+    $this->actingAs($this->operator)
+        ->put(route('operator.tickets.assign', $ticket), ['assignee_id' => ''])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+    expect($ticket->fresh()->assignee_id)->toBeNull();
 });
 
-it('DEFECT H6 (WP2 removes these throw sites): the 500s are unguarded reads of keys validation did not guarantee', function (string $method, string $routeName, array $payload, string $exception, string $message) {
+it('TARGET H6: the batch is all-or-nothing on a mid-loop failure, so a late error leaves no ticket half-changed', function () {
     [$tickets] = ticketBulkPair();
     $ids = array_map(fn ($t) => $t->id, $tickets);
-    $url = $routeName === 'operator.tickets.assign' ? route($routeName, $tickets[0]) : route($routeName);
-    $payload = $routeName === 'operator.tickets.bulk' ? ['ticket_ids' => $ids, ...$payload] : $payload;
+    $before = ticketBulkState($tickets);
+    $failOn = $tickets[1]->id;
+
+    // Fail while transitioning the second ticket (after the first already changed inside the batch).
+    TicketStatusHistory::creating(function ($history) use ($failOn) {
+        if ($history->ticket_id === $failOn) {
+            throw new RuntimeException('simulated failure');
+        }
+    });
 
     $this->withoutExceptionHandling();
 
-    expect(fn () => $this->actingAs($this->operator)->{$method}($url, $payload))
-        ->toThrow($exception, $message);
-})->with([
-    'bulk status, no key' => ['post', 'operator.tickets.bulk', ['action' => 'status'], ErrorException::class, 'Undefined array key "status"'],
-    'bulk status, empty' => ['post', 'operator.tickets.bulk', ['action' => 'status', 'status' => ''], TypeError::class, 'must be of type string, null given'],
-    'bulk assign, no key' => ['post', 'operator.tickets.bulk', ['action' => 'assign'], ErrorException::class, 'Undefined array key "assignee_id"'],
-    'single assign, no key' => ['put', 'operator.tickets.assign', [], ErrorException::class, 'Undefined array key "assignee_id"'],
-]);
+    expect(fn () => $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => $ids, 'action' => 'close']))
+        ->toThrow(RuntimeException::class);
+
+    TicketStatusHistory::flushEventListeners();
+    expect(ticketBulkState($tickets))->toBe($before);
+});

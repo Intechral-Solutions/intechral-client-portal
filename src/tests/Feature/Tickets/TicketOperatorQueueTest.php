@@ -100,7 +100,9 @@ it('shows operator ticket detail page', function () {
 it('allows operator to assign a ticket', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
+    // EPIC-010D H5: only a tickets.assign holder is an eligible assignee.
     $assignee = User::factory()->create();
+    $assignee->assignRole('operator');
     $ticket = Ticket::factory()->open()->for(User::factory()->create(), 'user')->create();
 
     $this->actingAs($operator)
@@ -129,7 +131,9 @@ it('allows operator to unassign a ticket', function () {
 it('bulk-assigns tickets to an operator', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
+    // EPIC-010D H5: only a tickets.assign holder is an eligible assignee.
     $assignee = User::factory()->create();
+    $assignee->assignRole('operator');
     $user = User::factory()->create();
 
     $t1 = Ticket::factory()->open()->for($user, 'user')->create();

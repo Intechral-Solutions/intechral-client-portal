@@ -5,8 +5,8 @@
 **Series:** hardening epics [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) · [EPIC-010B](./EPIC-010B-tenant-scoping.md) · [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) · **EPIC-010D**
 **Planned:** 2026-09-24, against `epic-011e-projects-kanban` at `a09c723`
 **Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
-**Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 Not started
-**Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision
+**Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 **Complete** (2026-09-24)
+**Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision; [Amendment 3 (2026-09-24)](#amendment-3-wp2-results-2026-09-24): WP2 results, assignment eligibility, notification gating and de-duplication, bulk validation, CSV policy, id-derived Ticket numbers, concurrency results, lifecycle assessment
 
 ---
 
@@ -14,6 +14,7 @@
 
 - [Amendment 1: WP0 Results (2026-09-24)](#amendment-1-wp0-results-2026-09-24)
 - [Amendment 2: WP1 Results (2026-09-24)](#amendment-2-wp1-results-2026-09-24)
+- [Amendment 3: WP2 Results (2026-09-24)](#amendment-3-wp2-results-2026-09-24)
 
 1. [Status and parent context](#1-status-and-parent-context)
 2. [Goal](#2-goal)
@@ -301,6 +302,122 @@ The capability test lives in one private helper (`worksTickets` = `tickets.assig
 - The development database `portal` checksums are identical before and after (41 tables).
 - Development `storage/app` is unchanged; the fake disk is clean.
 - Mail is faked in every test path.
+
+---
+
+## Amendment 3: WP2 Results (2026-09-24)
+
+WP2 fixed H5, H6, H7 and H8 and added the stale-assignee notification gate and reply-recipient de-duplication. There was **no migration, backfill, dependency change, route change, `company_id`/visibility change, or WP1 authorization change** (the notification gate consumes `TicketPolicy::view` as WP1 left it). The only markup change is the pre-authorized error block in `operator/tickets/index.blade.php` (§14).
+
+Method: the WP2-owned `DEFECT` tests were converted to `TARGET` tests first. Against **unchanged runtime code** the five converted suites gave 33 failed, 51 passed. The failures were the intended ones (missing validation errors, the four 500 sites, unneutralized cells, duplicate notifications, numbers not matching ids). The passing targets are regression guards for behavior that was already correct (over-neutralization, author never notified, internal notes notify nobody, eligible assignee accepted). One target passed only by coincidence, so it was strengthened with an id gap and made red before the fix. The runtime change then turned everything green. Pre-fix evidence stays in Amendment 1.
+
+### A3.1 Assignment eligibility (H5)
+
+- **One seam:** `TicketService::assertAssignable(?int)`, called by `TicketService::assign`, the only writer of `tickets.assignee_id`. `null` (unassign) is always allowed; any user id must belong to a user who **currently** `can('tickets.assign')`, otherwise a `ValidationException` on `assignee_id`. The check is by capability, so a custom role or a direct grant qualifies whatever its name.
+- **Single** (`Operator\TicketController::assign`) and **bulk** (`Operator\TicketBulkController::update`) both go through it. Bulk calls it once before touching any ticket, inside the batch transaction.
+- A rejected assignment changes nothing and writes no activity-log entry. A successful assignment or single unassign logs exactly as before (`assigned ticket`, causer, `assignee_id`).
+- **Stale assignee (D2):** nothing auto-unassigns. An unrelated action (status change) leaves the assignment. Re-selecting the stale assignee, single or bulk, fails eligibility (no exemption for the current assignee). Explicit single-ticket unassign still works. The queue still shows the stale assignee (true data).
+- The operator dropdowns already list `User::permission('tickets.assign')`, so no UI change was needed for candidates.
+
+### A3.2 Notifications
+
+`TicketService::addReply` builds the recipient set by user identity:
+
+1. an internal note has none;
+2. otherwise the owner and the assignee (non-null);
+3. the author is removed (existing "reply by someone else" semantics);
+4. duplicates are removed by user id;
+5. each remaining user must currently pass `Gate::forUser($user)->allows('view', $ticket)`.
+
+| Case | Result |
+|------|--------|
+| Owner = assignee, reply by a third party | one notification (was two) |
+| Distinct eligible owner and assignee | one each |
+| Author is owner and assignee | none |
+| Assignee lost `tickets.assign`, not the owner | none (no preview, title, author or link) |
+| Stale assignee who is also the owner | one (ownership grants `view`) |
+| Customer assignee | none |
+| Internal note | none |
+
+Notification content, queueing (`ShouldQueue`, mail only) and templates are unchanged. WP1's guarantee still holds: an unauthorized reply never reaches this stage.
+
+### A3.3 Bulk and single-assign validation (H6)
+
+| Request | Rules |
+|---------|-------|
+| Bulk `assignee_id` | `required_if:action,assign`, `nullable`, `integer`, `exists:users,id`, then eligibility |
+| Bulk `status` | `required_if:action,status`, `nullable`, `in:open,…,closed` |
+| Bulk `ticket_ids`, `action` | unchanged (`required|array|min:1`, `integer|exists`, `in:assign,close,resolve,status`) |
+| Single `assignee_id` | `present`, `nullable`, `integer`, `exists:users,id`; an absent key is a validation error, an explicit blank is the intentional unassign |
+
+- The four exception sites are gone (`$validated` is read only for keys the rules guarantee). Missing, blank, null and unknown values are a redirect with session errors, never a 500, with zero mutation.
+- **No bulk unassign (D4):** a blank or missing bulk assignee is invalid input and cannot unassign anything.
+- The batch runs in one transaction, so a mid-loop failure rolls every ticket back (tested by failing the second ticket's status-history insert).
+- **Bulk partial-success message: deliberately unchanged.** §14 states "Per-Ticket invalid transitions keep today's semantics (skipped silently…); reporting skipped rows is Helpdesk MVP", so the flash still counts every selected ticket. The WP0 CHARACTERIZATION test that records it stays green as a documented fact.
+
+### A3.4 CSV export (H7)
+
+- `fputcsv(..., escape: '')` for the header and rows (RFC 4180).
+- New `App\Support\CsvText::safe()` holds the formula neutralization: a leading `=`, `+`, `-` or `@`, after optional whitespace (including a tab), gets a leading apostrophe. It was extracted **unchanged** from `TimeEntryService::safeCsvText`, which now calls it, so the Time export is byte-identical (its existing tests pass unchanged).
+- Applied to ticket number, title, category, submitter and assignee. Priority, status and timestamps are system values and are written as before. Text that merely contains a formula character (`Total = 5`, `a+b`, `user@example.com`) is left alone.
+- Order is `created_at DESC, id DESC` (tied rows verified).
+- Columns, headers, filename, the date window and the eager `get()` are unchanged: no report redesign and no streaming rewrite (F-6 and scalability remain deferred; the report and export still share one window).
+
+### A3.5 Ticket-number algorithm (H8)
+
+`TicketService::create` reserves the row identity first, inside one `DB::transaction`: insert with a unique temporary `ticket_number` (`TMP-` + 12 hex characters, 16 characters, the column width), then set `ticket_number = 'TKT-' . str_pad(id, 4, '0')` and commit. Attachments and the confirmation email happen after commit, as before (F-7 unchanged).
+
+- No allocation reads `MAX(id)`, a count or any existing number, and there are no retries. The number derives from the database-reserved auto-increment id, unique by construction.
+- The temporary value is inside an uncommitted transaction, so it is never visible. A failure while finalizing rolls the ticket back (tested: no row, no `TMP-` value, no file, no mail).
+- The format stays `TKT-` + zero-padded id (at least four digits). Historical numbers, including `TKT-E2E1`, are untouched.
+- Deleting the highest ticket cannot re-issue its number: the new id is above it. This relies on InnoDB keeping the auto-increment counter across restarts, which MariaDB does since 10.2.4 (the stack runs 10.11.19).
+- **Deploy invariant unchanged:** preflight P3b (numeric-form numbers above `MAX(id)`) must be 0 before WP2 ships, because a legacy number that a future id would reach would then collide. Non-numeric numbers cannot collide.
+
+### A3.6 Concurrency results (testing database only)
+
+The probe now asserts that every attempt succeeds, no attempt loses to a unique violation, and every saved number is unique and equals `TKT-{id}`.
+
+| Workers × creates | Attempts | Succeeded | Lost to unique violation | Other errors |
+|---|---|---|---|---|
+| 4 × 10 (suite default, 3 runs) | 40 each | 40 each | **0** | 0 |
+| 8 × 25 | 200 | 200 | **0** | 0 |
+| 8 × 50 | 400 | 400 | **0** | 0 |
+| 12 × 50 | 600 | 600 | **0** | 0 |
+
+Before the fix (Amendment 1, A1.5): 25–52% of the same shapes lost. Each run commits one user, races the workers and deletes the user in a `finally` block; the testing database was left with 0 tickets and 0 users. The development database was not used.
+
+### A3.7 Factory and fixtures
+
+`TicketFactory` numbers are `TKT-F` + six unique digits: they can never equal a service number (`TKT-` + digits) and never collide with `TKT-E2E1`. Tests that need a specific value still pass one. `TicketFactory` no longer uses the `TKT-0001`–`TKT-9999` range that could pre-empt a service number. The seeded `TKT-E2E1` fixture is unchanged.
+
+### A3.8 Tests flipped
+
+- **Assignment suite:** the customer/custom-role/role-less single-assign defect (now: validation error, unchanged assignee, no log), the bulk defect (now: error, nothing changed), the customer-assignee preview, the stale-assignee test, and the owner=assignee double notification (now once). Added: eligible-by-custom-role and direct-grant, stale assignee lifecycle (stays, cannot be re-selected, can be cleared), bulk eligible with logging, author-never-notified, distinct recipients, stale-owner-once, internal-note-none.
+- **Bulk suite:** the four exception-site tests became validation datasets (status missing/blank/null/unknown; assign missing/blank/null/non-id/unknown user), the bulk-blank-unassign defect became invalid input with no unassign (D4), single assign without a key is a validation error, and an all-or-nothing rollback test was added. The throw-site dataset was removed.
+- **Export suite:** formula titles, planted title, user-controlled names and category, the backslash case, and the tie-breaker are now targets. Added guards for non-formula text and system columns.
+- **Number suite:** rewritten; the reflection tests on the removed `nextTicketNumber()` were replaced by the targets above and the probe was tightened.
+- **`TicketOperatorQueueTest`:** "allows operator to assign a ticket" and "bulk-assigns tickets to an operator" now use an eligible operator assignee.
+- **Kept:** every BASELINE and GUARD test, the bulk partial-success CHARACTERIZATION, and the deferred F-6 window CHARACTERIZATION.
+- Suite total: **933 passed** (3749 assertions), up from 918.
+
+### A3.9 Deviations and plan corrections
+
+- The temporary number uses 12 random hex characters rather than a counter. It only has to avoid colliding with another *uncommitted* insert's temporary value inside the same window (48 bits, and a collision would block rather than corrupt); it is not a retry mechanism.
+- The recipient visibility check runs uniformly on the owner and the assignee; for the owner it always passes (`view` grants the owner), so it adds no behavior.
+- `assertAssignable` is public so bulk can reject before its loop, as §13 specified.
+
+### A3.10 Hygiene
+
+- The development database's product tables are checksum-identical before and after; only the framework `sessions` table gained anonymous rows from the dev tooling's HTTP health probe (`curl`), unrelated to the tests.
+- Development `storage/app` is unchanged; the fake disk is empty; the testing database holds no leftover tickets or users.
+- Mail is faked in every test path; nothing reached Mailpit.
+- No migration was added, so `migrate:status` is unchanged (nothing pending).
+
+### A3.11 Lifecycle assessment
+
+Against §19: H1–H9 are fixed with the §16 tests (including side-effect-absence assertions); `TicketPolicy` has no role-name check; the customer list matches customer detail; internal content is unreachable to non-operators; there is no schema migration, backfill, dependency or UI change beyond §14's error block; the full Pest suite passes on MariaDB and `./dev check` passes (its non-Pest steps plus Pint were run alongside the separate full Pest run); §17 results are recorded for development.
+
+Open before the epic can be **Verified**: run the A1.10 production preflight (P3b must be 0; P4b investigated) before deploying, and record the counts; update the roadmap item and epic index to the final status. Following the EPIC-011E precedent (implementation commits, then a separate verification/close-out commit), the recommended sequence is: **Implemented** when the WP2 commit lands, **Verified** after the production preflight is recorded, and **Done** on merge. The header status is left unchanged in this amendment.
 
 ---
 
@@ -661,7 +778,9 @@ Results: [Amendment 2](#amendment-2-wp1-results-2026-09-24).
 - Show page uses `viewInternal` for reply filtering; operator actions add `authorize('view')`.
 - Target tests red first, then green.
 
-### WP2 — Integrity and robustness (H5, H6, H7, H8)
+### WP2 — Integrity and robustness (H5, H6, H7, H8) — **Complete (2026-09-24)**
+
+Results: [Amendment 3](#amendment-3-wp2-results-2026-09-24).
 
 - Assignment eligibility seam and assignee notification gate (§13).
 - Bulk and single-assign validation; transactional bulk loop; minimal error block (§14).

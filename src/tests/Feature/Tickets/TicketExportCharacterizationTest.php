@@ -2,23 +2,21 @@
 
 use App\Models\User;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 require_once __DIR__.'/TicketTestHelpers.php';
 
 /*
- * EPIC-010D WP0 characterization: H7 (Ticket CSV export safety) on
- * GET /operator/tickets/reports/export (Operator\TicketReportController::export), plus the
- * report/export date window (F-6, deferred).
+ * EPIC-010D: H7 (Ticket CSV export safety) on GET /operator/tickets/reports/export
+ * (Operator\TicketReportController::export), plus the report/export date window (F-6, deferred).
+ * WP0 characterized the export; WP2 converted every defect test into the TARGET contract
+ * (pre-fix evidence: EPIC-010D Amendment 1).
  *
- * Serialization today: fputcsv() into php://output inside response()->stream(), with PHP's
- * default escape character "\" and no formula neutralization. The reference for WP2 is the Time
- * export (TimeEntryService::exportCsv + safeCsvText, escape: ''), pinned by TimeInertiaTest
- * "exports filtered RFC-compatible CSV and neutralizes spreadsheet formulas".
+ * Serialization: fputcsv(..., escape: '') (RFC 4180) with free-text cells neutralized by the same
+ * App\Support\CsvText helper the Time export uses; rows ordered created_at DESC, id DESC.
  *
- * Prefixes: BASELINE (keep), DEFECT H7 (CURRENT BROKEN behavior, WP2 flips it),
- * CHARACTERIZATION (current fact recorded for a later decision).
+ * Prefixes: BASELINE (already correct, keep), TARGET (the WP2 contract), CHARACTERIZATION
+ * (deferred behavior recorded as fact).
  */
 
 const TICKET_CSV_HEADER = ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due'];
@@ -62,12 +60,12 @@ it('BASELINE H7: header row, content type and filename; no BOM', function () {
         ->and($response->headers->get('Content-Disposition'))->toBe('attachment; filename="tickets-2026-09-24.csv"');
 });
 
-it('DEFECT H7 (WP2 flips to a leading apostrophe): formula-leading titles are exported verbatim', function (string $title) {
+it('TARGET H7: formula-leading titles are neutralized with a leading apostrophe', function (string $title) {
     $ticket = ticketFor(ticketUser(), ['title' => $title]);
 
     [, $csv] = ticketExportCsv($this->operator);
 
-    expect(ticketExportRows($csv)[$ticket->ticket_number][1])->toBe($title);
+    expect(ticketExportRows($csv)[$ticket->ticket_number][1])->toBe("'".$title);
 })->with([
     'equals' => '=HYPERLINK("https://evil.example","Click")',
     'plus' => '+SUM(1,1)',
@@ -77,7 +75,14 @@ it('DEFECT H7 (WP2 flips to a leading apostrophe): formula-leading titles are ex
     'leading tab' => "\t=1+1",
 ]);
 
-it('DEFECT H7 (WP2 flips): a customer can plant a formula title through the ordinary create form, and it reaches the operator export', function () {
+it('TARGET H7: text that merely contains or ends with a formula character is left alone', function (string $title) {
+    $ticket = ticketFor(ticketUser(), ['title' => $title]);
+
+    [, $csv] = ticketExportCsv($this->operator);
+
+    expect(ticketExportRows($csv)[$ticket->ticket_number][1])->toBe($title);
+})->with(['Total = 5', 'a+b', 'user@example.com', 'Costs -5', '100%']);
+it('TARGET H7: a formula title planted through the ordinary create form reaches the operator export neutralized', function () {
     $customer = ticketUser();
 
     $this->actingAs($customer)->post(route('tickets.store'), [
@@ -89,21 +94,21 @@ it('DEFECT H7 (WP2 flips): a customer can plant a formula title through the ordi
 
     [, $csv] = ticketExportCsv($this->operator);
 
-    expect($csv)->toContain('"=HYPERLINK(""https://evil.example"",""Open"")"');
+    expect($csv)->toContain('"\'=HYPERLINK(""https://evil.example"",""Open"")"')
+        ->and($csv)->not->toContain(',"=HYPERLINK(');
 });
-
-it('DEFECT H7 (WP2 flips): user-controlled submitter and assignee names are exported verbatim', function () {
-    $submitter = ticketUser(attributes: ['name' => '=cmd|\'/c calc\'!A1']);
+it('TARGET H7: user-controlled submitter, assignee and category cells are neutralized', function () {
+    $submitter = ticketUser(attributes: ['name' => "=cmd|'/c calc'!A1"]);
     $assignee = ticketUser('operator', ['name' => '@evil']);
-    $ticket = ticketFor($submitter, ['assignee_id' => $assignee->id]);
+    $ticket = ticketFor($submitter, ['assignee_id' => $assignee->id, 'category' => '+Injected']);
 
     [, $csv] = ticketExportCsv($this->operator);
     $row = ticketExportRows($csv)[$ticket->ticket_number];
 
-    expect($row[5])->toBe('=cmd|\'/c calc\'!A1')
-        ->and($row[6])->toBe('@evil');
+    expect($row[2])->toBe("'+Injected")
+        ->and($row[5])->toBe("'=cmd|'/c calc'!A1")
+        ->and($row[6])->toBe("'@evil");
 });
-
 it('BASELINE H7: commas, double quotes, embedded newlines and UTF-8 round-trip through an RFC-4180 reader', function (string $title) {
     $ticket = ticketFor(ticketUser(), ['title' => $title]);
 
@@ -117,33 +122,39 @@ it('BASELINE H7: commas, double quotes, embedded newlines and UTF-8 round-trip t
     'utf8' => 'Ünïcödé — 日本語 ✓',
 ]);
 
-it('DEFECT H7 (WP2 flips via escape: \'\'): a backslash before a quote is written in PHP\'s escape dialect, so an RFC-4180 reader corrupts the cell', function () {
+it('TARGET H7: a backslash before a quote round-trips through an RFC-4180 reader', function () {
     $title = 'Path C:\\share\\"quoted" end';
     $ticket = ticketFor(ticketUser(), ['title' => $title]);
 
     [, $csv] = ticketExportCsv($this->operator);
-    $line = collect(explode("\n", $csv))->first(fn ($l) => str_starts_with($l, $ticket->ticket_number));
 
-    // PHP's own backslash-escape reader recovers the value...
-    expect(str_getcsv($line, escape: '\\')[1])->toBe($title)
-        // ...an RFC-4180 reader (Excel, LibreOffice, escape: '') does not.
-        ->and(ticketExportRows($csv)[$ticket->ticket_number][1] ?? null)->not->toBe($title);
+    expect(ticketExportRows($csv)[$ticket->ticket_number][1])->toBe($title);
 });
 
-it('DEFECT H7 (WP2 adds id DESC): export ordering is created_at DESC only, with no tie-breaker', function () {
-    $sameInstant = now()->subDay()->startOfSecond();
-    ticketFor(ticketUser(), ['created_at' => $sameInstant]);
-    ticketFor(ticketUser(), ['created_at' => $sameInstant]);
+it('TARGET H7: the header row and system columns are written without neutralization or reshaping', function () {
+    $ticket = ticketFor(ticketUser(), ['status' => 'open', 'priority' => 'high']);
 
-    DB::enableQueryLog();
-    ticketExportCsv($this->operator);
-    $select = collect(DB::getQueryLog())->pluck('query')
-        ->first(fn ($sql) => str_contains($sql, 'from `tickets`') && str_contains($sql, 'order by'));
-    DB::disableQueryLog();
+    [, $csv] = ticketExportCsv($this->operator);
+    $row = ticketExportRows($csv)[$ticket->ticket_number];
 
-    expect($select)->toEndWith('order by `created_at` desc');
+    expect(ticketParseCsv($csv)[0])->toBe(TICKET_CSV_HEADER)
+        ->and([$row[3], $row[4]])->toBe(['high', 'open'])
+        ->and($row[7])->toBe($ticket->created_at->toDateTimeString());
 });
+it('TARGET H7: rows tied on created_at are ordered by id DESC, and newer rows come first', function () {
+    $tied = now()->subDay()->startOfSecond();
+    $a = ticketFor(ticketUser(), ['created_at' => $tied]);
+    $b = ticketFor(ticketUser(), ['created_at' => $tied]);
+    $c = ticketFor(ticketUser(), ['created_at' => $tied]);
+    $newer = ticketFor(ticketUser(), ['created_at' => now()->subHour()]);
+    $sameAgain = ticketFor(ticketUser(), ['created_at' => $tied]);
 
+    [, $csv] = ticketExportCsv($this->operator);
+
+    expect(array_keys(ticketExportRows($csv)))->toBe([
+        $newer->ticket_number, $sameAgain->ticket_number, $c->ticket_number, $b->ticket_number, $a->ticket_number,
+    ]);
+});
 it('CHARACTERIZATION F-6 (deferred): supplied dates are parsed with the current time of day, so both window edges sit at "now" on the given dates; report and export share the window', function () {
     Carbon::setTestNow('2026-09-24 12:00:00');
     $at = fn (string $ts, string $title) => ticketFor(ticketUser(), ['created_at' => Carbon::parse($ts), 'title' => $title, 'category' => 'General']);

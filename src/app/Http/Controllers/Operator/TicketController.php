@@ -69,11 +69,13 @@ class TicketController extends Controller
     {
         $this->authorize('view', $ticket);
 
+        // `present` makes an absent key a validation error; an explicit blank value is the
+        // intentional single-ticket unassign. Eligibility is enforced by TicketService::assign.
         $validated = $request->validate([
-            'assignee_id' => ['nullable', 'exists:users,id'],
+            'assignee_id' => ['present', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $service->assign($ticket, $validated['assignee_id'] ?: null, auth()->user());
+        $service->assign($ticket, $validated['assignee_id'] === null ? null : (int) $validated['assignee_id'], auth()->user());
 
         return back()->with('status', 'Ticket assignment updated.');
     }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\TimeEntry;
 use App\Models\TimeEntryBlock;
 use App\Models\User;
+use App\Support\CsvText;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -373,11 +374,11 @@ class TimeEntryService
         foreach ($query->get() as $entry) {
             fputcsv($stream, [
                 $entry->date->format('Y-m-d'),
-                $this->safeCsvText($entry->user?->name),
-                $this->safeCsvText($entry->project?->name),
-                $this->safeCsvText($entry->task?->title),
-                $this->safeCsvText($entry->ticket?->ticket_number),
-                $this->safeCsvText($entry->description),
+                CsvText::safe($entry->user?->name),
+                CsvText::safe($entry->project?->name),
+                CsvText::safe($entry->task?->title),
+                CsvText::safe($entry->ticket?->ticket_number),
+                CsvText::safe($entry->description),
                 number_format($entry->durationDecimal(), 2),
                 $entry->billable ? 'Yes' : 'No',
                 $entry->billed ? 'Yes' : 'No',
@@ -744,14 +745,5 @@ class TimeEntryService
         if (isset($filters['billed'])) {
             $query->where('billed', $filters['billed']);
         }
-    }
-
-    private function safeCsvText(?string $value): string
-    {
-        $value ??= '';
-
-        return preg_match('/^[\\s]*[=+\-@]/u', $value) === 1
-            ? "'{$value}"
-            : $value;
     }
 }
