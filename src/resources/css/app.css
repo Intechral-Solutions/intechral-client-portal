@@ -122,6 +122,46 @@
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
     --font-display: 'Newsreader', Georgia, serif;
 
+    /* Radius — Direction D §4.2 (EPIC-013 WP2). `rounded-control` is the 5px of
+       buttons, inputs, chips and menu rows; `-control-lg` is the 7px of large
+       buttons; `rounded-overlay` is the 8px of menus, popovers and dialogs;
+       `rounded-tag` is the 2-3px of tags. */
+    --radius-control: 5px;
+    --radius-control-lg: 7px;
+    --radius-overlay: 8px;
+    --radius-tag: 3px;
+
+    /* Overlay animations (EPIC-013 WP2). Durations and easing come from the
+       WP1c motion tokens; `--ds-shift` collapses to 0 under
+       prefers-reduced-motion (see :root below), leaving an opacity fade. */
+    --animate-overlay-in: ds-fade-in var(--ds-anim-sheet) var(--ds-motion-easing) both;
+    --animate-overlay-out: ds-fade-out var(--ds-anim-sheet-exit) var(--ds-motion-easing-exit) both;
+    --animate-dialog-in: ds-dialog-in var(--ds-anim-sheet) var(--ds-motion-easing) both;
+    --animate-dialog-out: ds-dialog-out var(--ds-anim-sheet-exit) var(--ds-motion-easing-exit) both;
+    --animate-menu-in: ds-menu-in var(--ds-anim-base) var(--ds-motion-easing) both;
+    --animate-menu-out: ds-fade-out var(--ds-anim-base-exit) var(--ds-motion-easing-exit) both;
+
+    @keyframes ds-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes ds-fade-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    @keyframes ds-dialog-in {
+        from { opacity: 0; transform: translateY(var(--ds-shift)); }
+        to { opacity: 1; transform: none; }
+    }
+    @keyframes ds-dialog-out {
+        from { opacity: 1; transform: none; }
+        to { opacity: 0; transform: translateY(var(--ds-shift)); }
+    }
+    @keyframes ds-menu-in {
+        from { opacity: 0; transform: translateY(calc(var(--ds-shift) * -0.5)); }
+        to { opacity: 1; transform: none; }
+    }
+
     /* Brand palette */
     --color-brand-50:  #eef2ff;
     --color-brand-100: #e0e7ff;
@@ -157,6 +197,7 @@
     /* Rules */
     --color-rule: var(--ds-rule);
     --color-rule-control: var(--ds-rule-control);
+    --color-control-edge: var(--ds-control-edge);
     --color-rule-strong: var(--ds-rule-strong);
 
     /* Text. `text-secondary`, `text-muted` and `text-faint` are the
@@ -216,9 +257,11 @@
 
 /* ── Compatibility aliases (shadcn + legacy status) ─────────────
    Kept for existing consumers (Direction D §2.4). `accent`, `success`
-   and `warning` now name Direction D tokens above; their legacy
-   meanings moved to `legacy-*` names with identical values, the same
-   isolation WP1a applied to the hand-written utilities. ── */
+   and `warning` now name Direction D tokens above; the legacy accent
+   meaning lives on as `legacy-accent` (identical value), the same
+   isolation WP1a applied to the hand-written utilities. WP2 retired
+   `legacy-success`/`legacy-warning` with the Alert restyle: their only
+   consumer was FlashRegion. ── */
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -238,8 +281,6 @@
     --color-ring: var(--ring);
     --color-info: var(--info);
     --color-legacy-accent: var(--accent);
-    --color-legacy-success: var(--success);
-    --color-legacy-warning: var(--warning);
 }
 
 /* ── Theme-invariant Direction D tokens (EPIC-013 WP1c) ─────── */
@@ -251,6 +292,25 @@
     --ds-motion-sheet: 240ms;
     --ds-motion-easing:      cubic-bezier(0.2, 0, 0, 1);
     --ds-motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /* Overlay animation durations (EPIC-013 WP2): enter = the motion token,
+       exit = 70% of it (§16). Reduced motion removes the translation and
+       caps fades at motion-fast (§16). */
+    --ds-shift: 8px;
+    --ds-anim-base: var(--ds-motion-base);
+    --ds-anim-base-exit: calc(var(--ds-motion-base) * 0.7);
+    --ds-anim-sheet: var(--ds-motion-sheet);
+    --ds-anim-sheet-exit: calc(var(--ds-motion-sheet) * 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --ds-shift: 0px;
+        --ds-anim-base: var(--ds-motion-fast);
+        --ds-anim-base-exit: var(--ds-motion-fast);
+        --ds-anim-sheet: var(--ds-motion-fast);
+        --ds-anim-sheet-exit: var(--ds-motion-fast);
+    }
 }
 
 /* ── Light theme (default) ────────────────────────────────── */
@@ -267,6 +327,7 @@
     --ds-surface-selected: #FFFFFF;
     --ds-rule:             #E3E0D8;
     --ds-rule-control:     #D2CEC3;
+    --ds-control-edge:     #8B877C; /* resting boundary of interactive controls; >=3:1 (WCAG 1.4.11) */
     --ds-rule-strong:      #1A1B1E;
     --ds-text:             #1A1B1E;
     --ds-text-secondary:   #3F4248;
@@ -297,14 +358,16 @@
     --ds-shadow-overlay:   0 14px 36px rgba(26, 27, 30, 0.16), 0 0 0 1px #E3E0D8;
 
     /* shadcn compatibility aliases. `destructive` and `ring` point at Direction D
-       (WP1c, measured safe); every other alias keeps its legacy value, and
-       `primary` stays indigo until WP2's Button restyle (EPIC-013 §8.3). */
+       (WP1c, measured safe). `primary` points at ink (EPIC-013 WP2, Amendment 6:
+       every consumer that meant "accent" was made explicit first, so `primary`
+       now only ever means "the primary action"). Every other alias keeps its
+       legacy value. */
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
     --card-foreground: var(--text-primary);
-    --primary:       var(--accent);
-    --primary-foreground: var(--accent-text);
+    --primary:       var(--ds-ink);
+    --primary-foreground: var(--ds-on-ink);
     --secondary:     theme(colors.gray.100);
     --secondary-foreground: theme(colors.gray.900);
     --muted:         var(--bg-surface);
@@ -389,6 +452,7 @@
     --ds-surface-selected: #18292D;
     --ds-rule:             #1E2D31;
     --ds-rule-control:     #2A3D42;
+    --ds-control-edge:     #617679; /* resting boundary of interactive controls; >=3:1 (WCAG 1.4.11) */
     --ds-rule-strong:      #C8D7D9;
     --ds-text:             #E6EEEF;
     --ds-text-secondary:   #C3D1D3;
@@ -423,8 +487,8 @@
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
     --card-foreground: var(--text-primary);
-    --primary:       var(--accent);
-    --primary-foreground: var(--accent-text);
+    --primary:       var(--ds-ink);
+    --primary-foreground: var(--ds-on-ink);
     --secondary:     theme(colors.gray.800);
     --secondary-foreground: theme(colors.gray.50);
     --muted:         var(--bg-surface);

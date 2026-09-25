@@ -1,7 +1,6 @@
 import { Link } from '@inertiajs/react';
 
 import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import type { Paginated } from '@/types/pagination';
 
 type PaginationProps = {
@@ -13,7 +12,10 @@ type PaginationProps = {
 
 /**
  * Previous / next navigation for a Laravel paginator. The URLs come from the server
- * (`->withQueryString()`), so filters survive paging.
+ * (`->withQueryString()`), so filters survive paging. Both links are `secondary` buttons; an
+ * unavailable direction is omitted (an empty cell keeps the indicator centred) rather than rendered
+ * as a dead control. There are no numbered page links, so there is no current-page link to mark
+ * with `aria-current`; the indicator states the position in text.
  */
 export function Pagination({ paginator }: PaginationProps) {
     const { current_page, last_page, prev_page_url, next_page_url } = paginator;
@@ -21,17 +23,25 @@ export function Pagination({ paginator }: PaginationProps) {
     return (
         <nav aria-label="Pagination" className="flex items-center justify-between">
             {prev_page_url ? (
-                <Link href={prev_page_url} className={cn(buttonVariants({ variant: 'outline' }))}>
+                <Link
+                    href={prev_page_url}
+                    rel="prev"
+                    className={buttonVariants({ variant: 'secondary' })}
+                >
                     Previous
                 </Link>
             ) : (
                 <span />
             )}
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-text-secondary tabular-nums">
                 Page {current_page} of {last_page}
             </span>
             {next_page_url ? (
-                <Link href={next_page_url} className={cn(buttonVariants({ variant: 'outline' }))}>
+                <Link
+                    href={next_page_url}
+                    rel="next"
+                    className={buttonVariants({ variant: 'secondary' })}
+                >
                     Next
                 </Link>
             ) : (

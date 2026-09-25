@@ -15,7 +15,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 
 import { PageHeader } from '@/components/page-header';
-import { Badge } from '@/components/ui/badge';
+import { Status, type StatusTone } from '@/components/ui/status';
 import { buttonVariants } from '@/components/ui/button';
 import { AppLayout } from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
@@ -106,7 +106,7 @@ function DestinationLink({
     );
 }
 
-function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
+function statusTone(status: string): StatusTone {
     if (['resolved', 'closed', 'complete', 'completed'].includes(status)) return 'success';
     if (['urgent', 'overdue', 'rejected'].includes(status)) return 'danger';
     if (['pending', 'waiting', 'on_hold'].includes(status)) return 'warning';
@@ -138,7 +138,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                                     key={metric.key}
                                     href={metric.href}
                                     visit={metric.visit}
-                                    className="group rounded-md border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    className="group rounded-md border border-border bg-card p-5 shadow-sm transition-colors hover:border-accent-line focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                     aria-label={`View ${metric.label}`}
                                 >
                                     <div className="flex items-start justify-between gap-4">
@@ -151,7 +151,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                                             </p>
                                         </div>
                                         <Icon
-                                            className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary"
+                                            className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-accent"
                                             aria-hidden="true"
                                         />
                                     </div>
@@ -201,9 +201,9 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                                                 </p>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-3">
-                                                <Badge variant={statusVariant(ticket.status)}>
+                                                <Status tone={statusTone(ticket.status)}>
                                                     {ticket.statusLabel}
-                                                </Badge>
+                                                </Status>
                                                 <ArrowRight
                                                     className="hidden h-4 w-4 text-muted-foreground sm:block"
                                                     aria-hidden="true"

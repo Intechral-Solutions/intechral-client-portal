@@ -51,3 +51,42 @@ it('shows a refusal inside the open dialog as an alert', async () => {
 function refusal() {
     return screen.getByRole('alert');
 }
+
+it('closes on Escape, returns focus to its opener, and offers an explicit close control', async () => {
+    const user = userEvent.setup();
+    render(<Harness onConfirm={vi.fn()} />);
+    const opener = screen.getByRole('button', { name: 'Open' });
+
+    await user.click(opener);
+    expect(screen.getByRole('button', { name: 'Close dialog' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+
+    await user.click(opener);
+    await user.click(screen.getByRole('button', { name: 'Close dialog' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+});
+
+it('keeps the confirm control destructive and disables both actions while processing', async () => {
+    const user = userEvent.setup();
+    render(
+        <ConfirmationDialog
+            open
+            onOpenChange={vi.fn()}
+            title="Delete project"
+            description="This cannot be undone."
+            confirmLabel="Delete project"
+            onConfirm={vi.fn()}
+            processing
+        >
+            <Button type="button">Open</Button>
+        </ConfirmationDialog>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Working...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await user.keyboard('{Escape}');
+});

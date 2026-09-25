@@ -89,8 +89,21 @@ it('switches between authenticator and recovery inputs and moves focus', async (
     render(<TwoFactorChallengePage />);
 
     expect(screen.getByLabelText('Authentication code')).toHaveFocus();
+    // The method switch is a toggle pair: the selected method is exposed, not only filled ink.
+    expect(screen.getByRole('button', { name: 'Authenticator' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
+    expect(screen.getByRole('button', { name: 'Recovery code' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await user.click(screen.getByRole('button', { name: 'Recovery code' }));
     expect(screen.getByLabelText('Recovery code')).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Recovery code' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     expect(setData).toHaveBeenCalledWith('code', '');
 });
 

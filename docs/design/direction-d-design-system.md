@@ -78,12 +78,13 @@ Wording follows `docs/product/README.md`: **Current** = implemented today, **Tar
 | `surface-hover` | `#E8E5DD` | `#162427` | Hover on nav rows and list rows |
 | `surface-selected` | `#FFFFFF` | `#18292D` | Selected nav item surface (drawer, rail) |
 | `rule` | `#E3E0D8` | `#1E2D31` | Row separators, panel borders |
-| `rule-control` | `#D2CEC3` | `#2A3D42` | Control borders (inputs, buttons, chips), table header rule |
+| `rule-control` | `#D2CEC3` | `#2A3D42` | Structural control-adjacent hairlines: chip and tag borders, table header rule, unfilled priority bars, disabled control edges. **Not** the boundary of an interactive control (see `control-edge`); at about 1.5:1 it is too faint to identify one |
+| `control-edge` | `#8B877C` | `#617679` | Resting boundary of interactive controls that have no fill of their own to identify them: text inputs, textareas, native selects, secondary buttons, the rail account button. At least 3:1 against `canvas`, `surface`, `drawer`, `surface-sunken` and the legacy page and card backgrounds in both themes (WCAG 1.4.11). Never for table rules, section rules or decorative separators |
 | `rule-strong` | `#1A1B1E` | `#C8D7D9` | Section title rule; strongest strata line |
 | `text` | `#1A1B1E` | `#E6EEEF` | Primary text |
 | `text-secondary` | `#3F4248` | `#C3D1D3` | Secondary body text, nav labels |
 | `text-muted` | `#5C5F66` | `#98AEB2` | Metadata, column headers (meets 4.5:1 on canvas and surface) |
-| `text-faint` | `#8A8D93` | `#6D8388` | Placeholders, disabled, decorative only. **Never** for information-bearing text |
+| `text-faint` | `#8A8D93` | `#6D8388` | Decorative glyphs and non-informational affordances only. **Never** for information-bearing text: not placeholders, and not the label or value of a disabled control |
 | `accent` | `#0B6A73` | `#7ADDE4` | Links, informational status, accent text |
 | `accent-hover` | `#084E55` | `#B2F4F7` | Link hover |
 | `accent-soft` | `#E3EEEE` | `#12292C` | Selected-row tint, active filter chip, decision card (customer) |
@@ -119,10 +120,11 @@ Wording follows `docs/product/README.md`: **Current** = implemented today, **Tar
 2. **Cyan discipline.** Pure `#19E7F2` appears only as `live`, `accent-line` and `focus` in dark mode. It is never a large fill, background or button colour.
 3. **Live text uses `live-text`.** `live` is for glyphs, dots, segments and bars only. In light mode `live` (`#0B8792`) measures 4.29:1 on white and 3.73:1 on `live-soft`, which fails AA for text. All live-coloured **text** (running times, the current-stage label, the `+N` badge) uses `live-text`, which is deep teal in light and cyan in dark.
 4. **Warning has two tokens.** Text uses `warning`; shapes use `warning-glyph`, because the lighter amber that reads well as a shape fails as text on paper.
-5. **Ink is primary.** One primary (ink) button per region. Secondary actions are outline (`surface` + `rule-control`). Ghost buttons are for toolbars and icon actions.
+5. **Ink is primary.** One primary (ink) button per region. Secondary actions are outline (`surface` + `control-edge`). Ghost buttons are for toolbars and icon actions.
 6. **Soft tints are rare.** `*-soft` backgrounds are for selected rows, running rows, active filters, banners and the customer "waiting on you" card. They are not decorative.
-7. **Text-faint is non-informational.** If removing the text would lose information, it must not be `text-faint`.
-8. **Future themes** add a new `[data-theme]` block with the same token names. No Direction D component may reference a hex value.
+7. **Text-faint is non-informational.** If removing the text would lose information, it must not be `text-faint`. That includes placeholders (WCAG requires 4.5:1 for them) and the label or value of a disabled control, which use `text-muted`.
+8. **Interactive boundaries use `control-edge`.** A control whose visible boundary is what identifies it (an input, a select, a secondary button) draws it 1px in `control-edge`, which meets the 3:1 non-text contrast of WCAG 1.4.11. `rule-control` and `rule` are structural hairlines and are not used for that role. Hover strengthens the edge to `text-muted`, an invalid field recolours it `danger`, and focus adds the 2px `focus` outline, so rest, hover, invalid and focus are all distinguishable.
+9. **Future themes** add a new `[data-theme]` block with the same token names. No Direction D component may reference a hex value.
 
 ### 2.4 Migration compatibility (implementation constraint)
 
@@ -217,7 +219,8 @@ Never nest a rounded container inside another rounded container that has a visib
 | Line | Token | Use |
 |---|---|---|
 | Hairline | `rule` 1px | Row separators, panel edges, shell borders |
-| Control | `rule-control` 1px | Control borders; table header underline |
+| Control | `rule-control` 1px | Table header underline; chip and tag borders (structural, not interactive boundaries) |
+| Control edge | `control-edge` 1px | Resting boundary of inputs, selects, textareas and secondary buttons (§2.3.8) |
 | Section | `rule-strong` 1px | Under every section title (`section` style) |
 | Strata | 1px `rule-control` + 1px `text-faint` @ 70% + 2px `rule-strong`, 2px apart | **Only** under entity headers (§17) |
 
@@ -592,7 +595,7 @@ Personal only. **Never** administrative items (Users, Roles, Pages and Settings 
 | Shell | Account trigger |
 |---|---|
 | Customer top bar | The circular avatar (34px) **is** the trigger button |
-| Operator rail | A **rounded-square rail button** (40×40, radius 6, rail-item geometry, `surface` + `rule-control` ring) **containing** a circular 28px avatar |
+| Operator rail | A **rounded-square rail button** (40×40, radius 6, rail-item geometry, `surface` + `control-edge` ring) **containing** a circular 28px avatar |
 
 Both triggers are `<button>` elements with `aria-haspopup="menu"`, `aria-expanded`, and an accessible name ("Account menu: <name>").
 
@@ -681,7 +684,7 @@ Single-key shortcuts are inactive while focus is in a text field, and can be tur
 
 - **Hide** controls the user can never use (capability).
 - **Disable** controls blocked by the current state, with a tooltip or visible reason (billed, archived, waiting for the server).
-- Disabled controls use `text-faint`, keep their layout, and are `aria-disabled` so the reason is discoverable.
+- Disabled controls drop their fill to `surface-sunken` and keep their label or value at `text-muted` (never `text-faint`: it is still information), keep their layout, and are `aria-disabled` so the reason is discoverable.
 
 ### 15.5 Optimistic vs confirmed
 

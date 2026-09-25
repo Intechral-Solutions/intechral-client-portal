@@ -216,7 +216,7 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
                     </Link>
                     <Link
                         href={allocation.url()}
-                        className="border-b-2 border-primary px-3 py-2 text-sm font-medium text-primary"
+                        className="border-b-2 border-ink px-3 py-2 text-sm font-medium text-text"
                     >
                         Allocation
                     </Link>
@@ -247,11 +247,7 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
                     </Button>
                 </form>
 
-                {error ? (
-                    <Alert role="alert" className="text-destructive">
-                        {error}
-                    </Alert>
-                ) : null}
+                {error ? <Alert variant="danger">{error}</Alert> : null}
                 {status ? (
                     <p className="text-sm text-muted-foreground" role="status">
                         {status}

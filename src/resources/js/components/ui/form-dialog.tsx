@@ -66,7 +66,7 @@ export function FormDialog({
                     {children}
                     <div className="flex justify-end gap-2 pt-2">
                         <Dialog.Close asChild>
-                            <Button type="button" variant="outline" disabled={processing}>
+                            <Button type="button" variant="secondary" disabled={processing}>
                                 Cancel
                             </Button>
                         </Dialog.Close>

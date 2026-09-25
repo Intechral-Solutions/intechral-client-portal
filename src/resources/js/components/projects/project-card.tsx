@@ -43,7 +43,6 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
                     value={project.completion}
                     label={`${project.name} completion`}
                     valueText={`${project.completion}% complete`}
-                    className="h-1.5"
                 />
             </div>
 

@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Alert } from '@/components/ui/alert';
@@ -9,21 +9,13 @@ type FlashRegionProps = {
     flash: FlashProps;
 };
 
-// `legacy-success`/`legacy-warning` keep the pre-Direction D colours (EPIC-013 WP1c);
-// `danger` is the Direction D token. WP2's Alert restyle replaces all four.
+// Each flash key maps to an Alert variant, which owns the glyph, the kind label and the live-region
+// role (`danger` -> `alert`; `success`, `info` and `warning` -> `status`).
 const variants = {
-    success: {
-        icon: CircleCheck,
-        className: 'border-legacy-success text-legacy-success',
-        role: 'status',
-    },
-    status: { icon: Info, className: 'border-info text-info', role: 'status' },
-    warning: {
-        icon: TriangleAlert,
-        className: 'border-legacy-warning text-legacy-warning',
-        role: 'status',
-    },
-    error: { icon: CircleAlert, className: 'border-danger text-danger', role: 'alert' },
+    success: 'success',
+    status: 'info',
+    warning: 'warning',
+    error: 'danger',
 } as const;
 
 type FlashType = keyof typeof variants;
@@ -48,27 +40,24 @@ export function FlashRegion({ flash }: FlashRegionProps) {
     return (
         <div className="mx-auto w-full max-w-7xl space-y-2 px-4 pt-4 sm:px-6 lg:px-8">
             {messages.map(([type, message]) => {
-                const variant = variants[type];
-                const Icon = variant.icon;
-
                 return (
                     <Alert
                         key={`${type}:${message}`}
-                        className={`flex items-start gap-3 ${variant.className}`}
-                        role={variant.role}
+                        variant={variants[type]}
+                        action={
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="-my-2 -mr-2"
+                                aria-label="Dismiss message"
+                                onClick={() => setDismissedSignature(signature)}
+                            >
+                                <X className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                        }
                     >
-                        <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span className="flex-1">{message}</span>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="-my-2 -mr-2"
-                            aria-label="Dismiss message"
-                            onClick={() => setDismissedSignature(signature)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
+                        {message}
                     </Alert>
                 );
             })}

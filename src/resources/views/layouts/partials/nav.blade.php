@@ -10,7 +10,7 @@
         'rounded-md px-3 py-2 text-sm font-medium transition-colors ' . (
             $active
                 ? 'legacy-bg-surface legacy-text-primary'
-                : 'legacy-text-secondary hover:legacy-bg-surface hover:text-primary'
+                : 'legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent'
         );
 @endphp
 
@@ -40,7 +40,7 @@
 
                 {{-- Theme toggle --}}
                 <button id="theme-toggle" type="button" aria-label="Toggle colour theme"
-                        class="rounded-md p-2 legacy-text-secondary hover:legacy-bg-surface hover:text-primary transition-colors">
+                        class="rounded-md p-2 legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent transition-colors">
                     {{-- Moon — shown in light mode --}}
                     <svg id="icon-moon" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
@@ -59,7 +59,7 @@
                             aria-expanded="false"
                             aria-haspopup="true"
                             aria-controls="user-menu"
-                            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium legacy-text-secondary hover:legacy-bg-surface hover:text-primary transition-colors">
+                            class="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent transition-colors">
                         <span>{{ auth()->user()->name }}</span>
                         <svg class="h-4 w-4 transition-transform duration-150" id="user-menu-chevron"
                              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -82,7 +82,7 @@
                         {{-- Profile --}}
                         <a href="{{ route('profile.show') }}"
                            role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('profile.*') ? 'legacy-text-primary' : 'legacy-text-secondary hover:text-primary' }}"
+                           class="block px-4 py-2 text-sm transition-colors {{ request()->routeIs('profile.*') ? 'legacy-text-primary' : 'legacy-text-secondary hover:text-legacy-accent' }}"
                            style="{{ request()->routeIs('profile.*') ? 'background-color: var(--bg-surface);' : '' }}">
                             Profile
                         </a>
@@ -94,7 +94,7 @@
                         @foreach ($managementNavigation as $item)
                         <a href="{{ $item['href'] }}"
                            role="menuitem"
-                           class="block px-4 py-2 text-sm transition-colors {{ $item['isActive'] ? 'legacy-text-primary' : 'legacy-text-secondary hover:text-primary' }}"
+                           class="block px-4 py-2 text-sm transition-colors {{ $item['isActive'] ? 'legacy-text-primary' : 'legacy-text-secondary hover:text-legacy-accent' }}"
                            style="{{ $item['isActive'] ? 'background-color: var(--bg-surface);' : '' }}">
                             {{ $item['label'] }}
                         </a>
@@ -107,7 +107,7 @@
                             @csrf
                             <button type="submit"
                                     role="menuitem"
-                                    class="w-full px-4 py-2 text-left text-sm legacy-text-secondary hover:text-primary transition-colors">
+                                    class="w-full px-4 py-2 text-left text-sm legacy-text-secondary hover:text-legacy-accent transition-colors">
                                 Sign out
                             </button>
                         </form>
@@ -120,7 +120,7 @@
                         aria-expanded="false"
                         aria-controls="mobile-menu"
                         aria-label="Open navigation menu"
-                        class="md:hidden rounded-md p-2 legacy-text-secondary hover:legacy-bg-surface hover:text-primary transition-colors ml-1">
+                        class="md:hidden rounded-md p-2 legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent transition-colors ml-1">
                     <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
@@ -128,7 +128,7 @@
 
                 @else
                 <a href="{{ route('login') }}"
-                   class="rounded-md px-4 py-2 text-sm font-medium legacy-text-secondary hover:legacy-bg-surface hover:text-primary transition-colors">
+                   class="rounded-md px-4 py-2 text-sm font-medium legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent transition-colors">
                     Sign in
                 </a>
                 @endauth
@@ -144,7 +144,7 @@
         <div class="px-4 py-3 space-y-1">
             @foreach ($primaryNavigation as $item)
             <a href="{{ $item['href'] }}"
-               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ $item['isActive'] ? 'legacy-bg-surface legacy-text-primary' : 'legacy-text-secondary hover:legacy-bg-surface hover:text-primary' }}">
+               class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {{ $item['isActive'] ? 'legacy-bg-surface legacy-text-primary' : 'legacy-text-secondary hover:legacy-bg-surface hover:text-legacy-accent' }}">
                 {{ $item['label'] }}
             </a>
             @endforeach

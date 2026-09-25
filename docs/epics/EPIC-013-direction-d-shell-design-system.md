@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope)
 
 ---
 
@@ -54,6 +54,7 @@
 - [Amendment 3: WP1b Results (2026-09-25)](#amendment-3-wp1b-results-2026-09-25)
 - [Amendment 4: WP1c Results (2026-09-25)](#amendment-4-wp1c-results-2026-09-25)
 - [Amendment 5: WP1d Results (2026-09-25)](#amendment-5-wp1d-results-2026-09-25)
+- [Amendment 6: WP2 Results (2026-09-25)](#amendment-6-wp2-results-2026-09-25)
 
 ---
 
@@ -430,7 +431,7 @@ Applied only where the mapping cannot reduce contrast, erase a control boundary,
 | `border` / `input` | `rule-control` | Yes — `rule-control` is the control-boundary token by definition |
 | `ring` | `focus` | Yes |
 | `destructive` | `danger` | Yes |
-| `primary` | **Hold at legacy indigo initially** | **No** — Direction D primary is ink (L7). Repointing `primary` to `ink` turns every `bg-primary` button into a near-black slab and every `text-primary` link into body-coloured text across all 12 React pages at once. Flip in WP2 together with the Button restyle, not in WP1 |
+| `primary` | **Hold at legacy indigo initially** | **No** — Direction D primary is ink (L7). Repointing `primary` to `ink` turns every `bg-primary` button into a near-black slab and every `text-primary` link into body-coloured text across all 12 React pages at once. Flip in WP2 together with the Button restyle, not in WP1. **Done in WP2 — see [Amendment 6, A6.3](#a63-the-primary-alias-flipped-to-ink-after-every-consumer-was-resolved)** |
 | `secondary`, `accent-foreground`, `success`/`warning`/`info` | Hold at legacy | Deferred to the slice that migrates their consumers |
 | `--bg-*`, `--text-*`, `--border-*`, `--surface-*` raw family | **Unchanged values** | They back 900+ Blade sites; they are frozen, not remapped, until Blade page bodies migrate |
 
@@ -1026,6 +1027,8 @@ Classification of every existing shared primitive. The governing rule (Direction
 | `RunningTimerBar` | **Replace** | → `TimerPill` + `TimerTray` |
 | Domain components (`projects/`, `tasks/`, `time/` — 50 files) | **Untouched** | They inherit restyled primitives and tokens. Their redesign belongs to their product epics |
 
+*Outcome of WP2 against this table: [Amendment 6](#amendment-6-wp2-results-2026-09-25). `Status` and `Avatar` were created; `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip` and `Popover` (and their three Radix dependencies) were deferred to the packages that own their first consumer (A6.10); `Badge` is retained as the tag primitive.*
+
 **New components in this epic** (Direction D §18, foundation subset only): `AppShell`, `Rail`, `RailItem`, `Drawer`, `DrawerSection`, `DrawerItem`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `SkipLink`, `AccountMenu`, `AccountTrigger`, `Avatar`, `BrandMark`, `TimerPill`, `TimerTray`, `TimerControl`, `PageFrame`, `Section`, `EntityHeader`, `Strata`, `Status`, `Tag`, `EmptyState`, `ErrorState`, `Skeleton`, `Tabs` (Radix), `Tooltip` (Radix), `Popover` (Radix).
 
 **Deferred, despite appearing in Direction D §18:** `Priority`, `StagePath`, `Chip`/`FilterChip`, `FilterBar`, `DataTable` conventions, `BulkBar`, `Card`, `Combobox`, `CustomerShell`/`TopNav`. Each is built by the first product epic that has a real consumer — the roadmap's "foundations earn their keep" principle. Building them here would mean writing components with no caller and no way to validate them.
@@ -1364,6 +1367,8 @@ Four independently revertible slices.
 - Unit tests for semantics: roles, `aria-current`, `aria-valuetext`, glyph+label never colour-alone.
 - **No page migrations for aesthetics.**
 
+- **Complete (2026-09-25) — results in [Amendment 6](#amendment-6-wp2-results-2026-09-25).** Executed with one deliberate narrowing: of the additions, only `Status` and `Avatar` were built (live consumers); `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip`, `Popover` and the three Radix dependencies are deferred with named first consumers (A6.10).
+
 **Exit:** primitives pass semantics tests; the compatibility matrix re-passes; no page body restructured.
 
 ### WP3 — Navigation contract
@@ -1496,7 +1501,7 @@ Entry conditions, so this is not started prematurely: the Focused shell exists a
 
 | # | Risk | Likelihood | Impact | Mitigation | Rollback |
 |---|---|---|---|---|---|
-| R1 | Token layer degrades unmigrated Blade screens (567 utility sites + 900 raw-variable sites) | Medium | High | F1 resolved by a mechanical rename before any token lands; F2 orphans defined; `primary` held until WP2; ten-screen matrix in both themes | Revert the single WP1c commit; WP1a/WP1b stand alone |
+| R1 | Token layer degrades unmigrated Blade screens (567 utility sites + 900 raw-variable sites) | Medium | High | F1 resolved by a mechanical rename before any token lands; F2 orphans defined; `primary` held until WP2 (flipped in WP2, Amendment 6); ten-screen matrix in both themes | Revert the single WP1c commit; WP1a/WP1b stand alone |
 | R2 | Ink primary buttons make existing React pages look broken or lose affordance | Medium | Medium | The `primary` flip ships **with** the Button restyle in WP2, with its own visual pass, not silently in WP1 | Revert WP2's alias line; Button keeps legacy indigo |
 | R3 | Font swap clips or truncates dense legacy Blade layouts | Medium | Medium | G1 gate in WP0 renders the two densest screens before committing; `font-display: swap`; explicit fallback stacks | Revert WP1d; the bunny.net link is one line in each root view |
 | R4 | Drawer persistence flashes or shifts layout | Medium | Medium | S1 spike proves it before WP4; CSS-driven geometry; cookie is the pre-agreed fallback | Ship with the drawer always at the workspace default; persistence is additive |
@@ -2471,14 +2476,14 @@ Searched: every `.blade.php`/`.tsx`/`.ts`/`.js` under `src/resources` (token-lev
 | `ring` | 9 (`focus-visible:ring-ring` — Button, Input, Textarea, NativeSelect, links) | `var(--accent)` indigo | **`var(--ds-focus)`** | **Yes** | Light 6.29 → **6.32** (equal/better); dark 4.51 / **3.28** / 3.97 → **13.19 / 9.61 / 11.62**. Fixes a near-threshold dark focus ring on cards. Focus-only, no layout effect. React only (Blade focus rings use `currentColor`) |
 | `destructive` | 8 (`text-destructive` × 7 inline errors, `bg-destructive` × 1 Button variant) | `var(--danger)` red-600 / red-400 | **`var(--ds-danger)`** | **Yes** | Text light 4.77 / 4.56 → **6.57 / 6.29**; dark 6.97 / 5.08 / 6.14 → **8.79 / 6.40 / 7.75**; destructive fill with its unchanged foreground 4.77 → **6.57** light, 6.97 → **8.79** dark. Also keeps React's reds consistent with the F5 error flash |
 | `destructive-foreground` | 1 | white / gray-950 | unchanged | No | Still correct on the new fill (above) |
-| `primary`, `primary-foreground` | 24 / 3 | indigo / white | unchanged | **No — held** | A4.6 |
+| `primary`, `primary-foreground` | 24 / 3 | indigo / white | unchanged | **No — held** | A4.6. **Superseded: flipped to ink in WP2, [A6.3](#a63-the-primary-alias-flipped-to-ink-after-every-consumer-was-resolved)** |
 | `foreground`, `card-foreground` | 27 / 6 | `--text-primary` | unchanged | No | `text` would **reduce** contrast: light 17.75 → 17.22, dark 19.27 → 17.11 (−2.2), and would split React text from inherited body text and Blade text |
 | `muted-foreground` | 98 | `--text-secondary` gray-600 / gray-400 | unchanged | No | `text-muted` **reduces** light contrast 7.56 → 6.40 (−1.16) on white, 7.23 → 6.12 on `muted`; dark would improve. Mixed → hold |
 | `border`, `input` | 65 / 9 | `--border-base` gray-300 / gray-700 | unchanged | No | `rule-control` **weakens dark control boundaries**: 1.42 → 1.29 on cards, 1.95 → 1.77 on the page (light would gain +0.1). Mixed → hold |
 | `background` | 13 (incl. Input/Textarea/Select/outline Button fills) | `--bg-base` white / gray-950 | unchanged | No | Too broad: a whole-surface swap to warm paper / teal-black under every React form control, while `html`/`body` and all Blade pages stay legacy — a cross-renderer seam. Owned by WP2 (controls) / WP4 (shell) |
 | `card` | 10 | `--bg-elevated` | unchanged | No | Identical in light, but every React card in dark would move `#1e2939 → #142023` against held borders — broad. WP4/WP7 |
 | `muted`, `secondary`, `secondary-foreground`, `accent-foreground`, `info` | 15 / 1 / 3 / 0 / 2 | legacy | unchanged | No | No Direction D equivalent is safe or needed yet; deferred to the slice migrating their consumers (§8.3) |
-| `accent`, `success`, `warning` (Tailwind names) | 7 / 2 / 2 | legacy indigo / green-600 / amber-500 | **names reassigned to Direction D**; legacy meanings kept as `legacy-accent` / `legacy-success` / `legacy-warning` with identical values | Names only — rendered values unchanged | F4 isolation (A4.4). Retire each `legacy-*` token when its consumer migrates: the 7 checkboxes with their Blade pages, the two flash variants with WP2's Alert restyle |
+| `accent`, `success`, `warning` (Tailwind names) | 7 / 2 / 2 | legacy indigo / green-600 / amber-500 | **names reassigned to Direction D**; legacy meanings kept as `legacy-accent` / `legacy-success` / `legacy-warning` with identical values | Names only — rendered values unchanged | F4 isolation (A4.4). Retire each `legacy-*` token when its consumer migrates: the 7 checkboxes with their Blade pages, the two flash variants with WP2's Alert restyle *(retired in WP2, [A6.7](#a67-alert-flashregion-pagination))* |
 | Raw `--bg-*`, `--text-*`, `--border-*`, `--surface-*`, status families, `--accent*`, `--danger/success/warning/info`, `--shadow-*`, `--color-brand-*` | ~900+ Blade `var()` sites | — | unchanged | No | Frozen until Blade page bodies migrate (§8.3) |
 | WP1b six orphans | 51 | A3.3 | unchanged | No | A4.15 |
 | WP1a `legacy-*` utilities | 34 base + 32 variant | A2.4 | unchanged | No | A4.14 |
@@ -2487,7 +2492,7 @@ Net: **110 of 114 non-canonical theme declarations are byte-identical** in the c
 
 ### A4.6 `primary` hold
 
-`--primary: var(--accent)` (indigo `#4f46e5` / `#6366f1`) is unchanged in both themes and pinned by a test (A4.16). No Button, badge or link was restyled; the matrix shows `bg-primary` buttons, `border-primary`/`text-primary` active tabs and the two `accent-primary` checkboxes computing the same colours before and after. WP2 flips `primary` to `ink` together with the Button restyle and updates that test deliberately.
+`--primary: var(--accent)` (indigo `#4f46e5` / `#6366f1`) is unchanged in both themes and pinned by a test (A4.16). No Button, badge or link was restyled; the matrix shows `bg-primary` buttons, `border-primary`/`text-primary` active tabs and the two `accent-primary` checkboxes computing the same colours before and after. WP2 flips `primary` to `ink` together with the Button restyle and updates that test deliberately. *(Done: [A6.3](#a63-the-primary-alias-flipped-to-ink-after-every-consumer-was-resolved).)*
 
 ### A4.7 Canonical contrast audit (measured)
 
@@ -2643,7 +2648,7 @@ Both failures are environment conditions outside the WP1c diff. The equivalent f
 2. **F5 is the only Direction D adoption, and it is a choice.** If the reviewer prefers WP1c to change nothing visible, the one-line alternative is `border-current` in place of `border-danger text-danger`, which freezes today's ink rendering until WP2's Alert restyle. The activation was chosen because it follows the A2.5 precedent and is strictly more legible.
 3. **Stale compiled views feed the Tailwind build.** `@source '../../storage/framework/views/*.php'` scans every compiled template, including pre-WP1a compiles and an orphan of the deleted `time/allocation.blade.php`. In a dev-tree build this generates dead rules (after WP1c, `.hover\:bg-surface:hover`, `.hover\:bg-surface-hover:hover` and `.accent-accent` against Direction D values). No rendered markup can carry them, and a clean-checkout build (CI) has none, but the dev CSS size depends on local residue. Owner: the CI handoff ([§30](#30-ci-handoff)), which should build from a clean view cache, or a later decision to drop that `@source` line.
 4. **§8.3's alias table was partly optimistic.** `foreground`, `muted-foreground`, `border`/`input`, `background` and `card` were listed as safe; measured, each reduces contrast or control-boundary strength somewhere, or swaps whole surfaces, so all are held. Only `ring` and `destructive` pass. The §8.3 plan also did not anticipate F3/F4.
-5. **Control and hairline rules are below WCAG 1.4.11's 3:1** in both themes by design (`rule-control` 1.44–1.63). The contract makes no contrast claim for them, and the held legacy `border` has the same property (1.42–1.95). This does not block the token layer, but WP2's Input/Button restyle must make control identity not depend on the border alone (fill, label, focus ring), and should record how it satisfies 1.4.11.
+5. **Control and hairline rules are below WCAG 1.4.11's 3:1** in both themes by design (`rule-control` 1.44–1.63). The contract makes no contrast claim for them, and the held legacy `border` has the same property (1.42–1.95). This does not block the token layer, but WP2's Input/Button restyle must make control identity not depend on the border alone (fill, label, focus ring), and should record how it satisfies 1.4.11. *(Resolved in WP2: a dedicated `control-edge` token now draws the interactive boundary at ≥ 3:1, and `rule-control` stays a structural hairline. See [A6.25](#a625-post-review-remediation-resting-control-boundary-and-scope-confirmation).)*
 6. `text-faint` measures 3.05–4.65 and stays decorative/placeholder-only. `success` text on `canvas` (4.83) is the narrowest canonical text pair; WP2's `Status` should not place `success` text on anything darker than `canvas`.
 
 ### A4.20 Files changed
@@ -2904,3 +2909,326 @@ WP2 may start. It inherits:
 - **Control metrics:** native `<select>` height tracks font metrics (A5.7); the `Input`/`NativeSelect`/`Button` restyle should fix control heights explicitly rather than inherit them.
 - **Unchanged obligations:** the `primary` flip with the Button restyle (A4.6), 1.4.11 control identity (A4.19 finding 5), `success` text placement (finding 6), and the two A4.8 legacy contrast debts via `Status`.
 - **Not WP2's:** the theme bootstrap consolidation (WP4/WP5), BrandMark (WP4, C9), the Plex Sans 600 preload question (WP8).
+
+---
+
+## Amendment 6: WP2 Results (2026-09-25)
+
+### A6.1 Committed scope, as executed
+
+**Owner-confirmed.** The owner explicitly approved the narrowed component scope described here: `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip` and `Popover` (and the three Radix dependencies) stay **deferred until a concrete current or foundation consumer exists**, because live inspection found none. They are not to be added to satisfy the literal §28 inventory. The narrowing below is therefore settled scope, not an open question.
+
+WP2 ran on `feature/epic-013-direction-d-shell` at `b8c74a5` (WP1d), working tree clean at start. **WP2 is now Complete**, with one deliberate narrowing of the §28 list that this section records rather than hides.
+
+[§28 WP2](#wp2--shared-primitives) lists the restyles, the three reworks, and nine additions (`Avatar`, `Status`, `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip`, `Popover`, with three Radix dependencies). It also carries the governing rules that the additions must have a real consumer ("each with a real consumer", §26) and that there are **no page migrations for aesthetics**. The WP2 work order applied both: **an addition was built only where a live consumer exists in the tree today**; the rest are deferred to the package that owns their first consumer (A6.10). §28's *restyle* and *rework* lists were executed in full.
+
+| §28 item | Outcome |
+|---|---|
+| `Button` (ink) + `primary` flip | Done, one reviewable change with its audit (A6.3, A6.4) |
+| `Input`, `Textarea`, `Label` | Restyled; `NativeSelect` (retained) pinned to the same control scale |
+| `DropdownMenu`, `Dialog`/`DialogShell`, `ConfirmationDialog`, `FormDialog` | Restyled, behaviour untouched |
+| `Alert` (+ `FlashRegion`), `Pagination` | Restyled |
+| `Progress` → `ProgressBar`/`Meter` | Reworked in place; keeps the `Progress` export (A6.9) |
+| `SectionPanel` → `Section`; `PageHeader` | `Section` created, `SectionPanel` is now a wrapper over it; `PageHeader` gained an overline |
+| `Status`, `Avatar` | **Created** (real consumers: A6.2) |
+| `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip`, `Popover` | **Deferred**, no live consumer (A6.10) |
+
+No PHP under `app/`, no migration, no route, no controller changed. The only backend-tree files touched are the architecture test and one Blade partial (`nav.blade.php`, A6.3).
+
+### A6.2 Component inventory
+
+| Component | Prior state | Final state | Action | Current consumers |
+|---|---|---|---|---|
+| `Button` | cva: default/secondary/outline/ghost/destructive × default/icon/sm, `bg-primary` (indigo), `h-9`, `hover:opacity`, disabled by global 50% opacity | `primary` (= `default`), `secondary` (= `outline`), `ghost`, `destructive` × `sm` / `md` (= `default`) / `lg` / `icon`; ink fill; explicit shared control heights; 2px/2px `focus` outline; disabled = `surface-sunken` + `text-muted` (was `text-faint` in the first pass; A6.25) | **Restyle** | 74 JSX sites + 11 raw `buttonVariants` link sites (Pagination, board, create/edit, dashboard, operator time) |
+| `Input`, `Textarea`, `Label` | shadcn tokens, `h-10`, ring focus | `surface` fill, `rule-control` edge, `text` ink, `aria-invalid` edge, explicit `h-9`, outline focus | **Restyle** | every React form |
+| `NativeSelect` | `h-10`, shadcn tokens | Same treatment; `h-9`, `py-0`, still a native `<select>` | **Retain, normalised** | 15 sites (time, operator time, create-task, project fields, invitations …) |
+| `DialogShell`, `ConfirmationDialog`, `FormDialog` | `bg-black/50`, `rounded-md border shadow-xl` | `bg-scrim`, `rounded-overlay bg-surface shadow-overlay`, token-driven enter/exit animation (reduced-motion aware) | **Restyle** | milestones, project delete, time entry delete/edit, profile |
+| `DropdownMenu` | `bg-card border shadow-lg`, `focus:bg-muted` | `surface` + `shadow-overlay`, radius 8, `data-highlighted` = `surface-hover`, keyboard outline | **Restyle** | board Move menu, account menu (`app-layout`) |
+| `Alert` | one bordered box, no variants | `neutral` / `info` / `success` / `warning` / `danger`, each with a glyph and an `sr-only` kind label; `danger` is `role=alert`, the rest `status` | **Restyle** | `FlashRegion`, profile, time pages |
+| `Pagination` | outline buttons | `secondary` buttons, tokens, `rel=prev/next` | **Restyle** | tasks, operator time |
+| `Progress` | `progressbar`, 8px, `bg-muted` / `bg-primary` | `progressbar`, 6px (`md`) / 4px (`sm`), `progress-track` / `progress-fill` | **Rework** (kept `Progress`) | project card, milestone card, checklist, operator time (new) |
+| `SectionPanel` | 2-column grid, `border-border` | wrapper over `Section layout="split"`, same geometry, token colours | **Rework** | 26 |
+| `Section` | did not exist | stacked (title over `rule-strong`) and split layouts, `aria-labelledby` `<section>` | **New** | via `SectionPanel` |
+| `PageHeader` | title + description + actions | adds `overline`; tokens; actions wrap | **Rework** | 11 |
+| `Status` | did not exist (colour-only `Badge` variants) | glyph + label + tone; `neutral` / `info` / `success` / `warning` / `danger` / `live`; 7 shapes | **New** | `TaskStatusBadge`, `ProjectStatusBadge`, dashboard ticket status, profile 2FA state, time "Running" |
+| `Avatar` | two hand-rolled `bg-primary` circles | circular initials on `surface-sunken`, `role=img` + name, `decorative` | **New** | `TaskCard`, `TaskComments` |
+| `Badge` | five variants | neutral moved to tokens; documented as the tag / chip primitive; status variants kept for unmigrated consumers | **Retain** | 12 sites (Billed / Locked / Billable / Owner / Current, `PriorityBadge`) |
+| `control-metrics.ts` | — | the single control-height scale and the shared focus ring | **New** (helper) | Button, Input, Textarea, NativeSelect |
+
+### A6.3 The `primary` alias: flipped to ink, after every consumer was resolved
+
+WP1c held `--primary: var(--accent)`. It now reads **`var(--ds-ink)`** (`--primary-foreground: var(--ds-on-ink)`) in both themes. It was done in the required order: inventory every consumer, classify, make each accent-meaning consumer explicit, then remap.
+
+**Inventory.** A raw scan of `resources/` (`bg|text|border|ring|accent|fill|stroke|outline|divide|decoration|shadow`-`primary`, with any variant prefix, in `.tsx`, `.ts`, `.blade.php`, `.js`) plus `app/`, `database/`, `config/`, `routes/` and `lang/` found **13 site groups**, and the 74 `<Button>` sites that consume `primary` implicitly through the `default` variant.
+
+| # | Site | Was | Classification | Resolution |
+|---|---|---|---|---|
+| 1 | `Button` `default` variant | `bg-primary` indigo | **primary action** | `bg-ink text-on-ink` (the flip, A6.4) |
+| 2–3 | `login.tsx:77`, `company-selector.tsx:40` | `accent-primary` checkbox | selected-state control | **`accent-accent`** (interactive accent; the Blade checkboxes keep `legacy-accent`) |
+| 4–6 | `tasks/index.tsx` `ViewTab`, `time/index.tsx` "Entries", `time/allocation.tsx` "Allocation" | `border-primary text-primary` active tab | active / selected | **`border-ink text-text`**, the Direction D ink underline |
+| 7 | `dashboard/index.tsx` card links | `hover:border-primary` | hover accent | **`hover:border-accent-line`** |
+| 8 | `dashboard/index.tsx` chevron | `group-hover:text-primary` | hover accent | **`group-hover:text-accent`** |
+| 9 | `operator/time/index.tsx` share bar | `bg-primary` fill | progress fill | now `<Progress>` (`progress-fill`), and gains a named `progressbar` |
+| 10–11 | `task-card.tsx`, `task-comments.tsx` | `bg-primary text-primary-foreground` circle | identity mark (legacy misuse of an action colour) | **`Avatar`** |
+| 12 | `progress.tsx` | `bg-primary` fill | progress fill | `bg-progress-fill` |
+| 13 | `nav.blade.php` × 9 | `hover:text-primary` | link-hover accent | **`hover:text-legacy-accent`**, byte-identical rendering (indigo), so the Blade nav is untouched |
+
+The ten A2.5 sites were already resolved by WP1a: sites 1–7 are `legacy-text-primary` (ink) and are unaffected; sites 8–10 are rows 4–6 above. The two-factor method switch used `variant="default"` as its *selected* state; it stays an ink fill (the segmented-control look) and now exposes `aria-pressed`.
+
+**The 74 implicit `default` Buttons** were read: every one is a submit / create / save / apply / start action (auth forms, project and task forms, milestone create, timer start, quick-add), plus the create-task opener. Ink is the correct fill for all of them. No cyan is used as a fill anywhere.
+
+**After the flip** nothing in `resources/` consumes `primary` for an accent meaning. The alias stays defined as *"the primary action"* for any future shadcn-style code. It is guarded twice (A6.19): the mapping itself, and a source scan that fails if a `text|border|ring|accent-primary` idiom reappears.
+
+### A6.4 Button contract
+
+`primary` = ink (`bg-ink text-on-ink`); `secondary` = `surface` + `control-edge` (A6.25); `ghost` = no resting chrome; `destructive` = the WP1c `destructive → danger` alias (fill, confirming action only). `outline` and `default` remain as aliases so no call site changed. Heights come from the shared scale (A6.5); a border is always present (transparent when the variant has no edge) so every variant is the same size for the same label. No variant repeats a class another sets, because `buttonVariants` is also used as a raw class string on links (where `twMerge` does not run); a test enforces it. Disabled controls drop their fill for `surface-sunken`, keep their label at `text-muted` (A6.25) and a `rule` edge, and keep `pointer-events-none`. Focus is the §14.1 2px/2px `focus` outline. Transitions cover colour, background and border only, **not** `outline-color`: with `transition-colors` the ring faded in from black over 120 ms (found in the browser, fixed).
+
+Hover is `ink/90`, active `ink/80` (primary) and `surface-hover` / `surface-sunken` (secondary, ghost); contrast in A6.12.
+
+### A6.5 Forms and control geometry
+
+One scale, `components/ui/control-metrics.ts`: **sm 32 / md 36 / lg 40 px**, `pointer-coarse` steps to 40 / 44 / 48. `Button`, `Input` and `NativeSelect` all read it, so they align in a row. `Textarea` keeps `min-h-24` (never a fixed height). Radius is the §4.2 5 px (`rounded-control`), 7 px for `lg`; new theme tokens `--radius-control`, `-control-lg`, `-overlay`, `-tag`.
+
+**Measured (Chromium, `/time`, `/projects/create`, `/profile`, `/operator/time`, with and without the web fonts, by aborting every `*.woff2`):** every `input`, `select` and `button` is **36 px in both conditions**. At HEAD they were 40 (inputs, selects) and 36 (buttons), and four filter selects hand-copied the primitive's classes with `h-10 … bg-background` (so they neither matched the primitive nor could be restyled). Those redundant overrides were deleted, and the raw `<input>` in `quick-add-task.tsx` was replaced with `Input`. Inputs and selects are therefore 4 px shorter on the React pages: a deliberate density change toward the 36 px row of §4.1.
+
+**What WP1d's 37 → 38 px finding was.** The React `NativeSelect` was already height-pinned at HEAD (40 px both ways), so the metric-driven growth WP1d saw is on **Blade** selects, which have no explicit height. WP2 pins every React control; the Blade selects are WP5's and still track the font.
+
+**WCAG 1.4.11 (non-text contrast) — resolved after review (A6.25).** The first WP2 pass drew field edges in `rule-control` (1.44–1.63:1) and could not honestly claim 1.4.11 for the resting state. The owner did not accept label, hover or focus as a substitute for a visible boundary, so WP2 now draws the resting edge of `Input`, `Textarea`, `NativeSelect` and the `secondary` `Button` in a dedicated **`control-edge`** token, **3.06–4.20:1 against every surface a control renders on, in both themes**. The values, the surfaces measured, and the Direction D spec change are in A6.25. Placeholder text uses `text-muted` (6.40 / 7.17:1, AA) rather than the contract's old `text-faint` (3.05), which fails AA for text; the spec now says so.
+
+### A6.6 Dialog and dropdown
+
+`DialogShell` is now `bg-scrim` over a `surface` panel with `shadow-overlay`, radius 8, `text` ink; cancel buttons are `secondary`. Enter uses `motion-sheet` (240 ms), exit 70% of it; the menu uses `motion-base`. Under `prefers-reduced-motion` the translation is removed (`--ds-shift: 0`) and durations fall to `motion-fast` (120 ms), verified in Chromium (`animation-duration: 0.12s`). Behaviour is untouched: the controlled/uncontrolled contract, opener focus return, `FormDialog` submit containment and error rendering, and the destructive confirmation copy are byte-identical, and no confirmation was added. `DropdownMenu` keeps Radix semantics; the highlighted row is `surface-hover`, plus a 2px inset `focus` outline (`:focus-visible`, so keyboard only) because a 1.2:1 fill alone is a weak focus indicator; disabled rows are `text-muted` (A6.25; the label is still information).
+
+### A6.7 Alert, FlashRegion, Pagination
+
+`Alert` variants carry a glyph **and** an `sr-only` kind label ("Error: …"), body text stays `text` on the soft tint, the glyph takes the semantic text colour. Only `danger` is `role="alert"`. `FlashRegion` is now a thin mapper (`success`, `status → info`, `warning`, `error → danger`) with the dismiss button in the new `action` slot; it keeps its live-region semantics and retires `legacy-success` / `legacy-warning` (their only consumer), so those two `@theme` names were removed and the guard updated. Profile's two warning panels and the allocation error panel moved to `variant="warning"` / `"danger"`. `Pagination` is `secondary` buttons with `rel=prev/next`; it has no numbered links, so there is no current-page link to mark `aria-current`, and the disabled direction stays omitted.
+
+### A6.8 Status
+
+`Status` is an inline mark, not a pill: a 12 px SVG glyph (`aria-hidden`) + the label as text + a tone. Tones and default shapes: `neutral` hollow circle, `info` half circle, `success` check-in-circle, `warning` triangle, `danger` square, `live` dot; a domain may override the shape (`dot`, `dashed`, …). The label uses the text-safe token, the glyph the shape token (`success` / `success-glyph`, `warning` / `warning-glyph`, `live-text` / `live`). The primitive contains no ticket, task, project or invoice vocabulary; the label is a `string` child rendered as text (React-escaped; tested with `<img onerror>` and `<script>`). A test proves the six tones have six distinct shapes.
+
+Adopted (clearly shared-primitive, mechanical): `TaskStatusBadge`, `ProjectStatusBadge` (active `dot`, on hold `dashed`, completed `check`, archived `circle`), the dashboard's ticket status, the profile 2FA Enabled/Disabled, and the time page's "Running" (`live`). **Not** migrated, because they are attributes or tags rather than states: Billed / Locked / Billable / Non-billable, Owner, Current, and `PriorityBadge` (Priority is deferred).
+
+### A6.9 Progress → continuous bar
+
+`Progress` stays `role="progressbar"` with `aria-valuemin/max/now`, a required name and optional `aria-valuetext`. §11.3 assigns `progressbar` to completion and `meter` to a quantity read against a plan; every current consumer (project card, milestone card, checklist, the new operator-time share bar) is completion, so **no `meter` was built**. Geometry: 6 px (`md`, default) or 4 px (`sm`), radius half the height, `progress-track` / `progress-fill`, never cyan; the width transition uses `motion-base` and is removed under reduced motion. The expected-marker and over-100% treatments are not implemented (no consumer). Two consumers' redundant `h-1.5` overrides were removed.
+
+### A6.10 New Radix primitives, dependencies, and deferrals
+
+**No dependency was added.** `package.json` and `package-lock.json` are unchanged.
+
+| Component | Decision | Reason |
+|---|---|---|
+| `Tabs` (Radix) | **Deferred** | The three live "tabs" (`tasks` `ViewTab`, `time` Entries / Allocation) are route links with `aria-current="page"` (each is a separate Inertia page). `role=tablist` / `tabpanel` semantics would be wrong for them. They were made explicit ink-underline instead (A6.3). First consumer: an in-page tabbed view (Projects / entity pages, WP7+) |
+| `Tooltip` (Radix) | **Deferred** | The epic's consumer is disabled-reason tooltips; no live React control carries a disabled reason (`title` on a drag handle only). First consumer: billing-lock / archived disabled controls |
+| `Popover` (Radix) | **Deferred** | Its consumer is `TimerTray` (WP6). No tray exists |
+| `Tag` | **Deferred** | `Badge` already serves tags and chips; a second component would duplicate it. Split when source tags (`BOARD` / `TICKET`) get a consumer |
+| `Skeleton`, `ErrorState` | **Deferred** | No loading region or region-level error state exists to consume them |
+| `EmptyState` | **Deferred** | Three ad hoc one-line empties ("No milestones yet.", …) do not justify a component yet; Home (WP7) is the first structured consumer |
+| `StagePath`, `Priority`, `FilterBar`, `DataTable`, `BulkBar`, `Card`, `Combobox`, `Chip` | **Deferred** (epic §20) | unchanged |
+| `TimerPill/Tray/Control`, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `AccountMenu`, `CustomerShell`, `TopNav`, `NavigationLink`, `BrandMark` | **Not WP2's** | WP3–WP6 |
+
+Deferring `Tabs`, `Tooltip` and `Popover` changes the epic's stated "three new Radix packages … measured after WP2" (§26, §20): that measurement now applies where each package is finally added. This is the one place the executed scope is smaller than the committed §28 bullet, and it is a call for the reviewer to confirm.
+
+### A6.11 Alias register update (§24.2)
+
+| Alias / name | Was | Now | Note |
+|---|---|---|---|
+| `primary` | `var(--accent)` indigo (held) | **`var(--ds-ink)`** | A6.3 |
+| `primary-foreground` | `var(--accent-text)` | **`var(--ds-on-ink)`** | A6.3 |
+| `legacy-success`, `legacy-warning` | isolation names, 1 consumer (`FlashRegion`) | **retired** | A6.7; the raw `--success` / `--warning` variables stay for Blade |
+| `legacy-accent` | 7 Blade checkboxes | unchanged | now also the Blade nav hover (9 sites) |
+| `destructive`, `ring` | WP1c mappings | unchanged | Button / Input / Dialog focus now use `outline-focus` directly; `ring-ring` remains only on legacy consumers |
+| `background`, `card`, `border`, `input`, `muted`, `muted-foreground`, `foreground`, `secondary*`, `accent-foreground`, `info` | held | held | primitives no longer read them, so they can now be retired as their remaining page consumers migrate |
+| Radius, overlay animations | — | `--radius-control/-control-lg/-overlay/-tag`, `--animate-overlay/dialog/menu-in/out` | new, additive |
+
+### A6.12 Contrast (measured in Chromium, sRGB, rendered composites, both themes)
+
+Lab page rendered from the built primitives on `canvas` and `surface`; thresholds 4.5 text, 3.0 non-text. Light / dark.
+
+| Pair | Light | Dark |
+|---|---:|---:|
+| Primary button text on ink: rest / hover / active | 17.22 / 13.16 / 9.31 | 15.81 / 12.98 / 10.30 |
+| Secondary text on surface: rest / hover / active | 17.22 / 13.68 / 14.71 | 14.15 / 13.56 / 15.30 |
+| Ghost text on canvas: rest / hover | 15.79 / 13.68 | 14.15 / 13.56 |
+| Destructive text on danger: rest / hover / active | 6.57 / 5.69 / **4.76** | 8.79 / 7.30 / 5.99 |
+| Disabled controls, first pass (`text-faint`, superseded: now `text-muted`, 5.46 / 7.75, A6.25) | 2.84–3.05 | 4.17–4.50 |
+| Input text; placeholder | 17.22; 6.40 | 14.15; 7.17 |
+| Input edge at rest / hover / invalid, **as first measured with `rule-control` (superseded, A6.25)** | 1.44–1.57 / 3.05 / 6.03–6.57 | 1.46–1.63 / 4.65 / 7.27–8.12 |
+| Focus outline vs surround (all controls) | 5.79 | 12.18 |
+| `Status` label text, canvas / surface: neutral | 5.86 / 6.40 | 8.00 / 7.17 |
+| info | 5.79 / 6.32 | 11.77 / 10.54 |
+| success (narrowest) | **4.83** / 5.27 | 10.15 / 9.09 |
+| warning | 5.43 / 5.92 | 10.15 / 9.08 |
+| danger | 6.03 / 6.57 | 8.12 / 7.27 |
+| live | 5.79 / 6.32 | 12.18 / 10.91 |
+| `Status` glyph (non-text): success | 3.89 / 4.25 | 9.03 / 8.09 |
+| warning | 3.34 / 3.64 | 10.15 / 9.08 |
+| live | 3.93 / 4.29 | 12.18 / 10.91 |
+| `Alert` body text (all variants, min) | 14.54 | 12.94 |
+| `Alert` glyph on its tint (min) | 5.23 | 7.44 |
+| `Progress` fill on track / fill on surface | 13.18 / 15.79 | 9.61 / 12.56 |
+
+**No failing pair.** Every text pair listed is ≥ 4.5 (`destructive` active, 4.76, is the narrowest; disabled controls are exempt and only need to stay distinguishable) and every non-text pair ≥ 3. The `Progress` track (1.20 / 1.31 against its surround) is decorative; the bar's identity is the fill. The resting-edge (1.4.11) rows above are superseded by A6.25; the current edge is `control-edge`. Across the 21-route matrix no text pair got worse than before and none newly fell below 4.5.
+
+### A6.13 Accessibility
+
+Native `<button>`, `<input>`, `<select>`, `<textarea>`, `<label>` throughout; `NativeSelect` stays native. Disabled is the native attribute (communicated programmatically and unfocusable). Every icon-only `Button` in the tree (14 sites) already had an accessible name; none needed a fix. `Status` never relies on colour (distinct glyph shapes + visible text). `Alert` announces its kind in text and uses `alert` only for errors. Dialogs are named and described, trap focus, close on Esc, an explicit close button and overlay click, and return focus to the opener (verified in Chromium in all four combinations of theme × reduced motion). Menus open from the keyboard, arrow-move a `menuitem` highlight with a visible outline, and Esc returns focus to the trigger. The `Avatar` exposes the name (never the email) or is hidden when the name is beside it. The two-factor method switch exposes `aria-pressed`. No tooltip exists, so nothing depends on one. The S2 navigation focus policy was not implemented.
+
+### A6.14 Visual compatibility matrix
+
+The 21-route WP0 set, both themes, 1360 × 900, operator (guest for auth), against a `base` server built from `b8c74a5` and the live post-WP2 tree, with seeded fixtures (invoice, CRM company + contact, CMS page, existing tickets and projects). Text colours and contrasts compared element by element; rest-state full-page pixel diff.
+
+| Route | Class | Evidence |
+|---|---|---|
+| `projects.create` | **Deliberate Direction D change** | ink primary, `surface` controls, tokenised section rules; page 12 px shorter (36 px controls); 0 text pairs worse |
+| `tasks.index` | **Deliberate change** | ink "New task", ink underline tab, `Status` for task state, secondary pagination |
+| `projects.board` | **Deliberate change** | `Status` project state, secondary header actions, `Input` in quick-add |
+| `profile` | **Deliberate change** | ink actions, `Status` for 2FA, warning `Alert`; the +120 px in the diff is three extra rows of the browser-session list (the harness's own logins) |
+| `dashboard` | **Deliberate change** | `Status` for ticket state, hover accents, secondary actions |
+| `time.index` | **Deliberate change** | ink underline tab, 36 px selects and inputs, `Status` live "Running" |
+| `login`, `forgot-password` | **Deliberate change** | ink submit, tokenised inputs and link buttons |
+| `tickets.show`, `operator.tickets.index`, `operator.tickets.show`, `roles.edit` #1 and #2, `billing.invoices` index / edit / show, `crm.companies.show`, `cms.show`, `cms.index`, `users.show` | **Unchanged** | **0 px** pixel diff, 0 text or control changes, both themes (Blade; no React primitive is used) |
+| `operator.cms.index` | Unchanged | 0 text or control changes; the ~3,000 px band (y 210–267) is the relative-timestamp noise A4.9 already recorded |
+
+**0 regressions.** 76 control geometry changes, all on the seven React routes, all the intended 40 → 36 px normalisation or Button/Input restyle. 0 route with new horizontal overflow, clipping or a text pair newly under 4.5:1. The Blade nav is unaffected by the `primary` flip (9 hover sites made explicit and verified byte-identical in the compiled CSS: `.hover\:text-legacy-accent:hover { color: var(--accent) }`). Blade never referenced `--primary` directly.
+
+### A6.15 Real-browser results
+
+- **Primitive interaction script, Chromium, light × dark × reduced-motion (70 / 70):** dialog radius 8 px, scrim colour (`rgba(26,27,30,.18)` / `rgba(0,0,0,.45)`), enter animation `ds-dialog-in` at 240 ms (120 ms reduced, `--ds-shift: 0px`), focus lands inside, Tab stays trapped, control outline solid 2px / 2px in the `focus` colour (`rgb(11,106,115)` / `rgb(25,231,242)`), Esc and the close button and overlay click all dismiss and return focus to the opener; Move menu and account menu open from the keyboard, arrow to a `menuitem` with a visible outline, radius 8, Esc returns focus; the error flash is `role=alert` with glyph, "Error:" label and `danger-soft` tint and dismisses.
+- **Existing Playwright suite (`./dev test:e2e`, 46 specs):** see A6.20; the run that counts is the one against the final tree, recorded there.
+
+### A6.16 Responsive and dense controls
+
+Widths 1360 / 1280 / 1024 / 768 / 640 (200% reflow of 1280) / 390 on seven React routes plus the task detail page, 48 route-widths: **0 horizontal overflow and 0 clipped controls**, identical to `base`. Controls are 36 px at 100% with and without web fonts. The 640 and 390 px renders were inspected; the dashboard, forms and timer controls stay usable. No WP4 shell work was done.
+
+### A6.17 Bundle and performance
+
+Clean container copies (no stale compiled views), `vite build`, HEAD vs WP2:
+
+| Asset | HEAD raw / gzip | WP2 raw / gzip | Δ gzip |
+|---|---:|---:|---:|
+| `app.css` | 69.58 / 14.96 kB | 76.09 / 16.02 kB | **+1.06 kB** |
+| `app.js` (entry) | 350.48 / 110.14 kB | 350.56 / 110.17 kB | +0.03 kB |
+| `app-layout.js` (shell) | 101.95 / 34.17 kB | 102.09 / 34.21 kB | +0.04 kB |
+| `allocation.js` (Chart.js, lazy) | 234.32 / 79.88 kB | 234.28 / 79.88 kB | 0 |
+| `board.js` (dnd-kit, lazy) | 61.32 / 19.92 kB | 61.07 / 19.86 kB | −0.06 kB |
+| new chunks `status.js`, `avatar.js` | — | 2.18 + 0.74 / 0.75 + 0.51 kB | +1.26 kB |
+| all JS + CSS | 312.94 kB gz | 316.29 kB gz | **+3.35 kB** |
+
+Chart.js and dnd-kit stay in their lazy chunks; nothing moved into the entry or shell. No Radix package was added, so there is no dependency contribution to report. (The live `public/build` CSS is ~91 kB because the dev tree's `storage/framework/views` residue feeds Tailwind's `@source`, A4.19 #3; it is not comparable to a clean build.)
+
+### A6.18 WP1 regression checks
+
+- **WP1a:** the ten `text-primary` decisions hold (A6.3); the seven `legacy-text-primary` sites and the `legacy-*` utilities are untouched; the `hover:legacy-bg-surface` sites in Blade are untouched. No `legacy-legacy-*`.
+- **WP1b:** the six orphans keep their mappings (guard test); Blade routes pixel-identical.
+- **WP1c:** every canonical token and text / shadow / motion exposure still passes the 39 original assertions; `ring → focus`, `destructive → danger` and every held alias are unchanged. The `primary` guard was replaced deliberately (A6.19), not deleted. Compiled CSS carries `--primary: var(--ds-ink)`.
+- **WP1d:** `DirectionDTypographyContractTest` green; fonts, preloads and `@font-face` untouched; no metric or family change.
+
+### A6.19 Tests and static guards
+
+Vitest **378 → 440** (54 → 62 files, +62; 436 after the first pass, +4 in A6.25): new `button`, `input` (+ `NativeSelect`/`Textarea` scale contract), `alert`, `status`, `avatar`, `section`, `page-header`, `project-status-badge`; extended `progress`, `flash-region`, `pagination`, `confirmation-dialog`, `task-status-badge`, `auth-pages`. They assert semantics (roles, names, labels, `aria-pressed`, disabled, focus return, Esc, hostile strings as text, distinct glyph shapes, `aria-valuenow`) and only these styling contracts: primary is ink and never accent / live, aliases equal their targets, no duplicate classes per property, shared control height, no pill or card on `Status` / `SectionPanel`. Pest **972 → 982** (`DirectionDThemeContractTest` 44 cases; 980 / 42 after the first pass, +2 in A6.25): the `primary` guard now pins `--primary: var(--ds-ink)` / `--primary-foreground: var(--ds-on-ink)` with the reason in the test, a new source scan fails if an accent-meaning `primary` idiom returns, the `legacy-success/-warning` retirement, and the radius and reduced-motion animation tokens. **Mutation-checked:** flipping `--primary` back and adding a `text-primary` string each failed their test; restored.
+
+### A6.20 Validation
+
+- `./dev check`: CLI self-tests, `git diff --check`, Pint, Wayfinder + `tsc` + ESLint `--max-warnings=0` + Prettier + Vitest + production build, Pest: all pass (first pass 436 / 980; final tree 440 / 982 with 4,119 assertions, A6.25). (One earlier run failed a `user.type` of 400 characters and, in the next run, an existing 5 s dialog test purely because a stray hung `tinker` process left over from an earlier step was saturating the container; the offender was killed and the tests, one of them mine and rewritten to `paste`, then passed.)
+- **Playwright against the final tree** (after the A6.25 remediation): **46 / 46 passed** (`./dev test:e2e --workers=1`, 9.3 min, Chromium via the live nginx stack serving the final `public/build`), covering auth, projects, milestones (dialogs, focus return), board Move-menu keyboard flow, pointer drag, tasks, task detail and time. Product-data counts afterwards differed only by the one standalone task that the `tasks-migration` D3 spec leaves behind by design; it was deleted and counts verified at baseline. The runs made *before* the remediation are superseded and are not evidence for the final tree.
+- **Earlier runs, stated plainly.** A first parallel run (8 workers) had 10 failures (timeouts, one rate-limited sign-in, a shared-operator interaction) and leaked a project and a task. An early serial run had two 30 s timeouts (`milestones` read-only member, `projects` edit-page safety) that passed when re-run in isolation and in the next full run. **These were not conclusively classified**: no pre-WP2 (HEAD) run of the suite was made, so it is not established whether they were environmental (the container was also saturated by a stray `tinker` process around then) or a WP2 effect. The claim made here is only that the final tree passes; nothing is claimed about the cause of the earlier failures. The `tasks-migration` D3 spec leaves one standalone task per run by design, which is deleted after each run to restore counts.
+
+### A6.21 Cleanup / ownership
+
+All scratch (container `/tmp/wp2`: a HEAD copy, a clean WP2 copy, harnesses, screenshots, the lab) removed; both `artisan serve` processes stopped; the harness-created sessions deleted; fixtures deleted and counts verified at baseline (users 3, invoices 0, CRM 0, CMS 0, tickets 2, projects 4, tasks 12, roles 2, time entries 3). No component was left as scratch or demo; no Storybook; no dependency; no tracked build output; `git status` shows only the files in A6.23; nothing under `src` outside `vendor` / `node_modules` is root-owned. (529 gitignored runtime files under `storage/` (`inertia-devtools/*.json`, one compiled view), written as root by the container's PHP processes during the browser runs, were chowned back to the host user.)
+
+### A6.22 Deviations / findings
+
+1. **Scope narrowing of §28** (A6.1, A6.10) — `Tabs`, `Tooltip`, `Popover`, `Tag`, `Skeleton`, `EmptyState`, `ErrorState` were not built, because none has a live consumer. This is the one item for the owner to confirm. It also means "the three Radix packages, measured after WP2" (§26) is now measured where they land.
+2. **Resting field edges did not reach WCAG 1.4.11's 3:1** in the first pass (`rule-control`, about 1.5:1) and a design-contract token was needed. **Fixed in the A6.25 remediation** with `control-edge`; no longer open.
+3. **Hand-copied primitive classes defeated the restyle.** Four selects duplicated `NativeSelect`'s classes with legacy tokens and an `h-10`, and `quick-add-task` used a raw `<input>`. All five were reduced to the primitive. Other hand-rolled controls are bare native checkboxes (time forms, checklist) that use browser defaults; a Checkbox primitive is not in WP2's list.
+4. **`transition-colors` animates `outline-color`**, so the focus ring flashed from black. Found only in the browser; the shared controls now name their transitioned properties.
+5. **`buttonVariants` is used as a raw class string on eleven links, where `twMerge` never runs.** The HEAD strings carried both `text-sm` and `text-xs` for `sm`, so which won depended on CSS order. The variant strings are now conflict-free and a test pins it.
+6. **`aria-disabled` styling was not added.** Direction D §15.4 prefers `aria-disabled` for controls that must stay focusable; the few such controls (move-task trigger, allocation editor) style themselves. A shared `aria-disabled:` treatment is left for the first product epic that needs it.
+7. `Section` has no direct page consumer: it is exercised through `SectionPanel`'s 26. Pages adopt the stacked layout when they are rebuilt.
+8. The Playwright suite shares one operator and the dev database, so parallel runs interfere with each other and leak fixtures; run it serially.
+9. The dev-tree stale-view CSS residue (A4.19 #3) inflates the live stylesheet to ~91 kB; clean builds are 76 kB. CI (§30) should build from a clean view cache.
+
+### A6.23 Files changed
+
+`src/resources/css/app.css` · `src/resources/js/components/ui/{button,input,textarea,label,native-select,dialog-shell,confirmation-dialog,form-dialog,dropdown-menu,alert,badge,progress}.tsx` · **new** `ui/{status,avatar,control-metrics}` · `components/{page-header,section-panel,pagination}.tsx` · **new** `components/section.tsx` · `components/feedback/flash-region.tsx` · `components/projects/{project-status-badge,task-status-badge,task-card,task-comments,project-card,milestone-card,company-selector,quick-add-task}.tsx` · `pages/{auth/login,auth/two-factor-challenge,dashboard/index,tasks/index,time/index,time/allocation,operator/time/index,profile/show}.tsx` · `resources/views/layouts/partials/nav.blade.php` (9 hover classes) · tests: **new** `button`, `input`, `alert`, `status`, `avatar`, `section`, `page-header`, `project-status-badge`; modified `progress`, `flash-region`, `pagination`, `confirmation-dialog`, `task-status-badge`, `auth-pages`; `tests/Unit/Configuration/DirectionDThemeContractTest.php` · this document · `docs/design/direction-d-design-system.md` (A6.25).
+
+### A6.24 WP3 handoff
+
+WP3 (navigation contract) may start; it touches no primitive. What it inherits:
+
+- **`primary` means the primary action** (ink) everywhere; any shell code should use `bg-ink` / `text-on-ink`, `border-accent-line` / `text-accent` for selected and link accents, and never reintroduce a `text|border|ring|accent-primary` idiom (guarded).
+- **Interactive boundaries use `control-edge`** (≥ 3:1, A6.25); `rule-control` and `rule` are for structural hairlines only, and the rail account button should use `control-edge`.
+- **A control scale and focus ring** in `components/ui/control-metrics.ts`; `Button`, `Input`, `NativeSelect` line up at 32 / 36 / 40 px. Rail and drawer controls should read it.
+- **Overlay tokens and animations** (`bg-scrim`, `shadow-overlay`, `rounded-overlay`, `animate-*-in/out`) are ready for the overlay drawer; reduced motion is already handled in the token layer, not per component.
+- **`Status`, `Avatar`, `Alert`, `Section`, `PageHeader` (overline)** exist for the shell and Home. `AccountTrigger` (WP4) should compose `Avatar`.
+- **Deferred with a named first consumer:** `Tabs` (in-page tabbed views), `Tooltip` (disabled reasons, e.g. the rail's unavailable items), `Popover` (`TimerTray`, WP6). Add the Radix package in the WP that needs it, with its consumer.
+- **Open:** the Blade native-select height (WP5), the dev-tree CSS residue (CI, §30), Blade status debt (below).
+
+**Legacy contrast debt, unchanged:** `--surface-muted` / `--text-muted` (invoice draft / cancelled badges, 2.49 / 2.35) and `--surface-accent` / `--accent` in dark (open tickets, built-in role chips, 3.28) both live in **Blade** and Blade is pixel-identical after WP2, so **neither is resolved**. `Status` is the canonical replacement and passes its own contract (A6.12); Finance, Helpdesk and System adopt it when their Blade pages migrate.
+
+### A6.25 Post-review remediation: resting control boundary, and scope confirmation
+
+**Scope confirmed by the owner.** The narrowed WP2 component scope (A6.1, A6.10) was explicitly approved. `Tag`, `Skeleton`, `EmptyState`, `ErrorState`, `Tabs`, `Tooltip` and `Popover` remain deferred until a concrete consumer exists, and were not added to satisfy §28's literal list. This amendment stays authoritative for WP2's scope.
+
+**The finding.** The first WP2 pass drew every field's resting edge in `rule-control` (light `#D2CEC3`, dark `#2A3D42`), measured at 1.44–1.63:1: a control whose only resting affordance was a boundary the eye could barely find, propped up by its label, its hover state and its focus ring. The owner rejected that as the answer to WCAG 1.4.11 for form controls, and WP2 owns foundational form-control presentation.
+
+**Root cause.** The contract gave one token, `rule-control`, two unrelated jobs: the *interactive boundary* of inputs, buttons and chips, and a *structural hairline* (table-header rule, chip borders). At about 1.5:1 it is right for the second and wrong for the first, and raising it would have made every structural rule heavy ("structure over boxes").
+
+**Solution: a dedicated semantic token, `control-edge`** (chosen after checking the existing ones):
+- `rule-strong` (15.8:1) is a section-title rule and far too heavy for a field.
+- `text-faint` happens to be 3.05:1 on `canvas` (light) but falls to 2.90 on `drawer` and 2.84 on `surface-sunken`, and it is a *text* token the spec forbids for anything informative; borrowing it for a border would blur two roles.
+- `rule-control` cannot be raised without repainting its structural consumers.
+
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `control-edge` | `#8B877C` | `#617679` | Resting 1px boundary of interactive controls with no fill of their own: `Input`, `Textarea`, `NativeSelect`, the `secondary` `Button` (so also `outline`, `Pagination`, the dialog Cancel). Not used for table, section or drawer rules. |
+| `rule-control` | `#D2CEC3` (unchanged) | `#2A3D42` (unchanged) | Structural hairlines: chip and tag borders (`Badge`, `Avatar`), neutral `Alert`, disabled control edges. |
+
+Values are the lightest that reach 3:1 on every surface a control actually renders on, in the palette's own hues (warm gray, teal gray), and are 1px so the 32 / 36 / 40 px control heights do not move. Filled variants (`primary` ink, `destructive`) already identify themselves by fill (15.79:1 and 6.03:1 against the page) and did not change; `ghost` has no boundary by design. Hover strengthens the edge to `text-muted` (was `text-faint`, which sat too close to the new resting edge), an invalid field recolours it `danger`, and focus adds the 2px `focus` outline, so rest, hover, invalid and focus stay four distinct states.
+
+**Two related corrections in the same change.** The disabled label of every button and disabled field value and dropdown row moved from `text-faint` to `text-muted` (it is information; 5.46:1 light / 7.75:1 dark on `surface-sunken`), and disabled field edges use `rule-control` on a `surface-sunken` fill, so a disabled control is still an identifiable control.
+
+**Measured contrast (Chromium, rendered sRGB composites; the edge against the surface it actually sits on).** Lab render of the built primitives on each real surface, plus the real pages:
+
+| Pair | Light | Dark |
+|---|---:|---:|
+| Edge on `canvas` | 3.29 | 3.88 |
+| Edge on `surface` (cards, `Section`, dialogs) | 3.59 | 3.47 |
+| Edge against the field's own `surface` fill | 3.59 | 3.47 |
+| Edge on `drawer` | 3.12 | 3.72 |
+| Edge on `surface-sunken` | 3.06 | 3.75 |
+| Edge on legacy page background (`--bg-base`) | 3.59 | 4.20 |
+| Edge on legacy muted panel (gray-50 / gray-900) | 3.43 | 3.70 |
+| Edge on legacy card (white / gray-800) | 3.59 | **3.06** |
+| Secondary button edge (all of the above) | identical | identical |
+| Real page: login (inside the auth card) | 3.59 | 3.06 |
+| Real page: `projects.create`, `profile`, `time.index` | 3.59 | 4.20 |
+| Hover edge (`text-muted`) on `canvas` | 5.86 | 8.00 |
+| Invalid edge (`danger`) on `canvas` | 6.03 | 8.12 |
+| Focus outline on `canvas` (unchanged) | 5.79 | 12.18 |
+| Disabled field value / disabled button label, on `surface-sunken` | 5.46 | 7.75 |
+| Disabled edge (`rule-control`, exempt) | 1.44 | 1.63 |
+
+Every pair the field can sit on is ≥ 3:1 in both themes; the narrowest are 3.06 (light on `surface-sunken`, dark on the legacy gray-800 card). The dark legacy-card row is the real constraint: raising the value further would be heavier than needed. No value was chosen against a surface a field never sits on; the seven surfaces are the ones Input/Textarea/NativeSelect render on today or will on the Direction D shell (canvas, `Section`/card/dialog `surface`, drawer, sunken, and the three legacy backgrounds).
+
+**Visual result.** Inspected at 1360 px and at 640 px with a 2× device scale (200% reflow equivalent), light and dark, on the login card, `projects.create`, and a lab of every state on every surface: the edge reads as a quiet mid-gray line, not a black box; rest, hover, invalid (red), focus (teal / cyan ring) and disabled (sunken fill, muted text) are all distinguishable. Control heights re-measured after the change: **36 px** for every `input`, `select` and `button` with and without web fonts on `/time`, `/projects/create`, `/profile`, `/operator/time`; 32 / 36 / 40 px for `sm` / `md` / `lg`; the textarea is unchanged. 48 route-widths from 1360 to 390 px: 0 horizontal overflow, 0 clipped controls. The Chromium interaction script (dialog focus, Esc, overlay dismiss, focus return, menu keyboard, flash) passed 70 / 70 again. 0 text pair got worse than before the remediation and none newly fell below 4.5:1.
+
+**Blade.** The 13 Blade routes are pixel-identical (0 px) in both themes against a build of the same tree without the token, on the same fixtures (`operator/cms` shows only its relative-timestamp noise, 38–45 px). Nothing in Blade uses `control-edge` or the changed React classes, so the new token cannot reach it. The React routes changed only where a field, select, textarea or secondary button is drawn.
+
+**Direction D spec change: yes, the canonical contract changed.** `docs/design/direction-d-design-system.md` (the markdown spec is canonical) was edited:
+- §2.2 colour table: **added** `control-edge` (`#8B877C` / `#617679`, with its role and the "never for table, section or drawer rules" limit); **narrowed** `rule-control` to structural hairlines and stated it is *not* an interactive boundary; **redefined** `text-faint` as decorative only, including "not placeholders, not the label or value of a disabled control".
+- §2.3 rule 5: secondary actions are `surface` + `control-edge`. Rule 7 extended (placeholders and disabled labels use `text-muted`). **New rule 8:** interactive boundaries use `control-edge`, with the hover / invalid / focus behaviour (later rule renumbered to 9).
+- §4.3 rules table: `rule-control` row narrowed; **new** "Control edge" row.
+- §13.1: the rail account button uses a `control-edge` ring.
+- §15.4: disabled controls keep their label or value at `text-muted`, never `text-faint`.
+
+`docs/design/direction-d-tokens.css` was **not** touched: the spec declares it a reference artifact only, not the production stylesheet and not kept in sync (spec header). Its mockup-era values are not a source for any production token.
+
+**Implementation** follows the WP1c pattern: `--ds-control-edge` in both theme blocks of `app.css`, `--color-control-edge: var(--ds-control-edge)` in `@theme inline`, and `control-edge` added to the `DirectionDThemeContractTest` canonical list (defined once per theme, exposed to Tailwind). A new test in the same file computes the contrast of both `--ds-control-edge` values against the enumerated surfaces and asserts ≥ 3:1, and that `rule-control` is still under 2:1 against `canvas` so it cannot quietly be raised. This is the one colour-value assertion in the suite, deliberate because a wiring-only test could not stop the edge being made faint again. **Mutation-checked:** changing the light value to `#B0ACA0` failed it (2.08:1 on `canvas`); restored. Every other WP1a–WP1d and WP2 guard is unchanged and green. No dependency was added.
+
+**Files (remediation only):** `src/resources/css/app.css`; `components/ui/{input,textarea,native-select,button,dropdown-menu}.tsx`; tests `ui/{input,button}.test.tsx`, `pagination.test.tsx`, `tests/Unit/Configuration/DirectionDThemeContractTest.php`; `docs/design/direction-d-design-system.md`; this document.
+
+**Final validation of the tree after this remediation:** `./dev check` passes in full on the final tree (CLI self-tests, `git diff --check`, Pint, Wayfinder, `tsc`, ESLint `--max-warnings=0`, Prettier, Vitest **440 / 440** in 62 files, production build, Pest **982 passed / 4,119 assertions**), plus the serial Playwright run in A6.20.

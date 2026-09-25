@@ -16,6 +16,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { Status } from '@/components/ui/status';
 import { AppLayout } from '@/layouts/app-layout';
 import { formatDate } from '@/lib/dates';
 import {
@@ -288,7 +289,7 @@ export function EntryActions({ entry }: { entry: TimeEntryData }) {
     const [error, setError] = useState<string | null>(null);
 
     if (entry.locked) return <Badge>Locked</Badge>;
-    if (entry.running) return <Badge variant="success">Running</Badge>;
+    if (entry.running) return <Status tone="live">Running</Status>;
 
     return (
         <div className="flex flex-col items-end gap-2">
@@ -375,7 +376,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                 <nav className="flex gap-1 border-b border-border" aria-label="Time views">
                     <Link
                         href={timeIndex.url()}
-                        className="border-b-2 border-primary px-3 py-2 text-sm font-medium text-primary"
+                        className="border-b-2 border-ink px-3 py-2 text-sm font-medium text-text"
                     >
                         Entries
                     </Link>
@@ -406,7 +407,6 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
                                     id="filter-project"
                                     value={projectId}
                                     onChange={(event) => setProjectId(event.target.value)}
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
                                 >
                                     <option value="">All projects</option>
                                     {projects.map((project) => (

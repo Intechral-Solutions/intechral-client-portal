@@ -1,21 +1,22 @@
 import type { ReactNode } from 'react';
 
+import { Section } from '@/components/section';
+
 type SectionPanelProps = {
     title: string;
     description?: string;
     children: ReactNode;
 };
 
+/**
+ * The existing two-column form section (title left, content right), kept as-is for its 26
+ * consumers and now a thin wrapper over `Section layout="split"`. New code uses `Section`
+ * directly; pages move over as they are adopted (EPIC-013 WP2 does not migrate them).
+ */
 export function SectionPanel({ title, description, children }: SectionPanelProps) {
     return (
-        <section className="grid gap-6 border-b border-border py-8 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
-            <div>
-                <h2 className="text-base font-semibold text-foreground">{title}</h2>
-                {description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-                ) : null}
-            </div>
-            <div className="min-w-0">{children}</div>
-        </section>
+        <Section layout="split" title={title} description={description}>
+            {children}
+        </Section>
     );
 }

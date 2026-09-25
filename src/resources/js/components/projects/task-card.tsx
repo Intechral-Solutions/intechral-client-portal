@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { MoveTaskMenu, type MoveTargetColumn } from '@/components/projects/move-task-menu';
 import { PriorityBadge } from '@/components/projects/priority-badge';
+import { Avatar } from '@/components/ui/avatar';
 import { formatDate } from '@/lib/dates';
 import { show as taskShowRoute } from '@/routes/projects/tasks';
 import type { BoardTask } from '@/types/projects';
@@ -96,13 +97,7 @@ function TaskCardImpl({
                     ) : null}
                 </div>
                 {task.assignee ? (
-                    <span
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground"
-                        title={task.assignee.name}
-                        aria-label={task.assignee.name}
-                    >
-                        {task.assignee.name.charAt(0).toUpperCase()}
-                    </span>
+                    <Avatar size="sm" name={task.assignee.name} title={task.assignee.name} />
                 ) : null}
             </div>
 

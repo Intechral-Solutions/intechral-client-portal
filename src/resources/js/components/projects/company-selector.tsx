@@ -37,7 +37,7 @@ export function CompanySelector({
                     <label key={company.id} className="flex items-center gap-2 text-sm">
                         <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-input accent-primary"
+                            className="h-4 w-4 rounded border-input accent-accent"
                             checked={selected.includes(company.id)}
                             onChange={(event) =>
                                 onChange(

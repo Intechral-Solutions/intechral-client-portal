@@ -29,7 +29,7 @@ function ViewTab({ href, active, children }: { href: string; active: boolean; ch
             className={cn(
                 '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors',
                 active
-                    ? 'border-primary text-primary'
+                    ? 'border-ink text-text'
                     : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
         >
