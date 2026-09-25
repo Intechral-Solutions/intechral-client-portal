@@ -12,12 +12,13 @@ use Inertia\Testing\AssertableInertia as Assert;
 require_once __DIR__.'/TicketTestHelpers.php';
 
 /*
- * EPIC-010D WP0 characterization: H4 (list/detail mismatch through legacy company membership),
- * H9 (literal `operator` role in TicketPolicy vs the `tickets.assign` route gate) and F-1
- * (`company_id` is never persisted by the create path).
+ * EPIC-010D: H4 (list/detail visibility), H9 (Ticket visibility keyed on the tickets.assign
+ * capability, never on the literal `operator` role) and F-1 (`company_id` is never persisted by
+ * the create path). WP0 characterized them; WP1 converted every defect test into the TARGET
+ * contract (pre-fix evidence: EPIC-010D Amendment 1).
  *
- * Prefixes as in TicketSecurityCharacterizationTest: BASELINE (keep), DEFECT Hn (current broken
- * behavior, flipped by the named WP), GUARD (a contract WP1 must not break while fixing Hn).
+ * Prefixes: BASELINE (already correct, keep), TARGET Hn (the WP1 contract), GUARD (a contract the
+ * WP1 defense-in-depth checks must not break).
  */
 
 beforeEach(function () {
@@ -53,7 +54,7 @@ function ticketCompanyFixture(): array
     return compact('operator', 'owner', 'peer', 'outsider', 'organization', 'company', 'ticket');
 }
 
-it('DEFECT H4 (WP1 flips to not listed): a same-company peer sees the ticket on /tickets with a link that 403s', function () {
+it('TARGET H4: a same-company peer holding tickets.view_org neither lists nor opens the ticket', function () {
     $f = ticketCompanyFixture();
 
     expect($f['peer']->can('tickets.view_org'))->toBeTrue()
@@ -61,9 +62,9 @@ it('DEFECT H4 (WP1 flips to not listed): a same-company peer sees the ticket on 
 
     $this->actingAs($f['peer'])->get(route('tickets.index'))
         ->assertOk()
-        ->assertSee('Company linked ticket')
-        ->assertSee($f['ticket']->ticket_number)
-        ->assertSee(route('tickets.show', $f['ticket']), false);
+        ->assertDontSee('Company linked ticket')
+        ->assertDontSee($f['ticket']->ticket_number)
+        ->assertDontSee(route('tickets.show', $f['ticket']), false);
 
     $this->actingAs($f['peer'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
     expect(Gate::forUser($f['peer'])->allows('view', $f['ticket']))->toBeFalse();
@@ -79,17 +80,18 @@ it('BASELINE H4: the owner lists and opens their ticket; an unrelated customer d
     $this->actingAs($f['outsider'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
 });
 
-it('BASELINE H4: the company clause is driven by tickets.view_org; a member without it does not see the peer ticket', function () {
+it('TARGET H4: every row on a customer list is a ticket the customer may open (no dead links)', function () {
     $f = ticketCompanyFixture();
-    $member = ticketCustomRoleUser('customer_no_org', ['tickets.view']);
-    $f['organization']->members()->attach($member, ['role' => 'member']);
+    ticketFor($f['peer'], ['title' => 'Peer own ticket', 'company_id' => $f['company']->id]);
+    ticketFor($f['peer'], ['title' => 'Peer unlinked ticket']);
 
-    $this->actingAs($member)->get(route('tickets.index'))
-        ->assertOk()
-        ->assertDontSee('Company linked ticket');
+    $listed = $this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk()->viewData('tickets');
+
+    expect($listed->pluck('title')->sort()->values()->all())->toBe(['Peer own ticket', 'Peer unlinked ticket'])
+        ->and($listed->every(fn (Ticket $ticket) => Gate::forUser($f['peer'])->allows('view', $ticket)))->toBeTrue();
 });
 
-it('BASELINE H4: an operator opens any ticket but /tickets lists only their own and company-linked ones', function () {
+it('BASELINE H4: /tickets is an operator\'s own-requests list, while the operator still opens any ticket', function () {
     $f = ticketCompanyFixture();
     ticketFor($f['operator'], ['title' => 'Operator own request']);
 
@@ -144,31 +146,37 @@ function ticketRoleFixture(): array
     ];
 }
 
-it('DEFECT H9 (WP1 flips agent and user+assign to true): TicketPolicy::view keys operator visibility on the literal role, not on tickets.assign', function () {
+it('TARGET H9: view, reply and viewInternal key on the tickets.assign capability, never on a role name', function () {
     $f = ticketRoleFixture();
     $userWithAssign = ticketUser();
     $userWithAssign->givePermissionTo('tickets.assign');
+    $ownerWithAssign = ticketUser();
+    $ownerWithAssign->givePermissionTo('tickets.assign');
+    $ownTicket = ticketFor($ownerWithAssign);
+    $viewOnly = ticketCustomRoleUser('viewer_only', ['tickets.view']);
 
-    $matrix = collect([
-        'owner' => $f['owner'],
-        'customer' => $f['customer'],
-        'operator' => $f['operator'],
-        'agent (custom role: tickets.view + tickets.assign)' => $f['agent'],
-        'user role + direct tickets.assign' => $userWithAssign,
-    ])->map(fn (User $actor) => Gate::forUser($actor)->allows('view', $f['ticket']))->all();
+    $abilities = fn (User $actor, Ticket $ticket) => [
+        'view' => Gate::forUser($actor)->allows('view', $ticket),
+        'reply' => Gate::forUser($actor)->allows('reply', $ticket),
+        'viewInternal' => Gate::forUser($actor)->allows('viewInternal', $ticket),
+        'viewInternal (class)' => Gate::forUser($actor)->allows('viewInternal', Ticket::class),
+    ];
+    $all = ['view' => true, 'reply' => true, 'viewInternal' => true, 'viewInternal (class)' => true];
+    $none = ['view' => false, 'reply' => false, 'viewInternal' => false, 'viewInternal (class)' => false];
 
-    expect($matrix)->toBe([
-        'owner' => true,
-        'customer' => false,
-        'operator' => true,
-        'agent (custom role: tickets.view + tickets.assign)' => false,
-        'user role + direct tickets.assign' => false,
-    ]);
-    expect($f['agent']->can('tickets.assign'))->toBeTrue()
-        ->and($f['agent']->hasRole('operator'))->toBeFalse();
+    expect($abilities($f['owner'], $f['ticket']))->toBe(['view' => true, 'reply' => true, 'viewInternal' => false, 'viewInternal (class)' => false])
+        ->and($abilities($ownerWithAssign, $ownTicket))->toBe($all)
+        ->and($abilities($f['customer'], $f['ticket']))->toBe($none)
+        ->and($abilities($f['operator'], $f['ticket']))->toBe($all)
+        ->and($abilities($f['agent'], $f['ticket']))->toBe($all)
+        ->and($abilities($userWithAssign, $f['ticket']))->toBe($all)
+        ->and($abilities($viewOnly, $f['ticket']))->toBe($none);
+
+    expect($f['agent']->hasRole('operator'))->toBeFalse()
+        ->and($viewOnly->can('tickets.view'))->toBeTrue();
 });
 
-it('GUARD H9 (must stay 200 through WP1; see the authorize(view) sequencing rule): the route gate alone lets the agent use the operator queue, show, status, assign and reply', function () {
+it('GUARD H9 (defense-in-depth in place): the agent still uses the operator queue, show, status, assign and reply after the policy checks were added', function () {
     $f = ticketRoleFixture();
 
     $this->actingAs($f['agent'])->get(route('operator.tickets.index'))->assertOk()->assertSee('Agent assigned ticket');
@@ -187,36 +195,34 @@ it('GUARD H9 (must stay 200 through WP1; see the authorize(view) sequencing rule
         ->and($f['ticket']->replies()->where('body', 'Agent internal')->sole()->is_internal)->toBeTrue();
 });
 
-it('DEFECT H9 (WP1 flips to allowed): the same agent is refused the user show page and every attachment link rendered on the operator show page', function () {
+it('TARGET H9: the agent opens the user show page and every attachment linked from the operator show page', function () {
     $f = ticketRoleFixture();
 
-    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
-    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['publicAttachment']))->assertForbidden();
-    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertForbidden();
-
-    // Control: the built-in operator gets both.
-    $this->actingAs($f['operator'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertOk();
+    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertOk();
+    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['publicAttachment']))->assertOk();
+    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertOk();
 });
 
-it('DEFECT H9 (WP1 flips to allowed): the agent cannot start a timer on, or be offered, a ticket assigned to them', function () {
+it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to them; a customer still cannot use a foreign ticket', function () {
     $f = ticketRoleFixture();
 
     $this->actingAs($f['agent'])
+        ->getJson(route('time.context.options', ['type' => 'ticket']))
+        ->assertOk()
+        ->assertJsonPath('0.id', $f['ticket']->id);
+    $this->actingAs($f['agent'])
+        ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
+        ->assertSuccessful()
+        ->assertJsonPath('context.id', $f['ticket']->id);
+
+    $this->actingAs($f['customer'])
         ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
 
-    $this->actingAs($f['agent'])
-        ->getJson(route('time.context.options', ['type' => 'ticket']))
-        ->assertOk()
-        ->assertExactJson([]);
-
-    // Control: the same ticket assigned to the built-in operator is offered.
-    $f['ticket']->update(['assignee_id' => $f['operator']->id]);
-    $this->actingAs($f['operator'])
-        ->getJson(route('time.context.options', ['type' => 'ticket']))
-        ->assertOk()
-        ->assertJsonPath('0.id', $f['ticket']->id);
+    $this->actingAs($f['owner'])
+        ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
+        ->assertSuccessful();
 });
 
 it('BASELINE H9: dashboard and navigation already key on tickets.assign, so the agent gets the queue and operator links', function () {
@@ -229,13 +235,11 @@ it('BASELINE H9: dashboard and navigation already key on tickets.assign, so the 
             ->where('navigation', fn ($navigation) => collect($navigation)->flatten()->contains('ticket-queue')));
 });
 
-it('DEFECT H9 (WP1 flips to allowed): the agent\'s internal-note visibility depends on the route used, because the user show page is policy-gated', function () {
+it('TARGET H9: internal-note visibility no longer depends on the route; the agent sees notes on both show pages, the owner on neither', function () {
     $f = ticketRoleFixture();
 
-    // Operator show (route gate only): sees the internal note. User show (policy): never reached.
     $this->actingAs($f['agent'])->get(route('operator.tickets.show', $f['ticket']))->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
-    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
-
-    // Built-in operator: both routes, both show the note.
+    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
     $this->actingAs($f['operator'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
+    $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertDontSee('AGENT-VISIBLE-INTERNAL-NOTE');
 });

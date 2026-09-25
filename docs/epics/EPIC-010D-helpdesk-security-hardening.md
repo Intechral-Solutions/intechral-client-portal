@@ -5,14 +5,15 @@
 **Series:** hardening epics [EPIC-010A](./EPIC-010A-mariadb-test-parity.md) · [EPIC-010B](./EPIC-010B-tenant-scoping.md) · [EPIC-010C](./EPIC-010C-billed-time-entry-locking.md) · **EPIC-010D**
 **Planned:** 2026-09-24, against `epic-011e-projects-kanban` at `a09c723`
 **Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
-**Work packages:** WP0 **Complete** (2026-09-24) · WP1 Not started · WP2 Not started
-**Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections
+**Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 Not started
+**Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision
 
 ---
 
 ## Contents
 
 - [Amendment 1: WP0 Results (2026-09-24)](#amendment-1-wp0-results-2026-09-24)
+- [Amendment 2: WP1 Results (2026-09-24)](#amendment-2-wp1-results-2026-09-24)
 
 1. [Status and parent context](#1-status-and-parent-context)
 2. [Goal](#2-goal)
@@ -236,6 +237,70 @@ The rest of the dev data: max id 5, `AUTO_INCREMENT` 6, 0 internal replies. Dev 
 - All Ticket characterization tests use `Storage::fake('local')` and clean it in `afterEach`; the fake disk holds only its `.gitignore` afterwards.
 - Mail is faked in tests (`Notification::fake()`, `MAIL_MAILER=array` in `phpunit.xml`) and probe workers use the `array` mailer. By construction, no test path can deliver to Mailpit.
 - The probe ran only against `intechral_client_portal_testing`, which `TestDatabaseSafety` enforces in each worker.
+
+---
+
+## Amendment 2: WP1 Results (2026-09-24)
+
+WP1 fixed H1, H2, H3, H4 and H9 in one change, with the H9 policy correction in the same change as every new `authorize()` call (A1.4 sequencing rule). There was no migration, backfill, `company_id` write, dependency change, Blade/React change, route change or WP2 behavior change.
+
+Method: the WP1-owned `DEFECT` tests were converted to `TARGET` tests first. Against unchanged runtime code, 24 of the 26 target cases failed for the expected reasons (an unauthorized reply returned 302 instead of 403, and so on). The other two already held: the agent replying, and the operator reply route refusing the owner. The runtime change then turned all of them green. Pre-fix evidence stays in Amendment 1.
+
+### A2.1 Policy semantics (`TicketPolicy`, the single seam)
+
+| Ability | Rule |
+|---------|------|
+| `view(user, ticket)` | owner **or** `can('tickets.assign')` |
+| `reply(user, ticket)` | same as `view` |
+| `viewInternal(user, ?ticket)` | `can('tickets.assign')` **and** (no ticket given, or `view`). The class-level form (`can('viewInternal', Ticket::class)`) answers "may see internal content of Tickets they can view", following `ProjectPolicy::manageMembers`' optional-model style. |
+| `downloadAttachment(user, ticket, attachment)` | attachment belongs to the Ticket; `view`; body attachment → allow; parent reply must exist **on the same Ticket**; internal parent → `viewInternal` |
+
+The capability test lives in one private helper (`worksTickets` = `tickets.assign`). No role name appears in Ticket authorization. `tickets.view` alone grants nothing beyond the actor's own Tickets. `tickets.view_org` is unused and reserved (D1).
+
+**Why one policy rather than a `TicketAttachmentPolicy`:**
+
+- The repository registers one policy per aggregate root (`Ticket`, `Project`, `Invoice` in `AppServiceProvider`).
+- The attachment decision is entirely derived from Ticket abilities (`view`, `viewInternal`).
+- Keeping it on `TicketPolicy` avoids a second policy that would have to call back into the first. The controller passes the aggregate root first: `authorize('downloadAttachment', [$attachment->ticket, $attachment])`.
+
+### A2.2 Final behavior
+
+| Finding | Final code path |
+|---------|-----------------|
+| H1 | `Operator\TicketReplyController::store` (both reply routes). The new order: **1.** `authorize('reply')`; **2.** validation; **3.** `is_internal` coercion via `viewInternal`; **4.** reply row; **5.** per file: disk write, attachment row; **6.** owner notification; **7.** assignee notification. A refused actor gets 403 with no session errors, no reply or attachment row, no file and no notification, for a valid body, an empty or missing body, an attachment, and `is_internal=1`, whether the actor is an unrelated customer or a role-less account. Non-operators' `is_internal=1` is still coerced to public. Closed-ticket replies are unchanged (F-2). Reply/file atomicity is unchanged (F-7) |
+| H2 | `TicketController::downloadAttachment` → `downloadAttachment` ability. The matrix is pinned for body, public-reply and internal-note attachments across owner, operator, agent and unrelated customer. An internal attachment is refused to the owner (403, no bytes, no `Content-Disposition`). An attachment whose parent reply is on another Ticket is refused to everyone, operators included. The 404 for an authorized row whose file is gone is unchanged. There is no path exposure and no signed URLs |
+| H3 | `Ticket::scopeSearch($term, bool $includeInternal = false)` excludes internal replies unless the caller opts in. Both callers pass the flag explicitly from `viewInternal(Ticket::class)`: the customer index (false for customers) and the operator queue (true). Hidden text no longer changes membership or the paginator total. Wildcard escaping (F-4) is unchanged |
+| H4 | `/tickets` index is `Ticket::forUser($user)` only; the company/`tickets.view_org` branch is gone. Every listed row passes `view` (pinned). A same-company peer neither lists nor opens the ticket. `/tickets` is each actor's own-requests list; operators work through the queue |
+| H9 | Operator visibility is `tickets.assign`. A custom role with it, or a `user` role with a direct grant, can: open `/tickets/{id}`; see internal notes on both show pages; download every attachment they are entitled to; start timers on, and be offered, their Tickets (`AccessibleTimeContext` unchanged, it follows the policy); follow the reply-mail "View Ticket" link. Internal visibility on the user show page now goes through `viewInternal` |
+
+### A2.3 Operator defense-in-depth
+
+`authorize('view', $ticket)` was added to `Operator\TicketController::show`, `::updateStatus` and `::assign`, and `authorize('reply', $ticket)` to the reply controller. They landed in the same change as the policy fix. **GUARD H9** stays green: the agent still uses queue, show, status, assign and reply. Bulk, index, reports and export remain route-gated, as A1.4 planned. With the policy and the `tickets.assign` gate agreeing for every Ticket, nothing on live inspection called for more.
+
+### A2.4 Tests
+
+- **Converted** (DEFECT → TARGET), 26 cases:
+  - Security suite: H1 unauthorized reply (12-case dataset: 2 actors × 6 payloads), H1 agent reply on both routes, H1 operator route refuses the owner, H2 full matrix, H2 guessed internal id, H2 crossed parent, H3 customer search, H3 scope opt-in.
+  - Visibility suite: H4 peer, H4 no dead links, H9 ability matrix (7 actors, including `tickets.view`-only and owner-with-`tickets.assign`), H9 show and attachments, H9 time context (agent allowed, foreign customer 422, owner allowed), H9 internal notes on both routes.
+  - Assignment suite: H9 mail link.
+- **Removed:**
+  - `ORDER H1`, now covered by the dataset's empty/missing-body cases, which prove authorization precedes validation.
+  - `BASELINE H4` "company clause is driven by `tickets.view_org`", whose premise is gone; replaced by the no-dead-links target.
+- **Renamed only:** `GUARD H9`, `BASELINE H4` (operator own-requests list), `BASELINE H3` (operator opt-in).
+- **Untouched:** all `BASELINE` tests; all WP2-owned `DEFECT H5–H8` and stale-assignee tests; existing Ticket, Time and Projects suites. No fixture needed changing for the new policy.
+- Full suite: **918 passed** (3642 assertions), up from 906.
+
+### A2.5 WP2 handoff update
+
+- **Notification de-duplication is decided:** one recipient receives at most one notification per reply, even when they are both owner and assignee. This supersedes A1.6's "preserves this unless the owner approves".
+- WP2 also implements the stale-assignee send-time gate (§13). It can use `TicketPolicy::view` directly.
+- WP1 guarantees only that an unauthorized reply never reaches notification.
+
+### A2.6 Hygiene
+
+- The development database `portal` checksums are identical before and after (41 tables).
+- Development `storage/app` is unchanged; the fake disk is clean.
+- Mail is faked in every test path.
 
 ---
 
@@ -585,7 +650,9 @@ Three packages. WP1 and WP2 are separable: WP1 changes who may read/write; WP2 c
 
 Results: [Amendment 1](#amendment-1-wp0-results-2026-09-24).
 
-### WP1 — Authorization and confidentiality (H1, H2, H3, H4, H9)
+### WP1 — Authorization and confidentiality (H1, H2, H3, H4, H9) — **Complete (2026-09-24)**
+
+Results: [Amendment 2](#amendment-2-wp1-results-2026-09-24).
 
 - `TicketPolicy`: `view` (capability-based), `reply`, `viewInternal`.
 - Attachment policy (§11); controller uses it.

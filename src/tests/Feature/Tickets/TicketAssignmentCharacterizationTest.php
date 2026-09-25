@@ -193,7 +193,7 @@ it('CHARACTERIZATION notifications: the reply mail carries the ticket number and
         ->and($mail->actionUrl)->toBe(url("/tickets/{$ticket->id}"));
 });
 
-it('DEFECT H9 consequence (WP1 flips): the reply mail links an agent assignee to the user show route, which 403s for them', function () {
+it('TARGET H9: an agent assignee can follow the reply mail link to the ticket', function () {
     $owner = ticketUser();
     $agent = ticketAgent();
     $ticket = ticketFor($owner, ['assignee_id' => $agent->id]);
@@ -202,5 +202,5 @@ it('DEFECT H9 consequence (WP1 flips): the reply mail links an agent assignee to
     $link = (new TicketRepliedNotification($ticket, $reply))->toMail($agent)->actionUrl;
 
     expect($link)->toBe(route('tickets.show', $ticket));
-    $this->actingAs($agent)->get($link)->assertForbidden();
+    $this->actingAs($agent)->get($link)->assertOk();
 });

@@ -19,15 +19,13 @@ class TicketController extends Controller
     {
         /** @var User $user */
         $user = auth()->user();
-        $companyIds = $user->can('tickets.view_org') ? $user->orgCompanyIds() : [];
 
-        $tickets = Ticket::where(function ($q) use ($user, $companyIds) {
-            $q->forUser($user);
-            if (! empty($companyIds)) {
-                $q->orWhereIn('company_id', $companyIds);
-            }
-        })
-            ->when($request->filled('search'), fn ($q) => $q->search($request->search))
+        // Own Tickets only: the same universe TicketPolicy::view grants a customer. Company
+        // membership grants no Ticket visibility (EPIC-010D D1, H4).
+        $includeInternal = $user->can('viewInternal', Ticket::class);
+
+        $tickets = Ticket::forUser($user)
+            ->when($request->filled('search'), fn ($q) => $q->search($request->search, $includeInternal))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -93,7 +91,7 @@ class TicketController extends Controller
             'attachments',
             'statusHistories.user',
             'replies' => fn ($q) => $q->with('user', 'attachments')
-                ->when(! auth()->user()->can('tickets.assign'), fn ($q) => $q->where('is_internal', false)),
+                ->when(auth()->user()->cannot('viewInternal', $ticket), fn ($q) => $q->where('is_internal', false)),
         ]);
 
         return view('tickets.show', compact('ticket'));
@@ -101,7 +99,7 @@ class TicketController extends Controller
 
     public function downloadAttachment(TicketAttachment $attachment)
     {
-        $this->authorize('view', $attachment->ticket);
+        $this->authorize('downloadAttachment', [$attachment->ticket, $attachment]);
 
         abort_unless(Storage::disk('local')->exists($attachment->path), 404);
 

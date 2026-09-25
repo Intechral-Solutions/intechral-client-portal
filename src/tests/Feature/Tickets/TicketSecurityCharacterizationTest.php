@@ -12,15 +12,13 @@ use Illuminate\Support\Facades\Storage;
 require_once __DIR__.'/TicketTestHelpers.php';
 
 /*
- * EPIC-010D WP0 characterization: H1 (reply authorization), H2 (internal-note attachment
- * download), H3 (internal-note search oracle).
+ * EPIC-010D: H1 (reply authorization), H2 (internal-note attachment download), H3
+ * (internal-note search oracle). WP0 characterized them; WP1 converted every defect test into
+ * the TARGET contract below (the pre-fix evidence is recorded in EPIC-010D Amendment 1).
  *
- * Test names use three prefixes:
- *   BASELINE  behavior that is correct today and must survive WP1/WP2 unchanged;
- *   DEFECT Hn CURRENT BROKEN behavior, pinned only as evidence. The expectation is the
- *             vulnerability, NOT a contract; the named WP flips or replaces the test
- *             (EPIC-010D §16, "WP0 findings");
- *   ORDER     the current order of operations WP1 must re-sequence.
+ * Test names use two prefixes:
+ *   BASELINE  behavior that was already correct and must survive unchanged;
+ *   TARGET Hn the security contract WP1 established (written red, then fixed).
  *
  * Mail and storage are always faked: Notification::fake() and Storage::fake('local').
  */
@@ -126,81 +124,59 @@ it('BASELINE H1: the operator reply route already refuses customers and writes n
     Notification::assertNothingSent();
 });
 
-it('DEFECT H1 (WP1 flips to 403 with no side effects): an unrelated customer can reply into another user\'s ticket, store a file, and email the owner and assignee', function () {
+it('TARGET H1: an unrelated account is refused before validation, whatever it sends, and nothing is written, stored or sent', function (string $kind, array $payload) {
     $owner = ticketUser();
     $assignee = ticketUser('operator');
-    $attacker = ticketUser();
     $ticket = ticketFor($owner, ['assignee_id' => $assignee->id]);
+    $attacker = $kind === 'unrelated customer' ? ticketUser() : User::factory()->create();
+    $payload = array_map(fn ($value) => $value === 'FILE' ? [UploadedFile::fake()->create('payload.pdf', 8, 'application/pdf')] : $value, $payload);
 
     $this->actingAs($attacker)
-        ->post(route('tickets.replies.store', $ticket), [
-            'body' => 'Injected by an unrelated account.',
-            'attachments' => [UploadedFile::fake()->create('payload.pdf', 8, 'application/pdf')],
-        ])
-        ->assertRedirect()
-        ->assertSessionHas('status', 'Reply added.');
-
-    $reply = $ticket->replies()->sole();
-    $attachment = TicketAttachment::sole();
-    expect($reply->user_id)->toBe($attacker->id)
-        ->and($reply->is_internal)->toBeFalse()
-        ->and($attachment->reply_id)->toBe($reply->id)
-        ->and($attachment->ticket_id)->toBe($ticket->id)
-        ->and($attachment->user_id)->toBe($attacker->id)
-        ->and($attachment->path)->toStartWith("tickets/{$ticket->id}/");
-    Storage::disk('local')->assertExists($attachment->path);
-
-    Notification::assertSentToTimes($owner, TicketRepliedNotification::class, 1);
-    Notification::assertSentToTimes($assignee, TicketRepliedNotification::class, 1);
-    Notification::assertSentTo($owner, TicketRepliedNotification::class,
-        fn (TicketRepliedNotification $n) => $n->reply->is($reply) && $n->ticket->is($ticket));
-});
-
-it('DEFECT H1 (WP1 flips to 403): an account with no role or permission at all can reply to any ticket', function () {
-    $owner = ticketUser();
-    $bare = User::factory()->create();
-    $ticket = ticketFor($owner);
-
-    expect($bare->getAllPermissions())->toBeEmpty();
-
-    $this->actingAs($bare)
-        ->post(route('tickets.replies.store', $ticket), ['body' => 'No permissions needed.'])
-        ->assertRedirect()
-        ->assertSessionHas('status');
-
-    expect($ticket->replies()->sole()->user_id)->toBe($bare->id);
-    Notification::assertSentTo($owner, TicketRepliedNotification::class);
-});
-
-it('DEFECT H1 (WP1 flips to 403): the is_internal flag is not the gate; an unrelated customer\'s internal request is coerced public and still emails the owner', function () {
-    $owner = ticketUser();
-    $attacker = ticketUser();
-    $ticket = ticketFor($owner);
-
-    $this->actingAs($attacker)
-        ->post(route('tickets.replies.store', $ticket), ['body' => 'Pretend internal.', 'is_internal' => '1'])
-        ->assertRedirect();
-
-    expect($ticket->replies()->sole()->is_internal)->toBeFalse();
-    Notification::assertSentTo($owner, TicketRepliedNotification::class);
-});
-
-it('ORDER H1 (WP1 moves authorization first): an unauthorized request with an invalid body gets validation errors, not 403, and writes nothing', function () {
-    $owner = ticketUser();
-    $attacker = ticketUser();
-    $ticket = ticketFor($owner);
-
-    $this->actingAs($attacker)
-        ->post(route('tickets.replies.store', $ticket), [
-            'body' => '',
-            'attachments' => [UploadedFile::fake()->create('x.pdf', 1, 'application/pdf')],
-        ])
-        ->assertRedirect()
-        ->assertSessionHasErrors('body');
+        ->post(route('tickets.replies.store', $ticket), $payload)
+        ->assertForbidden()
+        ->assertSessionHasNoErrors();
 
     expect(TicketReply::count())->toBe(0)
         ->and(TicketAttachment::count())->toBe(0)
         ->and(Storage::disk('local')->allFiles())->toBe([]);
+    Notification::assertNothingSent();
+})->with(['unrelated customer', 'role-less account'])->with([
+    'valid body' => [['body' => 'Injected by an unrelated account.']],
+    'empty body' => [['body' => '']],
+    'missing body' => [[]],
+    'valid body with attachment' => [['body' => 'With payload.', 'attachments' => 'FILE']],
+    'invalid body with attachment' => [['body' => '', 'attachments' => 'FILE']],
+    'internal request' => [['body' => 'Pretend internal.', 'is_internal' => '1']],
+]);
+
+it('TARGET H1: a tickets.assign agent without the operator role replies publicly on the user route and internally on the operator route', function () {
+    $owner = ticketUser();
+    $agent = ticketAgent();
+    $ticket = ticketFor($owner);
+
+    $this->actingAs($agent)
+        ->post(route('tickets.replies.store', $ticket), ['body' => 'Agent public reply.'])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Reply added.');
+    $this->actingAs($agent)
+        ->post(route('operator.tickets.replies.store', $ticket), ['body' => 'Agent internal note.', 'is_internal' => '1'])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Reply added.');
+
+    expect($ticket->replies()->where('body', 'Agent public reply.')->sole()->is_internal)->toBeFalse()
+        ->and($ticket->replies()->where('body', 'Agent internal note.')->sole()->is_internal)->toBeTrue();
+    Notification::assertSentToTimes($owner, TicketRepliedNotification::class, 1);
+});
+
+it('TARGET H1: the operator reply route (internal notes) still refuses the ticket owner at its tickets.assign gate', function () {
+    $owner = ticketUser();
+    $ticket = ticketFor($owner);
+
+    $this->actingAs($owner)
+        ->post(route('operator.tickets.replies.store', $ticket), ['body' => 'Owner via operator route', 'is_internal' => '1'])
+        ->assertForbidden();
+
+    expect(TicketReply::count())->toBe(0);
     Notification::assertNothingSent();
 });
 
@@ -253,19 +229,43 @@ it('BASELINE H2: an operator downloads an internal-note attachment', function ()
     expect($response->streamedContent())->toBe('INTERNAL-SECRET-BYTES');
 });
 
-it('DEFECT H2 (WP1 flips to 403): the ticket owner downloads an internal-note attachment by guessing its id', function () {
+it('TARGET H2: attachment download follows Ticket, then parent reply, then attachment visibility for every actor', function () {
+    $f = ticketWithAttachments();
+    $actors = [
+        'owner' => $f['owner'],
+        'operator' => $f['operator'],
+        'agent' => ticketAgent(),
+        'unrelated customer' => ticketUser(),
+    ];
+    $expected = [
+        'owner' => ['body' => 200, 'public' => 200, 'internal' => 403],
+        'operator' => ['body' => 200, 'public' => 200, 'internal' => 200],
+        'agent' => ['body' => 200, 'public' => 200, 'internal' => 200],
+        'unrelated customer' => ['body' => 403, 'public' => 403, 'internal' => 403],
+    ];
+
+    $actual = [];
+    foreach ($actors as $name => $actor) {
+        foreach (['body', 'public', 'internal'] as $key) {
+            $actual[$name][$key] = $this->actingAs($actor)->get(route('tickets.attachment.download', $f[$key]))->getStatusCode();
+        }
+    }
+
+    expect($actual)->toBe($expected);
+});
+
+it('TARGET H2: the ticket owner cannot fetch an internal-note attachment by guessing its id, and the refusal carries no file bytes', function () {
     $f = ticketWithAttachments();
 
-    // The owner's show page hides the note and its link...
     $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))
         ->assertOk()
         ->assertDontSee('internal-secret.txt');
 
-    // ...but the download route only checks Ticket view, never reply.is_internal.
     $response = $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f['internal']));
 
-    $response->assertOk()->assertDownload('internal-secret.txt');
-    expect($response->streamedContent())->toBe('INTERNAL-SECRET-BYTES');
+    $response->assertForbidden();
+    expect($response->headers->get('Content-Disposition'))->toBeNull()
+        ->and($response->getContent())->not->toContain('INTERNAL-SECRET-BYTES');
 });
 
 it('BASELINE H2: an unrelated customer is refused every attachment of a foreign ticket (Ticket view is checked)', function () {
@@ -287,16 +287,21 @@ it('BASELINE H2: existence answers are 403 for an existing foreign id, 404 for a
     $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f['public']))->assertNotFound();
 });
 
-it('DEFECT H2 (WP1 adds the reply→ticket integrity guard): authorization never consults the parent reply, even one on another ticket', function () {
+it('TARGET H2: an attachment whose parent reply belongs to another ticket is refused to everyone, operators included', function () {
     $f = ticketWithAttachments();
     $elsewhere = ticketFor(ticketUser());
     $foreignNote = ticketReply($elsewhere, $f['operator'], true, 'Note on another ticket');
+    $foreignPublic = ticketReply($elsewhere, $f['operator'], false, 'Public reply on another ticket');
 
-    // A row whose ticket_id says "owner's ticket" but whose parent is an internal note elsewhere.
-    // Live data has none (preflight P4b), so this pins the decision path, not a reachable state.
-    $crossed = ticketAttachment($f['ticket'], $foreignNote, $f['operator'], 'crossed.txt', 'CROSSED');
+    // Rows whose ticket_id says "owner's ticket" but whose parent reply lives elsewhere. Live data
+    // has none (preflight P4b); the guard makes the parent relationship authoritative anyway.
+    $crossedInternal = ticketAttachment($f['ticket'], $foreignNote, $f['operator'], 'crossed.txt', 'CROSSED');
+    $crossedPublic = ticketAttachment($f['ticket'], $foreignPublic, $f['operator'], 'crossed-public.txt', 'CROSSED');
 
-    $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $crossed))->assertOk();
+    foreach ([$f['owner'], $f['operator'], ticketAgent()] as $actor) {
+        $this->actingAs($actor)->get(route('tickets.attachment.download', $crossedInternal))->assertForbidden();
+        $this->actingAs($actor)->get(route('tickets.attachment.download', $crossedPublic))->assertForbidden();
+    }
 });
 
 it('BASELINE H2: the served local disk does not bypass the download route (unsigned /storage URLs are refused)', function () {
@@ -335,23 +340,29 @@ it('BASELINE H3: customer search matches public reply text on their own tickets 
     expect($response->viewData('tickets')->total())->toBe(1);
 });
 
-it('DEFECT H3 (WP1 flips to zero results): a term that exists only in a hidden internal note makes the customer\'s ticket match', function () {
+it('TARGET H3: a term that exists only in a hidden internal note matches nothing for the customer, and the count shows it', function () {
     $f = ticketSearchFixture();
 
     $response = $this->actingAs($f['owner'])->get(route('tickets.index', ['search' => 'INTMARKERB9']));
 
-    // The oracle: result membership and the paginator total depend on hidden text...
     $response->assertOk()
-        ->assertSee('Printer offline')
-        ->assertDontSee('Mailbox quota');
-    expect($response->viewData('tickets')->total())->toBe(1);
-
-    // ...while no snippet, note body or note metadata is rendered (the list shows title, number,
-    // category, priority, status, age).
-    $response->assertDontSee('credit hold')->assertDontSee('do not escalate');
+        ->assertDontSee('Printer offline')
+        ->assertDontSee('Mailbox quota')
+        ->assertSee('No tickets found.')
+        ->assertDontSee('credit hold');
+    expect($response->viewData('tickets')->total())->toBe(0);
 });
 
-it('BASELINE H3: operator queue search includes internal-note text (intended; must survive WP1)', function () {
+it('TARGET H3: the search scope excludes internal notes unless the caller opts in', function () {
+    $f = ticketSearchFixture();
+
+    expect(Ticket::search('INTMARKERB9')->pluck('id')->all())->toBe([])
+        ->and(Ticket::search('INTMARKERB9', false)->pluck('id')->all())->toBe([])
+        ->and(Ticket::search('INTMARKERB9', true)->pluck('id')->all())->toBe([$f['marked']->id])
+        ->and(Ticket::search('PUBMARKERA7')->pluck('id')->all())->toBe([$f['marked']->id]);
+});
+
+it('BASELINE H3: operator queue search includes internal-note text (explicit opt-in)', function () {
     $f = ticketSearchFixture();
 
     $response = $this->actingAs($f['operator'])->get(route('operator.tickets.index', ['search' => 'INTMARKERB9']));
