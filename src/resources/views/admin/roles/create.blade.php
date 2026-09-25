@@ -51,7 +51,7 @@
                            style="border-color: var(--border-base);">
                         <input type="checkbox" name="permissions[]" value="{{ $permission }}"
                                {{ in_array($permission, old('permissions', [])) ? 'checked' : '' }}
-                               class="h-4 w-4 rounded accent-accent">
+                               class="h-4 w-4 rounded accent-legacy-accent">
                         <span style="color: var(--text-primary);">{{ Str::after($permission, '.') }}</span>
                     </label>
                     @endforeach

@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17)
 
 ---
 
@@ -52,6 +52,7 @@
 - [Amendment 1: WP0 Results (2026-09-25)](#amendment-1-wp0-results-2026-09-25)
 - [Amendment 2: WP1a Results (2026-09-25)](#amendment-2-wp1a-results-2026-09-25)
 - [Amendment 3: WP1b Results (2026-09-25)](#amendment-3-wp1b-results-2026-09-25)
+- [Amendment 4: WP1c Results (2026-09-25)](#amendment-4-wp1c-results-2026-09-25)
 
 ---
 
@@ -1348,7 +1349,7 @@ Four independently revertible slices.
 
 - **WP1a — Complete (2026-09-25) — results in [Amendment 2](#amendment-2-wp1a-results-2026-09-25).** Rename the thirteen legacy utilities to a `legacy-` prefix; values unchanged. Resolves F1.
 - **WP1b — Complete (2026-09-25) — results in [Amendment 3](#amendment-3-wp1b-results-2026-09-25).** Define the six orphan variables (A1.3's `--accent-success` included). Resolves F2.
-- **WP1c** — add the Direction D token blocks (light + dark) via `@theme inline` on the existing `data-theme` contract; apply the safe alias remappings; **hold `primary`**.
+- **WP1c — Complete (2026-09-25) — results in [Amendment 4](#amendment-4-wp1c-results-2026-09-25).** Add the Direction D token blocks (light + dark) via `@theme inline` on the existing `data-theme` contract; apply the safe alias remappings; **hold `primary`**.
 - **WP1d** — self-host the three families per G1; delete the bunny.net `<link>` and `preconnect` from both root views; add the `@font-face` block and preloads.
 
 **Exit:** `./dev check` green after each slice; the ten-screen compatibility matrix passes in both themes; no Direction D component exists yet.
@@ -2361,3 +2362,300 @@ WP1c may start. It owns, and WP1b did not touch:
 - Two contrast debts to hand to WP2/Finance's `Status`/badge component work, not to fix inline in WP1c: `--surface-muted`/`--text-muted` (A1.3, re-confirmed A3.7) and the newly found `--surface-accent`/`--accent` dark-mode pairing (A3.7). Both are pre-existing-pattern failures that become visible, not created, once their variables are real.
 - Seeding an invoice, a CRM company and a published CMS page before running the full legacy-compatibility matrix (A1.15/C13, A2.17) — still zero of each in the dev database; this session's invoice fixture was created and deleted, not left behind.
 - WP1c's own token registration is unobstructed: all six WP1b variables and all thirteen WP1a `legacy-*` utilities are stable, defined once each, at the correct existing theme layer, with no competing second token source introduced.
+
+---
+
+## Amendment 4: WP1c Results (2026-09-25)
+
+WP1c ran on `feature/epic-013-direction-d-shell` at `15fa334` (the committed WP1a+WP1b result — see A4.19 finding 1), working tree clean at start. **WP1c is now Complete.** The production change is the Direction D semantic token layer in `app.css`, two measured alias remaps, and a mechanical isolation of the only three Tailwind colour tokens whose names Direction D claims (7 Blade checkbox classes, 2 flash variants). No route, migration, permission, dependency, package-manifest, font, primitive or shell file changed. The full gate is green on the WP1c tree; the literal `./dev check` is blocked only by two pre-existing environment conditions outside the diff (A4.17). **Where this amendment conflicts with the body or with prior amendments, this amendment wins for WP1c-scoped facts.** EPIC-013 remains **Planned**.
+
+### A4.1 Method
+
+- **Isolation.** The running containers bind-mount the main checkout's `src`, not a worktree, so the WP1c tree was copied into the `portal_app` container's own filesystem (`/tmp/wp1c/{base,post}`, never a bind mount) with `node_modules` linked and `vendor` copied. `base` is `15fa334`; `post` is the WP1c tree. Each copy was served by its own `php artisan serve` against the same dev database, so every comparison is between two real applications differing only by this slice.
+- **Build fidelity.** A `base` build with the dev tree's compiled-view cache is **byte-identical** to the live `public/build` CSS (sha `49b95615…`, 78,770 B — A3.11's figure). Because that cache contains stale and orphaned templates (A4.19 finding 3), both copies were then rebuilt from a freshly compiled view cache (`view:clear` + `view:cache`) so the before/after comparison reflects source, not residue.
+- **Browser.** Chromium 1243 via Playwright 1.63 (the container-installed browser WP0–WP1b used). Every colour was read back as rendered sRGB through a canvas, never taken from the design document.
+- **Canonical source.** Token names and values are taken from [Direction D §2.2](../design/direction-d-design-system.md#22-colour-tokens), §2.2 *Shadows* and §16; `direction-d-tokens.css` was used only to cross-check values. Where the two differ, the spec won: it names `warning`/`success`/`progress-fill`/`progress-track`/`surface-sunken`/`surface-selected` and adds `live-text`, where the mockup file has `warn`/`ok`/`fill`/`track`/`sunken`/`sel` and no `live-text`. No mockup-only name (`card-shadow`, `rule-2`, `.st`, …) entered production.
+
+### A4.2 Canonical tokens implemented
+
+Every token in §2.2 plus the two §2.2 shadows and the §16 motion values. **Tailwind exposure rule:** each colour token `x` is registered as `--color-x: var(--ds-x)`, so `bg-x`, `text-x`, `border-x`, `ring-x`, `outline-x`, `divide-x`, `fill-x`, `accent-x` … all exist; the three text tokens additionally register the §2.1 short forms `--text-color-{secondary,muted,faint}`, so the canonical text utilities are exactly `text-text`, `text-secondary`, `text-muted`, `text-faint`.
+
+| Token | Light | Dark | Primary utilities | Live consumers after WP1c |
+|---|---|---|---|---|
+| `canvas` | `#F6F5F1` | `#0D1416` | `bg-canvas` | 0 |
+| `rail` | `#EBE8E1` | `#091012` | `bg-rail` | 0 |
+| `drawer` | `#F1EFEA` | `#10191C` | `bg-drawer` | 0 |
+| `surface` | `#FFFFFF` | `#142023` | `bg-surface` | 0 |
+| `surface-sunken` | `#EFEDE7` | `#0F181A` | `bg-surface-sunken` | 0 |
+| `surface-hover` | `#E8E5DD` | `#162427` | `hover:bg-surface-hover` | 0 |
+| `surface-selected` | `#FFFFFF` | `#18292D` | `bg-surface-selected` | 0 |
+| `rule` | `#E3E0D8` | `#1E2D31` | `border-rule`, `divide-rule` | 0 (`fill-rule` artefact, A4.4) |
+| `rule-control` | `#D2CEC3` | `#2A3D42` | `border-rule-control` | 0 |
+| `rule-strong` | `#1A1B1E` | `#C8D7D9` | `border-rule-strong`, `bg-rule-strong` | 0 |
+| `text` | `#1A1B1E` | `#E6EEEF` | `text-text`, `bg-text` (expected marker) | 0 |
+| `text-secondary` | `#3F4248` | `#C3D1D3` | `text-secondary` | 0 |
+| `text-muted` | `#5C5F66` | `#98AEB2` | `text-muted` | 0 (unrendered vendor view, A4.4) |
+| `text-faint` | `#8A8D93` | `#6D8388` | `text-faint`, `bg-text-faint`, `border-text-faint` | 0 — decorative/placeholder only (§2.3.7) |
+| `accent` | `#0B6A73` | `#7ADDE4` | `text-accent` | 0 (legacy consumers isolated, A4.4) |
+| `accent-hover` | `#084E55` | `#B2F4F7` | `hover:text-accent-hover` | 0 |
+| `accent-soft` | `#E3EEEE` | `#12292C` | `bg-accent-soft` | 0 |
+| `accent-line` | `#0B6A73` | `#19E7F2` | `bg-accent-line`, `border-accent-line` | 0 |
+| `live` | `#0B8792` | `#19E7F2` | `bg-live` | 0 |
+| `live-soft` | `#E4F2F2` | `#0E2629` | `bg-live-soft` | 0 |
+| `live-text` | `#0B6A73` | `#19E7F2` | `text-live-text` | 0 |
+| `ink` | `#1A1B1E` | `#E6EEEF` | `bg-ink` | 0 |
+| `on-ink` | `#FFFFFF` | `#0D1416` | `text-on-ink` | 0 |
+| `danger` | `#B42318` | `#FF8A7A` | `text-danger`, `border-danger` | **1 component** — the React error flash (A4.4); plus the `destructive` alias (A4.5) |
+| `danger-soft` | `#FBEAE7` | `#2A1715` | `bg-danger-soft` | 0 |
+| `warning` | `#8A5A0B` | `#F2B45A` | `text-warning` | 0 (legacy consumer isolated) |
+| `warning-glyph` | `#B7791F` | `#F2B45A` | `bg-warning-glyph` | 0 |
+| `warning-soft` | `#FAF0DC` | `#2A2013` | `bg-warning-soft` | 0 |
+| `success` | `#2B7A4B` | `#6FD39A` | `text-success` | 0 (legacy consumer isolated) |
+| `success-glyph` | `#2E8B57` | `#4CCB86` | `bg-success-glyph` | 0 |
+| `progress-fill` | `#1A1B1E` | `#C8D7D9` | `bg-progress-fill` | 0 |
+| `progress-track` | `#E4E1D9` | `#1E2D31` | `bg-progress-track` | 0 |
+| `stage-future` | `#C9C5BA` | `#34494E` | `border-stage-future` | 0 |
+| `focus` | `#0B6A73` | `#19E7F2` | `ring-focus`, `outline-focus` | 0 direct; the `ring` alias (A4.5) |
+| `scrim` | `rgba(26,27,30,.18)` | `rgba(0,0,0,.45)` | `bg-scrim` | 0 |
+| `shadow-card` | `0 1px 2px rgba(26,27,30,.05), 0 0 0 1px #E3E0D8` | `0 0 0 1px #213136` | `shadow-card` | 0 |
+| `shadow-overlay` | `0 14px 36px rgba(26,27,30,.16), 0 0 0 1px #E3E0D8` | `0 14px 36px rgba(0,0,0,.55), 0 0 0 1px #2A3D42` | `shadow-overlay` | 0 |
+| `motion-fast/base/panel/sheet` | 120 / 160 / 200 / 240 ms (theme-invariant) | — | `duration-motion-{fast,base,panel,sheet}` | 0 |
+| motion easing (enter / exit) | `cubic-bezier(.2,0,0,1)` / `cubic-bezier(.4,0,1,1)` | — | `ease-motion`, `ease-motion-exit` | 0 |
+
+**Deliberately not added:** radius, spacing and the §3.2 type scale (the contract lists them as usage tables, not as token-level foundation values assigned to this slice), a `progress` *expected-marker* token (§11.3 specifies it as the existing `text` colour, available as `bg-text`), `info`-family tokens (Direction D uses `accent` for informational status), and fonts (WP1d).
+
+### A4.3 Theme architecture
+
+```
+@import 'tailwindcss'; @source …                       unchanged
+@theme { fonts, --color-brand-* }                       unchanged (fonts are WP1d)
+@theme inline { Direction D → Tailwind }                NEW  --color-<token>: var(--ds-<token>) …
+@theme inline { shadcn + legacy aliases }               kept; accent/success/warning moved to legacy-*
+:root { --ds-motion-* }                                 NEW  theme-invariant
+:root, [data-theme="light"] { --ds-* ; aliases ; raws } Direction D light values first, then the legacy layer
+[data-theme="dark"]          { --ds-* ; aliases ; raws } Direction D dark values first, then the legacy layer
+html/body base defaults                                 unchanged (still legacy --bg-base / --text-primary)
+@layer utilities { .legacy-* }                          unchanged (WP1a)
+```
+
+- **One source.** The raw Direction D hex values exist only in the two theme blocks of `app.css`; nothing else in the repository defines or references them (verified by search; the only other files containing any of the palette hexes are the two canonical brand SVGs, untouched).
+- **The `--ds-` custom-property namespace is required, not stylistic.** Seven canonical names are already live legacy raw variables with different values: `--accent`, `--accent-hover`, `--danger`, `--success`, `--warning`, `--text-secondary`, `--text-muted`, together backing ~900 Blade `var()` sites. Defining Direction D under its bare names would be exactly the flag-day swap §8.1 rejected, one level down (finding **F3**, A4.4). The prefix is confined to the theme layer: components consume the utilities, which carry the canonical names (`bg-surface`, `text-muted`), not the variables. §8.1's Option B rejection (prefixed *utilities*) is therefore not reopened. Because `@theme inline` variables are not emitted at runtime (verified in the compiled CSS), a later component that genuinely needs a raw variable in an arbitrary value (e.g. the live-dot halo) references `var(--ds-live-soft)`; when the legacy raws retire, dropping the prefix is a local edit.
+- **The theme mechanism is unchanged.** Same selectors (`:root, [data-theme="light"]` / `[data-theme="dark"]`), no third theme, no change to either root view's bootstrap script, `useAppearance`, or the Blade nav toggle.
+- **The page base is not adopted.** `html`/`body` stay on legacy `--bg-base`/`--text-primary`; no page, layout or primitive references a Direction D utility.
+
+### A4.4 Collision audit
+
+Searched: every `.blade.php`/`.tsx`/`.ts`/`.js` under `src/resources` (token-level scan with variant prefixes and `!`/opacity modifiers stripped), `app.css`, inline `<style>` blocks (only the self-contained `welcome.blade.php`, excluded as in A1.2), the vendor pagination views and compiled views that `@source` also scans, runtime `classList`/`className` assignments in Blade scripts, and dynamically built class names (`` `text-${…}` ``). Then proved against the compiled output of a throwaway probe build containing every Direction D utility.
+
+| # | Finding | Evidence | Resolution |
+|---|---|---|---|
+| **F3** | **Custom-property collision.** 7 canonical names are live legacy raw variables (A4.3) | `app.css` + ~900 `var()` sites | `--ds-*` namespace for the canonical layer; legacy raws untouched |
+| **F4** | **Tailwind-token collision.** `accent`, `success`, `warning` were already registered as shadcn/legacy colour tokens (`--color-accent: var(--accent)` etc.) with live consumers: `accent-accent` × 7 (Blade checkboxes: `operator/tickets/{index ×2,show}`, `tickets/show`, `admin/roles/{create,edit}`, `admin/users/show`) and `border-/text-success`, `border-/text-warning` (React `FlashRegion`, its only consumer) | census + compiled CSS | **Isolated, the WP1a pattern:** the legacy meanings move to `--color-legacy-{accent,success,warning}` with **identical** `var()` targets; the 9 consumer sites are renamed (`accent-legacy-accent`, `border-/text-legacy-success`, `border-/text-legacy-warning`); the canonical names are then free for Direction D. Compiled declarations are byte-identical (`.accent-legacy-accent{accent-color:var(--accent)}` ≡ the old `.accent-accent`), tailwind-merge resolves the new names exactly as the old ones, and all 60+ checkboxes in the matrix compute the same `accent-color` in both themes before and after |
+| F5 | **Latent dead utility.** `FlashRegion`'s `error` variant has always carried `border-danger text-danger`, but no `danger` token existed, so the error flash rendered in inherited ink with a `currentColor` border (tailwind-merge had already dropped `border-border`) | compiled CSS (no rule), Chromium | **Activated deliberately**, the A2.5 sites 8–10 precedent: intent is unambiguous (the other three variants are coloured), one reviewed component, and it now resolves to Direction D `danger` at **6.57:1** light / **6.40:1** dark on the Alert's card. The only Direction D adoption in the slice; see A4.9 and A4.19 finding 2 |
+| — | `text-muted` / `text-secondary` vs shadcn `muted` / `secondary` | Tailwind 4.3.1 resolves `text-*` from `--text-color-*` before `--color-*` (verified in `tailwindcss/dist/lib.js`) | `text-muted`/`text-secondary` → Direction D; `bg-muted`/`bg-secondary` stay shadcn. Neither text form had a consumer (A2.8) |
+| — | `fill-rule` | 12 Blade SVG **attributes** (`fill-rule="evenodd"`) are scanned as a candidate, so `.fill-rule{fill:var(--ds-rule)}` is generated | Benign: the selector is a class no element carries. Recorded, not changed |
+| — | `text-muted` (Bootstrap's own class) | Laravel's `bootstrap-5` pagination view is in the `@source` glob | Benign: the app never selects the Bootstrap paginator |
+| — | `bg-surface`, `hover:bg-surface`, `hover:bg-surface-hover`, `accent-accent` in stale compiled views | `storage/framework/views` holds pre-WP1a compiles and an orphan of the deleted `time/allocation.blade.php` | Generates dead rules in a dev-tree build only; no rendered markup can carry them. A4.19 finding 3 |
+| — | `hover:bg-surface` (WP1a's A2.3 hazard) | 0 live occurrences | Stays neutralised — WP1a's rename held |
+| — | Every other canonical name (`canvas`, `rail`, `drawer`, `surface-*`, `rule-*`, `text`, `text-faint`, `accent-*`, `live*`, `ink`, `on-ink`, `*-soft`, `*-glyph`, `progress-*`, `stage-future`, `focus`, `scrim`, `shadow-card`, `shadow-overlay`) | 0 occurrences anywhere; no dynamic construction or runtime toggling | Free |
+
+**Result:** in the clean post-WP1c build exactly four generated rules read a `--ds-*` variable — `text-danger`/`border-danger` (F5, deliberate), `fill-rule` and `text-muted` (both benign, never rendered). No existing live markup silently picks up a Direction D value.
+
+### A4.5 Compatibility alias decisions (the §24.2 alias register, opened)
+
+**Rule applied:** an alias is remapped only if, on every background it is actually rendered on, the measured contrast is **not reduced** in either theme and no control boundary weakens. §8.3's "stays AA" criterion is necessary but not sufficient ([Direction D §2.4.3](../design/direction-d-design-system.md#24-migration-compatibility-implementation-constraint): *"Where a mapping would reduce contrast … keep the legacy value"*). Measured in Chromium from the compiled stylesheet, on the legacy `background` / `card` / `muted` surfaces.
+
+| Alias | Consumers (Tailwind) | Prior target | Final target | Changed? | Evidence / rationale |
+|---|---:|---|---|---|---|
+| `ring` | 9 (`focus-visible:ring-ring` — Button, Input, Textarea, NativeSelect, links) | `var(--accent)` indigo | **`var(--ds-focus)`** | **Yes** | Light 6.29 → **6.32** (equal/better); dark 4.51 / **3.28** / 3.97 → **13.19 / 9.61 / 11.62**. Fixes a near-threshold dark focus ring on cards. Focus-only, no layout effect. React only (Blade focus rings use `currentColor`) |
+| `destructive` | 8 (`text-destructive` × 7 inline errors, `bg-destructive` × 1 Button variant) | `var(--danger)` red-600 / red-400 | **`var(--ds-danger)`** | **Yes** | Text light 4.77 / 4.56 → **6.57 / 6.29**; dark 6.97 / 5.08 / 6.14 → **8.79 / 6.40 / 7.75**; destructive fill with its unchanged foreground 4.77 → **6.57** light, 6.97 → **8.79** dark. Also keeps React's reds consistent with the F5 error flash |
+| `destructive-foreground` | 1 | white / gray-950 | unchanged | No | Still correct on the new fill (above) |
+| `primary`, `primary-foreground` | 24 / 3 | indigo / white | unchanged | **No — held** | A4.6 |
+| `foreground`, `card-foreground` | 27 / 6 | `--text-primary` | unchanged | No | `text` would **reduce** contrast: light 17.75 → 17.22, dark 19.27 → 17.11 (−2.2), and would split React text from inherited body text and Blade text |
+| `muted-foreground` | 98 | `--text-secondary` gray-600 / gray-400 | unchanged | No | `text-muted` **reduces** light contrast 7.56 → 6.40 (−1.16) on white, 7.23 → 6.12 on `muted`; dark would improve. Mixed → hold |
+| `border`, `input` | 65 / 9 | `--border-base` gray-300 / gray-700 | unchanged | No | `rule-control` **weakens dark control boundaries**: 1.42 → 1.29 on cards, 1.95 → 1.77 on the page (light would gain +0.1). Mixed → hold |
+| `background` | 13 (incl. Input/Textarea/Select/outline Button fills) | `--bg-base` white / gray-950 | unchanged | No | Too broad: a whole-surface swap to warm paper / teal-black under every React form control, while `html`/`body` and all Blade pages stay legacy — a cross-renderer seam. Owned by WP2 (controls) / WP4 (shell) |
+| `card` | 10 | `--bg-elevated` | unchanged | No | Identical in light, but every React card in dark would move `#1e2939 → #142023` against held borders — broad. WP4/WP7 |
+| `muted`, `secondary`, `secondary-foreground`, `accent-foreground`, `info` | 15 / 1 / 3 / 0 / 2 | legacy | unchanged | No | No Direction D equivalent is safe or needed yet; deferred to the slice migrating their consumers (§8.3) |
+| `accent`, `success`, `warning` (Tailwind names) | 7 / 2 / 2 | legacy indigo / green-600 / amber-500 | **names reassigned to Direction D**; legacy meanings kept as `legacy-accent` / `legacy-success` / `legacy-warning` with identical values | Names only — rendered values unchanged | F4 isolation (A4.4). Retire each `legacy-*` token when its consumer migrates: the 7 checkboxes with their Blade pages, the two flash variants with WP2's Alert restyle |
+| Raw `--bg-*`, `--text-*`, `--border-*`, `--surface-*`, status families, `--accent*`, `--danger/success/warning/info`, `--shadow-*`, `--color-brand-*` | ~900+ Blade `var()` sites | — | unchanged | No | Frozen until Blade page bodies migrate (§8.3) |
+| WP1b six orphans | 51 | A3.3 | unchanged | No | A4.15 |
+| WP1a `legacy-*` utilities | 34 base + 32 variant | A2.4 | unchanged | No | A4.14 |
+
+Net: **110 of 114 non-canonical theme declarations are byte-identical** in the compiled CSS; the four that differ are exactly `--ring` and `--destructive` in each theme.
+
+### A4.6 `primary` hold
+
+`--primary: var(--accent)` (indigo `#4f46e5` / `#6366f1`) is unchanged in both themes and pinned by a test (A4.16). No Button, badge or link was restyled; the matrix shows `bg-primary` buttons, `border-primary`/`text-primary` active tabs and the two `accent-primary` checkboxes computing the same colours before and after. WP2 flips `primary` to `ink` together with the Button restyle and updates that test deliberately.
+
+### A4.7 Canonical contrast audit (measured)
+
+Measured from the compiled post-WP1c stylesheet in Chromium, every canonical pair both themes; **0 failures**. Minimum observed per group (thresholds: 4.5 text, 3.0 non-text):
+
+| Pair | Light min | Dark min | Backgrounds covered |
+|---|---:|---:|---|
+| `text` | 13.68 (surface-hover) | 12.80 (surface-selected) | canvas, surface, drawer, rail, sunken, hover, selected |
+| `text-secondary` | 8.00 | 9.60 | same seven |
+| `text-muted` (information-bearing) | **5.08** (surface-hover) | 6.48 | same seven — the contract's "4.5:1 on canvas and surface" holds (5.86 / 6.40 light) |
+| `accent` link/info | 5.02 (surface-hover) | 9.64 | canvas, surface, accent-soft, drawer, hover |
+| `accent-hover` | 8.63 | 13.63 | canvas, surface |
+| `live-text` | 5.50 (live-soft) | 10.36 | canvas, surface, live-soft — contract claims 5.2:1+, confirmed |
+| `live` glyph (non-text) | 3.73 (live-soft) | 10.36 | matches the contract's own 4.29 / 3.73 figures, which is why text uses `live-text` |
+| `on-ink` on `ink` | 17.22 | 15.81 | — |
+| `danger` text | 5.64 (danger-soft) | 7.27 | canvas, surface, danger-soft |
+| `warning` text | 5.23 (warning-soft) | 8.71 | canvas, surface, warning-soft |
+| `warning-glyph` (non-text) | 3.34 | 9.08 | canvas, surface |
+| `success` text | **4.83** (canvas) | 9.09 | canvas, surface — the narrowest canonical text pair |
+| `success-glyph` (non-text) | 3.89 | 8.09 | canvas, surface |
+| `focus` ring (non-text) | 5.02 | 9.87 | all seven surfaces + accent-soft |
+| `progress-fill` on `progress-track` | 13.18 | 9.61 | — |
+| `rule-strong` | 15.79 | 11.25 | canvas, surface |
+| `text-faint` | 3.05 / 3.33 | 4.65 / 4.17 | **Decorative/placeholder only** by contract (§2.3.7); not an information-bearing pair |
+| `rule-control`, `rule` | 1.44–1.57 / 1.21–1.32 | 1.46–1.63 / 1.17–1.31 | Reported, not a contract claim — see A4.19 finding 5 |
+
+### A4.8 Known legacy contrast debts (unchanged; not Direction D)
+
+Kept separate from A4.7: these are legacy compatibility pairings that no Direction D token touches. Re-measured post-WP1c, identical to A3.7:
+
+| Debt | Light | Dark | Owner |
+|---|---:|---:|---|
+| `--surface-muted` / `--text-muted` — invoice `draft`/`cancelled` badges | 2.49 | 2.35 | Finance `Status` adoption (WP2 provides `Status`) |
+| `--surface-accent` / `--accent` — `open` ticket, `Built-in` role chips | 5.78 | **3.28** | Helpdesk/System `Status` adoption |
+
+Neither badge was rewritten; the canonical layer is AA-clean, and these two remain legacy debt.
+
+### A4.9 Legacy compatibility matrix
+
+[§25.4](#254-legacy-compatibility-screen-matrix)'s ten screens plus the CMS surfaces and eight representative extras, each in **light and dark**, as `operator@intechral.test` (guest for auth), 1360 × 900, on the `base` and `post` servers. Per route: element-by-element computed text colour and composited background (with contrast), control border/fill/`accent-color`/ring, orphan-variable resolution, focus-probe ring, overflow, `data-theme`, and a rest-state full-page pixel diff (a base-vs-base run established the noise floor: session-list growth on `/profile`, a relative timestamp on `/operator/cms`).
+
+| Route | Renderer | Light | Dark | Classification |
+|---|---|---|---|---|
+| `projects.create` | React | ring only | ring only | compatible normalization (focus ring) |
+| `tasks.index` | React | 0 px | 0 px | unchanged |
+| `projects.board` (#468) | React | 0 px | 0 px | unchanged |
+| `profile.show` | React | ring only (+ session rows) | ring only | compatible normalization |
+| `tickets.show` (#4) | Blade | 0 px | 0 px | unchanged |
+| `operator.tickets.index` | Blade | 0 px | 0 px | unchanged (checkbox `accent-color` identical) |
+| `roles.edit` (#2) | Blade | 0 px | 0 px | unchanged (41 checkboxes identical) |
+| `billing.invoices.edit` (fixture) | Blade | 0 px | 0 px | unchanged |
+| `billing.invoices.show` (fixture) | Blade | 0 px | 0 px | unchanged |
+| `billing.invoices.index` (fixture, draft badge) | Blade | 0 px | 0 px | unchanged (debt A4.8 unchanged) |
+| `crm.companies.show` (fixture) | Blade | 0 px | 0 px | unchanged |
+| `login` | React | ring on the auto-focused field | same | compatible normalization |
+| `cms.show` (fixture page) | Blade | 0 px | 0 px | unchanged |
+| `operator.cms.index` | Blade | noise (54 px, = base-vs-base) | timestamp only | unchanged |
+| `dashboard` | React | ring only | ring only | compatible normalization |
+| `time.index` | React | ring only | ring only | compatible normalization |
+| `operator.tickets.show` (#4) | Blade | 0 px | 0 px | unchanged |
+| `users.show` (#1) | Blade | 0 px | 0 px | unchanged |
+| `forgot-password` | React | ring on the auto-focused field | same | compatible normalization |
+| error flash → `profile.show` (real `SocialiteController` context failure) | React | ink → `danger` 6.57:1 | ink → `danger` 6.40:1 | **deliberate Direction D-adjacent change** (F5) |
+| error flash → `login` (guest) | React | same | same | **deliberate Direction D-adjacent change** (F5) |
+
+**Regressions: none.** Every route returned 200 with the correct `data-theme`; zero horizontal overflow; zero text element's contrast decreased except the F5 flash text (a dead-utility defect resolving to its intended colour, still ≥ 6.4:1); zero control boundary changed; zero F2/WP1b orphan resolved differently; no transparent surface introduced. Every Blade route is pixel-identical at rest.
+
+### A4.10 Fixtures
+
+The dev database held 0 invoices, 0 CRM companies and 0 CMS pages (A1.15/C13). Created through the existing factories, pinned to existing users so no user was created, and deleted after the matrix:
+
+| Fixture | Mechanism | Purpose | Cleanup |
+|---|---|---|---|
+| Invoice #2 `INV-WP1C` (draft; client user 2, created by operator 1) + 2 line items | `Invoice::factory()->draft()`, `InvoiceItem::factory()->count(2)` | Screens 8 (edit, show, index; `--surface-muted` badge) | Deleted; counts back to 0 |
+| CRM company #1 + contact #1 | `CrmCompany::factory()`, `CrmContact::factory()` | Screen 9 | Deleted; counts back to 0 |
+| CMS page #1 `wp1c-fixture-page` (published) | `CmsPage::factory()->published()` | `cms.show`, `operator.cms.index` | Deleted; count back to 0 |
+
+Baseline and final counts: users 3, invoices 0, invoice_items 0, crm_companies 0, crm_contacts 0, cms_pages 0, tickets 2, projects 4, tasks 12, roles 2, organizations 0, time_entries 3. Pre-existing residue left untouched: user #38 (`daren.dach@example.net`, operator) and the E2E projects noted in A1.17.
+
+### A4.11 Theme first paint
+
+Real Chromium, `post` build, 20 cold document loads: stored preference **and** OS preference × light/dark × {auth `login`, React `/dashboard`, Blade `/operator/tickets`, React → Blade via a real link, Blade → React via a real link}. On the **first animation frame** `data-theme` was the expected value, the `<html>` background was already the theme's `--bg-base` (`rgb(255,255,255)` / `oklch(0.13 0.028 261.692)`), the stylesheet was loaded, and a `MutationObserver` recorded **no subsequent flip**. **20/20 pass.** WP1c adds only custom properties inside the existing theme blocks; the bootstrap scripts, their placement and `localStorage['theme']` are untouched.
+
+### A4.12 Generated-CSS verification
+
+From a throwaway probe build (every Direction D utility plus the legacy families, container-only, deleted):
+
+- Each Direction D utility compiles to one rule on its `--ds-*` variable: `.bg-canvas{background-color:var(--ds-canvas)}`, `.bg-surface`, `.bg-drawer`, `.hover\:bg-surface-hover:hover`, `.text-text{color:var(--ds-text)}`, `.text-secondary{color:var(--ds-text-secondary)}`, `.text-muted{color:var(--ds-text-muted)}`, `.text-faint`, `.border-rule`, `.border-rule-control`, `.divide-rule` (child selector), `.ring-focus{--tw-ring-color:var(--ds-focus)}`, `.outline-focus`, `.text-accent{color:var(--ds-accent)}`, `.bg-live`, `.text-live-text`, `.bg-ink`/`.text-on-ink`, `.text-danger`, `.text-warning`, `.text-success`, `.shadow-card{--tw-shadow:var(--ds-shadow-card);…}` (a shadow, not a colour), `.duration-motion-panel`, `.ease-motion`.
+- Legacy utilities remain separate: `.bg-muted{…var(--muted)}`, `.bg-secondary`, `.text-muted-foreground`, `.bg-primary`/`.text-primary{…var(--primary)}`, `.bg-background`, `.bg-card`, `.border-border`, `.ring-ring{…var(--ring)}`, `.accent-legacy-accent{accent-color:var(--accent)}`, `.text-legacy-success{color:var(--success)}`, and all thirteen `.legacy-*` hand-written utilities.
+- Each of the 43 `--ds-*` variables is declared exactly where intended — once per theme block (37) or once in `:root` (6 motion) — with no later override. Light and dark values match A4.2.
+
+### A4.13 CSS / bundle size
+
+| Asset | Before | After | Delta |
+|---|---:|---:|---:|
+| `app.css`, dev-tree view cache (= live, A3.11) | 78,770 B raw / 15,262 B gzip-9 | 81,130 / 16,056 | **+2,360 / +794** |
+| `app.css`, clean view cache (source-only) | 77,545 / 15,127 | 79,728 / 15,871 | **+2,183 / +744** |
+| `app.js` (Blade entry) | 49,294 | 49,294 | 0 (same hash) |
+| `app.tsx` entry | 350,487 | 350,487 | 0 (hash changed only through chunk-name references) |
+| `app-layout` (shell chunk) | 101,956 | 101,956 | 0 (same cascade) |
+| `wayfinder` (shared chunk holding `FlashRegion`) | 39,306 | 39,334 | **+28** — exactly the four lengthened `legacy-*` class strings |
+| `board`, `allocation` | 61,326 / 234,321 | same | 0 |
+
+The ~2.2 KB is 74 colour/shadow declarations plus ~60 `@theme inline` registrations. Since `@theme inline` emits nothing until used, the growth is the theme blocks themselves, so later utilities cost bytes only when adopted. Gzip is `gzip -9` throughout (A3.11 used Vite's reported gzip, hence its slightly different 15,346).
+
+### A4.14 WP1a regression check
+
+- The thirteen `.legacy-*` rules in the compiled CSS are byte-identical before and after (md5 match); `@layer utilities` is untouched in source.
+- The WP1a namespace is still vacated: no unprefixed base or variant consumer of `bg-surface`, `text-primary` (outside the three deliberate active-tab sites and the `hover:`/`group-hover:` accent sites A2.5/A2.6 kept), `text-secondary`, `text-muted`, `bg-base`, `bg-elevated`, `border-subtle`, `border-base`, `text-inverse`, `btn-accent` or `shadow-theme-*` exists in live source; `hover:bg-surface` has 0 live sites.
+- The ten React `text-primary` decisions are untouched: the seven `legacy-text-primary` sites and the three active tabs (`tasks/index.tsx`, `time/index.tsx`, `time/allocation.tsx`) show zero diff, and the matrix shows identical computed colours on `/tasks`, `/time`, `/dashboard`, `login`.
+
+### A4.15 WP1b regression check
+
+- All six orphans are defined once per theme block with their A3.3 mappings, including `--surface-elevated: var(--bg-surface)` and `--accent-success: var(--success)` (compiled-CSS check and the A4.16 test).
+- No orphan element resolved differently in any matrix route (0 changes across all `[style*="--surface-"]`, `[style*="--border-muted"]` and `accent-success` elements).
+- No compatibility variable became undefined: 114 non-canonical declarations compared, 110 byte-identical, 4 intended (A4.5).
+
+### A4.16 Tests / static guards
+
+New: `tests/Unit/Configuration/DirectionDThemeContractTest.php` (39 cases). It asserts **names and wiring, never colour values**:
+
+- every one of the 35 canonical colour tokens is declared exactly once in each theme block and exposed as `--color-x: var(--ds-x)`, so a missing dark value, which would otherwise silently inherit the light value, fails;
+- the text short forms, both shadows and the motion tokens are exposed;
+- the full compatibility layer (shadcn aliases, raw families, WP1b orphans, the three `legacy-*` isolation tokens) stays defined in both themes;
+- `primary` stays `var(--accent)` until WP2 changes it deliberately;
+- the six WP1b mappings hold.
+
+Mutation-checked in the container copy: deleting one dark token, flipping `primary`, and reverting `--surface-elevated` each failed their test (3 failed / 36 passed); restored byte-identically. No snapshot of the stylesheet, no compiled-CSS parser.
+
+### A4.17 Validation results
+
+- **Post-WP1c tree** (container copy with a real `vendor`): Pint `--test` pass (244 files); `npm run check` pass (Wayfinder, `tsc`, ESLint `--max-warnings=0`, Prettier, **378/378** Vitest, production build); Pest **972 passed / 4000 assertions** (933 + 39 new).
+- **`./dev check` from the worktree:** `bash dev check` was run from the worktree (the launcher still lacks `+x`, A2.16). **Its container steps cannot see a worktree**: `portal_app` bind-mounts the main checkout's `src`, so Pint, `npm run check` and Pest ran against the main checkout, whose source equals `15fa334` (Pest's 933 tests, not 972, confirm it). Results:
+
+- `git diff --check`: pass (worktree).
+- Pint: pass.
+- Pest: **933 passed / 3749 assertions**.
+- **CLI self-tests fail only because `dev` is tracked `100644` with `core.fileMode=false`.** With a temporary `+x` on the worktree's copy they pass (196/196 assertions); the mode was restored and nothing was recorded.
+- **`npm run check` passes Wayfinder, `tsc`, ESLint, Prettier and 378/378 Vitest, then `vite build` fails** with `EACCES … unlink public/build/assets/allocation-Dw-pDb0S.js`. The main checkout's `public/build/assets` and `manifest.json` have been **root-owned since 09:45 local**, before this session, so no uid-1000 build can replace them; the failed build wrote nothing.
+
+Both failures are environment conditions outside the WP1c diff. The equivalent full gate against the WP1c tree (above) is green and is the evidence for this slice. Fixing either condition (tracking `dev` as `100755`; a `chown` of the main checkout's `public/build`) is left to the repository owner.
+- `git diff --check` clean.
+
+### A4.18 Cleanup / ownership
+
+- Fixtures deleted, counts verified back to baseline (A4.10). The 30 database sessions the harness logins created (all `127.0.0.1` via `artisan serve`, 17:14–17:26 UTC) were deleted; sessions arriving through nginx were left alone.
+- Both `artisan serve` processes stopped; `/tmp/wp1c` (copies, probe build, Playwright scripts, screenshots) removed from the container. WP1c's own verification wrote nothing into the main checkout. The only main-checkout effects are those `./dev check` always has, from the gate run and one diagnostic re-run of its `npm run check` step: `route:clear`, and Wayfinder regenerating its ignored TypeScript from unchanged routes. The build step failed before writing (A4.17), so the served `public/build` is unchanged (still `app-Cil4pvXJ.css`, 78,770 B).
+- No scratch CSS, proof component, font file, package or manifest change; no tracked generated asset; no root-owned file in the worktree.
+
+### A4.19 Deviations / findings
+
+1. **WP1a and WP1b share one commit.** Amendment 3 records WP1b starting at `8af256c` (WP1a). That commit exists but is on no branch; the feature branch has a single `15fa334` "refactor: isolate legacy theme utilities" containing both slices (WP1a + the twelve WP1b lines + Amendments 2 and 3). Content is complete and correct; only the per-slice revertibility promised by [§24.3](#243-reversibility) is coarser than planned for those two slices. Not changed here.
+2. **F5 is the only Direction D adoption, and it is a choice.** If the reviewer prefers WP1c to change nothing visible, the one-line alternative is `border-current` in place of `border-danger text-danger`, which freezes today's ink rendering until WP2's Alert restyle. The activation was chosen because it follows the A2.5 precedent and is strictly more legible.
+3. **Stale compiled views feed the Tailwind build.** `@source '../../storage/framework/views/*.php'` scans every compiled template, including pre-WP1a compiles and an orphan of the deleted `time/allocation.blade.php`. In a dev-tree build this generates dead rules (after WP1c, `.hover\:bg-surface:hover`, `.hover\:bg-surface-hover:hover` and `.accent-accent` against Direction D values). No rendered markup can carry them, and a clean-checkout build (CI) has none, but the dev CSS size depends on local residue. Owner: the CI handoff ([§30](#30-ci-handoff)), which should build from a clean view cache, or a later decision to drop that `@source` line.
+4. **§8.3's alias table was partly optimistic.** `foreground`, `muted-foreground`, `border`/`input`, `background` and `card` were listed as safe; measured, each reduces contrast or control-boundary strength somewhere, or swaps whole surfaces, so all are held. Only `ring` and `destructive` pass. The §8.3 plan also did not anticipate F3/F4.
+5. **Control and hairline rules are below WCAG 1.4.11's 3:1** in both themes by design (`rule-control` 1.44–1.63). The contract makes no contrast claim for them, and the held legacy `border` has the same property (1.42–1.95). This does not block the token layer, but WP2's Input/Button restyle must make control identity not depend on the border alone (fill, label, focus ring), and should record how it satisfies 1.4.11.
+6. `text-faint` measures 3.05–4.65 and stays decorative/placeholder-only. `success` text on `canvas` (4.83) is the narrowest canonical text pair; WP2's `Status` should not place `success` text on anything darker than `canvas`.
+
+### A4.20 Files changed
+
+`src/resources/css/app.css` · `src/resources/js/components/feedback/flash-region.tsx` · `src/resources/views/admin/roles/{create,edit}.blade.php` · `src/resources/views/admin/users/show.blade.php` · `src/resources/views/operator/tickets/{index,show}.blade.php` · `src/resources/views/tickets/show.blade.php` · `src/tests/Unit/Configuration/DirectionDThemeContractTest.php` (new) · this document.
+
+### A4.21 WP1d handoff
+
+WP1d may start. Its committed scope ([§28 WP1](#wp1--semantic-tokens-and-typography), G1/[A1.4](#a14-g1--self-hosted-woff2-confirmed-with-the-budget-arithmetic-corrected), [§9.3](#93-recommendation)) is:
+
+- self-host IBM Plex Sans 400/500/600, IBM Plex Mono 400/500 and **static** Newsreader 400/500 as latin WOFF2 subsets under `src/resources/fonts/` (7 files, 143.4 KB against the 180 KB budget; Plex Sans latin-ext declared conditionally by `unicode-range`, uncounted);
+- add the `@font-face` block to `app.css` with `font-display: swap`, and replace `--font-sans`/`--font-mono` (adding the Newsreader display family) in the existing `@theme` block;
+- delete the fonts.bunny.net `<link>` and `preconnect` from **both** root views, and add `<link rel="preload">` for Plex Sans 400 and 500 only;
+- run the density gate on `/admin/roles/{id}/edit` and `/operator/tickets` (C7) and the matrix again.
+
+WP1d does **not** own the shared theme bootstrap (WP4/WP5, A1.7), BrandMark (WP4, C9), or any primitive. WP1c leaves it an unobstructed `@theme` block (fonts untouched) and a theme layer whose Direction D values need no change for typography.

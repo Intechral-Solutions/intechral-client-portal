@@ -31,6 +31,89 @@
     --color-brand-950: #1e1b4b;
 }
 
+/* ── Direction D semantic tokens → Tailwind (EPIC-013 WP1c) ──────
+   Canonical names from docs/design/direction-d-design-system.md §2.2,
+   §2.2 Shadows and §16. Values live only in the theme blocks below as
+   --ds-* custom properties; the --ds- namespace exists because several
+   canonical names (--accent, --danger, --success, --warning,
+   --text-secondary, --text-muted …) are already live legacy raw
+   variables with different values. Components use the utilities
+   (bg-surface, text-muted, border-rule …), never the hex values. ── */
+@theme inline {
+    /* Surfaces */
+    --color-canvas: var(--ds-canvas);
+    --color-rail: var(--ds-rail);
+    --color-drawer: var(--ds-drawer);
+    --color-surface: var(--ds-surface);
+    --color-surface-sunken: var(--ds-surface-sunken);
+    --color-surface-hover: var(--ds-surface-hover);
+    --color-surface-selected: var(--ds-surface-selected);
+
+    /* Rules */
+    --color-rule: var(--ds-rule);
+    --color-rule-control: var(--ds-rule-control);
+    --color-rule-strong: var(--ds-rule-strong);
+
+    /* Text. `text-secondary`, `text-muted` and `text-faint` are the
+       canonical text utilities (§2.1); the --color-text-* forms exist for
+       the few non-text uses (strata line, marker, control outline). */
+    --color-text: var(--ds-text);
+    --color-text-secondary: var(--ds-text-secondary);
+    --color-text-muted: var(--ds-text-muted);
+    --color-text-faint: var(--ds-text-faint);
+    --text-color-secondary: var(--ds-text-secondary);
+    --text-color-muted: var(--ds-text-muted);
+    --text-color-faint: var(--ds-text-faint);
+
+    /* Accent and live */
+    --color-accent: var(--ds-accent);
+    --color-accent-hover: var(--ds-accent-hover);
+    --color-accent-soft: var(--ds-accent-soft);
+    --color-accent-line: var(--ds-accent-line);
+    --color-live: var(--ds-live);
+    --color-live-soft: var(--ds-live-soft);
+    --color-live-text: var(--ds-live-text);
+
+    /* Ink (primary action) */
+    --color-ink: var(--ds-ink);
+    --color-on-ink: var(--ds-on-ink);
+
+    /* State */
+    --color-danger: var(--ds-danger);
+    --color-danger-soft: var(--ds-danger-soft);
+    --color-warning: var(--ds-warning);
+    --color-warning-glyph: var(--ds-warning-glyph);
+    --color-warning-soft: var(--ds-warning-soft);
+    --color-success: var(--ds-success);
+    --color-success-glyph: var(--ds-success-glyph);
+
+    /* Progress */
+    --color-progress-fill: var(--ds-progress-fill);
+    --color-progress-track: var(--ds-progress-track);
+    --color-stage-future: var(--ds-stage-future);
+
+    /* Focus and scrim */
+    --color-focus: var(--ds-focus);
+    --color-scrim: var(--ds-scrim);
+
+    /* Elevation */
+    --shadow-card: var(--ds-shadow-card);
+    --shadow-overlay: var(--ds-shadow-overlay);
+
+    /* Motion */
+    --transition-duration-motion-fast: var(--ds-motion-fast);
+    --transition-duration-motion-base: var(--ds-motion-base);
+    --transition-duration-motion-panel: var(--ds-motion-panel);
+    --transition-duration-motion-sheet: var(--ds-motion-sheet);
+    --ease-motion: var(--ds-motion-easing);
+    --ease-motion-exit: var(--ds-motion-easing-exit);
+}
+
+/* ── Compatibility aliases (shadcn + legacy status) ─────────────
+   Kept for existing consumers (Direction D §2.4). `accent`, `success`
+   and `warning` now name Direction D tokens above; their legacy
+   meanings moved to `legacy-*` names with identical values, the same
+   isolation WP1a applied to the hand-written utilities. ── */
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -42,21 +125,75 @@
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
-    --color-success: var(--success);
-    --color-warning: var(--warning);
     --color-info: var(--info);
+    --color-legacy-accent: var(--accent);
+    --color-legacy-success: var(--success);
+    --color-legacy-warning: var(--warning);
+}
+
+/* ── Theme-invariant Direction D tokens (EPIC-013 WP1c) ─────── */
+:root {
+    /* Motion (§16). Exits run at 70% of the enter duration. */
+    --ds-motion-fast:  120ms;
+    --ds-motion-base:  160ms;
+    --ds-motion-panel: 200ms;
+    --ds-motion-sheet: 240ms;
+    --ds-motion-easing:      cubic-bezier(0.2, 0, 0, 1);
+    --ds-motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* ── Light theme (default) ────────────────────────────────── */
 :root,
 [data-theme="light"] {
+    /* Direction D semantic tokens (EPIC-013 WP1c) — canonical light values,
+       direction-d-design-system.md §2.2. Exposed through @theme inline above. */
+    --ds-canvas:           #F6F5F1;
+    --ds-rail:             #EBE8E1;
+    --ds-drawer:           #F1EFEA;
+    --ds-surface:          #FFFFFF;
+    --ds-surface-sunken:   #EFEDE7;
+    --ds-surface-hover:    #E8E5DD;
+    --ds-surface-selected: #FFFFFF;
+    --ds-rule:             #E3E0D8;
+    --ds-rule-control:     #D2CEC3;
+    --ds-rule-strong:      #1A1B1E;
+    --ds-text:             #1A1B1E;
+    --ds-text-secondary:   #3F4248;
+    --ds-text-muted:       #5C5F66;
+    --ds-text-faint:       #8A8D93; /* placeholders/disabled/decorative only (§2.3.7) */
+    --ds-accent:           #0B6A73;
+    --ds-accent-hover:     #084E55;
+    --ds-accent-soft:      #E3EEEE;
+    --ds-accent-line:      #0B6A73;
+    --ds-live:             #0B8792; /* glyphs/dots/bars only; text uses --ds-live-text (§2.3.3) */
+    --ds-live-soft:        #E4F2F2;
+    --ds-live-text:        #0B6A73;
+    --ds-ink:              #1A1B1E;
+    --ds-on-ink:           #FFFFFF;
+    --ds-danger:           #B42318;
+    --ds-danger-soft:      #FBEAE7;
+    --ds-warning:          #8A5A0B;
+    --ds-warning-glyph:    #B7791F;
+    --ds-warning-soft:     #FAF0DC;
+    --ds-success:          #2B7A4B;
+    --ds-success-glyph:    #2E8B57;
+    --ds-progress-fill:    #1A1B1E;
+    --ds-progress-track:   #E4E1D9;
+    --ds-stage-future:     #C9C5BA;
+    --ds-focus:            #0B6A73;
+    --ds-scrim:            rgba(26, 27, 30, 0.18);
+    --ds-shadow-card:      0 1px 2px rgba(26, 27, 30, 0.05), 0 0 0 1px #E3E0D8;
+    --ds-shadow-overlay:   0 14px 36px rgba(26, 27, 30, 0.16), 0 0 0 1px #E3E0D8;
+
+    /* shadcn compatibility aliases. `destructive` and `ring` point at Direction D
+       (WP1c, measured safe); every other alias keeps its legacy value, and
+       `primary` stays indigo until WP2's Button restyle (EPIC-013 §8.3). */
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
@@ -68,11 +205,11 @@
     --muted:         var(--bg-surface);
     --muted-foreground: var(--text-secondary);
     --accent-foreground: var(--text-primary);
-    --destructive:   var(--danger);
+    --destructive:   var(--ds-danger);
     --destructive-foreground: theme(colors.white);
     --border:        var(--border-base);
     --input:         var(--border-base);
-    --ring:          var(--accent);
+    --ring:          var(--ds-focus);
 
     /* Backgrounds */
     --bg-base:       theme(colors.white);
@@ -136,6 +273,47 @@
 /* ── Dark theme ───────────────────────────────────────────── */
 [data-theme="dark"] {
     color-scheme: dark;
+
+    /* Direction D semantic tokens (EPIC-013 WP1c) — canonical dark values */
+    --ds-canvas:           #0D1416;
+    --ds-rail:             #091012;
+    --ds-drawer:           #10191C;
+    --ds-surface:          #142023;
+    --ds-surface-sunken:   #0F181A;
+    --ds-surface-hover:    #162427;
+    --ds-surface-selected: #18292D;
+    --ds-rule:             #1E2D31;
+    --ds-rule-control:     #2A3D42;
+    --ds-rule-strong:      #C8D7D9;
+    --ds-text:             #E6EEEF;
+    --ds-text-secondary:   #C3D1D3;
+    --ds-text-muted:       #98AEB2;
+    --ds-text-faint:       #6D8388;
+    --ds-accent:           #7ADDE4;
+    --ds-accent-hover:     #B2F4F7;
+    --ds-accent-soft:      #12292C;
+    --ds-accent-line:      #19E7F2;
+    --ds-live:             #19E7F2;
+    --ds-live-soft:        #0E2629;
+    --ds-live-text:        #19E7F2;
+    --ds-ink:              #E6EEEF;
+    --ds-on-ink:           #0D1416;
+    --ds-danger:           #FF8A7A;
+    --ds-danger-soft:      #2A1715;
+    --ds-warning:          #F2B45A;
+    --ds-warning-glyph:    #F2B45A;
+    --ds-warning-soft:     #2A2013;
+    --ds-success:          #6FD39A;
+    --ds-success-glyph:    #4CCB86;
+    --ds-progress-fill:    #C8D7D9;
+    --ds-progress-track:   #1E2D31;
+    --ds-stage-future:     #34494E;
+    --ds-focus:            #19E7F2;
+    --ds-scrim:            rgba(0, 0, 0, 0.45);
+    --ds-shadow-card:      0 0 0 1px #213136;
+    --ds-shadow-overlay:   0 14px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px #2A3D42;
+
+    /* shadcn compatibility aliases — see the light block */
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
@@ -147,11 +325,11 @@
     --muted:         var(--bg-surface);
     --muted-foreground: var(--text-secondary);
     --accent-foreground: var(--text-primary);
-    --destructive:   var(--danger);
+    --destructive:   var(--ds-danger);
     --destructive-foreground: theme(colors.gray.950);
     --border:        var(--border-base);
     --input:         var(--border-base);
-    --ring:          var(--accent);
+    --ring:          var(--ds-focus);
 
     /* Backgrounds */
     --bg-base:       theme(colors.gray.950);

@@ -9,10 +9,20 @@ type FlashRegionProps = {
     flash: FlashProps;
 };
 
+// `legacy-success`/`legacy-warning` keep the pre-Direction D colours (EPIC-013 WP1c);
+// `danger` is the Direction D token. WP2's Alert restyle replaces all four.
 const variants = {
-    success: { icon: CircleCheck, className: 'border-success text-success', role: 'status' },
+    success: {
+        icon: CircleCheck,
+        className: 'border-legacy-success text-legacy-success',
+        role: 'status',
+    },
     status: { icon: Info, className: 'border-info text-info', role: 'status' },
-    warning: { icon: TriangleAlert, className: 'border-warning text-warning', role: 'status' },
+    warning: {
+        icon: TriangleAlert,
+        className: 'border-legacy-warning text-legacy-warning',
+        role: 'status',
+    },
     error: { icon: CircleAlert, className: 'border-danger text-danger', role: 'alert' },
 } as const;
 

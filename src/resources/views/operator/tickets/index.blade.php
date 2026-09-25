@@ -79,7 +79,7 @@
             <thead>
                 <tr style="background-color: var(--surface-elevated);">
                     <th class="px-4 py-3">
-                        <input type="checkbox" id="select-all" class="h-4 w-4 rounded accent-accent">
+                        <input type="checkbox" id="select-all" class="h-4 w-4 rounded accent-legacy-accent">
                     </th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Ticket</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Priority</th>
@@ -94,7 +94,7 @@
                 @forelse ($tickets as $ticket)
                 <tr class="transition-colors hover:legacy-bg-surface {{ $ticket->isOverdue() ? 'bg-red-50' : '' }}">
                     <td class="px-4 py-3">
-                        <input type="checkbox" name="ticket_ids[]" value="{{ $ticket->id }}" class="h-4 w-4 rounded accent-accent ticket-cb">
+                        <input type="checkbox" name="ticket_ids[]" value="{{ $ticket->id }}" class="h-4 w-4 rounded accent-legacy-accent ticket-cb">
                     </td>
                     <td class="px-4 py-3">
                         <p class="font-medium text-sm" style="color: var(--text-primary);">{{ $ticket->title }}</p>

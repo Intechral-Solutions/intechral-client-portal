@@ -105,7 +105,7 @@
                               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);"></textarea>
                     @can('tickets.assign')
                     <label class="flex cursor-pointer items-center gap-2 text-sm" style="color: var(--text-secondary);">
-                        <input type="checkbox" name="is_internal" value="1" class="h-4 w-4 rounded accent-accent">
+                        <input type="checkbox" name="is_internal" value="1" class="h-4 w-4 rounded accent-legacy-accent">
                         Internal note (not visible to submitter)
                     </label>
                     @endcan

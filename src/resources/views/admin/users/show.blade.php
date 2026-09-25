@@ -127,7 +127,7 @@
                                style="border-color: var(--border-base);">
                             <input type="checkbox" name="roles[]" value="{{ $role->name }}"
                                    {{ $user->hasRole($role->name) ? 'checked' : '' }}
-                                   class="h-4 w-4 rounded accent-accent">
+                                   class="h-4 w-4 rounded accent-legacy-accent">
                             <span style="color: var(--text-primary);">{{ $role->name }}</span>
                         </label>
                         @endforeach
