@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { personas, signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP7 critical flows: the project task detail page as a React/Inertia page (§24 item
@@ -41,7 +42,7 @@ test('board to task detail and back over Inertia, with the persistent timer surv
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP7 task nav project');
     await quickAdd(page, 'Backlog', 'E2E WP7 nav task');
 
@@ -77,7 +78,7 @@ test('a manager edits task fields and assigns, then clears, a milestone (I4)', a
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP7 edit project');
 
     await page.goto(`/projects/${projectId}/milestones`);
@@ -120,7 +121,7 @@ test('a manager adds a checklist item; a plain member can toggle it but not auth
     browser,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP7 checklist project');
     await quickAdd(page, 'Backlog', 'E2E WP7 checklist task');
 
@@ -143,10 +144,9 @@ test('a manager adds a checklist item; a plain member can toggle it but not auth
     await expect(checkbox).toBeVisible();
     await expect(checkbox).not.toBeChecked();
 
-    const memberContext = await browser.newContext();
+    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
     const memberPage = await memberContext.newPage();
     try {
-        await signIn(memberPage, 'user@intechral.test');
         await memberPage.goto(taskUrl);
 
         const memberCheckbox = memberPage.getByRole('checkbox', { name: 'E2E checklist item' });
@@ -171,7 +171,7 @@ test('an unreferenced task deletes; a task with recorded time is blocked and his
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP7 delete project');
 
     await quickAdd(page, 'Backlog', 'E2E WP7 deletable task');

@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { CreateTaskForm } from '@/components/tasks/create-task-form';
 import { TaskListRow } from '@/components/tasks/task-list-row';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { cn } from '@/lib/utils';
 import { index } from '@/routes/tasks';
 import type { Paginated } from '@/types/pagination';
@@ -100,6 +100,6 @@ export function TasksIndexPage({ tasks, view, canViewOrg, createOptions }: Tasks
     );
 }
 
-TasksIndexPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+TasksIndexPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default TasksIndexPage;

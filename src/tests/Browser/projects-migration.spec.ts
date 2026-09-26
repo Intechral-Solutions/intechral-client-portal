@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
+import { signedIn } from './support/auth';
 import { signIn } from './support/sign-in';
 
 /**
@@ -37,11 +38,13 @@ test('index to create, and the create page as projects.admin adds a member and l
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
 
     await page.goto('/projects');
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
-    await page.getByRole('link', { name: 'New project' }).click();
+    // The Projects drawer now offers the same workspace action, so this scopes to the page's own
+    // primary button rather than matching both (§11.1 lists "New project" as a drawer action).
+    await page.getByRole('main').getByRole('link', { name: 'New project' }).click();
     await expect(page).toHaveURL(/\/projects\/create$/);
 
     // The required name field is a native HTML constraint: an empty submit is blocked by the
@@ -80,7 +83,7 @@ test('edit-page safety regression: saving renames without deleting, and delete n
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP3 edit regression');
     await page.goto(`/projects/${projectId}/edit`);
 
@@ -114,7 +117,7 @@ test('a project with recorded time cannot be deleted and the refusal shows in th
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP3 D4 project');
 
     // Record time through the page so the fixture teardown removes the entry before the project.
@@ -152,7 +155,7 @@ test('administrator membership editing, a hostile member name stays text, and a 
     browser,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP3 membership project');
 
     const hostileEmail = `e2e-wp3-hostile-${Date.now()}@intechral.test`;
@@ -196,6 +199,8 @@ test('administrator membership editing, a hostile member name stays text, and a 
         const managerContext = await browser.newContext();
         const managerPage = await managerContext.newPage();
         try {
+            // This actor is created by the test itself with a per-run email, so there is no
+            // reusable state to mint for it; a real login is the only option and the only one needed.
             await signIn(managerPage, managerEmail, 'unused-e2e-password');
             await managerPage.goto(`/projects/${projectId}/edit`);
 
@@ -232,7 +237,7 @@ test('the projects index and create page are usable at a phone viewport with no 
     cleanup,
 }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
 
     await page.goto('/projects');
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
@@ -241,7 +246,9 @@ test('the projects index and create page are usable at a phone viewport with no 
     );
     expect(indexOverflow).toBe(false);
 
-    await page.getByRole('link', { name: 'New project' }).click();
+    // The Projects drawer now offers the same workspace action, so this scopes to the page's own
+    // primary button rather than matching both (§11.1 lists "New project" as a drawer action).
+    await page.getByRole('main').getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('E2E WP3 mobile project');
     const createOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

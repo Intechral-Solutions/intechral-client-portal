@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { personas, signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP5 critical flows: the project board as a React/Inertia page, keyboard-accessible
@@ -38,7 +39,7 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP5 board nav project');
 
     // Start a timer for this project so its elapsed clock is the SPA-navigation signal: a full
@@ -101,7 +102,7 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 keyboard move project');
 
     await quickAdd(page, 'Backlog', 'E2E keyboard move task');
@@ -120,9 +121,9 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
     // (`[aria-live="polite"]` alone also matches the persistent RunningTimerBar's "Active
     // timers" region; `.sr-only` is what distinguishes the board's own live region from it.)
     await expect(moveButton).toBeFocused();
-    await expect(page.locator('[aria-live="polite"].sr-only')).toHaveText(
-        'Moved "E2E keyboard move task" to To Do, position 1 of 1.',
-    );
+    await expect(
+        page.locator('[aria-live="polite"].sr-only:not([data-shell-announcer])'),
+    ).toHaveText('Moved "E2E keyboard move task" to To Do, position 1 of 1.');
 
     // Persists after a reload: the move was a real server round trip, not a client-only effect.
     await page.reload();
@@ -130,26 +131,20 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
 });
 
 test('move up and down within a column through the Move menu', async ({ page, cleanup }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 reorder project');
 
     await quickAdd(page, 'Backlog', 'E2E first task');
     await quickAdd(page, 'Backlog', 'E2E second task');
 
     const backlogColumn = page.locator('[data-column-id]').filter({ hasText: 'Backlog' });
-    await expect(backlogColumn.getByRole('link')).toHaveText([
-        'E2E first task',
-        'E2E second task',
-    ]);
+    await expect(backlogColumn.getByRole('link')).toHaveText(['E2E first task', 'E2E second task']);
 
     await page.getByRole('button', { name: 'Move "E2E second task"' }).focus();
     await page.keyboard.press('Enter');
     await page.getByRole('menuitem', { name: 'Move up' }).click();
 
-    await expect(backlogColumn.getByRole('link')).toHaveText([
-        'E2E second task',
-        'E2E first task',
-    ]);
+    await expect(backlogColumn.getByRole('link')).toHaveText(['E2E second task', 'E2E first task']);
 });
 
 test('a plain project member gets a read-only board and can still open, comment on, and toggle a checklist item for a task', async ({
@@ -157,7 +152,7 @@ test('a plain project member gets a read-only board and can still open, comment 
     browser,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP5 read-only board');
 
     await quickAdd(page, 'Backlog', 'E2E D1 task');
@@ -171,10 +166,9 @@ test('a plain project member gets a read-only board and can still open, comment 
     await page.getByRole('button', { name: 'Update members' }).click();
     await expect(page.getByRole('status')).toContainText('Members updated.');
 
-    const memberContext = await browser.newContext();
+    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
     const memberPage = await memberContext.newPage();
     try {
-        await signIn(memberPage, 'user@intechral.test');
         await memberPage.goto(`/projects/${projectId}/board`);
 
         await expect(memberPage.getByRole('link', { name: 'E2E D1 task' })).toBeVisible();
@@ -201,7 +195,7 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
     cleanup,
 }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 mobile project');
 
     await quickAdd(page, 'Backlog', 'E2E mobile task');

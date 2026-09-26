@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { exportMethod, index } from '@/routes/operator/time';
 import type { Paginated } from '@/types/pagination';
 
@@ -307,6 +307,6 @@ function SummaryList({
     );
 }
 
-ReportPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ReportPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ReportPage;

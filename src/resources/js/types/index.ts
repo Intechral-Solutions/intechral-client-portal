@@ -10,5 +10,4 @@ export type {
     Workspace,
     WorkspacePresentation,
 } from './navigation';
-export type { LegacyNavigationGroup, LegacyNavigationItem } from './navigation-legacy';
 export type { AuthAvatar, AuthProps, AuthUser, FlashProps, SharedPageProps } from './shared';

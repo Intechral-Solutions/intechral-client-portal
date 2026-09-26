@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/page-header';
 import { MilestoneCard } from '@/components/projects/milestone-card';
 import { MilestoneFormDialog } from '@/components/projects/milestone-form-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { board } from '@/routes/projects';
 import type { MilestoneItem } from '@/types/projects';
 
@@ -107,6 +107,6 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
     );
 }
 
-MilestonesIndexPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+MilestonesIndexPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default MilestonesIndexPage;

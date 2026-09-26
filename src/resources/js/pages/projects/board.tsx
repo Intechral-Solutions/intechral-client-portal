@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { Board } from '@/components/projects/board';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { buttonVariants } from '@/components/ui/button';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { edit, index } from '@/routes/projects';
 import { index as milestonesIndex } from '@/routes/projects/milestones';
 import type { BoardColumn, ProjectStatus } from '@/types/projects';
@@ -63,6 +63,6 @@ export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardPr
     );
 }
 
-ProjectBoardPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ProjectBoardPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ProjectBoardPage;

@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Shared\Navigation\LegacyShellNavigation;
 use App\Shared\Navigation\NavigationBuilder;
 use App\Support\Initials;
 use Illuminate\Http\Request;
@@ -51,8 +50,6 @@ class HandleInertiaRequests extends Middleware
                 'presentation' => 'operational',
             ],
             'navigation' => fn () => $this->navigation($request),
-            // TEMPORARY: the pre-WP4 shell's flat shape. Removed with `app-layout.tsx`'s header.
-            'navigationLegacy' => fn () => LegacyShellNavigation::groups($this->navigation($request)),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
@@ -68,9 +65,8 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * One builder invocation per request (EPIC-013 §12.3 rule 11), even when both the canonical and
-     * the compatibility prop are evaluated. Keyed on the request so a reused middleware instance can
-     * never serve another request's navigation.
+     * One builder invocation per request (EPIC-013 §12.3 rule 11). Keyed on the request so a reused
+     * middleware instance can never serve another request's navigation.
      *
      * @return array{currentWorkspace: string|null, workspaces: array<int, array<string, mixed>>}
      */

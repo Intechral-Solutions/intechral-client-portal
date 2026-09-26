@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { allocation, index as timeIndex } from '@/routes/time';
 import { allocation as updateAllocation } from '@/routes/time/blocks';
 import type { AllocationEntry, AllocationSlotResponse } from '@/types/time';
@@ -286,6 +286,6 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
     );
 }
 
-AllocationPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+AllocationPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default AllocationPage;

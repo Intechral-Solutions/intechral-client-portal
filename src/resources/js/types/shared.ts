@@ -1,4 +1,3 @@
-import type { LegacyNavigationGroup } from './navigation-legacy';
 import type { Navigation, ShellProps } from './navigation';
 
 /** Initials are derived server-side so both renderers agree; `url` is null (no photo storage). */
@@ -32,9 +31,14 @@ export type SharedPageProps = {
     };
     auth: AuthProps;
     shell: ShellProps;
-    /** The canonical WP3 contract. New shell code reads this. */
+    /**
+     * The canonical navigation contract, and the shell's only navigation input.
+     *
+     * WP3's temporary `navigationLegacy` companion prop is gone from the Inertia payload: the
+     * Direction D shell projects `context` into the drawer, so nothing on the React side needs the
+     * flattened shape. `ShellComposer` still supplies it to `layouts/partials/nav.blade.php`, which
+     * WP5 replaces.
+     */
     navigation: Navigation;
-    /** TEMPORARY: the pre-WP4 shell's flat shape. Removed in WP4 with `app-layout.tsx`'s header. */
-    navigationLegacy: LegacyNavigationGroup[];
     flash: FlashProps;
 };

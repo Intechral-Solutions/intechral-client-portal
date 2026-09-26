@@ -3,12 +3,14 @@
 namespace App\Shared\Navigation;
 
 /**
- * TEMPORARY compatibility seam for the pre-WP4 shells. Deleted with them.
+ * TEMPORARY compatibility seam for the pre-Direction-D Blade shell. Deleted with it in WP5.
  *
- * WP3 lands the canonical workspace contract on its own, ahead of the Direction D shell (WP4 React,
- * WP5 Blade). Until those land, the old sticky-header shells still render a flat list of links and
- * have no drawer to project a workspace's `context` into, so this projects the canonical model down
- * into the flat shape they already understand:
+ * **The React side no longer uses this.** WP4 replaced `app-layout.tsx` with the Direction D shell,
+ * which projects each workspace's `context` into the drawer, so `HandleInertiaRequests` stopped
+ * sharing the flattened shape entirely. The one remaining consumer is
+ * `layouts/partials/nav.blade.php`, which still renders a flat list of links and has no drawer to
+ * project `context` into; it receives this through `ShellComposer` until WP5 replaces it with the
+ * Blade shell partials. The projection is:
  *
  *   primary  — one entry per workspace, in canonical order.
  *   overflow — the contextual destinations that are not already reachable as a workspace entry,
@@ -17,13 +19,13 @@ namespace App\Shared\Navigation;
  *
  * `overflow` is NOT the retired "Manage" group under another name. It is not derived from a
  * management concept, carries no label or heading, and is not audience-scoped: it is purely the
- * remainder that a shell without a drawer cannot otherwise reach. Its only job is that WP3 removes
- * no authorized destination from a shell it has not yet replaced. When WP4/WP5 render the rail and
- * the drawer, both this class and its two shared-prop/view bindings are deleted, and nothing in the
+ * remainder that a shell without a drawer cannot otherwise reach. Its only job is that the reshape
+ * removes no authorized destination from a shell it has not yet replaced. When WP5 renders the Blade
+ * rail and drawer, this class and its one remaining view binding are deleted, and nothing in the
  * canonical contract changes.
  *
  * `Actions` items are excluded: "New project" is a workspace action, not a navigation destination,
- * and the pre-WP3 shells never offered it.
+ * and the pre-WP3 shell never offered it.
  */
 final class LegacyShellNavigation
 {

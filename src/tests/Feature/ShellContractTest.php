@@ -87,13 +87,10 @@ it('keeps the retired Manage grouping out of the shared payload', function () {
             // The payload is workspace-shaped: there is no group list to hold a "Manage" section.
             ->missing('navigation.0')
             ->has('navigation.workspaces')
-            ->where('navigationLegacy', fn ($groups) => collect($groups)
-                ->pluck('key')
-                ->diff(['primary', 'overflow'])
-                ->isEmpty())
-            ->where('navigationLegacy', fn ($groups) => collect($groups)
-                ->pluck('label')
-                ->every(fn ($label) => $label === null)));
+            // WP4: the Direction D shell projects `context` into the drawer, so the compatibility
+            // projection left the Inertia payload entirely. It survives only for the Blade partial
+            // WP5 replaces, which the composer test below covers.
+            ->missing('navigationLegacy'));
 });
 
 it('gives the Blade shell the same payload as the Inertia prop, from one builder', function () {

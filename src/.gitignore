@@ -18,6 +18,9 @@
 /resources/js/wayfinder
 /test-results
 /playwright-report
+# Reusable authenticated browser state, minted per run by the Playwright `setup` project. It is
+# live session material: never source-controlled (tests/Browser/support/auth.ts).
+/tests/Browser/.auth
 /public/build
 /public/hot
 /public/storage

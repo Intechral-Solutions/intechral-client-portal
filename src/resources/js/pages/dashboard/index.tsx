@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Status, type StatusTone } from '@/components/ui/status';
 import { buttonVariants } from '@/components/ui/button';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { cn } from '@/lib/utils';
 
 type VisitMode = 'inertia' | 'document';
@@ -312,6 +312,6 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
     );
 }
 
-DashboardPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+DashboardPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default DashboardPage;

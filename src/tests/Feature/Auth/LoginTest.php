@@ -18,7 +18,7 @@ test('login page is accessible to guests', function () {
         // EPIC-013 §12.2: the canonical shape is stable for every actor, so a guest gets an empty
         // workspace list rather than an empty array and no consumer branches on the shape.
         ->where('navigation', ['currentWorkspace' => null, 'workspaces' => []])
-        ->where('navigationLegacy', [])
+        ->missing('navigationLegacy')
         ->where('shell.presentation', 'operational'));
 });
 

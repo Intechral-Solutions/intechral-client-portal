@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Status } from '@/components/ui/status';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { formatDate } from '@/lib/dates';
 import {
     allocation,
@@ -518,6 +518,6 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
     );
 }
 
-TimePage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+TimePage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default TimePage;

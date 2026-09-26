@@ -32,8 +32,9 @@ final class ShellComposer
 
         $view->with([
             'navigation' => $navigation,
-            // TEMPORARY, as in the Inertia prop: the flat shape `partials/nav.blade.php` still
-            // renders. Removed with that partial in WP5.
+            // TEMPORARY and Blade-only: the flat shape `partials/nav.blade.php` still renders. The
+            // Inertia payload dropped it in WP4, when the Direction D shell began projecting
+            // `context` itself. Removed with that partial in WP5.
             'navigationLegacy' => LegacyShellNavigation::groups($navigation),
             'shell' => ['presentation' => 'operational'],
             'shellUser' => $user ? [

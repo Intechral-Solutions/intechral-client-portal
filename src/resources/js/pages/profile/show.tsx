@@ -23,7 +23,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Status } from '@/components/ui/status';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { formatTimestamp } from '@/lib/dates';
 import { confirmation as passwordConfirmation } from '@/routes/password';
 import { confirm as confirmProfilePassword } from '@/routes/profile/password';
@@ -754,6 +754,6 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
     );
 }
 
-ProfilePage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ProfilePage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ProfilePage;

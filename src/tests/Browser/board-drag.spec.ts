@@ -1,7 +1,8 @@
 import { devices } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { E2eCleanup, expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { personas, signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP6 critical flows: pointer/touch drag through dnd-kit, layered over the WP5 board.
@@ -123,7 +124,7 @@ async function expectMoveSettled(page: Page) {
 
 test.describe('pointer drag (EPIC-011E WP6)', () => {
     test('drags a card upward within a column by its handle', async ({ page, cleanup }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 drag up project');
         await quickAdd(page, 'Backlog', 'E2E drag first');
         await quickAdd(page, 'Backlog', 'E2E drag second');
@@ -140,7 +141,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
     });
 
     test('drags a card downward within a column by its handle', async ({ page, cleanup }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 drag down project');
         await quickAdd(page, 'Backlog', 'E2E down first');
         await quickAdd(page, 'Backlog', 'E2E down second');
@@ -156,7 +157,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 cross-column project');
         await quickAdd(page, 'Backlog', 'E2E cross column task');
 
@@ -171,7 +172,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
     });
 
     test('drops a card into an empty column', async ({ page, cleanup }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 empty column project');
         await quickAdd(page, 'Backlog', 'E2E empty column task');
 
@@ -187,7 +188,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 append project');
         await quickAdd(page, 'To Do', 'E2E append existing');
         // Padding cards in a sibling column only, so the board's flex columns (default
@@ -219,7 +220,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 invalid drop project');
         await quickAdd(page, 'Backlog', 'E2E invalid drop task');
 
@@ -235,14 +236,16 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         // Still exactly where it started, and no live-region announcement of a move that never
         // happened.
         await expect(backlog.getByRole('link', { name: 'E2E invalid drop task' })).toBeVisible();
-        await expect(page.locator('[aria-live="polite"].sr-only')).toHaveText('');
+        await expect(
+            page.locator('[aria-live="polite"].sr-only:not([data-shell-announcer])'),
+        ).toHaveText('');
     });
 
     test('single-flight: the Move menu is disabled while a dragged move is reconciling, and re-enabled once it settles', async ({
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 busy project');
         await quickAdd(page, 'Backlog', 'E2E busy task one');
         await quickAdd(page, 'Backlog', 'E2E busy task two');
@@ -276,7 +279,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 handle-only project');
         await quickAdd(page, 'Backlog', 'E2E body task');
 
@@ -305,7 +308,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         const projectId = await createProject(page, cleanup, 'E2E WP6 parity project');
         await quickAdd(page, 'Backlog', 'E2E parity task');
 
@@ -325,7 +328,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         browser,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         const projectId = await createProject(page, cleanup, 'E2E WP6 read-only drag project');
         await quickAdd(page, 'Backlog', 'E2E read-only task');
 
@@ -337,10 +340,11 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         await page.getByRole('button', { name: 'Update members' }).click();
         await expect(page.getByRole('status')).toContainText('Members updated.');
 
-        const memberContext = await browser.newContext();
+        const memberContext = await browser.newContext({
+            storageState: personas.member.storageState,
+        });
         const memberPage = await memberContext.newPage();
         try {
-            await signIn(memberPage, 'user@intechral.test');
             await memberPage.goto(`/projects/${projectId}/board`);
 
             await expect(
@@ -357,7 +361,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         page,
         cleanup,
     }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signedIn(page);
         await createProject(page, cleanup, 'E2E WP6 reconcile project');
         await quickAdd(page, 'Backlog', 'E2E reconcile task');
 
@@ -397,7 +401,7 @@ test.describe('touch (EPIC-011E WP6)', () => {
         const cleanup = new E2eCleanup(page);
 
         try {
-            await signIn(page, 'operator@intechral.test');
+            await signedIn(page);
             await createProject(page, cleanup, 'E2E WP6 touch project');
             await quickAdd(page, 'Backlog', 'E2E touch task');
 
@@ -482,7 +486,7 @@ test('horizontal autoscroll: holding a drag near the right edge scrolls the boar
     cleanup,
 }) => {
     await page.setViewportSize({ width: 500, height: 700 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP6 autoscroll project');
     await quickAdd(page, 'Backlog', 'E2E autoscroll task');
 
@@ -514,7 +518,7 @@ test('reduced motion: a drop still completes with no lingering overlay', async (
     cleanup,
 }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP6 reduced motion project');
     await quickAdd(page, 'Backlog', 'E2E reduced motion task');
 

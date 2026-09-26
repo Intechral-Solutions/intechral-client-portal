@@ -593,3 +593,194 @@ body {
     .legacy-shadow-theme-md { box-shadow: var(--shadow-md); }
     .legacy-shadow-theme-lg { box-shadow: var(--shadow-lg); }
 }
+
+/* ── Direction D operator shell (EPIC-013 WP4) ────────────────
+   Geometry from direction-d-design-system.md §5.1/§6 and the width classes
+   from §5.2, implemented entirely in CSS so no JavaScript decides layout
+   (EPIC-013 §16). Two attributes drive it:
+
+     html[data-drawer="open"|"collapsed"]   the remembered/default panel state
+     [data-shell="operational"][data-panel] whether this workspace has a
+                                            contextual panel at all
+
+   The panel preference is honoured only at XL, and at L only when pinned, so
+   M/S ignore it here rather than through a resize listener.
+
+   These rules are deliberately UNLAYERED. Shell parts also carry Tailwind
+   utilities (`flex`, `h-9`, ...), and an unlayered rule beats every layered one
+   regardless of specificity. Inside `@layer components` the width classes were
+   silently inert: `display: none` lost to `.flex` from the utilities layer, so
+   the rail list, the sheet trigger and the pin all stayed visible at every
+   width. Chromium caught that; the layer is the fix.
+   ── */
+[data-shell='operational'] {
+    --shell-rail: 64px;
+    --shell-rail-s: 56px;
+    --shell-drawer: 248px;
+    --shell-utility: 48px;
+
+    display: grid;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-areas: 'rail canvas';
+    grid-template-columns: var(--shell-rail) minmax(0, 1fr);
+    background-color: var(--ds-canvas);
+    color: var(--ds-text);
+}
+
+[data-shell='operational'] [data-shell-rail] {
+    grid-area: rail;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 0;
+    background-color: var(--ds-rail);
+    border-right: 1px solid var(--ds-rule);
+}
+
+[data-shell='operational'] [data-shell-drawer] {
+    grid-area: drawer;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    width: var(--shell-drawer);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--ds-drawer);
+    border-right: 1px solid var(--ds-rule);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+[data-shell='operational'] [data-shell-canvas] {
+    grid-area: canvas;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+[data-shell='operational'] [data-shell-utility] {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--shell-utility);
+    padding: 0 16px;
+    background-color: var(--ds-canvas);
+    border-bottom: 1px solid var(--ds-rule);
+}
+
+/* Overlay is the DEFAULT: it floats over the canvas with no scrim (§5.4), so
+   content stays visible behind it. The width classes below un-overlay it where
+   it is allowed to dock, which is what keeps docked-vs-overlay a pure CSS
+   decision with no resize listener and no JavaScript width query. */
+[data-shell='operational'] [data-shell-drawer] {
+    position: fixed;
+    top: 0;
+    left: var(--shell-rail);
+    z-index: 40;
+    box-shadow: var(--ds-shadow-overlay);
+}
+
+/* ── XL >= 1360: the panel docks whenever the workspace has one and the
+   remembered/default state is open. ── */
+@media (min-width: 1360px) {
+    html[data-drawer='open'] [data-shell='operational'][data-panel='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true']
+        > [data-shell-drawer] {
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+}
+
+/* ── L 1024-1359: "open" docks only when pinned at L; otherwise it stays an
+   overlay (Direction D §5.3 rule 2). ── */
+@media (min-width: 1024px) and (max-width: 1359.98px) {
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true'][data-pinned='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true'][data-pinned='true']
+        > [data-shell-drawer] {
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+}
+
+/* ── M 768-1023: overlay only, so the pin affordance is hidden and the
+   remembered preference cannot dock anything. ── */
+@media (max-width: 1023.98px) {
+    [data-shell='operational'] [data-shell-pin] {
+        display: none;
+    }
+}
+
+/* ── S < 768: the rail becomes a 56px top bar and its workspace list folds into
+   the nav sheet. ── */
+@media (max-width: 767.98px) {
+    [data-shell='operational'] {
+        grid-template-areas: 'rail' 'canvas';
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: var(--shell-rail-s) minmax(0, 1fr);
+    }
+
+    [data-shell='operational'] [data-shell-rail] {
+        flex-direction: row;
+        justify-content: space-between;
+        height: var(--shell-rail-s);
+        padding: 0 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--ds-rule);
+        z-index: 30;
+    }
+
+    /* Removed from the accessibility tree, not merely hidden, so the nav sheet
+       is the single set of workspace links at this width. */
+    [data-shell='operational'] [data-shell-workspaces],
+    [data-shell='operational'] [data-shell-drawer],
+    [data-shell='operational'] [data-shell-toggle] {
+        display: none;
+    }
+
+    /* Touch targets stay reachable at S (§16). */
+    [data-shell-sheet] [data-shell-nav-row] {
+        min-height: 44px;
+    }
+}
+
+@media (min-width: 768px) {
+    [data-shell='operational'] [data-shell-sheet-trigger] {
+        display: none;
+    }
+}
+
+/* ── Brand mark theming (EPIC-013 WP4, §10.3 / A1.5) ──────────
+   The canonical SVGs hard-code the brand cyan in their gradient stops, which
+   is correct on dark. CSS beats SVG presentation attributes, so light flattens
+   the fade to solid ink without touching path data or the source files. ── */
+[data-theme='light'] .brand-mark stop {
+    stop-color: var(--ds-ink);
+    stop-opacity: 1;
+}

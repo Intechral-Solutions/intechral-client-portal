@@ -1,7 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { avoidSlotBoundary, expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+import { personas, signedIn } from './support/auth';
+import { openAccountMenu, railLink } from './support/shell';
+
+// The first two flows are the member's own time; the third is an operator's. The persona is the
+// context's reusable authentication state, so it is declared per group rather than logged in per test.
+test.use({ storageState: personas.member.storageState });
 
 async function stopAllReactTimers(page: Page) {
     await page.goto('/time');
@@ -21,7 +26,7 @@ function section(page: Page, heading: string): Locator {
 test('multiple timers persist through Inertia and reconstruct across Blade documents', async ({
     page,
 }) => {
-    await signIn(page, 'user@intechral.test');
+    await signedIn(page);
     await stopAllReactTimers(page);
 
     const timerForm = section(page, 'Start a timer');
@@ -42,7 +47,7 @@ test('multiple timers persist through Inertia and reconstruct across Blade docum
     const initialClock = await firstClock.textContent();
     await expect(firstClock).not.toHaveText(initialClock ?? '', { timeout: 3000 });
 
-    await page.getByRole('button', { name: 'Open user menu' }).click();
+    await openAccountMenu(page);
     await page.getByRole('menuitem', { name: 'Profile' }).click();
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(2);
@@ -61,18 +66,20 @@ test('multiple timers persist through Inertia and reconstruct across Blade docum
     await page.getByRole('button', { name: 'Stop timer' }).first().click();
     await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
 
-    // Projects is a React page as of EPIC-011E WP3, so the Blade-document leg of this journey
-    // moves to Tickets (still Blade until EPIC-011F); it needs no fixture (§21, C4).
-    await page.getByRole('link', { name: 'Tickets' }).click();
+    // Projects is a React page as of EPIC-011E WP3, so the Blade-document leg of this journey moves
+    // to the Helpdesk workspace (still Blade until EPIC-011F); it needs no fixture (§21, C4).
+    // Helpdesk is a `document` destination, so this crosses the React -> Blade boundary.
+    await railLink(page, 'Helpdesk').click();
     await expect(page).toHaveURL(/\/tickets$/);
     await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
     const bladeClock = page.locator('#timer-overlay .timer-clock');
     const bladeInitial = await bladeClock.textContent();
     await expect(bladeClock).not.toHaveText(bladeInitial ?? '', { timeout: 3000 });
 
-    await page.getByRole('link', { name: 'Intechral Client Portal home' }).click();
+    // Back across the boundary through the Blade shell's own navigation, then into Time.
+    await page.getByRole('link', { name: 'Home', exact: true }).first().click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await page.getByRole('link', { name: 'Time', exact: true }).click();
+    await railLink(page, 'Time').click();
     await expect(page).toHaveURL(/\/time$/);
     await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
     await page.getByRole('button', { name: 'Stop timer' }).click();
@@ -94,7 +101,7 @@ test('multiple timers persist through Inertia and reconstruct across Blade docum
 
 test('manual entries and server-owned allocation remain usable on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signIn(page, 'user@intechral.test');
+    await signedIn(page);
     await stopAllReactTimers(page);
 
     const manualForm = section(page, 'Log time manually');
@@ -194,54 +201,58 @@ test('manual entries and server-owned allocation remain usable on mobile', async
     expect(overflow).toBe(false);
 });
 
-test('a timer started from the embedded Blade tracker is reconstructed by React', async ({
-    page,
-}) => {
-    await signIn(page, 'operator@intechral.test');
-    await stopAllReactTimers(page);
+test.describe('as an operator', () => {
+    test.use({ storageState: personas.operator.storageState });
 
-    // The embedded tracker's only remaining host is a ticket page (EPIC-011E WP7, §21: the
-    // project task page it used to also live on is React as of this work package). Tickets have
-    // no delete route and DevSeeder seeds none per run, so this uses the seeder's idempotent
-    // fixture ticket (`TKT-E2E1`) rather than creating one here; teardown removes only the timer
-    // entries this test creates, never the ticket.
-    await page.goto('/tickets');
-    await page
-        .getByRole('row')
-        .filter({ hasText: 'TKT-E2E1' })
-        .getByRole('link', { name: 'View' })
-        .click();
-    await expect(page).toHaveURL(/\/tickets\/\d+$/);
-    const ticketUrl = page.url();
+    test('a timer started from the embedded Blade tracker is reconstructed by React', async ({
+        page,
+    }) => {
+        await signedIn(page);
+        await stopAllReactTimers(page);
 
-    // Start from the Blade tracker (the request passes the hardened context validation).
-    await page.getByRole('button', { name: /Start Timer/ }).click();
-    await expect(page.getByText('Timer running')).toBeVisible();
-    await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
-    await expect(page.getByRole('region', { name: 'Active timers' })).toHaveCount(0);
+        // The embedded tracker's only remaining host is a ticket page (EPIC-011E WP7, §21: the
+        // project task page it used to also live on is React as of this work package). Tickets have
+        // no delete route and DevSeeder seeds none per run, so this uses the seeder's idempotent
+        // fixture ticket (`TKT-E2E1`) rather than creating one here; teardown removes only the timer
+        // entries this test creates, never the ticket.
+        await page.goto('/tickets');
+        await page
+            .getByRole('row')
+            .filter({ hasText: 'TKT-E2E1' })
+            .getByRole('link', { name: 'View' })
+            .click();
+        await expect(page).toHaveURL(/\/tickets\/\d+$/);
+        const ticketUrl = page.url();
 
-    // A document navigation into an Inertia page mounts React, which hydrates from Laravel.
-    await page.goto('/time');
-    const bar = page.getByRole('region', { name: 'Active timers' });
-    await expect(bar).toContainText('TKT-E2E1');
-    await expect(page.locator('#timer-overlay')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
+        // Start from the Blade tracker (the request passes the hardened context validation).
+        await page.getByRole('button', { name: /Start Timer/ }).click();
+        await expect(page.getByText('Timer running')).toBeVisible();
+        await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
+        await expect(page.getByRole('region', { name: 'Active timers' })).toHaveCount(0);
 
-    // And back to Blade: the same server record is shown by the legacy overlay.
-    await page.goto(ticketUrl);
-    await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
-    await expect(page.getByText('Timer running')).toBeVisible();
+        // A document navigation into an Inertia page mounts React, which hydrates from Laravel.
+        await page.goto('/time');
+        const bar = page.getByRole('region', { name: 'Active timers' });
+        await expect(bar).toContainText('TKT-E2E1');
+        await expect(page.locator('#timer-overlay')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Stop timer' })).toHaveCount(1);
 
-    // Stop through React so the timer is finished before cleanup runs.
-    await page.goto('/time');
-    await page.getByRole('button', { name: 'Stop timer' }).click();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toHaveCount(0);
+        // And back to Blade: the same server record is shown by the legacy overlay.
+        await page.goto(ticketUrl);
+        await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(1);
+        await expect(page.getByText('Timer running')).toBeVisible();
 
-    await page.goto(ticketUrl);
-    await expect(page.getByRole('button', { name: /Start Timer/ })).toBeVisible();
-    await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(0);
+        // Stop through React so the timer is finished before cleanup runs.
+        await page.goto('/time');
+        await page.getByRole('button', { name: 'Stop timer' }).click();
+        await expect(page.getByRole('region', { name: 'Active timers' })).toHaveCount(0);
 
-    // E2eCleanup already recorded this timer's entry id from the `/time/timer/start` response
-    // and removes it in teardown; the fixture ticket itself has no delete route and is not
-    // removed, so the next run's `firstOrCreate` finds it already there.
+        await page.goto(ticketUrl);
+        await expect(page.getByRole('button', { name: /Start Timer/ })).toBeVisible();
+        await expect(page.locator('#timer-overlay [data-timer-id]')).toHaveCount(0);
+
+        // E2eCleanup already recorded this timer's entry id from the `/time/timer/start` response
+        // and removes it in teardown; the fixture ticket itself has no delete route and is not
+        // removed, so the next run's `firstOrCreate` finds it already there.
+    });
 });

@@ -11,7 +11,7 @@ import { TaskStatusBadge } from '@/components/projects/task-status-badge';
 import { TaskTimePanel } from '@/components/projects/task-time-panel';
 import { formatDate } from '@/lib/dates';
 import { board } from '@/routes/projects';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import type {
     TaskChecklistItemData,
     TaskCommentData,
@@ -182,6 +182,6 @@ export function ProjectTaskShowPage({
     );
 }
 
-ProjectTaskShowPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ProjectTaskShowPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ProjectTaskShowPage;

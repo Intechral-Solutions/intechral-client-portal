@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 import { signIn } from './support/sign-in';
+import { openAccountMenu } from './support/shell';
+
+/**
+ * Authentication is this file's subject, so it opts out of the reusable state entirely: invalid
+ * credentials, the logout transition and the fresh-authentication password confirmation all have to
+ * drive the real Fortify route. Pre-authenticating them would hide the regressions they exist to
+ * catch, and they are also the suite's only intentional consumers of limiter budget.
+ */
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test('React login reports invalid credentials and logout returns to the auth shell', async ({
     page,
@@ -17,7 +26,7 @@ test('React login reports invalid credentials and logout returns to the auth she
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
 
-    await page.getByRole('button', { name: 'Open user menu' }).click();
+    await openAccountMenu(page);
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();

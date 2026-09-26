@@ -87,6 +87,33 @@ export type OptimisticSubmission = {
 const optimisticSubmissions: OptimisticSubmission[] = [];
 
 /**
+ * `router.on('navigate', …)` listeners. Deliberately not a spy: the shell's announcement policy
+ * relies on the returned unsubscribe function, which `mockReset()` would strip.
+ */
+const navigateListeners: Array<(event: unknown) => void> = [];
+
+function on(event: string, callback: (event: unknown) => void) {
+    if (event === 'navigate') {
+        navigateListeners.push(callback);
+    }
+
+    return () => {
+        const index = navigateListeners.indexOf(callback);
+
+        if (index >= 0) {
+            navigateListeners.splice(index, 1);
+        }
+    };
+}
+
+/** Fire an Inertia navigate, as a real client visit or a back/forward would. */
+export function emitInertiaNavigate() {
+    for (const listener of [...navigateListeners]) {
+        listener({});
+    }
+}
+
+/**
  * Every `router.optimistic(cb).put/post/patch(...)` call in order. The double does not apply
  * the transform, replay a rollback, or re-render on its own — real Inertia's props update by
  * swapping the whole page component's props, which in these tests happens by the test
@@ -126,7 +153,6 @@ const defaultShared: SharedPageProps = {
     auth: { user: null, permissions: [] },
     shell: { presentation: 'operational' },
     navigation: { currentWorkspace: null, workspaces: [] },
-    navigationLegacy: [],
     flash: { success: null, error: null, status: null, warning: null },
 };
 
@@ -160,6 +186,7 @@ export function resetInertiaMock() {
     Object.values(formMethods).forEach((spy) => spy.mockReset());
     submissions.length = 0;
     optimisticSubmissions.length = 0;
+    navigateListeners.length = 0;
     state.props = {};
     state.url = '/';
     state.errors = {};
@@ -196,7 +223,12 @@ function Link({ href, ...props }: LinkProps) {
         Object.entries(props).filter(([key]) => !inertiaOnlyLinkProps.includes(key)),
     );
 
-    return <a href={typeof href === 'string' ? href : href.url} {...anchor} />;
+    // `data-inertia-link` is how a test tells a client visit from a document navigation: real
+    // Inertia intercepts the click, a plain `<a>` does not, and that distinction is a contract the
+    // shell must preserve per destination (EPIC-013 §11.4).
+    return (
+        <a href={typeof href === 'string' ? href : href.url} data-inertia-link="true" {...anchor} />
+    );
 }
 
 type FormSetter<T> = {
@@ -289,7 +321,7 @@ export function inertiaReactMock() {
     return {
         Head: () => null,
         Link,
-        router: { ...inertiaSpies.router, optimistic },
+        router: { ...inertiaSpies.router, optimistic, on },
         useForm,
         usePage,
     };

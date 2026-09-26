@@ -3,7 +3,14 @@ import type { Page } from '@playwright/test';
 
 /**
  * The browser suite runs against the shared development database, so every record a test
- * creates must be removed again, including when the test fails halfway. Timer entries are
+ * creates must be removed again, including when the test fails halfway.
+ *
+ * Known gap, pre-dating this work and deliberately not addressed here: **standalone tasks are never
+ * removed.** They are created by the tasks-migration standalone-create flow, and `tasks` exposes only
+ * `index`/`store` — there is no delete route for a task with no project, so the teardown below has no
+ * supported endpoint to call. The development database accordingly accumulates `E2E … standalone task`
+ * rows (11 of them predate EPIC-013 WP4). Closing it needs a route or a different fixture strategy,
+ * which is its own piece of work. Timer entries are
  * recorded from the start responses (their ids only exist in the response), the project
  * fixture is registered as soon as its URL is known, and the fixture teardown below deletes
  * everything through the same HTTP endpoints the application exposes. Deleting an entry
@@ -73,6 +80,13 @@ export class E2eCleanup {
         }
 
         await this.deleteManualEntries();
+
+        // Drain the session's flash bag. Specs now share one authenticated session per persona
+        // (support/auth.ts), and Laravel flash data survives exactly one subsequent request — so the
+        // "Project deleted." this teardown just produced would otherwise be rendered by the NEXT
+        // test, whose own `getByRole('status')` assertion would then resolve to the wrong banner.
+        // One throwaway read consumes it, keeping the shared session free of this test's leftovers.
+        await page.goto('/time');
 
         expect(failures, 'E2E fixture cleanup').toEqual([]);
     }

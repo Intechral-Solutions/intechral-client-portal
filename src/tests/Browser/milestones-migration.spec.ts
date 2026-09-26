@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { personas, signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP4 critical flows: the project milestones page as a React/Inertia page. Focused
@@ -28,7 +29,7 @@ test('board to milestones, create, edit and delete an unreferenced milestone', a
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP4 milestones project');
 
     // The board and milestones are both React pages as of WP5: an Inertia navigation.
@@ -107,7 +108,7 @@ test('a plain project member sees milestones read-only, with no create, edit or 
     browser,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP4 read-only project');
 
     // Add the seeded Dev User as a plain member through the (WP3) React edit page: a mixed
@@ -128,10 +129,9 @@ test('a plain project member sees milestones read-only, with no create, edit or 
     await expect(page.getByRole('status')).toContainText('Milestone created.');
 
     // The plain member: no New milestone button, no edit or delete controls.
-    const memberContext = await browser.newContext();
+    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
     const memberPage = await memberContext.newPage();
     try {
-        await signIn(memberPage, 'user@intechral.test');
         await memberPage.goto(`/projects/${projectId}/milestones`);
 
         await expect(memberPage.getByRole('article', { name: 'Keeps its task' })).toBeVisible();
@@ -152,7 +152,7 @@ test('the milestones page is usable at a phone viewport with no document scroll'
     cleanup,
 }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP4 mobile project');
 
     await page.goto(`/projects/${projectId}/milestones`);

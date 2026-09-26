@@ -9,7 +9,6 @@ vi.mock('@inertiajs/react', () => ({
             auth: { user: null, permissions: [] },
             shell: { presentation: 'operational' },
             navigation: { currentWorkspace: null, workspaces: [] },
-            navigationLegacy: [],
             flash: {
                 success: null,
                 error: null,
