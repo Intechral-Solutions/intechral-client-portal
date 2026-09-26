@@ -9,7 +9,9 @@ use App\Policies\InvoicePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TicketPolicy;
 use App\Support\TestDatabaseSafety;
+use App\View\Composers\ShellComposer;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -33,5 +35,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+
+        // The Blade shell receives its navigation from the one builder, never by instantiating it
+        // inside a view (EPIC-013 §12.3 rule 11). WP5 adds the `layouts.partials.shell.*` partials
+        // to this binding as they replace `partials/nav`.
+        View::composer(['layouts.partials.nav'], ShellComposer::class);
     }
 }

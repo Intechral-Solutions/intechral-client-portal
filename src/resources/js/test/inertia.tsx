@@ -124,7 +124,9 @@ function optimistic(transform: (props: Record<string, unknown>) => Record<string
 const defaultShared: SharedPageProps = {
     app: { name: 'Intechral Portal' },
     auth: { user: null, permissions: [] },
-    navigation: [],
+    shell: { presentation: 'operational' },
+    navigation: { currentWorkspace: null, workspaces: [] },
+    navigationLegacy: [],
     flash: { success: null, error: null, status: null, warning: null },
 };
 

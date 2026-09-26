@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope)
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists**
 
 ---
 
@@ -55,6 +55,7 @@
 - [Amendment 4: WP1c Results (2026-09-25)](#amendment-4-wp1c-results-2026-09-25)
 - [Amendment 5: WP1d Results (2026-09-25)](#amendment-5-wp1d-results-2026-09-25)
 - [Amendment 6: WP2 Results (2026-09-25)](#amendment-6-wp2-results-2026-09-25)
+- [Amendment 7: WP3 Results (2026-09-25)](#amendment-7-wp3-results-2026-09-25)
 
 ---
 
@@ -3232,3 +3233,261 @@ Every pair the field can sit on is ≥ 3:1 in both themes; the narrowest are 3.0
 **Files (remediation only):** `src/resources/css/app.css`; `components/ui/{input,textarea,native-select,button,dropdown-menu}.tsx`; tests `ui/{input,button}.test.tsx`, `pagination.test.tsx`, `tests/Unit/Configuration/DirectionDThemeContractTest.php`; `docs/design/direction-d-design-system.md`; this document.
 
 **Final validation of the tree after this remediation:** `./dev check` passes in full on the final tree (CLI self-tests, `git diff --check`, Pint, Wayfinder, `tsc`, ESLint `--max-warnings=0`, Prettier, Vitest **440 / 440** in 62 files, production build, Pest **982 passed / 4,119 assertions**), plus the serial Playwright run in A6.20.
+
+---
+
+## Amendment 7: WP3 Results (2026-09-25)
+
+**Status:** WP3 (navigation contract) implemented on top of the WP2 tree. **WP4 is not started: no Direction D shell, rail, drawer or utility bar exists.** No route, no permission, no policy and no dependency changed.
+
+### A7.1 Method
+
+Tests first, in the order [R9](#32-risks-and-rollback) requires. `NavigationBuilderTest` was first extended **against the pre-WP3 builder** with a recursive whole-payload leakage helper, two leakage cases and the three [A1.10](#a110-presentation-neutral-contract--challenged-against-live-data-one-defect-found) collision characterizations; that suite ran green on the unreshaped tree (14 passed, 167 assertions) and only then was the builder reshaped. The characterizations were then rewritten as the post-reshape assertions the same three routes must now satisfy, so the collisions are pinned from both sides.
+
+Every actor in the matrix is built from the real authorization model — the two seeded roles, or a real Spatie role synced to an explicit [`PermissionCatalogue`](../../src/app/Shared/Permissions/PermissionCatalogue.php) subset. No test grants capability by any path the application does not use.
+
+### A7.2 The canonical contract, as implemented
+
+`NavigationBuilder::build(Request): array` returns one object, matching [§12.2](#122-target-shape):
+
+```php
+[
+  'currentWorkspace' => 'helpdesk',            // null when the route belongs to no workspace
+  'workspaces' => [
+    [
+      'key' => 'helpdesk', 'label' => 'Helpdesk', 'icon' => 'life-buoy',
+      'href' => '/tickets', 'visit' => 'document', 'isActive' => true,
+      'context' => [
+        ['key' => 'views', 'label' => 'Views', 'kind' => 'views', 'items' => [
+          ['key' => 'helpdesk.requests', 'label' => 'My requests', 'href' => '/tickets',
+           'visit' => 'document', 'isActive' => true, 'count' => null],
+          ['key' => 'helpdesk.queue', 'label' => 'Queue', 'href' => '/operator/tickets',
+           'visit' => 'document', 'isActive' => false, 'count' => null],
+          ['key' => 'helpdesk.reports', 'label' => 'Reports', 'href' => '/operator/tickets/reports',
+           'visit' => 'document', 'isActive' => false, 'count' => null],
+        ]],
+      ],
+      'presentation' => ['operational' => ['panel' => 'open']],
+    ],
+    // …
+  ],
+]
+```
+
+Guests receive `['currentWorkspace' => null, 'workspaces' => []]` rather than the pre-WP3 `[]`: the shape is now stable for every actor, so no consumer branches on it.
+
+**Semantic boundaries held.** `context` is content and names no shell concept — asserted by walking every key under `context` for the absence of `drawer`, `rail` and `panel`. `presentation` carries hints only: stripping the whole key leaves `currentWorkspace`, every workspace `key`/`href`/`visit`/`isActive` and every `context` section and item byte-identical, asserted for an operator and a `user`-role actor. Presentation is not a function of capability: for the same route, the two actors receive identical `presentation` for every workspace both can see.
+
+**Three fields deleted, not carried forward.** `method`, `activePatterns` and `children` were all dead ([A1.9](#a19-navigation-and-renderer-baseline)) and are gone from both the canonical model and the compatibility shape. Route-name patterns are now matching input only and are never serialized — a static assertion checks that no key named `patterns`, `activePatterns`, `method` or `children` appears anywhere in the payload.
+
+**Two enums make the closed sets explicit** rather than leaving them as loose strings: `ContextKind` (`views`, `queues`, `entities`, `saved`, `actions`) and `PanelDefault` (`open`, `collapsed`; "no panel" is the absence of a default, expressed as a null hint beside an empty `context`, never a third case). Both serialize to their string values, so the wire format is exactly §12.2.
+
+### A7.3 Workspace map
+
+Declared order is rendered order, independent of capability — asserted across four actor profiles.
+
+| # | Key | Label | Icon | Destination | Visit | Panel default | Context (`views`) | Gate |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `home` | Home | `house` | `dashboard` | inertia | **null** | **none** | authenticated |
+| 2 | `projects` | Projects | `folder-kanban` | `projects.index` | inertia | open | `projects.all` · *(`actions`: `projects.create`)* | `projects.view`; action on `projects.manage` |
+| 3 | `tasks` | Tasks | `list-checks` | `tasks.index` | inertia | collapsed | `tasks.mine`, `tasks.org` | authenticated; org view on `tasks.view_org` |
+| 4 | `helpdesk` | Helpdesk | `life-buoy` | `tickets.index` **or** `operator.tickets.index` | document | open | `helpdesk.requests`, `helpdesk.queue`, `helpdesk.reports` | `tickets.view` or `tickets.assign`; queue/reports on `tickets.assign` |
+| 5 | `time` | Time | `clock` | `time.index` **or** `operator.time.index` | inertia | collapsed | `time.mine`, `time.allocation`, `time.reports` | `time.log` or `time.view_all`; reports on `time.view_all` |
+| 6 | `directory` | Directory | `contact` | `crm.contacts.index` | document | open | `directory.people`, `directory.organizations`, `directory.portal-access` | `crm.manage` |
+| 7 | `finance` | Finance | `receipt` | `billing.invoices.index` **or** `billing.client.invoices.index` | document | open | `finance.invoices` **or** `finance.my-invoices` | `billing.manage` → operator; else `billing.view` → own |
+| 8 | `system` | System | `settings` | first permitted of Users / Roles / Pages | document | open | `system.users`, `system.roles`, `system.pages` | any of `users.view`, `roles.view`, `cms.edit` |
+| 9 | `resources` | Resources | `library` | `cms.index` | document | **null** | **none** | `cms.view` **and not** `cms.edit` (G3, transitional) |
+
+**Nothing future-only is emitted.** No Incidents, Knowledge, Relationships, Retainers, Rates, Budgets, Settings, Integrations, saved views, watch lists, recent entities or All-Tasks split. `entities` and `saved` have no emitter, and neither does `queues`: `count` is reserved and always null, so a queue section would render a count slot nothing can fill. Helpdesk Queue is recorded as `queues`' named first consumer once an endpoint provides counts — a `kind` change on an existing section, not a new concept. This narrows §12.2's "`entities` and `saved` are never emitted in this epic" to three unemitted kinds, and is asserted (`entities` and `saved` absent; every emitted `kind` in the enum).
+
+**One deviation from the eight-workspace target, and it is required.** `resources` is the ninth, transitional item: decision gate **G3**, confirmed in [A1.6](#a16-g3--the-transitional-pages-item-is-confirmed-across-seven-actor-profiles). The built-in `user` role holds `cms.view` by default and `/pages` is a read-only published-page viewer, so omitting it would remove every customer's access to published content. It is labelled **Resources** to match the surface's own heading, per A1.6's label correction; the route name is untouched.
+
+### A7.4 Capability filtering, pruning and defaults
+
+Filtering happens entirely server-side, through `$user->can()` on catalogue permissions, before anything reaches a client. Nothing is sent for React to hide.
+
+The structure prunes upward, at three levels:
+
+1. **Item** — omitted when its capability is absent.
+2. **Section** — omitted when every item was omitted, so no empty section survives (asserted: no emitted section has an empty `items`).
+3. **Workspace** — omitted entirely when it has no permitted destination at all, never rendered disabled or empty (§12.3 rule 7). A workspace with no contextual navigation at all is a different case and is emitted with its own single surface: `context => []` and `panel => null` agree, and neither is inferred from the other.
+
+**A default destination cannot point at a filtered-out item, by construction.** A workspace's `href` is not declared independently; it *is* the first surviving item of its first non-`actions` section, or its own surface when it has none. Asserted across seven actor profiles: for every emitted workspace, `href` equals its first surviving contextual destination. An `actions` section can never supply it, so "New project" cannot become the Projects destination. This is also what makes the two single-entry cases correct without special-casing: `tickets.assign` without `tickets.view` lands on the queue, `time.view_all` without `time.log` lands on reports — both reachable before WP3 through the "Manage" group, both still reachable.
+
+**Recursive leakage prevention.** `navigationValuesDeep()` flattens every `href`, `key` or named field from the whole nested payload at any depth, so an assertion cannot pass by inspecting one convenient path. For a `user`-role actor, across six routes, the complete payload contains no `/admin/`, `/operator/`, `/crm/` or `/organizations` href and none of twelve forbidden keys. The same helper is pointed at the compatibility projection, so the seam cannot leak what the canonical model withholds.
+
+### A7.5 G3 Pages — inventory and preservation
+
+| | Before WP3 | After WP3 |
+|---|---|---|
+| Who receives it | any actor with `cms.view` — including every `user`-role actor, and operators | `cms.view` **and not** `cms.edit` |
+| Where it appears | top-level `primary` item, label "Pages" | top-level workspace `resources`, label "Resources" |
+| Capability | `cms.view` | `cms.view` (unchanged permission; the `NOT cms.edit` term is new) |
+| Navigation mode | document | document (unchanged) |
+| Destination | `cms.index` | `cms.index` (unchanged) |
+| Operator page management | `cms-pages` in the "Manage" group (`cms.edit`) | `system.pages` inside System (`cms.edit`, unchanged) |
+
+Seven actor profiles are asserted as a matrix: the four `cms.view`-without-`cms.edit` profiles keep `cms.index` and the `resources` workspace; the two `cms.edit` profiles get `operator.cms.index` and **not** `cms.index`; an actor with neither gets no page surface. The one behaviour change is the deliberate G3 consequence A1.6 already recorded and accepted: an editor loses the duplicate *viewer* entry, and reaches the same published pages through the editor index, which renders `cms.show` for every row. Active state is asserted too: on `/pages` exactly `resources` is active and nothing else.
+
+### A7.6 Active-state contract
+
+Server-computed, via `$request->routeIs()`, as before — the client derives nothing.
+
+- **Workspaces** may declare broad patterns. Exactly one is active: when several match, the most specific pattern wins (literal dot-segments, ignoring the wildcard) and declaration order breaks a tie. `currentWorkspace` is that key, or null.
+- **Contextual items** declare **explicit route names only, no wildcards**, and are resolved **only inside the active workspace** — which is what structurally guarantees "at most one active item" rather than leaving it to pattern hygiene.
+- **Most-specific-wins** applies at item level too. Where two items legitimately share one route name and differ only by query parameter, the item with more satisfied constraints wins; ties fall to declaration order.
+- **`kind: 'actions'` items are never active.** They declare no routes at all, so an action cannot carry a selected strip by construction, not by pattern tuning.
+- **Nested and related routes** keep their owning item active: `projects.all` on board, edit, create, milestones and task detail; `helpdesk.requests` on ticket show and create; `system.roles` on role create and edit.
+
+The three A1.10 collisions are fixed and pinned, each as a named dataset case asserting the *complete* set of active keys:
+
+| Route | Before | After |
+|---|---|---|
+| `/operator/tickets/reports` | Queue **and** Reports | `helpdesk` + `helpdesk.reports` only |
+| `/time/allocation` | My time **and** Allocation | `time` + `time.allocation` only |
+| `/projects/create` | All projects **and** New project | `projects` + `projects.all` only |
+
+**One case is deliberately query-derived, on the server.** The two Tasks views are the same route (`tasks.index`) differentiated by `?view=`, so `tasks.org` declares an exact `view=org` constraint and `tasks.mine` declares none — mirroring `TaskController`, which clamps any unrecognized value to `mine`. `/tasks`, `/tasks?view=org` and `/tasks?view=nonsense` are each asserted. **Nothing is left client-derived**: no consumer performs URL matching, and the twenty-case dataset asserts the exact active set on twenty routes including one (`profile.show`) that belongs to no workspace and correctly activates nothing.
+
+**One suppression deliberately not moved into navigation.** `TaskController` also hides its org tab when the actor's organization has no company link — data, not capability. Reproducing it here would make the builder issue an organization query on every authenticated request, and the destination is authorized and safe (the org view can only widen the list with rows the actor may already open). The gate in navigation is the real capability, `tasks.view_org`.
+
+### A7.7 Visit / rendering-mode contract
+
+`visit` is per destination and unchanged in meaning: `inertia` for the client visit path, `document` where a full page load is required. It is carried on workspaces **and** on every contextual item, because the two can differ — Time is `inertia` and so are its three views, while Helpdesk is `document` throughout. No parallel mechanism was introduced.
+
+Asserted explicitly: the eight workspace modes (Home/Projects/Tasks/Time inertia; Helpdesk/Directory/Finance/System document), `resources` document, the item-level modes that differ in kind from a sibling (`time.reports` and `time.allocation` inertia, `helpdesk.queue` document, `projects.create` inertia, `system.users` document), and that every `visit` anywhere in the payload is one of the two values.
+
+### A7.8 Drawer-state contract
+
+**The server half only, which is all WP3 owns.** Per workspace, `presentation.operational.panel` carries the Direction D §5.3 default as `open`, `collapsed` or `null`, and `currentWorkspace` says which workspace that default applies to right now. Together those are exactly the two inputs the [§15.3](#153-recommended-architecture) pre-paint bootstrap needs in order to stamp `data-workspace` and fall back to a server default, and they are asserted bounded (`panel ∈ {open, collapsed, null}`, `presentation` containing only the `operational` key).
+
+**No cookie was added, deliberately.** [Spike S1](#a17-s1--drawer-persistence-confirmed-unchanged-the-cookie-is-not-needed) settled this with measurement: `inertia({ ssr: false })` means nothing of the React shell paints before JavaScript runs, the pre-paint attribute technique is already proven for the theme, and every case recorded 0 CLS. §15.4's cookie fallback was explicitly not taken, and §15.3 keeps the remembered state in `localStorage['shell.operational.panel']` — client-owned, namespaced to the Operational family so a later Focused shell cannot inherit it. There is therefore **no untrusted persisted value reaching the server at all**, which is the strongest available answer to "validate rather than trust": the server never reads it. The safe default when no valid stored value exists is the per-workspace `panel` hint above, and the parse/normalize/`try-catch` rules for the stored map are [§15.3](#153-recommended-architecture) and [§15.5](#155-storage-shape), implemented with the bootstrap in **WP4/WP5**. **No visual drawer was built.**
+
+### A7.9 Manage-group retirement
+
+The payload has no group list at all, so a "Manage" group is now structurally impossible rather than merely absent. Its six destinations moved as [§11.2](#112-what-this-changes-and-what-it-deliberately-does-not) specifies, and all six are asserted present for an operator and absent for a `user`-role actor:
+
+| Pre-WP3 "Manage" entry | Now |
+|---|---|
+| Ticket Queue | Helpdesk → `helpdesk.queue` |
+| Time Reports | Time → `time.reports` |
+| Organizations | Directory → `directory.portal-access` |
+| CMS Pages | System → `system.pages` |
+| Users | System → `system.users` |
+| Roles | System → `system.roles` |
+
+The heading is gone from both renderers now, not in WP4/WP5: `DropdownMenuLabel>Manage` is deleted from `app-layout.tsx` and the `Manage` heading from `nav.blade.php`. Nothing that used to live under it was dropped, and `operator.tickets.reports` and `time.allocation` — authorized before but never offered in navigation — are now reachable, which is the EPIC's intent rather than a widening of authorization.
+
+### A7.10 Backward compatibility: the pre-WP4 shell
+
+WP3 must be shippable before WP4 exists, and the two current shells have no drawer to project a workspace's `context` into. One temporary seam, `App\Shared\Navigation\LegacyShellNavigation`, flattens the canonical model into the shape they already render:
+
+- `primary` — one entry per workspace, canonical order.
+- `overflow` — the contextual destinations not already reachable as a workspace entry, labelled `"{Workspace} {Item}"` so two workspaces' "Reports" stay distinguishable in one flat list.
+
+`overflow` is **not "Manage" renamed.** It is not derived from a management concept, carries no label or heading, and is not audience-scoped — it is purely the remainder a drawerless shell cannot otherwise reach. It is reached through one shared prop, `navigationLegacy`, and one composer key of the same name, both marked temporary at their definition; `navigation` itself is the canonical model, so the direction of travel owns the canonical name. The projection also drops the three dead fields, so the compatibility item shape is a strict subset of the old one.
+
+**Why a seam at all, rather than two builders:** the alternative was flattening everything into one `primary` group, which puts sixteen links in a `max-w-7xl` horizontal bar and breaks the layout for real; or leaving `navigation` in the old shape and adding the new model beside it, which gives the compatibility shape the canonical name. Both were rejected. The projection lives in PHP, once, and is shared with both renderers rather than reimplemented in TypeScript.
+
+**Deleted in WP4/WP5, as a pure removal:** `LegacyShellNavigation`, the `navigationLegacy` prop and composer key, `types/navigation-legacy.ts`, `NavigationLink`, and the `app-layout.tsx` header. Nothing in the canonical contract changes when they go.
+
+### A7.11 Operational metadata — decision
+
+**Kept out of the navigation item contract.** The pre-WP3 payload carried no counts, badges or status indicators, and no consumer read any; nothing was found to migrate. The single reserved slot `count` is emitted as `null` on every item, per §12.3 rule 8, so a later epic adds data rather than a field. Nothing else operational was admitted: the timer, flash messages and permission list stay on their own shared props, and `queues` — the one `kind` whose whole purpose is countable lists — is left unemitted rather than shipping a count slot nothing can fill. Navigation semantics and operational metadata therefore remain separate, and no generic item type absorbs both.
+
+### A7.12 Shared props and types
+
+`HandleInertiaRequests::share` gains `shell => ['presentation' => 'operational']`, `auth.user.avatar => ['initials' => …, 'url' => null]` and the temporary `navigationLegacy`; `navigation` is reshaped. Initials are derived server-side by `App\Support\Initials`, whose rule mirrors `initialsOf()` in `ui/avatar.tsx` exactly and is asserted against that component's own seven-case table, so the two renderers cannot disagree about one person. `auth.permissions` is neither widened nor narrowed. No roles, organizations or model serialization were added — asserted with `missing()`.
+
+**One builder invocation per request** ([§12.3](#123-contract-rules) rule 11), even when both the canonical and the compatibility prop are evaluated: the middleware memoizes the payload keyed on the request, so a reused instance cannot serve another request's navigation. Blade's entry point is the new `App\View\Composers\ShellComposer`, bound to `layouts.partials.nav`; the `@php` block that instantiated `NavigationBuilder` inside the view is gone, and a static assertion keeps it gone. A parity test builds the payload both ways for the same actor and route and asserts they are identical.
+
+TypeScript mirrors the split: `types/navigation.ts` holds the canonical `Navigation`, `Workspace`, `ContextSection`, `ContextItem`, `ContextKind`, `VisitMode`, `WorkspacePresentation` and `ShellProps`; `types/navigation-legacy.ts` holds the compatibility shape and says at the top that it is deleted in WP4. No `any`, no broad dictionaries, and `SharedPageProps` names both props with the temporary one commented as such.
+
+### A7.13 Tests added
+
+`tests/Feature/NavigationBuilderTest.php` — rewritten, **60 cases / 1,016 assertions** (from 3 / 24). Helpers: `navigationValuesDeep()`, `navigationActiveKeysDeep()`, `navigationKeyNamesDeep()` (recursive, whole-payload), `withoutPresentation()`, and actor builders that go through real roles and real catalogue permissions.
+
+| Group | Cases |
+|---|---|
+| Shape and ordering | canonical keys at all three levels; order stable across four actor profiles; dead fields and route patterns absent; guests |
+| Presentation neutrality (L17) | no shell vocabulary under `context`; `kind` in the enum and never `entities`/`saved`; stripping `presentation` changes nothing; hints family-namespaced and bounded; hints do not vary by capability; emptiness semantic on Home and non-empty on Projects |
+| **Leakage (R9)** | recursive: no `/admin/`, `/operator/`, `/crm/`, `/organizations` href and none of twelve forbidden keys anywhere, over six routes; Directory withheld from three actor profiles; the same assertion against the compatibility seam |
+| Capability matrix | operator vs `user` workspace sets; sub-capability filtering for Helpdesk, Time and Projects; six-case System dataset; empty workspace omitted with no empty section surviving; default destination valid for seven profiles; Finance branch verbatim; single-entry routing for `tickets.assign`-only and `time.view_all`-only |
+| **Active state** | 20-case dataset asserting the complete active set, including the three A1.10 collisions, the three Tasks query cases and one no-workspace route; nested-route cases; client Finance branch |
+| Visit mode | eight workspace modes, item-level modes, transitional surface, every value in the enum |
+| G3 Pages | seven-profile matrix on viewer vs System destination; operator has no duplicate; `/pages` active state |
+| Account-menu boundary | no profile or logout href; no group-shaped key |
+| Compatibility seam | flat shape and item keys; overflow labels exact; actions excluded; no group named `management`; every pre-WP3 destination still reachable for both roles; no leakage; empty input yields no groups |
+
+`tests/Feature/ShellContractTest.php` — **new, 7 cases**: canonical prop contents and the presentation discriminator; server-derived initials with `missing()` on roles, organizations and secrets; the retired grouping absent from the payload; Blade-composer parity with the Inertia prop from one builder; a static guard that the view layer no longer instantiates the builder; the Blade shell rendering all six ex-"Manage" destinations with **no** "Manage" heading; and the same Blade page withholding from a `user`-role actor exactly what the canonical model withholds.
+
+`tests/Unit/Support/InitialsTest.php` — **new**: the seven-case table shared with `ui/avatar.test.tsx`.
+
+Modified: `InertiaFoundationTest` (new shared-prop keys; its Blade-document coexistence assertions unchanged and green), `app-layout.test.tsx` (canonical + compatibility props; asserts "Manage" is not in the account menu), `auth-layout.test.tsx`, `navigation-link.test.tsx` (dead fields dropped).
+
+### A7.14 Deviations from the written WP3 plan, and why
+
+| # | Plan text | What was done | Why |
+|---|---|---|---|
+| 1 | §11.1: eight workspaces plus a transitional Pages item | Emitted as nine, key `resources`, label **Resources** | G3 confirmed in A1.6, including the label correction; omitting it would remove every customer's access to published content |
+| 2 | §12.2: "`entities` and `saved` are never emitted in this epic" | `queues` is also unemitted | `count` is reserved and always null (rule 8), so a queue section would render a count slot nothing can fill. §11.1's Helpdesk row lists Queue as a **view**. Recorded with its named first consumer |
+| 3 | §12.2 shows `kind` and `panel` as bare strings | Backed by `ContextKind` and `PanelDefault` enums | Closed sets made explicit; both serialize to exactly the §12.2 wire format |
+| 4 | §25.1: "at most one `context` item `isActive`" | Guaranteed structurally: items are resolved only inside the active workspace, and `actions` items declare no routes | A property of the contract, not of pattern hygiene |
+| 5 | A1.10 requirement 1: explicit route names, most-specific-wins | Implemented, **plus** an exact query-parameter constraint | The two Tasks views are one route differentiated by `?view=`; without it they could not be distinguished server-side, and client URL matching was not acceptable |
+| 6 | §14.4 assigns `ShellComposer` to WP5 | Landed in WP3, bound to `layouts.partials.nav` | §28 WP3 assigns "add the Blade view composer; remove the `@php` builder call". WP5 rebinds it to the shell partials without changing the payload |
+| 7 | §17.2: the "Manage" section is removed from both renderers (WP4/WP5) | Removed from both renderers now | WP3 retires the grouping from the payload; leaving a heading over an unlabelled bucket would have been dishonest. The destinations all survive |
+| 8 | §12.5: "`share` gains exactly two keys and changes one" | Also gains the temporary `navigationLegacy` | WP3 must ship before WP4; see [A7.10](#a710-backward-compatibility-the-pre-wp4-shell). Deleted with the old shell |
+
+**Not done, deliberately:** no rail, drawer, utility bar, breadcrumb, view switcher, account menu redesign, skip link, brand mark, pre-paint bootstrap, `data-drawer` attribute, width classes or `AppShell`. `Page.layout` lines are untouched. No page was migrated or restyled, no Direction D primitive changed, and no dependency added.
+
+### A7.15 Regression check
+
+- **Authorized destinations reachable.** For an operator, all twelve pre-WP3 destinations and, for a `user`-role actor, all six, are asserted present in the compatibility projection the current shell renders.
+- **Unauthorized destinations absent.** Recursively, in both the canonical payload and the seam.
+- **G3 Pages** — unchanged capability, destination and visit mode; the seven-profile matrix pins it.
+- **Blade/document destinations** keep `visit => 'document'`; **Inertia destinations** keep `visit => 'inertia'`; asserted per workspace and per item.
+- **The current shell still renders** from the compatibility contract: `app-layout.tsx` and `nav.blade.php` both read `navigationLegacy`, their tests pass, and the `inertia-coexistence.spec.ts` account-menu path still resolves ("Time Reports" is the overflow label).
+- **No WP4 shell code, no primitive regression, no dependency change** — `package.json` and `composer.json` untouched.
+
+### A7.16 Files changed
+
+**New:** `src/app/Shared/Navigation/{ContextKind,PanelDefault,LegacyShellNavigation}.php` · `src/app/View/Composers/ShellComposer.php` · `src/app/Support/Initials.php` · `src/resources/js/types/{navigation,navigation-legacy}.ts` · `src/tests/Feature/ShellContractTest.php` · `src/tests/Unit/Support/InitialsTest.php`
+
+**Modified:** `src/app/Shared/Navigation/NavigationBuilder.php` · `src/app/Http/Middleware/HandleInertiaRequests.php` · `src/app/Providers/AppServiceProvider.php` · `src/resources/views/layouts/partials/nav.blade.php` · `src/resources/js/layouts/app-layout.tsx` · `src/resources/js/components/navigation/navigation-link.tsx` · `src/resources/js/types/{shared,index}.ts` · tests `NavigationBuilderTest.php`, `InertiaFoundationTest.php`, `app-layout.test.tsx`, `auth-layout.test.tsx`, `navigation-link.test.tsx` · this document
+
+### A7.17 Validation results
+
+`./dev check` on the final tree — **all checks passed, exit code 0**:
+
+| Step | Result |
+|---|---|
+| CLI self-tests (host bash, stubbed docker) | PASS |
+| `git diff --check` | PASS |
+| Pint (style, no changes written) | PASS |
+| Frontend: `npm run check` (Wayfinder → `tsc --noEmit` → ESLint `--max-warnings=0` → Prettier → Vitest → production build) | PASS |
+| PHP tests: Pest (testing DB) | PASS — **1,054 passed / 5,211 assertions**, 318.3s |
+
+Run independently so a failure would be easy to place:
+
+| Focused run | Result |
+|---|---|
+| `NavigationBuilderTest` + `ShellContractTest` + `InitialsTest` | **75 passed / 1,108 assertions**, 29.3s |
+| Vitest, full | **440 / 440** in 62 files |
+| Playwright `inertia-coexistence.spec.ts` | **3 / 3** — including the account-menu → Time Reports path, which the compatibility seam had to keep working, and the 390px mobile nav. Product-data counts unchanged |
+
+**Two honest notes on the run.** Vitest produced transient `userEvent` 5,000ms timeouts on two heavily-loaded interleaved runs (a different two files each time: profile/create, then milestones/quick-add-task); each passed in isolation and the gate's own run was 440/440, so these are environment load flakes, not WP3 regressions — none of the affected files touches navigation, shared props or the changed types. Separately, one earlier full-suite run reported a single `LoginTest` failure, which was a **real and expected** consequence of the reshape: the guest payload changed from `[]` to the canonical empty shape. That assertion was updated to the new contract rather than the contract bent back, and a `navigationLegacy`/`shell.presentation` assertion was added beside it.
+
+No Playwright remediation was attempted beyond the one navigation-relevant spec.
+
+### A7.18 WP4 handoff
+
+WP4 (React operator shell) may start. What it inherits:
+
+- **One payload, both renderers.** Read `navigation` (canonical) and `shell.presentation`. `navigationLegacy`, `LegacyShellNavigation`, `types/navigation-legacy.ts` and `NavigationLink` are deleted as the header goes; that removal touches nothing canonical.
+- **`icon` is a key, not markup.** Nine keys, all real `lucide-react` names: `house`, `folder-kanban`, `list-checks`, `life-buoy`, `clock`, `contact`, `receipt`, `settings`, `library`. An unknown key must render a documented neutral fallback, never throw.
+- **`Drawer` projects `context`; it does not own it.** Sections arrive ordered with a `kind`; an unknown `kind` renders as a plain section. `context => []` means no drawer and the rail item links straight to the surface.
+- **The panel default is `presentation.operational.panel`** for `currentWorkspace`; `null` means no panel. The remembered state, the pre-paint bootstrap, the `data-drawer` attribute and the width-class rules are WP4/WP5 work per §15.3 and A1.7's three implementation requirements.
+- **Active state is given, never derived.** Exactly one workspace and at most one item carry `isActive`; do not URL-match in React.
+- **`count` is null everywhere.** Render no count slot in this epic.
+- **The account menu is personal-only** and receives nothing from this payload; `auth.user.avatar.initials` is ready for `AccountTrigger` to compose `Avatar`.
+- **Open for WP5:** rebind `ShellComposer` to the `layouts.partials.shell.*` partials, and fix the Blade landmark divergence A1.9 records (`nav aria-label="Primary navigation"` currently wraps the whole sticky bar).

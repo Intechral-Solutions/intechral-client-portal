@@ -3,9 +3,11 @@
     No Alpine.js dependency — all interactivity handled with vanilla JS below.
 --}}
 @php
-    $navigationGroups = app(\App\Shared\Navigation\NavigationBuilder::class)->build(request());
-    $primaryNavigation = collect($navigationGroups)->firstWhere('key', 'primary')['items'] ?? [];
-    $managementNavigation = collect($navigationGroups)->firstWhere('key', 'management')['items'] ?? [];
+    // Navigation comes from App\View\Composers\ShellComposer ($navigation, $navigationLegacy).
+    // This partial renders the pre-WP4 flat shape; WP5 replaces it with the Direction D shell
+    // partials, which read the canonical $navigation model directly.
+    $primaryNavigation = collect($navigationLegacy)->firstWhere('key', 'primary')['items'] ?? [];
+    $overflowNavigation = collect($navigationLegacy)->firstWhere('key', 'overflow')['items'] ?? [];
     $navLink = fn (bool $active): string =>
         'rounded-md px-3 py-2 text-sm font-medium transition-colors ' . (
             $active
@@ -87,11 +89,12 @@
                             Profile
                         </a>
 
-                        {{-- Operator management links --}}
-                        @if ($managementNavigation)
+                        {{-- Contextual destinations the flat pre-WP4 shell has no drawer for. The
+                             retired "Manage" grouping is gone: no heading, no group label. WP5
+                             moves these into the Direction D drawer. --}}
+                        @if ($overflowNavigation)
                         <div class="my-1 border-t" style="border-color: var(--border-subtle);"></div>
-                        <p class="px-4 py-1 text-xs font-semibold uppercase tracking-wider" style="color: var(--text-muted);">Manage</p>
-                        @foreach ($managementNavigation as $item)
+                        @foreach ($overflowNavigation as $item)
                         <a href="{{ $item['href'] }}"
                            role="menuitem"
                            class="block px-4 py-2 text-sm transition-colors {{ $item['isActive'] ? 'legacy-text-primary' : 'legacy-text-secondary hover:text-legacy-accent' }}"

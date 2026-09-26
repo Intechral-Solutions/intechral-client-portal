@@ -1,12 +1,17 @@
+/**
+ * TEMPORARY: the pre-WP4 shell's link. Deleted in WP4 with `app-layout.tsx`'s sticky header, which
+ * `RailItem` and `DrawerItem` replace. It renders the flat compatibility shape
+ * (`LegacyNavigationItem`), never the canonical `Workspace`/`ContextItem` contract.
+ */
 import { Link } from '@inertiajs/react';
 import { forwardRef } from 'react';
 import type { AnchorHTMLAttributes, ComponentProps, MouseEvent } from 'react';
 
 import { cn } from '@/lib/utils';
-import type { NavigationItem } from '@/types';
+import type { LegacyNavigationItem } from '@/types';
 
 type NavigationLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
-    item: NavigationItem;
+    item: LegacyNavigationItem;
     onNavigate?: () => void;
 };
 

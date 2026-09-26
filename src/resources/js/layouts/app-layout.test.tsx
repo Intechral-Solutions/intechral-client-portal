@@ -7,39 +7,72 @@ const { post, props } = vi.hoisted(() => ({
     props: {
         app: { name: 'Test Portal' },
         auth: {
-            user: { id: 1, name: 'Test User', email: 'test@example.com' },
+            user: {
+                id: 1,
+                name: 'Test User',
+                email: 'test@example.com',
+                avatar: { initials: 'TU', url: null },
+            },
             permissions: ['projects.view'],
         },
-        navigation: [
+        shell: { presentation: 'operational' as const },
+        navigation: {
+            currentWorkspace: 'projects',
+            workspaces: [
+                {
+                    key: 'projects',
+                    label: 'Projects',
+                    icon: 'folder-kanban',
+                    href: '/projects',
+                    visit: 'inertia' as const,
+                    isActive: true,
+                    context: [
+                        {
+                            key: 'views',
+                            label: 'Views',
+                            kind: 'views' as const,
+                            items: [
+                                {
+                                    key: 'projects.all',
+                                    label: 'All projects',
+                                    href: '/projects',
+                                    visit: 'inertia' as const,
+                                    isActive: true,
+                                    count: null,
+                                },
+                            ],
+                        },
+                    ],
+                    presentation: { operational: { panel: 'open' as const } },
+                },
+            ],
+        },
+        // The flat compatibility projection the pre-WP4 header still renders. `overflow` carries
+        // no label: the "Manage" grouping is retired.
+        navigationLegacy: [
             {
-                key: 'primary',
+                key: 'primary' as const,
                 label: null,
                 items: [
                     {
                         key: 'projects',
                         label: 'Projects',
                         href: '/projects',
-                        method: 'get',
-                        visit: 'document',
-                        activePatterns: ['projects.*'],
+                        visit: 'document' as const,
                         isActive: false,
-                        children: [],
                     },
                 ],
             },
             {
-                key: 'management',
-                label: 'Manage',
+                key: 'overflow' as const,
+                label: null,
                 items: [
                     {
-                        key: 'users',
-                        label: 'Users',
-                        href: '/users',
-                        method: 'get',
-                        visit: 'document',
-                        activePatterns: ['users.*'],
+                        key: 'system.users',
+                        label: 'System Users',
+                        href: '/admin/users',
+                        visit: 'document' as const,
                         isActive: false,
-                        children: [],
                     },
                 ],
             },
@@ -75,10 +108,12 @@ it('renders shared navigation and exposes the user menu commands', async () => {
     expect(screen.getByText('Page body')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Open user menu' }));
-    expect(await screen.findByRole('menuitem', { name: 'Users' })).toHaveAttribute(
+    expect(await screen.findByRole('menuitem', { name: 'System Users' })).toHaveAttribute(
         'href',
-        '/users',
+        '/admin/users',
     );
+    // The retired "Manage" grouping must not come back as a heading in the account menu.
+    expect(screen.queryByText('Manage')).not.toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     expect(post).toHaveBeenCalledWith('/logout');
 });

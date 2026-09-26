@@ -12,24 +12,26 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import { dashboard, logout } from '@/routes';
 import { show as profile } from '@/routes/profile';
-import type { NavigationGroup, SharedPageProps } from '@/types';
+import type { LegacyNavigationGroup, SharedPageProps } from '@/types';
 
-function group(groups: NavigationGroup[], key: string) {
+function group(groups: LegacyNavigationGroup[], key: string) {
     return groups.find((candidate) => candidate.key === key)?.items ?? [];
 }
 
 export function AppLayout({ children }: PropsWithChildren) {
-    const { app, auth, navigation, flash } = usePage<SharedPageProps>().props;
+    const { app, auth, navigationLegacy, flash } = usePage<SharedPageProps>().props;
     const { appearance, toggleAppearance } = useAppearance();
-    const primary = group(navigation, 'primary');
-    const management = group(navigation, 'management');
+    // The pre-WP4 header has no drawer, so it renders the flat compatibility projection of the
+    // canonical `navigation` contract. WP4 replaces this whole layout with the Direction D shell,
+    // which reads `navigation` directly.
+    const primary = group(navigationLegacy, 'primary');
+    const overflow = group(navigationLegacy, 'overflow');
 
     return (
         <TimerProvider enabled={auth.permissions.includes('time.log')}>
@@ -97,11 +99,13 @@ export function AppLayout({ children }: PropsWithChildren) {
                                                 Profile
                                             </Link>
                                         </DropdownMenuItem>
-                                        {management.length ? (
+                                        {/* Contextual destinations this flat shell cannot otherwise
+                                            reach. The retired "Manage" grouping is gone: no
+                                            heading, no label. WP4 moves these into the drawer. */}
+                                        {overflow.length ? (
                                             <>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuLabel>Manage</DropdownMenuLabel>
-                                                {management.map((item) => (
+                                                {overflow.map((item) => (
                                                     <DropdownMenuItem key={item.key} asChild>
                                                         <NavigationLink
                                                             item={item}

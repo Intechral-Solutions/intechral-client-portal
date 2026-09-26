@@ -15,10 +15,7 @@ const baseItem = {
     key: 'projects',
     label: 'Projects',
     href: '/projects',
-    method: 'get' as const,
-    activePatterns: ['projects.*'],
     isActive: false,
-    children: [],
 };
 
 it('uses a document anchor for Blade destinations', () => {
