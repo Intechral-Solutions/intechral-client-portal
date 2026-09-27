@@ -2,7 +2,7 @@ import { devices } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { E2eCleanup, expect, test } from './support/e2e-fixtures';
 
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP6 critical flows: pointer/touch drag through dnd-kit, layered over the WP5 board.
@@ -325,7 +325,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
 
     test('a read-only member gets no drag handle and no Move menu', async ({
         page,
-        browser,
+        contextFor,
         cleanup,
     }) => {
         await signedIn(page);
@@ -340,9 +340,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         await page.getByRole('button', { name: 'Update members' }).click();
         await expect(page.getByRole('status')).toContainText('Members updated.');
 
-        const memberContext = await browser.newContext({
-            storageState: personas.member.storageState,
-        });
+        const memberContext = await contextFor('member');
         const memberPage = await memberContext.newPage();
         try {
             await memberPage.goto(`/projects/${projectId}/board`);
@@ -385,7 +383,7 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
 
 test.describe('touch (EPIC-011E WP6)', () => {
     test('a swipe on the card body scrolls the board; a touch drag from the handle moves the task', async ({
-        browser,
+        contextFor,
     }) => {
         // Pixel 7's own 412px viewport fits barely more than one 288px column, which would put
         // "To Do" (the drop target) partly or wholly off-screen — a touch coordinate beyond the
@@ -393,7 +391,7 @@ test.describe('touch (EPIC-011E WP6)', () => {
         // touch-capable, mobile UA) keeps this test about real touch pointer events, not
         // off-screen scrolling — that is what the separate desktop autoscroll flow and the
         // phone-viewport Move-menu flow (board-migration.spec.ts) already cover.
-        const context = await browser.newContext({
+        const context = await contextFor('operator', {
             ...devices['Pixel 7'],
             viewport: { width: 800, height: 700 },
         });

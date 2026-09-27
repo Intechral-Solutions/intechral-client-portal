@@ -1,5 +1,6 @@
-import { expect, test as base } from '@playwright/test';
 import type { Page } from '@playwright/test';
+
+import { expect, test as base } from './auth';
 
 /**
  * The browser suite runs against the shared development database, so every record a test
@@ -81,11 +82,12 @@ export class E2eCleanup {
 
         await this.deleteManualEntries();
 
-        // Drain the session's flash bag. Specs now share one authenticated session per persona
+        // Drain the session's flash bag. Tests in a worker share that worker's authenticated session
         // (support/auth.ts), and Laravel flash data survives exactly one subsequent request — so the
         // "Project deleted." this teardown just produced would otherwise be rendered by the NEXT
-        // test, whose own `getByRole('status')` assertion would then resolve to the wrong banner.
-        // One throwaway read consumes it, keeping the shared session free of this test's leftovers.
+        // test in this worker, whose own `getByRole('status')` assertion would then resolve to the
+        // wrong banner. One throwaway read consumes it, keeping the session free of this test's
+        // leftovers.
         await page.goto('/time');
 
         expect(failures, 'E2E fixture cleanup').toEqual([]);

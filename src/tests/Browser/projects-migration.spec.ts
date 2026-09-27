@@ -152,7 +152,7 @@ test('a project with recorded time cannot be deleted and the refusal shows in th
 
 test('administrator membership editing, a hostile member name stays text, and a non-admin manager sees it read-only', async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
     await signedIn(page);
@@ -196,7 +196,9 @@ test('administrator membership editing, a hostile member name stays text, and a 
 
         // The non-admin manager: read-only membership, no candidate directory, still full
         // access to the rest of the edit page.
-        const managerContext = await browser.newContext();
+        // Explicitly signed out: a bare `browser.newContext()` would inherit this test's operator
+        // session, `/login` would redirect away, and the form below would never render.
+        const managerContext = await contextFor('anonymous');
         const managerPage = await managerContext.newPage();
         try {
             // This actor is created by the test itself with a per-run email, so there is no

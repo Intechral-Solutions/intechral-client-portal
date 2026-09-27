@@ -1,6 +1,4 @@
-import { expect, test } from '@playwright/test';
-
-import { personas, signedIn } from './support/auth';
+import { expect, signedIn, test } from './support/auth';
 import { signIn } from './support/sign-in';
 import {
     accountTrigger,
@@ -247,11 +245,19 @@ test.describe('signing out', () => {
     // A real login, on purpose. Sessions are database-backed, so the sign-out below destroys the
     // session row it is presenting; if that were the shared baseline every later spec would run
     // unauthenticated. Logout transitions also belong on the real path on their own merits.
-    test.use({ storageState: { cookies: [], origins: [] } });
+    //
+    // Signs in as `e2e-signout@intechral.test` (DevSeeder), a dedicated fixture holding the same
+    // `operator` role — not the reusable operator persona itself. Every other worker that needs the
+    // operator persona mints its own real session too (support/auth.ts); adding this file's own real
+    // login to that same identity's Fortify bucket would reintroduce a limiter collision the
+    // per-worker session design exists to avoid. The assertion below — that a fully-permissioned
+    // account's menu leaks no administration item — holds for any account holding every permission,
+    // not specifically the shared one.
+    test.use({ persona: 'anonymous' });
 
     test('the account menu is personal only and signs out', async ({ page }) => {
         await page.setViewportSize(XL);
-        await signIn(page, 'operator@intechral.test');
+        await signIn(page, 'e2e-signout@intechral.test');
 
         await openAccountMenu(page);
 
@@ -338,7 +344,7 @@ test('the rail and drawer are reachable by plain Tab with visible focus', async 
 test.describe('as a member', () => {
     // These two assert what this actor may and may not reach, so the persona IS the test. It must not
     // be collapsed onto the operator to save a login: that would delete the authorization coverage.
-    test.use({ storageState: personas.member.storageState });
+    test.use({ persona: 'member' });
 
     test('capability filtering holds on the shell, and visibility is not authorization', async ({
         page,

@@ -1,12 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { avoidSlotBoundary, expect, test } from './support/e2e-fixtures';
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 import { openAccountMenu, railLink } from './support/shell';
 
 // The first two flows are the member's own time; the third is an operator's. The persona is the
 // context's reusable authentication state, so it is declared per group rather than logged in per test.
-test.use({ storageState: personas.member.storageState });
+test.use({ persona: 'member' });
 
 async function stopAllReactTimers(page: Page) {
     await page.goto('/time');
@@ -202,7 +202,7 @@ test('manual entries and server-owned allocation remain usable on mobile', async
 });
 
 test.describe('as an operator', () => {
-    test.use({ storageState: personas.operator.storageState });
+    test.use({ persona: 'operator' });
 
     test('a timer started from the embedded Blade tracker is reconstructed by React', async ({
         page,

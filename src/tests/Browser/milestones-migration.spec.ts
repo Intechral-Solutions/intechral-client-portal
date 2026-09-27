@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP4 critical flows: the project milestones page as a React/Inertia page. Focused
@@ -105,7 +105,7 @@ test('board to milestones, create, edit and delete an unreferenced milestone', a
 
 test('a plain project member sees milestones read-only, with no create, edit or delete controls', async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
     await signedIn(page);
@@ -129,7 +129,7 @@ test('a plain project member sees milestones read-only, with no create, edit or 
     await expect(page.getByRole('status')).toContainText('Milestone created.');
 
     // The plain member: no New milestone button, no edit or delete controls.
-    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
+    const memberContext = await contextFor('member');
     const memberPage = await memberContext.newPage();
     try {
         await memberPage.goto(`/projects/${projectId}/milestones`);

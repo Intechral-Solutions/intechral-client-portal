@@ -1,59 +1,157 @@
-import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { expect, test as base } from '@playwright/test';
+import type { Browser, BrowserContext, BrowserContextOptions, Page } from '@playwright/test';
+
+import { baseURL } from './env';
+import { signIn } from './sign-in';
 
 /**
- * Reusable authenticated browser state for the browser suite (EPIC-013 WP4 remediation).
+ * Authenticated browser sessions for the browser suite, one per **worker** per persona.
  *
- * **Why this exists.** Every spec used to submit the real login form once per test — 64 call sites,
- * 53 of them as the operator. Fortify throttles logins to five per minute per email + IP, and the
- * serial suite drove 9–18 attempts a minute, so it spent most of a run being rate limited: 114
- * `POST /login` requests, 45 of them HTTP 429, and two tests failed outright having exhausted every
- * retry. The suite was structurally overrunning the limiter; WP4's own spec added 13 logins and made
- * an already-marginal architecture fail.
+ * **Why per worker.** Playwright runs one worker per spec file by default, all against one
+ * database-backed Laravel session store. An earlier design minted a single session per persona per
+ * run and handed the same cookie to every worker, so every worker read and wrote the *same session
+ * row*. Flash messages and validation errors live in that row and survive exactly one later request,
+ * so any worker's request could consume, overwrite or receive another worker's: a Projects page
+ * rendering another spec's "Task created.", or losing its own "Project updated.". Sessions must
+ * therefore not be shared across workers. (Before that, every test logged in for itself — 64 logins a
+ * run against Fortify's five-per-minute limiter — which is what the reusable state replaced.)
  *
- * **What replaces it.** The `setup` project authenticates once per persona through the real login
- * form and saves the resulting cookies. Ordinary feature specs start from that state and never touch
- * the login form. Tests whose *subject* is authentication still drive the form, because
- * pre-authenticating them would hide exactly the regressions they exist to catch.
+ * **How.** A worker-scoped fixture (`sessions`) signs each persona in through the real login form the
+ * first time one of that worker's tests needs it, and keeps the resulting cookies in memory. The
+ * `storageState` fixture hands them to every context the worker creates. Tests in one worker run
+ * one at a time, so they safely share that worker's session; nothing crosses to another worker.
+ * Nothing is written to disk and nothing is forged: each session is a genuine login.
  *
- * The saved state is **cookies only** — deliberately. A captured `localStorage` would bake this
- * shell's own UI preferences (the appearance theme, and any drawer/pin state) into the baseline every
- * spec inherits, so the drawer-persistence tests could no longer establish their own initial
- * conditions. The baseline represents *authentication*, nothing else.
+ * **Cookies only, deliberately.** The reusable state holds authentication and nothing else. A
+ * captured `localStorage` would bake the shell's own UI preferences (appearance theme, drawer and
+ * pin state) into the baseline every spec inherits, so the persistence tests could no longer set
+ * their own initial conditions.
+ *
+ * **Choosing who a test is.** The default is the operator. `test.use({ persona: 'member' })` picks the
+ * member profile and `test.use({ persona: 'anonymous' })` starts signed out. The two personas are not
+ * interchangeable: `member` holds the built-in `user` role, and the specs asserting capability
+ * filtering, read-only boards and non-owner permissions depend on being that actor.
+ *
+ * **Extra contexts.** A bare `browser.newContext()` inherits the test's own `storageState`, i.e. it is
+ * *already signed in*. Open extra contexts with `contextFor(...)`, which states who the context is.
  */
 export type Persona = 'operator' | 'member';
+export type Who = Persona | 'anonymous';
 
-/**
- * The two capability profiles the suite genuinely needs. They are **not** interchangeable: `member`
- * holds the built-in `user` role, and the specs that assert capability filtering, read-only boards
- * and non-owner permissions depend on being that actor rather than an operator. Collapsing them onto
- * the operator would delete the authorization coverage, not just the logins.
- */
-export const personas: Record<Persona, { email: string; storageState: string }> = {
-    operator: {
-        email: 'operator@intechral.test',
-        storageState: 'tests/Browser/.auth/operator.json',
-    },
-    member: {
-        email: 'user@intechral.test',
-        storageState: 'tests/Browser/.auth/member.json',
-    },
+export const personas: Record<Persona, { email: string }> = {
+    operator: { email: 'operator@intechral.test' },
+    member: { email: 'user@intechral.test' },
 };
 
+type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>;
+
+export const anonymous: StorageState = { cookies: [], origins: [] };
+
+type Sessions = { stateFor: (persona: Persona) => Promise<StorageState> };
+
+type ContextFor = (who: Who, options?: BrowserContextOptions) => Promise<BrowserContext>;
+
 /**
- * Open an authenticated page without submitting the login form.
- *
- * The persona comes from the context's `storageState` — the project default, or a `test.use()`
- * override — so this only navigates and then proves the reused state is still good. A stale or
- * missing state lands on `/login`, and this fails there with a clear reason rather than deeper in
- * the spec as a confusing assertion about page content.
+ * Two workers holding the same session is the defect this file exists to prevent. Each worker
+ * records the CSRF token of every session it mints (one token per Laravel session) in a shared
+ * temp directory, exclusively, so a second claimant fails at once instead of producing flaky
+ * flash-message failures much later.
+ */
+function claimSession(token: string, owner: string) {
+    const directory = join(tmpdir(), 'portal-e2e-session-claims');
+    mkdirSync(directory, { recursive: true });
+
+    try {
+        writeFileSync(join(directory, createHash('sha1').update(token).digest('hex')), owner, {
+            flag: 'wx',
+        });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+            throw new Error(
+                `${owner} minted a Laravel session another Playwright worker already holds. ` +
+                    'Workers must never share a session (see support/auth.ts).',
+                { cause: error },
+            );
+        }
+        throw error;
+    }
+}
+
+async function mintSession(browser: Browser, persona: Persona, workerIndex: number) {
+    const context = await browser.newContext({ baseURL, storageState: anonymous });
+
+    try {
+        const page = await context.newPage();
+
+        // The real login form through the real Fortify route: the session has to come from a genuine
+        // authentication event, never a forged or hard-coded cookie.
+        await signIn(page, personas[persona].email, 'password', { waitOutThrottle: false });
+
+        const token = await page.locator('meta[name="csrf-token"]').getAttribute('content');
+        claimSession(token ?? '', `worker ${workerIndex} (${persona})`);
+
+        const { cookies } = await context.storageState();
+        expect(cookies.length, `${persona} authentication produced no cookies`).toBeGreaterThan(0);
+
+        return { cookies, origins: [] } satisfies StorageState;
+    } finally {
+        await context.close();
+    }
+}
+
+export const test = base.extend<{ persona: Who; contextFor: ContextFor }, { sessions: Sessions }>({
+    sessions: [
+        async ({ browser }, use, workerInfo) => {
+            const minted = new Map<Persona, Promise<StorageState>>();
+
+            await use({
+                stateFor: (persona) => {
+                    if (!minted.has(persona)) {
+                        minted.set(persona, mintSession(browser, persona, workerInfo.workerIndex));
+                    }
+
+                    return minted.get(persona)!;
+                },
+            });
+        },
+        { scope: 'worker' },
+    ],
+
+    persona: ['operator', { option: true }],
+
+    storageState: async ({ persona, sessions }, use) => {
+        await use(persona === 'anonymous' ? anonymous : await sessions.stateFor(persona));
+    },
+
+    contextFor: async ({ browser, sessions }, use) => {
+        await use(async (who, options = {}) =>
+            browser.newContext({
+                ...options,
+                storageState: who === 'anonymous' ? anonymous : await sessions.stateFor(who),
+            }),
+        );
+    },
+});
+
+export { expect };
+
+/**
+ * Open an authenticated page. The persona comes from the context's `storageState` (the default, or a
+ * `test.use({ persona })` override), so this only navigates and proves the session is still good. A
+ * missing or invalidated session lands on `/login`, and this fails there with a clear reason rather
+ * than deeper in the spec as a confusing assertion about page content.
  */
 export async function signedIn(page: Page, path = '/dashboard') {
     await page.goto(path);
 
     await expect(
         page,
-        'Reused authentication state did not resolve to an authenticated page. Re-run the suite so ' +
-            'the `setup` project regenerates it.',
+        "This worker's authenticated session did not resolve to an authenticated page. Something " +
+            'invalidated it (a sign-out, a password change) or the context started signed out.',
     ).not.toHaveURL(/\/login$/);
 }

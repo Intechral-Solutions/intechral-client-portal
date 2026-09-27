@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist**
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist** · [Amendment 9 (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27): POST-WP4 E2E hardening (not WP4, not WP5) — diagnosed why the six-spec failure group from A8.18 passed individually but failed together: parallel Playwright workers shared one Laravel session per persona, so one worker's flash/validation state could land in another's page, and a separate defect let a "fresh" manager context inherit the project's own operator auth. Remediated with a session minted per worker per persona (`support/auth.ts`), cookies-only and never written to disk; an explicit `contextFor('anonymous')` for contexts that must start signed out; and an explicit `workers: 3` cap, because a worker mints a persona's session at most once for its whole lifetime, so the cap bounds that persona's total real logins for the run regardless of spec-file count or machine core count. Three dedicated seeded fixtures (`e2e-login-flow`, `e2e-profile-mutation`, `e2e-signout`, via `DevSeeder`) moved authentication-subject flows off the reusable operator/member personas' own Fortify buckets. Full suite now 64/64 at normal parallel configuration (3 workers, ~3.3 min), 12 `POST /login` all 302, 0 `429`/`419`/5xx. `BrowserAuthContractTest` rewritten for the new architecture; login budget and identity table recorded in `docs/testing/e2e-browser-suite.md`. A separately reported dev-environment HTTP 400 was traced to the owner's browser sending a Cookie header nginx's default header-buffer limit rejects — unrelated to this work, no repository change
 
 ---
 
@@ -57,6 +57,7 @@
 - [Amendment 6: WP2 Results (2026-09-25)](#amendment-6-wp2-results-2026-09-25)
 - [Amendment 7: WP3 Results (2026-09-25)](#amendment-7-wp3-results-2026-09-25)
 - [Amendment 8: WP4 Results (2026-09-26)](#amendment-8-wp4-results-2026-09-26)
+- [Amendment 9: POST-WP4 E2E Hardening (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27)
 
 ---
 
@@ -3827,3 +3828,134 @@ WP5 (Blade parity) may start. **It has not started: no file under `resources/vie
 - **The brand mark transform** must match `BrandMark` exactly: strip `<title>`/`<desc>` and `aria-labelledby`, prefix every id and its `url(#…)` references, scope `.s`, remove `vector-effect`, add `class="brand-mark"` and an `aria-label`. `scopeBrandSvg()` in `brand-mark.tsx` is the reference implementation and is unit-tested.
 - **A landmark divergence to fix**, recorded in A1.9 and still true: `partials/nav.blade.php` puts `aria-label="Primary navigation"` on the whole sticky bar, so the brand link and account menu sit inside the navigation landmark. Direction D's `nav "Workspaces"` must contain workspace navigation only.
 - **Still open for later packages:** the timer pill and tray plus deleting `RunningTimerBar` (WP6), page frames and Home (WP7), and the two Blade contrast debts A6.24 records, which are unchanged because Blade page bodies are unchanged.
+
+## Amendment 9: POST-WP4 E2E Hardening (2026-09-27)
+
+**Status:** Browser-test reliability follow-up, done after WP4 was committed at `27f151a`. **This is
+not WP4 and not WP5.** No production application, authentication, permission or shell behaviour
+changed. Only `tests/Browser/**`, `playwright.config.ts`, `database/seeders/DevSeeder.php`,
+`tests/Unit/Configuration/BrowserAuthContractTest.php`, `.gitignore` and this documentation changed.
+
+### A9.1 Starting point
+
+Amendment 8 (A8.18) left the full Playwright suite at 50 passed / 13 failed, in six specs
+(`board-drag`, `board-migration`, `milestones-migration`, `projects-migration`,
+`task-detail-migration`, `tasks-migration`) that each passed individually but failed as a group, plus
+one unexplained `HTTP 429` in ten `POST /login` requests. This was explicitly recorded as unresolved
+follow-up, not a passing gate.
+
+### A9.2 Phase 1: diagnosis
+
+Static inspection plus targeted reproductions (never the full suite, per the investigation's own
+budget) established two independent causes:
+
+1. **Shared Laravel session across parallel workers.** The A8.18 remediation minted one authenticated
+   session per persona *per run*, through a Playwright `setup` project, and every worker reused the
+   same cookie. Every worker's requests therefore read and wrote the *same* database-backed session
+   row. Laravel flash data (`success`/`error`/`status`) and validation-error bags survive exactly one
+   subsequent request; captured traces showed one worker's exact `"Task created."` flash appearing in
+   another worker's Projects response, and an expected `"Project updated."` flash arriving `null`
+   because another worker's request had already consumed the row. Demonstrated: the formerly
+   deterministic Projects + Tasks failing pair passed 11/11 at `--workers=1` (no sharing possible) and
+   failed 2/3 times at the default worker count, with the specific failing pair changing each run —
+   consistent with contention over one shared row, not a fixed pairwise dependency.
+2. **A "fresh" browser context that wasn't.** `projects-migration.spec.ts`'s membership test opened a
+   new context for a manager it creates dynamically and called the real `signIn()` flow on it. The
+   project's default `storageState` was authenticated, and a bare `browser.newContext()` inherits it,
+   so `/login` redirected to `/dashboard`, the form never appeared, and the test failed alone and at
+   `--workers=1` — an independent defect, never explained by the shared session.
+
+A full suite at `--workers=1` (diagnostic only, never proposed as the fix) reached 62 passed / 1
+failed, the one failure being cause 2. This gave defect 1 as demonstrated-and-fixable and defect 2 as
+demonstrated-and-isolated, without yet testing the actual per-worker-session fix.
+
+### A9.3 Phase 2: per-worker sessions, and a structural collision
+
+The remediation replaced the shared per-run session with one minted per **worker**: a worker-scoped
+`sessions` fixture (`support/auth.ts`) signs a persona in through the real login form the first time
+that worker needs it and keeps the cookies in memory for the rest of its lifetime — memoized per
+persona, so a worker mints a given persona's session at most once, however many spec files it goes on
+to run. `browser.newContext()` calls that needed a second actor were replaced with an explicit
+`contextFor(who, options)`, so a context that must start signed out (the manager test's fix) declares
+`contextFor('anonymous')` rather than silently inheriting the default project state.
+
+Session-isolation itself was proven directly: distinct session rows for distinct workers (confirmed
+via the DB `sessions` table and a claim-file registry keyed by each minted session's CSRF token), and
+three clean repetitions of the formerly-deterministic Projects + Tasks pair under two parallel workers
+on a quiet machine, no foreign flash observed.
+
+Validating under Playwright's *normal* (unpinned) worker count — 8, on this machine — surfaced a
+second, structural problem: 47 `POST /login`, 29 refused with `HTTP 429`, 28 passed / 36 failed. With
+enough spec files defaulting to the operator persona, and Playwright's default worker count tied to
+machine core count, ordinary parallel execution alone could mint enough real operator logins inside
+one Fortify window (5/minute per email+IP) to collide with the limiter — before any
+authentication-subject test ran at all. This was reported rather than worked around with retries,
+per instruction.
+
+### A9.4 Final architecture
+
+Two changes closed the structural gap, without weakening Fortify or serializing the suite:
+
+1. **An explicit worker cap** (`workers: 3` in `playwright.config.ts`). Because a worker mints a
+   persona's session at most once for its whole lifetime, the cap bounds that persona's *total* real
+   logins for the entire run to at most the cap — deterministic, and independent of spec-file count
+   or machine core count. Three leaves two logins of headroom under the 5/minute ceiling for both the
+   operator and member buckets.
+2. **Dedicated seeded fixtures for authentication-subject flows that don't need the canonical
+   operator/member identity**, added to `database/seeders/DevSeeder.php` (dev/testing-only, same
+   `firstOrCreate` pattern as the existing accounts):
+   - `e2e-login-flow@intechral.test` — `auth-migration.spec.ts`'s invalid-credentials, valid-login,
+     logout and password-confirmation tests. The test's subject is the login form, not a permission,
+     so it no longer spends the operator persona's own per-worker login on top of this file's own
+     login churn.
+   - `e2e-profile-mutation@intechral.test` — `inertia-coexistence.spec.ts`'s account-mutation test,
+     which edits its own name/email. A failure part-way now can never leave the *shared* operator
+     account looking like a different person for every later run.
+   - `e2e-signout@intechral.test` — `shell.spec.ts`'s sign-out test, seeded with the full-permission
+     `operator` role. Its assertion (no administration item leaks into a fully-permissioned account's
+     menu) holds for any fully-permissioned account, not specifically the shared one, and it must sign
+     in for real regardless (sign-out destroys the database-backed session row it presents).
+
+The dynamically created manager (`projects-migration.spec.ts`) needed no identity change — a unique
+per-test email never shares a bucket with anything — only the `contextFor('anonymous')` fix so it
+starts genuinely signed out.
+
+Full login budget, per identity, and the reasoning behind each bound: `docs/testing/e2e-browser-suite.md`.
+
+### A9.5 Validation
+
+| Check | Result |
+|---|---|
+| `session-isolation.spec.ts` (new guard spec) | 3/3 passed |
+| Projects + Tasks pair, 2 workers, 3 repetitions | 10/10 each run, no foreign flash |
+| Manager fresh-context case, isolated | Passed; `GET /login` rendered the form (200), `POST /login` 302'd for the manager |
+| Full suite, normal configuration (no `--workers` override) | **64/64 passed**, 3 workers, ~3.3 min |
+| Login traffic, full suite | 12 `POST /login`, all 302; 0 `429`; 0 `419`; 0 application `5xx` |
+| `./dev check` | Green (`BrowserAuthContractTest` rewritten for the new architecture; a milestone-dialog Vitest timeout reproduced once under full-machine load and passed cleanly in isolation and on retry — pre-existing, unrelated to this work) |
+| `git diff --check` | Clean |
+
+### A9.6 An unrelated dev-environment report
+
+The owner separately reported `HTTP 400` accessing the normal dev environment in a browser. nginx's
+own access log already held the evidence: real-browser requests (`GET /`, `GET /favicon.ico`, Chrome
+on Windows) returning `400` with a 635-byte body immediately after an nginx restart, from a browser
+that already held cookies. A synthetic request with a ~9 KB `Cookie` header reproduced the identical
+signature (`400`, 635-byte body) against the same nginx, while a clean `curl` request with no cookies
+succeeded normally. nginx's default `large_client_header_buffers` (unconfigured here, so nginx's
+built-in default applies) rejects a request whose header line — including `Cookie` — exceeds its
+limit. Browsers scope cookies to a host, not a host+port, so a `localhost`-scoped cookie jar
+accumulates across *every* dev service the machine runs on `localhost`, of which this machine runs
+several. This is an environment characteristic of the owner's machine and browser profile, not
+anything this or any prior amendment changed; no repository file needed to change, and none did.
+
+### A9.7 Standalone-task cleanup gap
+
+Unchanged, as instructed. The known stale `E2E … standalone task` rows were confirmed in Phase 1 not
+to intersect any query the failing specs used, and remain documented in `E2eCleanup`'s own docblock.
+
+### A9.8 Handoff
+
+WP5 is not started. Nothing in this amendment touches `resources/views/layouts/partials/`, any route,
+policy, permission or dependency. The next Direction D work package inherits the browser suite as a
+64/64 passing gate at its normal parallel configuration, which A8.18 explicitly said it could not yet
+promise.

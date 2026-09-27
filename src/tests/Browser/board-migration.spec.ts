@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP5 critical flows: the project board as a React/Inertia page, keyboard-accessible
@@ -149,7 +149,7 @@ test('move up and down within a column through the Move menu', async ({ page, cl
 
 test('a plain project member gets a read-only board and can still open, comment on, and toggle a checklist item for a task', async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
     await signedIn(page);
@@ -166,7 +166,7 @@ test('a plain project member gets a read-only board and can still open, comment 
     await page.getByRole('button', { name: 'Update members' }).click();
     await expect(page.getByRole('status')).toContainText('Members updated.');
 
-    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
+    const memberContext = await contextFor('member');
     const memberPage = await memberContext.newPage();
     try {
         await memberPage.goto(`/projects/${projectId}/board`);

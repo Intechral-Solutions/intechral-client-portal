@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP7 critical flows: the project task detail page as a React/Inertia page (§24 item
@@ -118,7 +118,7 @@ test('a manager edits task fields and assigns, then clears, a milestone (I4)', a
 
 test('a manager adds a checklist item; a plain member can toggle it but not author or remove it (D5)', async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
     await signedIn(page);
@@ -144,7 +144,7 @@ test('a manager adds a checklist item; a plain member can toggle it but not auth
     await expect(checkbox).toBeVisible();
     await expect(checkbox).not.toBeChecked();
 
-    const memberContext = await browser.newContext({ storageState: personas.member.storageState });
+    const memberContext = await contextFor('member');
     const memberPage = await memberContext.newPage();
     try {
         await memberPage.goto(taskUrl);

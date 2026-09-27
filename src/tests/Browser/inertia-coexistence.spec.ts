@@ -1,6 +1,4 @@
-import { expect, test } from '@playwright/test';
-
-import { personas, signedIn } from './support/auth';
+import { expect, signedIn, test } from './support/auth';
 import { signIn } from './support/sign-in';
 import { accountTrigger, drawerLink, openAccountMenu, railLink } from './support/shell';
 
@@ -61,7 +59,7 @@ test('Dashboard and Profile coexist with Blade pages and a persistent theme', as
 test.describe('as a member', () => {
     // The capability-filtering assertions below are about this actor's own profile, so the persona is
     // the point of the test, not incidental setup.
-    test.use({ storageState: personas.member.storageState });
+    test.use({ persona: 'member' });
 
     test('narrow shell exposes permission-aware navigation through the nav sheet', async ({
         page,
@@ -96,13 +94,16 @@ test.describe('as a member', () => {
 });
 
 test.describe('account mutation', () => {
-    // This one authenticates for real and deliberately does NOT reuse the shared state: it edits the
-    // operator's own name and email. Even though it restores them, a failure part-way would leave the
-    // reusable baseline describing a different person for every later spec.
-    test.use({ storageState: { cookies: [], origins: [] } });
+    // This one authenticates for real and deliberately does NOT reuse the shared state: it edits its
+    // own name and email. Even though it restores them, a failure part-way would leave the account
+    // describing a different person. It signs in as `e2e-profile-mutation@intechral.test` (DevSeeder),
+    // not the reusable `operator` persona: a failure here must never leave the shared operator
+    // account's own name/email mutated for every later run, and this test needs no operator-specific
+    // permission.
+    test.use({ persona: 'anonymous' });
 
     test('profile information reports validation and saves through Inertia', async ({ page }) => {
-        await signIn(page, 'operator@intechral.test');
+        await signIn(page, 'e2e-profile-mutation@intechral.test');
         await page.getByRole('link', { name: 'My Profile' }).click();
 
         const name = page.getByLabel('Name');

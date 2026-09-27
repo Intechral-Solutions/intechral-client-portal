@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
-import { personas, signedIn } from './support/auth';
+import { signedIn } from './support/auth';
 
 /**
  * EPIC-011E WP8 critical flows: the unified `/tasks` list as a React/Inertia page, replacing the
@@ -165,7 +165,7 @@ test('a project task is linked and a standalone task is not, and the standalone 
 
 test("a task assigned to one person never appears on another person's task list", async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
     await signedIn(page);
@@ -179,7 +179,7 @@ test("a task assigned to one person never appears on another person's task list"
     // A second browser context, not a re-sign-in on the same page: every other multi-actor flow
     // in this suite (e.g. task-detail-migration.spec.ts's checklist test) does the same, so one
     // session's own state never leaks into the other's.
-    const otherContext = await browser.newContext({ storageState: personas.member.storageState });
+    const otherContext = await contextFor('member');
     try {
         const otherPage = await otherContext.newPage();
         await otherPage.goto('/tasks');
