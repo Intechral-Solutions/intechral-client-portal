@@ -712,6 +712,103 @@ body {
     display: none;
 }
 
+/* ── Page frame (EPIC-013 WP7, §19, Direction D §9) ───────────
+   Page GEOMETRY, which is a different job from the shell geometry above: the
+   shell decides where the canvas is, the frame decides how content sits inside
+   it. It lives here rather than in Tailwind utilities for the same reason every
+   other piece of geometry does — the width classes are the one place widths are
+   decided, and XL (1360px) is not a Tailwind screen, so expressing it in
+   utilities would mean either a second breakpoint vocabulary or a JS query.
+
+   `<main>` stays unpadded (§19.2). Page padding belongs to the frame, which is
+   what lets a canvas page deliberately reclaim it. The ten unmigrated pages keep
+   their own `mx-auto max-w-*` containers and are unaffected: nothing here
+   applies without `data-page-frame`.
+
+   Unlayered, like the shell rules above, because the frame's element also carries
+   Tailwind utilities and a layered rule would lose to them (A8.12 #2). ── */
+[data-page-frame] {
+    /* 40 / 32 / 24 / 16 by width class (§19.2). */
+    --page-gutter: 16px;
+
+    width: 100%;
+    min-width: 0;
+    padding-inline: var(--page-gutter);
+    padding-block: 24px;
+}
+
+@media (min-width: 768px) {
+    [data-page-frame] {
+        --page-gutter: 24px;
+
+        padding-block: 32px;
+    }
+}
+
+@media (min-width: 1024px) {
+    [data-page-frame] {
+        --page-gutter: 32px;
+    }
+}
+
+@media (min-width: 1360px) {
+    [data-page-frame] {
+        --page-gutter: 40px;
+    }
+}
+
+/* Canvas deliberately sets no max-width: full width minus the page padding is
+   the whole point (tables, boards, queues). Asserted by test. */
+
+/* Reading: a centred column whose max-width is the variant's measure. The
+   gutters are added back so the *text* column is 640/700/720/760, not the box. */
+[data-page-frame='reading'] {
+    --page-measure: 720px;
+
+    max-width: calc(var(--page-measure) + var(--page-gutter) * 2);
+    margin-inline: auto;
+}
+
+[data-page-frame='reading'][data-page-measure='forms'] {
+    --page-measure: 640px;
+}
+
+[data-page-frame='reading'][data-page-measure='conversation'] {
+    --page-measure: 700px;
+}
+
+[data-page-frame='reading'][data-page-measure='account'] {
+    --page-measure: 720px;
+}
+
+[data-page-frame='reading'][data-page-measure='knowledge'] {
+    --page-measure: 760px;
+}
+
+/* Grid: `1fr + 340–360px` (§9). The split waits for XL because at L the docked
+   drawer has already taken 248px, and splitting the remainder would leave a main
+   column narrower than the aside. Below XL the aside stacks under the content it
+   supports, which is also its reading order. */
+[data-page-frame='grid'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+
+/* The header spans the content region, as §6 draws it, so its rule runs the full
+   width rather than stopping where the supporting column begins. */
+[data-page-frame='grid'] [data-page-header] {
+    grid-column: 1 / -1;
+}
+
+@media (min-width: 1360px) {
+    [data-page-frame='grid'][data-page-split] {
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 40px;
+    }
+}
+
 /* Overlay is the DEFAULT: it floats over the canvas with no scrim (§5.4), so
    content stays visible behind it. The width classes below un-overlay it where
    it is allowed to dock, which is what keeps docked-vs-overlay a pure CSS

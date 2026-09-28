@@ -117,3 +117,18 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   same — and it is recorded rather than redesigned. Do not assume operator timer state is isolated
   because member state is: new exact-count or stop-everything assertions for `operator` need either a
   single owning file or an assertion that does not depend on the actor's global timer set.
+- After EPIC-013 WP7 (Amendment 12), with `home.spec.ts` and the board's canvas flow added: **89/89
+  passed, 3 workers, 4.5 minutes**, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`.
+  WP7 added seven tests and no logins — `home.spec.ts` uses the default `operator` persona, whose
+  session each worker has already minted.
+
+  **Do not run the full browser suite and the full Vitest suite at the same time.** Measured: run
+  concurrently, Playwright took 9.8 minutes instead of 4.5 and reported 16 failures, and Vitest
+  reported 9; run one at a time, both are green. The browser suite drives a real Chromium against the
+  development stack while Vitest creates a jsdom environment per file (368s of tracked time alone,
+  969s under contention), and the two starve each other. Failures observed while both are running are
+  evidence of nothing until reproduced alone.
+
+  `home.spec.ts` holds no shared-resource ownership: Home is read-only, creates no fixture and starts
+  no timer. The board's page-frame flow lives in `board-migration.spec.ts`, which already owns project
+  fixtures and their cleanup.

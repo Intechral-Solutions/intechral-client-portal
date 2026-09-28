@@ -58,8 +58,28 @@ it('shows the Settings link only when abilities.openSettings is true', () => {
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
 });
 
-it('links back to the projects index', () => {
+it('draws no trail of its own, because the shell owns the breadcrumb', () => {
     renderPage();
 
-    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects');
+    // EPIC-013 WP7: this page used to hand-build a `Projects /` trail beside its title. The utility
+    // bar has owned the breadcrumb since WP4 and already offers Projects as a link to the index, so
+    // the page's copy was a second source of truth and a duplicate landmark. The back-navigation it
+    // provided is not lost — it moved to the shell, where `board-migration.spec.ts` asserts there is
+    // exactly one of it. This inverts the old assertion rather than dropping it, which is the
+    // clearest record of the boundary change.
+    expect(screen.queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+});
+
+it('states the project as an entity, with the strata motif §17 allows here', () => {
+    const { container } = renderPage();
+
+    // A project workspace is one of the four surfaces Direction D §17 permits the motif on, and the
+    // entity header is the only thing that draws it.
+    expect(screen.getByRole('heading', { level: 1, name: 'Portal rebuild' })).toBeInTheDocument();
+    expect(container.querySelector('[data-strata]')).toBeInTheDocument();
+    expect(container.querySelector('[data-page-frame]')).toHaveAttribute(
+        'data-page-frame',
+        'canvas',
+    );
 });

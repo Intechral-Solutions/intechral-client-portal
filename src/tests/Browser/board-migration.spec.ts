@@ -215,3 +215,59 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
     const toDoColumn = page.locator('[data-column-id]').filter({ hasText: 'To Do' });
     await expect(toDoColumn.getByRole('link', { name: 'E2E mobile task' })).toBeVisible();
 });
+
+/**
+ * EPIC-013 WP7 — the board on a `canvas` page frame (§19.3, §25.3 flow 11).
+ *
+ * `shell.spec.ts` already proves the *canvas region* reclaims the viewport when the drawer is
+ * collapsed. This proves the other half, which is the half WP7 added: that the page inside it
+ * actually takes that width, minus the page gutters and nothing else. It lives in this file because
+ * the board's project fixtures and their cleanup already do.
+ */
+test('the board reclaims the wide canvas on its page frame, under an entity header', async ({
+    page,
+    cleanup,
+}) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signedIn(page);
+    await createProject(page, cleanup, 'E2E WP7 canvas project');
+
+    const frame = page.locator('[data-page-frame]');
+    await expect(frame).toHaveAttribute('data-page-frame', 'canvas');
+
+    // Collapsed drawer at XL: the canvas is the viewport minus the 64px rail, and the canvas frame
+    // is the whole of it. Canvas is the one width that sets no max-width, which is what makes the
+    // wider shell a real win for the board rather than a wider margin.
+    await page.getByRole('button', { name: 'Collapse workspace views' }).click();
+    await expect(page.getByRole('navigation', { name: 'Projects views' })).toBeHidden();
+
+    const frameBox = (await frame.boundingBox())!;
+    expect(frameBox.width).toBeCloseTo(1440 - 64, 0);
+
+    const padding = await frame.evaluate((node) => getComputedStyle(node).paddingLeft);
+    expect(padding).toBe('40px');
+    expect(
+        await frame.evaluate((node) => getComputedStyle(node).maxWidth),
+    ).toBe('none');
+
+    // The entity header (Direction D §6): the record's name is the page's one h1, its state is a
+    // glyph-and-label status rather than colour alone, and the strata rule closes the block. §17
+    // allows the motif on a project workspace, which is what this page is.
+    await expect(
+        page.getByRole('heading', { level: 1, name: 'E2E WP7 canvas project' }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.locator('[data-strata]')).toHaveCount(1);
+
+    // The hand-built "Projects /" trail this header replaced is gone: the utility bar has owned the
+    // breadcrumb since WP4, and two of them would be two sources of truth.
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(1);
+
+    // The actions survive the move into the header, as links, still Inertia.
+    await expect(page.getByRole('link', { name: 'Milestones' })).toBeVisible();
+
+    const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(overflow).toBe(false);
+});

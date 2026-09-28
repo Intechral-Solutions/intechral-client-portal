@@ -5,7 +5,9 @@ import { accountTrigger, drawerLink, openAccountMenu, railLink } from './support
 test('Dashboard and Profile coexist with Blade pages and a persistent theme', async ({ page }) => {
     await signedIn(page);
 
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    // EPIC-013 WP7: the page is titled Home. The rail has said Home since WP3 (§21.2 changes the
+    // label only) and this heading now agrees with it; the route is still `/dashboard`.
+    await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible();
     await page.getByRole('link', { name: 'My Profile' }).click();
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible();
@@ -25,7 +27,7 @@ test('Dashboard and Profile coexist with Blade pages and a persistent theme', as
 
     await railLink(page, 'Home').click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible();
 
     // Time Reports moved out of the retired "Manage" account-menu group and into the Time
     // workspace's contextual navigation (§11.2). Time defaults to a collapsed panel, so the rail

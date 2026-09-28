@@ -178,3 +178,61 @@ it('includes the one shared pre-paint bootstrap from both root views, before any
             ->and(str_contains($view, 'localStorage'))->toBeFalse();
     }
 });
+
+/*
+ * EPIC-013 WP7 — the strata motif's scope (Direction D §17, L8).
+ *
+ * The rule is "under entity headers only", and §17 lists what it must never mark: section headings,
+ * tables, cards, dialogs, list pages and Home. That is a property of the source tree rather than of
+ * any one rendered page — a motif that means "this page is a record" stops meaning anything the first
+ * time a second surface borrows it for decoration, and no rendering test would catch that.
+ *
+ * The check matches on the module specifier's last path segment rather than the literal `@/` alias,
+ * because that is the only part guaranteed to say "strata" regardless of whether the offending import
+ * is written as `@/components/strata`, `./strata` or `../components/strata` — this codebase uses both
+ * the alias and relative imports, and the guard must not be defeated by the one it doesn't check for.
+ */
+function importsStrata(string $source): bool
+{
+    // Any quoted specifier whose last path segment is exactly `strata` — the `/` immediately before
+    // it rules out an unrelated module that merely ends with those letters (e.g. `strata-legacy`).
+    return (bool) preg_match('/[\'"][^\'"]*\/strata[\'"]/', $source);
+}
+
+it('draws the strata motif only from the entity header', function () {
+    $offenders = [];
+    $allowed = [
+        resource_path('js/components/entity-header.tsx'),
+        resource_path('js/components/strata.tsx'),
+    ];
+
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(resource_path('js')));
+
+    foreach ($iterator as $file) {
+        if (! $file->isFile() || ! preg_match('/\.tsx?$/', $file->getFilename())) {
+            continue;
+        }
+
+        // Tests may render it directly to assert its own shape; they are not surfaces.
+        if (in_array($file->getPathname(), $allowed, true) || str_contains($file->getFilename(), '.test.')) {
+            continue;
+        }
+
+        if (importsStrata((string) file_get_contents($file))) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});
+
+it('recognises a Strata import by any specifier a consumer could plausibly write', function () {
+    expect(importsStrata("import { Strata } from '@/components/strata';"))->toBeTrue();
+    expect(importsStrata("import { Strata } from './strata';"))->toBeTrue();
+    expect(importsStrata("import { Strata } from '../components/strata';"))->toBeTrue();
+    expect(importsStrata("import type { Strata } from '@/components/strata';"))->toBeTrue();
+
+    // Must not flag an import that merely shares a path segment with the real one.
+    expect(importsStrata("import { Status } from '@/components/status';"))->toBeFalse();
+    expect(importsStrata("import { Strata } from '@/components/strata-legacy';"))->toBeFalse();
+});

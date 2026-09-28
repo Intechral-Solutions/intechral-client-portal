@@ -1430,6 +1430,8 @@ Four independently revertible slices.
 
 **Exit:** Home is a real Direction D surface; nothing fabricated; other pages still work.
 
+- **Complete (2026-09-28) — results in [Amendment 12](#amendment-12-wp7-results-2026-09-28).** `PageFrame` exists with all three width classes and owns page geometry, so `<main>` stays unpadded and a canvas page can reclaim the viewport; `EntityHeader` states a record and is the only thing that draws `Strata`, which Direction D §17 allows under entity headers alone. Home is a `grid` frame with its four metrics as a figure row rather than cards, built from the four existing props with the route, their shape and every `visit` mode unchanged, and nothing fabricated. `projects/board` moved onto `canvas` and gained the entity header, which retired the second breadcrumb it used to draw. `EmptyState` arrived with the consumer A6.10 named for it. The other ten pages' containers are untouched. One deviation: running timers on Home are not implemented, because WP6's pill now occupies that role (A12.6). Implemented on the WP6 tree (`8f2fc34`); not yet committed.
+
 ### WP8 — Hardening and verification
 
 - Re-run the ten-screen compatibility matrix, both themes, both renderers.
@@ -4675,3 +4677,430 @@ command affordance shares that row with the pill and must fit beside it within t
 `resources/js/lib/timer-state.ts` is the pattern for any further logic both renderers need — small,
 pure, server-derived, imported by both. `time-migration.spec.ts` owns the `member` persona's timer
 state; any new spec that starts timers as that persona belongs in it, or must use a different actor.
+
+## Amendment 12: WP7 Results (2026-09-28)
+
+**Status:** WP7 (page frames and Home) implemented on the WP6 tree (`8f2fc34`). **This is the WP7
+record; it does not revise Amendments 1–11.** No route, endpoint, migration, permission, policy,
+controller, model or service changed, and no dependency was added — §21.2 is explicit that Home's
+four props keep their shape and its route keeps its name, and they did. WP8 has not started.
+
+### A12.1 Scope, as the committed plan defines it
+
+[§28 WP7](#wp7--page-frames-and-home) assigns four things: `PageFrame` (canvas/grid/reading),
+`EntityHeader`, `Strata`; Dashboard → **Home** with honest data and no new props; `projects/board`
+onto `PageFrame width="canvas"`; and the other ten pages' containers left alone. Exit: Home is a real
+Direction D surface, nothing is fabricated, other pages still work. [§29](#29-exit-criteria)
+criterion 10 restates it as: all three width classes exist, Home adopts Direction D using only
+existing DTO data, and no approvals, project health or Helpdesk intelligence are invented.
+
+Two boundaries were read from the plan rather than assumed, because a name alone would have misled:
+
+- **Strata is a rule, not a container.** Direction D §17 and the §4.3 rule table define it as three
+  stacked lines — 1px `rule-control`, 1px `text-faint` at 70%, 2px `rule-strong`, 2px apart — allowed
+  **under entity headers only** and forbidden on "section headings, tables, cards, dialogs, **Home**,
+  list pages". L8 says the same. Reading it as a card or panel system would have inverted the one
+  rule it carries. Home therefore has no strata; the board does.
+- **Home uses `PageHeader`, not `EntityHeader`.** §21.2 names `PageHeader` + `Section`, and §6
+  separates the two grammars: an operator page has an overline, title, summary and actions; an entity
+  page has the record's name, its state, its actions, then the strata. Home is the first; the board is
+  the second.
+
+**No conflict** was found between the committed specification and the work-package brief.
+
+### A12.2 Pre-WP7 page architecture
+
+Twelve React pages each supplied their own container and their own title block. The duplication that
+mattered for WP7 was narrow and specific:
+
+| Pattern | Where | WP7's answer |
+|---|---|---|
+| `mx-auto max-w-7xl px-4 sm:px-6 lg:px-8` | Home and four others | `PageFrame` owns page geometry |
+| `px-4 py-6 sm:px-6 lg:px-8` with no max-width | `projects/board` | `PageFrame width="canvas"` |
+| A hand-built title row with an in-page `Projects /` trail | `projects/board` | `EntityHeader` |
+| Four bordered, shadowed metric cards | Home | A figure row (§21.1) |
+| Ad hoc one-line empty copy | Home and three others | `EmptyState`, with Home as its consumer |
+
+Everything else that looks similar across the twelve pages — forms, filters, tables — was left alone.
+§19.3 converts the pages it is already touching and no others, and R11 caps WP7 at exactly two.
+
+### A12.3 The page grammar
+
+The shell answers *where am I*. The frame answers *how does this page's content sit in the canvas*,
+and the header answers *what am I looking at*. They are separate components because they are separate
+questions, and none of them knows anything about a domain.
+
+- `PageFrame` owns page gutters, vertical rhythm, content width and the optional supporting column.
+  It owns no navigation, no utility bar, no breadcrumb, no timer, no authorization, no routing and no
+  data. `<main>` stays unpadded (§19.2), which is what lets a canvas page reclaim the full viewport.
+- `PageHeader` (WP2, unchanged) states a page. `EntityHeader` states a record and draws the strata.
+- `Section` (WP2, unchanged) groups content under a `rule-strong` line.
+- The ten unmigrated pages are untouched and unaffected: nothing in the new CSS applies without
+  `data-page-frame`, so their own containers keep working exactly as before.
+
+### A12.4 `PageFrame`
+
+A discriminated union rather than one wide prop bag, so a prop is only offered where it means
+something: `aside` is meaningless on a reading column and `measure` is meaningless on a board.
+
+| Width | Behaviour | Consumer |
+|---|---|---|
+| `canvas` | Full width minus gutters. **No max-width at all.** | `projects/board` |
+| `grid` | `1fr + 340px` at XL; stacks below. Optional `header` (spans) and `aside` (labelled). | Home |
+| `reading` | Centred column at `forms` 640 / `conversation` 700 / `account` 720 / `knowledge` 760. | **None yet** |
+
+`reading` ships without a consumer because §29 criterion 10 requires all three width classes to
+exist and §25.2 asserts each one applies its documented constraint. It is four CSS rules and a data
+attribute, not a speculative component, and the first reading-width page adopts it without inventing
+it. That is the one place WP7 builds ahead of a consumer, and it is the plan asking for it.
+
+The `header` slot exists because Home needed it: §6 draws the page header spanning the content
+region, and inside the main column its rule would stop where the supporting column begins.
+
+**Geometry lives in `app.css`, not in utilities.** The gutters are 40/32/24/16 by width class
+(§19.2), and XL is 1360px, which is not a Tailwind screen — expressing it in utilities would have
+meant either a second breakpoint vocabulary or a JS width query, and the width classes are the one
+place widths are decided. The rules are unlayered for the reason A8.12 #2 records. The consequence is
+that a jsdom test cannot measure them, so the split is deliberate: `page-frame.test.tsx` asserts which
+geometry the frame *names*, and the browser suite measures what it *is*. Neither half can quietly
+assert nothing.
+
+### A12.5 `EntityHeader` and `Strata`
+
+`EntityHeader` takes `title`, `overline`, `status`, `meta` and `actions`, renders the record's name as
+the page's one `h1`, and closes the block with `Strata`. It is an identity band, not a hero: one
+compact row where the width allows, so the record's actual content is not pushed below the fold.
+
+It knows no domain. No project, task, ticket or customer concept appears in it; the caller passes
+already-resolved strings and **already-authorized** action elements, because a component that received
+every possible action and decided which to draw would be making a capability decision it has no basis
+to make. It also draws no breadcrumb — the utility bar has owned that trail since WP4, and a second
+one inside the page would be both a duplicate landmark and a second source of truth.
+
+`Strata` is the motif itself and is drawn by `EntityHeader` alone. That scope is now a static guard in
+`ShellSeamContractTest`: no file outside `entity-header.tsx` may import it. A motif that means "this
+page is a record" stops meaning anything the first time another surface borrows it for decoration, and
+no rendering test would catch that.
+
+### A12.6 Home
+
+`PageFrame width="grid"`, `PageHeader` (date overline, title, summary), `Section` titles over
+`rule-strong`, and a supporting column carrying Quick actions and Directory.
+
+**The four metrics are a figure row, not cards** (§21.1, L10): a description list of label-and-number
+pairs, mono tabular numerals, separated by hairlines drawn by the band rather than by a border around
+each figure. Each figure is still its own link to the surface the number came from, and its accessible
+name now carries the value — a link called only "Open Tickets" would make a screen-reader user open
+the page to learn the number.
+
+**Preserved exactly:** the four props and their shape; every `visit` mode (Inertia vs document, which
+the server decides and the page honours); every href; the `crmSummary` gating; the route, its name and
+its URL. **Changed:** the composition, the "Dashboard" label → "Home" (the rail has said Home since
+WP3), the "CRM" heading → "Directory" to match the IA while the prop keeps its key, and the ticket
+list's empty copy.
+
+**Fabricated: nothing.** Approvals, project health, Helpdesk intelligence, SLA, "my work", watch lists
+and notifications are all absent, each because §21.1 marks it Future for want of any data behind it.
+Both the Vitest suite and the browser suite assert their absence, because the realistic failure mode
+is a later change quietly adding a plausible-looking figure with nothing behind it.
+
+**One deliberate deviation — acceptable documented deviation, corrected below (A12.16).** §21.1 marks
+"running timers on Home" as *Ship if it costs nothing beyond reading existing context*. It is not
+implemented. §12/§18 already planned the global timer pill as foundation scope when §21 was written —
+the shell did not yet have no timer surface planned, only none *built* — and WP6 is what actually put
+the pill permanently in the utility bar on every page. With that pill live, a timers section on Home
+would duplicate a control already on screen a few hundred pixels above it, and the tray it opens
+already lists every running timer, which is the "richer view" a Home section would otherwise exist to
+give. The condition "costs nothing" was about data availability, and that condition is still met; what
+changed is that Direction D §12.1's "exactly one global timer affordance" now has its one affordance
+elsewhere, and duplicating it is what §21.1 did not anticipate paying for. Recorded here rather than
+silently dropped.
+
+### A12.7 `projects/board`
+
+`PageFrame width="canvas"` and `EntityHeader`. The board was already full-bleed, so the frame hands it
+the whole canvas minus the gutters; measured at XL with the drawer collapsed it is 1376px wide with
+40px gutters and no max-width. The `Board` component itself — drag, quick-add, move, reorder — is
+untouched, as are `abilities.manage` and `abilities.openSettings`, which remain the server's answers.
+
+The hand-built title row became the real `EntityHeader`, which is where the strata legitimately
+appears: §17 lists the project workspace by name. That row also carried its own `Projects /` trail,
+which is gone, so the page now has one breadcrumb instead of two.
+
+### A12.8 `EmptyState`
+
+WP2 deferred it and A6.10 named **Home** as its first structured consumer. Home is that consumer, so
+the primitive arrives with it rather than ahead of it — the same rule WP6 followed for Popover. It is
+a rule-bounded band, not a card, and it takes a title and an optional description so a caller can say
+*which* kind of empty this is; §21.2 asks for copy distinguishing truly-empty from filtered-empty, and
+that is a writing requirement the component makes room for rather than one it can satisfy alone. Home
+has no filter, so its copy says what would put something in the list instead.
+
+**No other deferred primitive was revived.** `Tabs`, `Tooltip`, `Skeleton`, `ErrorState` and `Tag` have
+no WP7 consumer and none was invented for them. The board's Milestones link is a route link with
+`aria-current`, not a tab (A6.3), so no Radix Tabs dependency arose.
+
+### A12.9 Responsive and theme results (measured in Chromium)
+
+| Width class | Viewport | Gutters | Home | Board |
+|---|---|---|---|---|
+| XL | 1440 | 40px | `916px + 340px` split | frame 1376 with the drawer collapsed |
+| L | 1200 | 32px | stacked, aside full width | canvas |
+| M | 900 | 24px | stacked | canvas |
+| S | 390 | 16px | stacked | canvas, no document scroll |
+| 200% | 640 logical | 16px | stacked | — |
+
+No horizontal page overflow at any width on either page. Exactly one `h1` at every width. The `h1` is
+not clipped at 390px or at 200%. Both themes hold their structure; the figure band's numerals are drawn
+from tokens in both. The aside stacks *under* the content it supports below XL, which is also its
+reading order.
+
+The split waits for XL rather than starting at L because at L the docked drawer has already taken
+248px, and splitting the remainder would leave the main column narrower than the 340px aside beside it.
+
+### A12.10 Accessibility
+
+- One `h1` per page: "Home" on Home, the project's name on the board. The board previously had one
+  too, but as a hand-built row rather than a header component.
+- One breadcrumb landmark on both pages. WP7 **removed** the board's second one by replacing the
+  markup that drew it. The separately recorded duplicate in `projects/tasks/show.tsx` is untouched:
+  that page is one of the ten §19.3 leaves alone, and WP7 does not own its markup.
+- `PageFrame`'s supporting column is a labelled `<aside>` ("Shortcuts and directory"), so it is a named
+  complementary landmark rather than an unnamed region.
+- `Strata` and `EmptyState`'s icon are `aria-hidden`; the meaning is carried by the heading each sits
+  with.
+- Status stays glyph-and-label, never colour alone (§10), on both the ticket list and the board header.
+- Metric links are named by label, value and supporting text.
+- Actions remain real links, keeping their server-decided visit mode. No button nests inside a button.
+- WP7 introduces no motion, so there is nothing new under `prefers-reduced-motion`.
+
+### A12.11 Tests
+
+**Vitest (+24, corrected from an earlier "+34" — A12.16).** `page-frame.test.tsx` (5) — which geometry each width names, the reading default and
+its variants, `data-page-split` only when an aside is actually supplied, the header spanning as a
+direct child, and no complementary landmark on the single-column widths. `entity-header.test.tsx` (7,
+including `Strata`) — the `h1` level, the decorative strata, regions omitted when absent, **no
+breadcrumb**, exactly the actions it is handed and no others, a long name that is not truncated away,
+and the motif's three lines heaviest last. `empty-state.test.tsx` (5). `pages/dashboard/index.test.tsx`
+(9, rewritten) — the grid frame and labelled aside, the figure row as `dt`/`dd` pairs rather than
+cards, mono tabular numerals, the empty copy, Directory gating, the metric row omitted entirely when
+the actor may see no metric, and the absence sweep for the seven fabricated concepts.
+
+That last file was **rewritten, not replaced**: its three pre-WP7 cases asserted the `visit` contract
+through a `data-inertia` marker, the metric link's accessible name, and the CRM gating. All three
+properties are still asserted — the `data-inertia` mock is kept deliberately, because which links stay
+in the SPA is behaviour and WP7 is a presentation change.
+
+**Pest (+1 at WP7 completion; +1 more after audit remediation — A12.16).** The strata scope guard in
+`ShellSeamContractTest` (A12.5). WP7 changes no server contract, and no controller or request test was
+added for one — that much holds. This paragraph originally went further and claimed
+`DashboardInertiaTest`'s existing assertions over the four props were "exactly the guard that the
+props did not move." That overstated it: none of those assertions checked the complete top-level prop
+set, so a fabricated fifth prop would have passed unnoticed. §25.1's "Home DTO minimality" row asked
+for exactly that guard and none existed. A12.16 adds it and corrects this claim.
+
+**Playwright (+7, 82 → 89).** `home.spec.ts` (6) — the grid split and the 340px aside at XL against
+stacking below it, the measured 40/32/24/16 gutters with `main` still unpadded, the figure band with no
+figure carrying a radius or shadow, reflow at 200% and 390px with an unclipped heading, both themes,
+and the one-`h1`/one-breadcrumb/nothing-fabricated/no-strata assertions. `board-migration.spec.ts` (1)
+— the board reclaiming 1376px with the drawer collapsed, `max-width: none`, the entity header with its
+single `h1` and its one strata, and one breadcrumb where there used to be two.
+
+`home.spec.ts` is a new file and needs no ownership boundary of the kind A11.15 records: Home is
+read-only, creates no fixture and starts no timer. The board flow deliberately went into
+`board-migration.spec.ts`, which already owns project fixtures and their cleanup, rather than into a
+second spec that would have created its own.
+
+**Two existing test files were updated rather than deleted, both inverting an assertion WP7 made
+false.** `pages/projects/board.test.tsx` asserted the in-page `Projects` back-link; it now asserts the
+page draws *no* trail and no navigation landmark of its own, which is the clearest record of the
+boundary moving to the shell, plus a new case for the entity header and the canvas frame.
+`inertia-coexistence.spec.ts` asserted a `Dashboard` heading in two places; both now assert `Home` at
+level 1. That spec already navigated by a rail link **named Home** (WP3), so the page heading and the
+rail had disagreed since then and now agree. The route, its name and `/dashboard` are unchanged.
+
+### A12.12 Chromium findings
+
+Two, both found by measuring rather than by reading:
+
+1. **A false alarm, recorded because the first read was wrong.** At screenshot scale the strata under
+   the board's entity header looked like one heavy line rather than three. The first probe appeared to
+   confirm it — but it had selected the status badge's dot, because `header [aria-hidden="true"]`
+   matches that first. Re-probed against a precise hook, the motif measures exactly as §4.3 specifies:
+   8px total, 2px gaps, lines of 1px `rgb(210,206,195)`, 1px `text-faint` at 70%, and 2px
+   `rgb(26,27,30)`. Nothing was changed. `Strata` did gain a `data-strata` hook, which the browser
+   suite now uses.
+2. **Everything else measured first time.** Gutters, the 340px aside, the 1376px canvas, single `h1`,
+   no overflow at any width, both themes.
+
+### A12.13 Deviations and follow-ups
+
+- **Running timers on Home: not implemented** (A12.6). Deliberate, reasoned, recorded.
+- **`PageFrame width="reading"` ships without a consumer** (A12.4), because §29 criterion 10 and §25.2
+  require the width class to exist and be asserted.
+- **Untouched pre-existing issues**, none of which WP7 owns: the duplicate breadcrumb landmark in
+  `projects/tasks/show.tsx`; `tests/Browser` being neither type-checked nor linted; the load-sensitive
+  Vitest jsdom overhead; the `E2E … standalone task` fixture leak; the operator-persona E2E timer
+  isolation debt (A11.15); and the cosmetic lockfile caret (A11.2). `home.spec.ts` adds no mutable
+  resource, so none of them is made worse.
+- **The other ten pages keep their containers**, per §19.3. Converting them belongs to the epics that
+  redesign them.
+
+### A12.14 Validation results
+
+- **Pest:** **1,119 passed / 5,966 assertions** (WP6 baseline 1,118 / 5,964 — the one addition is the
+  strata scope guard).
+- **Vitest:** **775 passed / 76 files** (baseline 751 / 73).
+- **Playwright:** **89/89 passed, 0 failed, 0 skipped, 3 workers, 4.5 minutes** (baseline 82 tests,
+  of which the last full run measured 81/81 in 2.8 min). Auth traffic for the run: **12 POST `/login`,
+  12 × 302, 0 × 429, 0 × 419, 0 application 5xx** — the same twelve logins as every run since WP4, so
+  the new spec file added none. Full status distribution: 891 × 200, 144 × 302, 67 × 499 (client
+  navigated away mid-request), 39 × 303, 2 × 404 (a fixture teardown deleting an already-deleted
+  project), 2 × 403 (the deliberate `admin/users` authorization flow, §25.3 flow 12).
+- **`./dev check`:** all checks passed — CLI self-tests, `git diff --check`, Pint, `npm run check`
+  (Wayfinder, typecheck, lint, format check, Vitest, production build), Pest.
+
+**Two failures were real and are fixed; the rest were load, and the difference was measured, not
+assumed.** A first full run of both suites *concurrently* reported 9 failed Vitest files and 16 failed
+Playwright tests, with Playwright taking 9.8 minutes against a 2.8-minute baseline. Run alone, Vitest
+fell to **one** failure and Playwright to **one**, and both were genuine WP7 regressions: the board
+page test asserted the back-link WP7 removed, and `inertia-coexistence.spec.ts` asserted the heading
+WP7 renamed. With those fixed, both suites are green. The other 23 were the load-sensitivity A11.17
+already records — jsdom creation alone accounted for 969s of tracked time in the concurrent run
+against 368s when run alone — and the lesson is about how these gates are run, not about the tests:
+**do not run the two full suites at once.**
+
+**Fixture counts:** the authoritative run moved `tasks` by +1 and left `projects` and `time_entries`
+unchanged. That +1 is the pre-existing `E2E … standalone task` leak A9.7 and A11.17 record, one row
+per full run, unchanged by WP7. The development database also carries a project and two tasks left by
+the *failed* concurrent run, whose aborted tests never reached their cleanup; nothing was deleted, and
+they are inert fixtures.
+
+### A12.15 WP8 handoff
+
+WP8 (hardening and verification) may start. What it inherits: `PageFrame` exists with all three width
+classes, and `reading` is the one with no consumer yet — the compatibility matrix should exercise it
+through whichever page first adopts it, or note that none has. Home and `projects/board` are Direction
+D surfaces; the other ten pages still carry their own `mx-auto max-w-*` containers by design (§19.3),
+so the ten-screen matrix is still measuring those containers, not `PageFrame`. The strata motif's
+scope is now statically guarded, so WP8's regression audit does not need to re-police it by reading.
+The browser suite is 89 tests at 4.5 minutes on three workers, which is the figure the CI runtime
+budget in §30 should use rather than the 2.8-minute WP6 number.
+
+### A12.16 Independent audit and remediation (2026-09-28)
+
+An independent read-only architectural audit of the uncommitted WP7 tree (§28's scope, A12.1–A12.15 as
+written above, before this section) found the architecture **sound and fit to freeze** — no Critical
+and no High finding — but withheld a ready-to-commit verdict pending **2 Medium and 6 Low findings**,
+all local. This section is not a rewrite of A12.1–A12.15: those sections stand as the record of what
+WP7 actually shipped for review, including the two claims (the Vitest delta and the
+`DashboardInertiaTest` coverage claim, both corrected in place above with a pointer here) that the
+audit found inaccurate. What follows is what changed in response, applied to the same uncommitted WP7
+tree, before commit.
+
+**M1 — the Home metric row's `dl` structure was invalid HTML.** `dt`/`dd`/`p` sat inside an `<a>`
+inside `dl > div`; an anchor is not a legal parent of `dt`/`dd`, and only jsdom's tag-based role
+assignment — not the HTML content model — made the pre-remediation test pass. Fixed by making
+`dt`/`dd`/`p` direct children of the group `div` and turning the link into a stretched overlay
+(`absolute inset-0`) that carries the figure's full accessible name instead of wrapping the content.
+The whole figure is still one click target; nothing about the visible figure row, the four props, any
+href or any `visit` mode changed. `dashboard/index.test.tsx` gained a case asserting `dt`/`dd` are
+direct children of the group and that neither has an anchor ancestor.
+
+**M2 — `EmptyState` centred its content against Direction D §15.2**, which reads "Left-aligned inside
+the region, not centred illustrations." `text-center`, `mx-auto` and `justify-center` are gone; the
+icon now sits inline beside the copy as §15.2's "optional small line glyph" rather than above it as an
+illustration. `empty-state.test.tsx` gained a case asserting none of the pre-remediation centering
+utilities appear anywhere in the tree.
+
+**L1 — `PageFrame`'s `asideLabel` was optional even though the comment above it said a label is
+required whenever `aside` is supplied.** The `grid` arm is now a union of `{ aside: ReactNode;
+asideLabel: string }` and `{ aside?: never; asideLabel?: never }`, so the type now enforces what the
+comment already claimed. Home's own usage (`aside` and `asideLabel` always supplied together) needed
+no change; `npm run typecheck` is clean.
+
+**L2 — the Strata scope guard only matched the literal string `@/components/strata`**, so a relative
+import (`./strata`, `../components/strata`) would have passed it unnoticed even though the
+architectural rule it enforces — Strata is drawn by `EntityHeader` alone — is correct. The guard now
+matches any quoted module specifier whose last path segment is `strata`, which catches the alias and
+every relative spelling without parsing JavaScript imports. A new fixture-level test exercises the
+detection function directly against both forms, plus a near-miss (`strata-legacy`) it must not flag.
+
+**L3 — the "both themes" Playwright assertion was vacuous**: it asserted a captured colour was
+`toBeTruthy()`, which a hard-coded literal colour would also satisfy, so it did not prove the comment's
+claim that the figure numerals are token-driven. `home.spec.ts` now captures the colour in both light
+and dark and asserts `colours.light !== colours.dark`, which a literal colour cannot satisfy.
+
+**L4 — `entity-header.test.tsx` located Strata with the broad `[aria-hidden="true"]` selector**, the
+same selector that matched the wrong element (a status glyph's dot) during the Chromium measurement in
+A12.12. The test now uses `[data-strata]`, the stable hook that measurement settled on, and additionally
+asserts the element it finds carries `aria-hidden="true"` rather than assuming the selector guarantees it.
+
+**L5 — Home's empty-ticket copy ("Nothing is waiting on you here") implied personal assignment** that
+the underlying query does not consistently support: the operator query is every open ticket, not this
+actor's own. The sentence is now "New support activity appears in this list as it arrives.", true for
+both audiences.
+
+**L6a — the Vitest delta was misstated as "+34"; the real delta is +24** (751 → 775, and the per-file
+counts in A12.11 sum to 24). Corrected in A12.11 above. The 775 absolute result is unchanged by that
+correction; this remediation pass adds 2 more (the M1 and M2 test cases), for **777**.
+
+**L6b — A12.11 claimed `DashboardInertiaTest`'s existing assertions were "exactly the guard that the
+props did not move."** They were not: none of them checked the complete top-level prop set, so a new
+prop would have passed silently. Corrected in A12.11 above; L6c is the actual guard.
+
+**L6c — §25.1's "Home DTO minimality" row ("`dashboard` still ships exactly `metrics`, `recentTickets`,
+`quickActions`, `crmSummary` — no new props") had no test asserting it.** Added directly rather than
+deferred to WP8: `DashboardInertiaTest` now has a case that reads the raw Inertia page response,
+subtracts the named set of props every page shares (`errors` from Inertia's own base middleware, plus
+`app`, `auth`, `shell`, `navigation` and `flash` from `HandleInertiaRequests::share()`), and asserts
+what remains is exactly `metrics`, `recentTickets`, `quickActions`, `crmSummary` — no more, no fewer.
+**What this proves:** Home's own top-level props are exactly the four §25.1 names, so any fifth prop —
+whatever it is called, including but not limited to an "approvals" list, a "project health" score,
+"SLA" or "my work" data, a watch list or a notification — would fail the test the moment it appeared.
+**What it does not prove:** it does not prove anything about the *shape* of the four props themselves
+(the two existing tests already do that), and it does not protect against a change to
+`HandleInertiaRequests::share()` silently growing the shared set — a real new shared prop must be added
+to the test's own named list to keep passing, which is deliberate: that is the one place a change to
+what every page shares becomes visible in this file, rather than disappearing into an already-broad
+diff.
+
+**L6d — A12.6 said "when §21 was written the shell had no timer surface," offered as why the pill
+supersedes the §21.1 timer-on-Home item.** That was backwards: §12/§18 already scoped the global timer
+pill as foundation work when §21 was written; only its *build* (WP6) came later. Corrected in A12.6
+above. The conclusion does not change and is restated precisely: this is an **acceptable documented
+deviation**, not full compliance — §21.1's "costs nothing" condition was about data availability and
+is still met, but Direction D §12.1 permits exactly one global timer affordance, WP6 gave the product
+that one affordance in the utility bar pill, and its tray already lists every running timer, which
+makes a second, Home-local instance of the same affordance the thing that would now cost something.
+Neither the WP7 exit criteria nor §29 requires a Home timer section.
+
+**Not remediated, on the audit's own instruction.** Two observations (Tailwind's `sm`/`xl` breakpoints
+coexisting with Direction D's 768/1360 geometry; 1360/1024/768 as literal media-query values matching
+the existing shell CSS) were explicitly out of scope and are unchanged. The local development
+database's E2E residue (an old WP7 canvas project and the pre-existing standalone-task fixture leak,
+both already recorded in A12.14) was confirmed harmless and left untouched, per the audit and per
+§28's standing rule that WP7 does not own pre-existing debt it did not create.
+
+**Validation after remediation.** Focused Vitest across the five touched component/page files: **33
+passed** (page-frame 5, entity-header 7, empty-state 6, `dashboard/index` 10, `board` 5). Full Vitest:
+**777 passed / 76 files**. Focused Pest (`ShellSeamContractTest`, `DashboardInertiaTest`): **28 passed
+/ 565 assertions**. Full Pest (via `./dev check`): **1,121 passed / 5,980 assertions**. Focused
+Playwright, run alone rather than alongside `./dev check` (A12.14's own lesson about concurrent full
+suites, applied here at the focused scale too): `home.spec.ts` and `board-migration.spec.ts`, **12
+passed, 0 failed, 0 skipped**, 2 workers, 51.6s; development-database product counts unchanged before
+and after (`projects=19 tasks=48 time_entries=3`). `./dev check` run alone afterward: all five gates
+passed (CLI self-tests, `git diff --check`, Pint, frontend `npm run check` — Wayfinder, typecheck,
+lint, format check, the full Vitest run above, production build — and the full Pest run above).
+`git diff --check` is clean; `package.json` and `package-lock.json` remain byte-identical to HEAD; no
+file under `app/`, `routes/`, `database/`, `config/` or `bootstrap/` changed; the only PHP files
+touched are `tests/Feature/DashboardInertiaTest.php` and
+`tests/Unit/Configuration/ShellSeamContractTest.php`, both test-only.
+
+**The full 89-test Playwright run from A12.14 was not re-run.** None of M1/M2/L1–L6 changes a route,
+a prop shape, a `visit` mode, an href, board behaviour, authorization, or anything the other 87 tests
+in that suite observe; the two specs that do cover the changed surfaces were run alone and are green,
+with fixture counts unchanged. The 89/89 figure in A12.14 stands as evidence for the tree as a whole,
+not as something this remediation pass re-produced.
+
+**Recommendation: WP7 is ready to commit.**
