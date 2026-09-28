@@ -34,10 +34,8 @@ export type SharedPageProps = {
     /**
      * The canonical navigation contract, and the shell's only navigation input.
      *
-     * WP3's temporary `navigationLegacy` companion prop is gone from the Inertia payload: the
-     * Direction D shell projects `context` into the drawer, so nothing on the React side needs the
-     * flattened shape. `ShellComposer` still supplies it to `layouts/partials/nav.blade.php`, which
-     * WP5 replaces.
+     * The same payload reaches the Blade shell through `ShellComposer`. WP3's temporary flattened
+     * compatibility shape is gone from both renderers (WP4 on React, WP5 on Blade).
      */
     navigation: Navigation;
     flash: FlashProps;

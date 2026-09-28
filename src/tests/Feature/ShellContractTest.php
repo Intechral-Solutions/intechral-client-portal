@@ -87,9 +87,8 @@ it('keeps the retired Manage grouping out of the shared payload', function () {
             // The payload is workspace-shaped: there is no group list to hold a "Manage" section.
             ->missing('navigation.0')
             ->has('navigation.workspaces')
-            // WP4: the Direction D shell projects `context` into the drawer, so the compatibility
-            // projection left the Inertia payload entirely. It survives only for the Blade partial
-            // WP5 replaces, which the composer test below covers.
+            // WP3's flattened compatibility projection left the Inertia payload in WP4 and was deleted
+            // outright in WP5, when the Blade shell began projecting `context` itself.
             ->missing('navigationLegacy'));
 });
 
@@ -97,70 +96,96 @@ it('gives the Blade shell the same payload as the Inertia prop, from one builder
     $operator = shellActor('operator');
     $request = bindShellRequest($operator, 'operator.tickets.index');
 
-    $view = view('layouts.partials.nav');
+    $view = view('layouts.app');
     app(ShellComposer::class)->compose($view);
     $data = $view->getData();
 
     expect($data['navigation'])->toBe(app(NavigationBuilder::class)->build($request))
+        ->and(array_keys($data))->toBe(['navigation', 'shell', 'shellRoot', 'shellWorkspace', 'shellUser'])
         ->and($data['shell'])->toBe(['presentation' => 'operational'])
         ->and($data['navigation']['currentWorkspace'])->toBe('helpdesk')
+        // The current workspace is the payload's own entry, looked up by the server's key.
+        ->and($data['shellWorkspace'])->toBe(collect($data['navigation']['workspaces'])->firstWhere('key', 'helpdesk'))
+        ->and($data['shellRoot'])->toBe(['workspace' => 'helpdesk', 'drawerDefault' => 'open', 'hasPanel' => true])
         ->and($data['shellUser']['name'])->toBe($operator->name)
         ->and($data['shellUser']['avatar']['initials'])->toBe(Initials::from($operator->name))
-        ->and($data['shellUser']['avatar']['url'])->toBeNull()
-        ->and(collect($data['navigationLegacy'])->pluck('key')->all())->toBe(['primary', 'overflow']);
+        ->and($data['shellUser']['avatar']['url'])->toBeNull();
+});
+
+it('derives the pre-paint inputs from the payload alone, with emptiness semantic', function () {
+    $user = shellActor('user');
+
+    // Home has no contextual navigation, so no panel and no default, for any presentation.
+    bindShellRequest($user, 'dashboard');
+    expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
+        ->toBe(['workspace' => 'home', 'drawerDefault' => null, 'hasPanel' => false]);
+
+    // The G3 viewer surface is a single surface too.
+    bindShellRequest($user, 'cms.index');
+    expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
+        ->toBe(['workspace' => 'resources', 'drawerDefault' => null, 'hasPanel' => false]);
+
+    // Tasks has views and a collapsed server default.
+    bindShellRequest($user, 'tasks.index');
+    expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
+        ->toBe(['workspace' => 'tasks', 'drawerDefault' => 'collapsed', 'hasPanel' => true]);
+
+    // No workspace at all — a route that belongs to none, a guest, or no payload.
+    bindShellRequest($user, 'profile.show');
+    expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->and(ShellComposer::rootState(['currentWorkspace' => null, 'workspaces' => []]))
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->and(ShellComposer::rootState(null))
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false]);
 });
 
 it('composes the Blade shell safely for an unauthenticated render', function () {
-    // `errors/403` extends `layouts.app`, so the shell can render for a guest. Before WP3 the
-    // partial's own `@php` call handled that; now the composer must.
+    // `errors/403` extends `layouts.app`, so the shell can render for a guest.
     $request = Request::create(route('login', [], false));
     app()->instance('request', $request);
     $request->setUserResolver(fn () => null);
 
-    $view = view('layouts.partials.nav');
+    $view = view('layouts.app');
     app(ShellComposer::class)->compose($view);
     $data = $view->getData();
 
     expect($data['navigation'])->toBe(['currentWorkspace' => null, 'workspaces' => []])
-        ->and($data['navigationLegacy'])->toBe([])
         ->and($data['shellUser'])->toBeNull()
-        ->and($data['shell'])->toBe(['presentation' => 'operational']);
+        ->and($data['shellWorkspace'])->toBeNull()
+        ->and($data['shellRoot'])->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->and($data['shell'])->toBe(['presentation' => 'operational'])
+        ->and($data)->not->toHaveKey('navigationLegacy');
+});
+
+it('composes the Blade shell once per request, so the builder runs once', function () {
+    $operator = shellActor('operator');
+    $resolutions = 0;
+
+    // The builder is not shared, and on a Blade response only ShellComposer resolves it (the Inertia
+    // `navigation` prop is a lazy closure that a Blade response never evaluates), so each resolution
+    // is exactly one composition and one build.
+    app()->resolving(NavigationBuilder::class, function () use (&$resolutions) {
+        $resolutions++;
+    });
+
+    $this->actingAs($operator)->get(route('operator.tickets.index'))->assertOk();
+
+    expect($resolutions)->toBe(1);
 });
 
 it('no longer builds navigation inside the view layer', function () {
-    // EPIC-013 §12.3 rule 11: the builder has one entry point per renderer. A view that
-    // instantiates it is a second source of navigation truth.
-    $nav = (string) file_get_contents(resource_path('views/layouts/partials/nav.blade.php'));
+    // EPIC-013 §12.3 rule 11: the builder has one entry point per renderer. A view that instantiates
+    // it is a second source of navigation truth — so no Blade view anywhere may name it.
+    $offenders = [];
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(resource_path('views')));
 
-    expect($nav)->not->toContain('NavigationBuilder')
-        ->and($nav)->toContain('$navigationLegacy');
-});
+    foreach ($iterator as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')
+            && str_contains((string) file_get_contents($file->getPathname()), 'NavigationBuilder')) {
+            $offenders[] = $file->getPathname();
+        }
+    }
 
-it('renders the Blade shell from the contract without a Manage heading', function () {
-    $operator = shellActor('operator');
-
-    $response = $this->actingAs($operator)->get(route('tickets.index'));
-
-    $response->assertOk()
-        // Every destination the pre-WP3 "Manage" group carried is still reachable.
-        ->assertSee(route('operator.tickets.index'))
-        ->assertSee(route('operator.time.index'))
-        ->assertSee(route('organizations.index'))
-        ->assertSee(route('operator.cms.index'))
-        ->assertSee(route('users.index'))
-        ->assertSee(route('roles.index'))
-        // …and the grouping that used to hold them is gone.
-        ->assertDontSee('Manage');
-});
-
-it('withholds from the Blade shell exactly what it withholds from the Inertia prop', function () {
-    $user = shellActor('user');
-
-    $this->actingAs($user)->get(route('tickets.index'))
-        ->assertOk()
-        ->assertDontSee(route('operator.tickets.index'))
-        ->assertDontSee(route('users.index'))
-        ->assertDontSee(route('roles.index'))
-        ->assertDontSee(route('crm.companies.index'))
-        ->assertDontSee(route('organizations.index'));
+    expect($offenders)->toBe([]);
 });

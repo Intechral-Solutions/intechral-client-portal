@@ -1,8 +1,25 @@
+{{--
+    EPIC-013 WP5 — the Blade root, rendering the Direction D Operational shell (§14).
+
+    Blade and React render the same shell from the same server payload (ShellComposer, bound to this
+    view): the same data-shell-* structure, so the one unlayered geometry block in app.css lays out
+    both renderers identically; the same navigation, active state and authorization result; the same
+    account destinations and avatar initials; the same pre-paint bootstrap. Blade's differences are
+    exactly the ones §14.2 permits — a docked-or-hidden panel with no overlay, pin or view switcher.
+
+    Page bodies (@yield('content')) are untouched and keep their own containers (§14.3).
+--}}
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light"
+      @if ($shellRoot['workspace']) data-workspace="{{ $shellRoot['workspace'] }}" @endif
+      @if ($shellRoot['drawerDefault']) data-drawer-default="{{ $shellRoot['drawerDefault'] }}" @endif>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    {{-- First script in <head>, before any stylesheet can block it (A1.7 req. 2). --}}
+    @include('layouts.partials.shell.bootstrap')
+
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -14,35 +31,34 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    {{-- FOUC prevention: apply saved theme before first paint --}}
-    <script>
-        (function () {
-            var t = localStorage.getItem('theme');
-            if (!t) {
-                t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-                    ? 'dark' : 'light';
-            }
-            document.documentElement.setAttribute('data-theme', t);
-        })();
-    </script>
-
     @stack('head')
 </head>
-<body class="min-h-screen flex flex-col antialiased" style="background-color: var(--bg-base); color: var(--text-primary);">
+<body class="min-h-screen antialiased">
+    <div data-shell="operational"
+         data-shell-renderer="blade"
+         data-panel="{{ $shellRoot['hasPanel'] ? 'true' : 'false' }}">
+        {{-- First focusable element; visible on focus, never removed (Direction D §14.1). --}}
+        <a href="#main-content"
+           class="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:rounded-control focus-visible:bg-surface focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:text-text focus-visible:shadow-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Skip to content</a>
 
-    {{-- Navigation --}}
-    @include('layouts.partials.nav')
+        @include('layouts.partials.shell.rail')
 
-    {{-- Active timer overlay (shown when ≥1 timer is running) --}}
-    @include('layouts.partials.timer-overlay')
+        @if ($shellRoot['hasPanel'])
+            @include('layouts.partials.shell.drawer')
+        @endif
 
-    {{-- Main content --}}
-    <main id="main-content" class="flex-1">
-        @yield('content')
-    </main>
+        <div data-shell-canvas>
+            @include('layouts.partials.shell.utility-bar')
 
-    {{-- Footer --}}
-    @include('layouts.partials.footer')
+            {{-- The pre-Direction-D timer strip, unchanged: its pill/tray rework is WP6 (§18.4). --}}
+            @include('layouts.partials.timer-overlay')
+
+            {{-- `tabindex="-1"` makes it the skip link's focus target. --}}
+            <main id="main-content" tabindex="-1" class="min-w-0 flex-1 outline-none">
+                @yield('content')
+            </main>
+        </div>
+    </div>
 
     @stack('scripts')
 </body>

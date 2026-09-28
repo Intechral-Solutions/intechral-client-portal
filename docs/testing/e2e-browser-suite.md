@@ -68,6 +68,12 @@ Fortify's limiter key is email + IP, 5 requests/minute. With `workers: 3`:
 Every bucket stays at least 2 attempts below the 5/minute ceiling, without depending on exact
 scheduling within the run.
 
+Adding a spec file that only uses the `operator`/`member` personas does not change this table: a
+worker mints each persona at most once however many files it runs, so the per-persona bound stays the
+worker cap. `blade-shell.spec.ts` (EPIC-013 WP5) is such a file — it adds ten flows and no login. Its
+sign-out coverage rides on `shell.spec.ts`'s existing single `e2e-signout` login, which now signs out
+from the Blade account menu.
+
 ## Guards against regression
 
 - `tests/Browser/session-isolation.spec.ts` — behavioral: an explicitly anonymous context really
@@ -83,5 +89,9 @@ scheduling within the run.
 
 ## Validated result
 
-Full suite, normal parallel configuration (`workers: 3`, no flag override): 64/64 passed, ~3.3
-minutes, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`.
+Full suite, normal parallel configuration (`workers: 3`, no flag override):
+
+- POST-WP4 hardening (EPIC-013 Amendment 9): 64/64 passed, ~3.3 minutes, 12 `POST /login` (all 302),
+  0 `429`, 0 `419`, 0 application `5xx`.
+- After EPIC-013 WP5 (Amendment 10), with `blade-shell.spec.ts` added: 74/74 passed, 3 workers,
+  2.0 minutes, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`.

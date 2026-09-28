@@ -776,6 +776,65 @@ body {
     }
 }
 
+/* ── Blade renderer (EPIC-013 WP5, §14.2) ─────────────────────
+   The Blade shell renders the same data-shell hooks as React, so every rule
+   above lays it out unchanged: one geometry, one set of width classes. These
+   rules are only the simplification §14.2 permits, scoped by
+   [data-shell-renderer='blade'] so React is untouched:
+
+     - the panel is DOCKED OR HIDDEN, never an overlay, and has no pin;
+     - it docks at XL when html[data-drawer] is open (as React), and at L when
+       open too — the shared bootstrap starts L collapsed unless pinned, so an
+       open panel at L is one the user asked for, and it docks instead of
+       floating;
+     - at M its content is reached through the nav sheet, as at S.
+
+   Unlayered for the same reason as the block above (A8.12 #2). ── */
+[data-shell='operational'][data-shell-renderer='blade'] [data-shell-drawer],
+[data-shell='operational'][data-shell-renderer='blade'] [data-shell-toggle] {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    html[data-drawer='open'] [data-shell='operational'][data-shell-renderer='blade'][data-panel='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        > [data-shell-drawer] {
+        display: flex;
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+
+    html[data-drawer='collapsed']
+        [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        [data-shell-toggle] {
+        display: flex;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+    [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        [data-shell-sheet-trigger] {
+        display: flex;
+    }
+}
+
+/* The account menu lives inside the rail (Blade has no portal), and the rail
+   is sticky, which makes it a stacking context: the menu's own z-index cannot
+   lift it above the docked panel or the utility bar that follow the rail in
+   the DOM. While the menu is open the whole rail is lifted instead. Chromium
+   caught this as the docked panel intercepting clicks on the menu. */
+[data-shell='operational'][data-shell-renderer='blade']
+    [data-shell-rail]:has([data-shell-account][aria-expanded='true']) {
+    z-index: 45;
+}
+
 /* ── Brand mark theming (EPIC-013 WP4, §10.3 / A1.5) ──────────
    The canonical SVGs hard-code the brand cyan in their gradient stops, which
    is correct on dark. CSS beats SVG presentation attributes, so light flattens

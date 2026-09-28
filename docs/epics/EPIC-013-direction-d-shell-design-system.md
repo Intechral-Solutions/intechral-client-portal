@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist** · [Amendment 9 (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27): POST-WP4 E2E hardening (not WP4, not WP5) — diagnosed why the six-spec failure group from A8.18 passed individually but failed together: parallel Playwright workers shared one Laravel session per persona, so one worker's flash/validation state could land in another's page, and a separate defect let a "fresh" manager context inherit the project's own operator auth. Remediated with a session minted per worker per persona (`support/auth.ts`), cookies-only and never written to disk; an explicit `contextFor('anonymous')` for contexts that must start signed out; and an explicit `workers: 3` cap, because a worker mints a persona's session at most once for its whole lifetime, so the cap bounds that persona's total real logins for the run regardless of spec-file count or machine core count. Three dedicated seeded fixtures (`e2e-login-flow`, `e2e-profile-mutation`, `e2e-signout`, via `DevSeeder`) moved authentication-subject flows off the reusable operator/member personas' own Fortify buckets. Full suite now 64/64 at normal parallel configuration (3 workers, ~3.3 min), 12 `POST /login` all 302, 0 `429`/`419`/5xx. `BrowserAuthContractTest` rewritten for the new architecture; login budget and identity table recorded in `docs/testing/e2e-browser-suite.md`. A separately reported dev-environment HTTP 400 was traced to the owner's browser sending a Cookie header nginx's default header-buffer limit rejects — unrelated to this work, no repository change
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist** · [Amendment 9 (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27): POST-WP4 E2E hardening (not WP4, not WP5) — diagnosed why the six-spec failure group from A8.18 passed individually but failed together: parallel Playwright workers shared one Laravel session per persona, so one worker's flash/validation state could land in another's page, and a separate defect let a "fresh" manager context inherit the project's own operator auth. Remediated with a session minted per worker per persona (`support/auth.ts`), cookies-only and never written to disk; an explicit `contextFor('anonymous')` for contexts that must start signed out; and an explicit `workers: 3` cap, because a worker mints a persona's session at most once for its whole lifetime, so the cap bounds that persona's total real logins for the run regardless of spec-file count or machine core count. Three dedicated seeded fixtures (`e2e-login-flow`, `e2e-profile-mutation`, `e2e-signout`, via `DevSeeder`) moved authentication-subject flows off the reusable operator/member personas' own Fortify buckets. Full suite now 64/64 at normal parallel configuration (3 workers, ~3.3 min), 12 `POST /login` all 302, 0 `429`/`419`/5xx. `BrowserAuthContractTest` rewritten for the new architecture; login budget and identity table recorded in `docs/testing/e2e-browser-suite.md`. A separately reported dev-environment HTTP 400 was traced to the owner's browser sending a Cookie header nginx's default header-buffer limit rejects — unrelated to this work, no repository change · [Amendment 10 (2026-09-27)](#amendment-10-wp5-results-2026-09-27): WP5 results — Blade renders the canonical WP3 navigation model through Direction D shell partials (rail, docked-or-hidden panel, utility bar with breadcrumb, personal account menu, native-dialog nav sheet, brand mark) using the same `data-shell-*` hooks as React, so one unlayered geometry block lays out both renderers; `ShellComposer` bound once to `layouts.app`; one shared pre-paint bootstrap (`resources/js/shell/bootstrap.js`) inlined first in both roots, parity-tested against React's `resolvePanel` over 144 cases, 0 CLS measured; `LegacyShellNavigation`, `navigationLegacy`, the old nav bar, theme toggle and footer deleted; React→Blade→React with history, authorization, Resources, keyboard, XL/L/M/S and 200% reflow verified in Chromium; one Blade stacking defect and one vacuous WP4 seam guard found and fixed; full Playwright 74/74 on 3 workers, 12 logins all 302, 0 × 429/419/5xx
 
 ---
 
@@ -58,6 +58,7 @@
 - [Amendment 7: WP3 Results (2026-09-25)](#amendment-7-wp3-results-2026-09-25)
 - [Amendment 8: WP4 Results (2026-09-26)](#amendment-8-wp4-results-2026-09-26)
 - [Amendment 9: POST-WP4 E2E Hardening (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27)
+- [Amendment 10: WP5 Results (2026-09-27)](#amendment-10-wp5-results-2026-09-27)
 
 ---
 
@@ -1405,6 +1406,8 @@ Four independently revertible slices.
 - Mixed-navigation Pest and Playwright coverage (#6).
 
 **Exit:** a Blade page and an Inertia page are visibly the same product; theme and drawer state survive both transitions.
+
+- **Complete (2026-09-27) — results in [Amendment 10](#amendment-10-wp5-results-2026-09-27).** Blade renders the canonical WP3 model through the Direction D shell partials; one shared pre-paint bootstrap serves both roots; `LegacyShellNavigation`, `navigationLegacy`, `partials/nav.blade.php` and the authenticated footer are deleted. The timer pill remains WP6.
 
 ### WP6 — Global timer shell integration
 
@@ -3959,3 +3962,315 @@ WP5 is not started. Nothing in this amendment touches `resources/views/layouts/p
 policy, permission or dependency. The next Direction D work package inherits the browser suite as a
 64/64 passing gate at its normal parallel configuration, which A8.18 explicitly said it could not yet
 promise.
+
+## Amendment 10: WP5 Results (2026-09-27)
+
+**Status:** WP5 (Blade parity / renderer coexistence) implemented on the post-WP4-hardening tree
+(`28cba36`). **This is the WP5 record; it does not revise Amendment 9's E2E-hardening scope.** No
+route, permission, policy, controller, model, migration or dependency changed; no Blade page body was
+edited; no WP4 React shell component or hook changed behaviour. **WP6 has not started:** the timer
+strip is still the pre-Direction-D `timer-overlay` on Blade and `RunningTimerBar` on React.
+
+### A10.1 Method
+
+Inventory first (every Blade view using `layouts.app`, the nav partial, `ShellComposer`, the WP3
+payload, the WP4 CSS hooks and storage keys), then the shell, then tests that compare rendered Blade
+against the canonical payload, then real Chromium. Real Chromium caught one Blade defect that jsdom and
+Pest could not (A10.12). Two pre-existing *test* defects were also found, one of which had made a WP4
+seam guard unable to fail (A10.12).
+
+### A10.2 Pre-WP5 Blade architecture, as found
+
+| Part | State at `28cba36` |
+|---|---|
+| Blade root | `layouts/app.blade.php`: its own theme IIFE placed **after** `@vite`, `partials/nav.blade.php`, `partials/timer-overlay.blade.php`, `<main id="main-content">`, `partials/footer.blade.php`. 34 views extend it, including `errors/403` (reachable by a guest) |
+| Inertia root | `app.blade.php`: a second, separately written theme IIFE before `@vite` |
+| Navigation input | `ShellComposer` bound to `layouts.partials.nav`, supplying canonical `navigation` **and** the temporary flattened `navigationLegacy` (`LegacyShellNavigation`) — the nav partial rendered only the latter |
+| Chrome | `max-w-7xl` sticky bar: brand text link, flat `primary` links, a standalone theme toggle, a hand-rolled user dropdown carrying the flattened `overflow` destinations, a hamburger + mobile panel, and a ~90-line inline IIFE. `nav aria-label="Primary navigation"` wrapped the whole bar (the A1.9 divergence). No skip link, no `aria-current`, no `header` landmark, a global footer |
+| Theme | `localStorage['theme']` read by two different root scripts; a malformed stored value was applied verbatim to `data-theme` |
+| Panel state | None on Blade: `html[data-drawer]` was only ever stamped by React |
+
+`navigationLegacy`'s **only** consumer was `partials/nav.blade.php` (A8.11). Nothing else — no route,
+controller, test double or type — read it apart from tests that existed to pin the projection itself.
+
+### A10.3 Canonical navigation on Blade
+
+Blade now renders `navigation` directly — the WP3 model, from the one builder, through `ShellComposer`
+— and nothing else. Workspaces render in server order with server labels, `href`s, icons and
+`isActive`; the current workspace is taken from the payload **by `currentWorkspace` key**, never
+matched from the URL; its `context` sections render in order with `kind: 'actions'` as actions that can
+never carry `aria-current`; `count` renders nothing. All nine workspace identities go through the same
+loop, `resources` included. There is no `primary`/`overflow`, no "Manage", no second workspace
+catalogue, no permission check, no URL-pattern matching and no pruning in any template.
+
+**Visit mode.** From a Blade document there is no client router, so both `inertia` and `document`
+destinations are plain `<a href>` full-page loads: a `document` destination lands on Blade, an `inertia`
+destination boots the React app on arrival. Blade therefore needs no visit-mode branch at all, and
+infers nothing from URL shape.
+
+**Authorization** is exactly the server's: what the builder withheld is absent from the rendered HTML.
+`BladeShellTest` asserts the rendered rail, panel and sheet equal the payload for the same actor and
+route across nine actor/route cases, that a `user`-role actor's entire shell contains no `/admin/`,
+`/operator/`, `/crm/` or `/organizations` href, and Chromium confirms `admin/users` still answers 403
+inside the Blade shell.
+
+**`ShellComposer` binding — a refinement of §14.4.** It is bound once, to `layouts.app`, not to the
+individual shell partials. The root `<html>` needs `currentWorkspace` and the panel default for the
+pre-paint bootstrap (§15.3 step 1), which a partial-level binding cannot supply, and one binding on the
+layout keeps the builder at **one invocation per Blade request** (asserted) while every
+`layouts.partials.shell.*` include inherits the data. A static `ShellComposer::rootState()` derives the
+two bootstrap inputs (`workspace`, `drawerDefault` — null when `context` is empty, §12.3 rule 6) and is
+reused by the Inertia root from the `navigation` prop that response already resolved, so the builder is
+not invoked twice there either.
+
+### A10.4 Blade shell structure
+
+`layouts/app.blade.php` renders `div[data-shell="operational"][data-shell-renderer="blade"]` with the
+same `data-shell-*` hooks React renders, so the **one unlayered WP4 geometry block lays out both
+renderers**: skip link, `rail`, `drawer`, and a canvas holding the `utility-bar`, the unchanged timer
+strip and `<main id="main-content" tabindex="-1">`. The footer is gone.
+
+| Partial (`resources/views/layouts/partials/shell/`) | Twin of | Notes |
+|---|---|---|
+| `bootstrap.blade.php` | — | Inlines `resources/js/shell/bootstrap.js` (A10.6) |
+| `rail.blade.php` | `rail.tsx` | 64px; brand, panel toggle, `nav "Workspaces"` (workspace links only), sheet trigger, account control |
+| `drawer.blade.php` | `drawer.tsx` | 248px; projects `context`; the only accent strip; labels are not headings (A8.10) |
+| `utility-bar.blade.php` | `utility-bar.tsx` + `breadcrumb.tsx` | 48px `header`; breadcrumb from `currentWorkspace` + the active view, ending with the current page |
+| `account-menu.blade.php` | `account-menu.tsx` | 40×40 rounded-square trigger, 28px circular avatar from server initials |
+| `nav-sheet.blade.php` | `nav-sheet.tsx` | Native modal `<dialog>`; workspaces + current views; rows ≥ 44px |
+| `brand-mark.blade.php` | `brand-mark.tsx` | `App\Support\BrandMark`, a line-for-line port of `scopeBrandSvg()` |
+| `icon.blade.php` | `workspace-icon.tsx` | Explicit icon-key → inline SVG map using lucide's own path data (same glyphs), neutral `handshake` fallback |
+
+Styling is the Direction D token utilities React uses (`bg-surface-selected`, `ring-rule`,
+`rounded-control`, the WP2 `focusRing` string, …); no inline style block and no parallel Blade theme.
+Screenshots at XL in both themes show the Blade Helpdesk shell and the React Projects shell with the
+same rail, panel and utility-bar chrome.
+
+### A10.5 The simplified panel and the width classes
+
+§14.2 allows Blade a panel that is **docked or hidden** — no overlay, no pin, no focus trap — with its
+content folding into the nav sheet at M/S. Implemented as a small Blade-scoped CSS block
+(`[data-shell-renderer='blade']`, unlayered like the WP4 block) on top of the shared rules:
+
+| Class | Blade behaviour (measured in Chromium) |
+|---|---|
+| **XL** ≥ 1360 | As React: docked at 248px when `html[data-drawer]` is open, canvas at 312px; collapsed shows the rail toggle |
+| **L** 1024–1359 | Starts collapsed unless pinned (the shared bootstrap rule). Opening it **docks** it (canvas → 312px) instead of floating; `Esc` and content clicks leave it alone (A8.12 #3); collapse returns focus to the toggle |
+| **M** 768–1023 | Panel and toggle not rendered; the sheet trigger appears and the sheet holds the current views |
+| **S** < 768 | As React: 56px top bar, rail list and panel `display: none`, the sheet is the single set of workspace links |
+
+The toggle and collapse buttons write `localStorage['shell.operational.panel']` with the same key, shape
+and write rule as `use-panel-state.ts`, so a choice on either renderer is honoured by the other.
+`Ctrl+\` toggles whichever control CSS is currently showing, inert in text fields. There is **no Blade
+pin affordance**; a pin set in React for a workspace is still honoured by the shared bootstrap.
+
+### A10.6 Shared pre-paint bootstrap
+
+`resources/js/shell/bootstrap.js` is the **single** pre-paint script for both roots (§14.4). It is a
+classic, dependency-free script (a module script is deferred and could not run before paint), inlined by
+`partials/shell/bootstrap.blade.php` directly after `<meta charset>`/`viewport` and **before any
+stylesheet or `@vite`** in both roots (A1.7 requirement 2), replacing the two root-specific theme
+scripts.
+
+- **Owns** `html[data-theme]` and `html[data-drawer]` and nothing else. It reads the server-stamped
+  `html[data-workspace]` / `html[data-drawer-default]` and `localStorage` only; it carries no server
+  data, no authentication state, and never writes storage.
+- **Keys:** `theme`, `shell.operational.panel`, `shell.operational.pin` — the existing WP4 keys,
+  unchanged. No cookie, no server persistence.
+- **Panel rules:** exactly `resolvePanel()`'s — no default → collapsed; below XL and not pinned →
+  collapsed; else remembered, else default. `bootstrap.test.ts` executes the file's own text against
+  the hook's real `resolvePanel` over a **144-case parity matrix** (workspace × default × stored value
+  × pin × XL/below/`matchMedia` throwing); a deliberate one-line divergence fails 12 of them.
+- **Failure modes:** blocked storage, malformed JSON, arrays/strings/`null`, unknown workspaces and
+  out-of-set values all fall through to the server default; a `theme` value outside `light`/`dark` is no
+  longer applied verbatim (it falls back to `prefers-color-scheme`); the whole body is wrapped so it can
+  never break the page.
+- **Measured:** a cold Blade load with `dark` + a collapsed Helpdesk panel remembered reads
+  `dark/collapsed` on the **first animation frame** with a **cumulative layout shift of 0**.
+
+React keeps owning the attributes after mount exactly as in WP4; on an Inertia root the bootstrap's
+value and React's first layout effect agree by the parity test, and nothing paints in between
+(`ssr: false`).
+
+### A10.7 Appearance
+
+One mechanism: `localStorage['theme']` + `html[data-theme]`, written by the React Appearance radio
+group and by the Blade account menu's Appearance control, read by the one bootstrap. The standalone
+Blade theme toggle is deleted. Chromium proves the theme survives React→Blade, Blade→React and browser
+back/forward, and that a Blade Appearance change is what the React menu then shows as checked.
+
+### A10.8 Account and avatar
+
+Same destinations as React (§17.1–17.2): Profile, Security & MFA, Connected accounts, Sessions (2–4
+anchoring into `/profile`), Appearance (Light/Dark), a disabled Notifications row with its reason, Sign
+out (`POST /logout` with CSRF). The partial receives no navigation, so an administrative entry has no
+path in; asserted in Pest and in Chromium for an actor holding every permission. The trigger is a
+`button` with `aria-haspopup="menu"`, `aria-expanded` and the name "Account menu: {name}". Initials are
+`$shellUser['avatar']['initials']` (`App\Support\Initials`); Blade derives none. The Blade menu is a real
+`role="menu"`: items rove with arrows/Home/End, `Esc` closes and returns focus, `Tab` or an outside
+pointer closes it; Appearance uses `menuitemradio` inside a labelled group (the correct in-menu role).
+
+### A10.9 Accessibility
+
+Skip link first (Pest: first focusable element; Chromium: first Tab stop, visible, lands focus in
+`main`). Landmarks: `nav "Workspaces"` (workspace links only — the A1.9 divergence is fixed: no brand,
+toggle or account control inside it), `nav "{Workspace} views"`, `header`, `nav "Breadcrumb"`, `main`.
+`aria-current="page"` on the server-active rail item and view only. Rail and panel links are plain
+`<a href>` with no `tabindex` (L11, asserted in Chromium); the only composites are the account menu and
+the native `<dialog>` sheet. Visible focus measured at a 2px outline. No shell heading, so the page's
+`h1` stays the only one. Selected state carries weight, a ring and the strip as well as colour. Motion
+uses the Direction D motion tokens, which already honour `prefers-reduced-motion`. Sheet targets are
+≥ 44px. Not done here: an NVDA pass (WP8, §22.3).
+
+### A10.10 Renderer coexistence
+
+Asserted in Chromium (`blade-shell.spec.ts`), both directions:
+
+- **React → Blade:** on `/projects` choose Dark and collapse Projects; the rail's Helpdesk (`document`)
+  link unloads React (`#app` gone), the Blade shell renders with Helpdesk current, Dark, and Helpdesk's
+  own open panel.
+- **Blade → React:** collapse Helpdesk in Blade; the Blade rail's Projects (`inertia`) link mounts React
+  with Projects current, its panel still collapsed, still Dark; storage holds both choices.
+- **History:** Back returns to the Blade page with Helpdesk current and collapsed; Forward remounts React
+  on Projects.
+- **S sheet:** an `inertia` destination chosen in the Blade sheet boots React.
+
+The existing crossings in `shell.spec.ts`, `inertia-coexistence.spec.ts` and `time-migration.spec.ts`
+(including the embedded Blade timer tracker) pass against the new shell.
+
+### A10.11 Legacy cleanup
+
+| Removed | Why it was safe |
+|---|---|
+| `app/Shared/Navigation/LegacyShellNavigation.php` | Its one consumer, `partials/nav.blade.php`, is gone; nothing else in `app/`, `resources/` or tests reads it (asserted) |
+| `navigationLegacy` composer key | Same; the Inertia payload dropped it in WP4 |
+| `layouts/partials/nav.blade.php` (bar, theme toggle, user dropdown, mobile menu, inline IIFE) | Replaced by the shell partials |
+| `layouts/partials/footer.blade.php` | §14.4: removed from the authenticated shell; nothing else included it |
+| Both root-specific theme IIFEs | Replaced by the shared bootstrap |
+| Four compatibility-projection cases in `NavigationBuilderTest` | They tested the deleted class. The one with lasting value — every pre-WP3 destination still reachable for both roles — is kept, rewritten against the canonical model |
+
+**Intentionally retained:** `partials/timer-overlay.blade.php` + `timer-overlay.js` (relocated into the
+canvas, markup unchanged — the pill/tray rework is WP6, §18.4); `missing('navigationLegacy')` assertions
+in `ShellContractTest`/`LoginTest` (they guard the removal, not the seam); `welcome.blade.php`
+(standalone, not the shell).
+
+### A10.12 Defects found
+
+| # | Found by | Defect | Fix |
+|---|---|---|---|
+| 1 | Chromium | **The docked panel intercepted clicks on the Blade account menu.** The menu lives inside the rail (Blade has no portal), and a sticky rail is a stacking context, so the menu's own `z-index` could not lift it above the panel or utility bar later in the DOM | While the menu is open, the Blade rail itself is lifted (`:has([data-shell-account][aria-expanded='true'])`) |
+| 2 | Pest, while writing WP5 guards | **WP4's `keeps pages chrome-agnostic` guard could never fail.** `->not->toContain($forbidden, "{$file} must not …")` passes a second *needle*, not a message; Pest's `toContain` is variadic, so the negation passed whenever either needle was absent — always. Demonstrated live: `expect('import Rail …')->not->toContain('Rail', 'msg')` passes | Rewritten to a real reference check (imports from the module, or JSX use), with positive and negative samples proving it can fail. The corrected guard immediately flagged `pages/projects/tasks/show.tsx`, whose own `<nav aria-label="Breadcrumb">` predates this epic — page content, not a shell import, so the page is correct and the check was made precise rather than the page changed |
+| 3 | Same review | `NavigationBuilderTest`'s account-menu boundary case used `->not->toContain('management', 'primary', 'manage')`, which would pass if any one key were absent | Split into one needle per assertion |
+| 4 | Chromium | My own L11 check matched the account menu's `menuitem` links (whose roving `tabindex="-1"` is correct for a composite) | Scoped to `nav a[tabindex]` |
+
+### A10.13 Tests
+
+**Pest.** `tests/Feature/BladeShellTest.php` — **new, 24 cases**, asserting on the parsed DOM of real
+Blade responses against the builder's payload for the same actor and route: rail, sheet, panel and
+sheet-views equal the canonical projection (9 actor/route cases); `aria-current` is exactly the payload's
+active set, including the A1.10 collision routes and a nested route, and the breadcrumb ends on the
+current page (5); pre-paint inputs stamped from the payload, and no panel/toggle for a panel-less
+workspace; no withheld href anywhere in a member's shell; Resources for the member, not the operator;
+landmarks with the skip link first and no shell heading; server initials and the exact personal menu;
+retired chrome absent; the brand mark; a guest render; one bootstrap inlined before any stylesheet on
+both roots; no workspace stamped on a guest Inertia page. A mutation that injects one rail link and
+drops `aria-current` fails 15 of the 24. `tests/Unit/Support/BrandMarkTest.php` — **new, 8 cases**
+mirroring `brand-mark.test.tsx`, plus "path data is never altered". `ShellContractTest` — composer
+parity rebound to `layouts.app`, root-state derivation, one builder resolution per Blade request, and "no
+Blade view names the builder". `ShellSeamContractTest` — the guard fix above, plus "the pre-WP5 Blade
+shell and its projection are gone" and "both roots include the one bootstrap before `@vite`".
+
+**Vitest.** `resources/js/shell/bootstrap.test.ts` — **new, 156 cases** (the 144-case parity matrix,
+hostile storage, no writes, theme). `resources/js/shell/blade-shell.test.ts` — **new, 11 cases**: toggle
+and collapse with persistence and focus, a Blade write read back by React's `resolvePanel`, unreadable
+map replaced, refused write tolerated, menu open/Escape/arrows/Home/End/wrap/outside-pointer, Appearance.
+
+**Playwright.** `tests/Browser/blade-shell.spec.ts` — **new, 10 flows**: geometry and server state in
+both themes; React→Blade→React with history; first-frame theme/panel with CLS 0; L dock-only; M sheet;
+S top bar, sheet, 44px targets, the account menu on top, an `inertia` destination from the sheet; 200%
+reflow; the personal, keyboard-operable account menu owning Appearance across the crossing; skip link,
+plain-Tab rail and panel, 2px focus; member authorization, Resources, and a 403 inside the shell. It
+uses only the existing `operator`/`member` persona sessions — **no new identity and no new login**.
+`shell.spec.ts` — the two flows that asserted "no shell on Blade" now assert the Blade renderer of the
+shell; the sign-out flow checks the React menu, then signs out from the Blade menu (React sign-out
+remains covered by `auth-migration.spec.ts`), on its existing single `e2e-signout` login.
+
+### A10.14 Deviations from the written WP5 plan
+
+| # | Plan | What was done | Why |
+|---|---|---|---|
+| 1 | §14.4: composer "binds … to the shell partials" | Bound once to `layouts.app` | The root `<html>` needs the bootstrap inputs; one binding keeps one build per request (A10.3) |
+| 2 | §14.1: "same 48px utility bar with breadcrumb and timer pill" | Breadcrumb only; the timer strip is unchanged below the bar | The pill/tray is WP6 (§18.4), exactly as WP4 left React (A8.14 #5) |
+| 3 | §14.2: docked or hidden; M/S fold into the sheet | Also: at **L** an opened Blade panel docks rather than floats | Blade has no overlay; the shared bootstrap already starts L collapsed unless pinned, so an open panel at L is one the user asked for |
+| 4 | §14.1: menu semantics "`role="menu"` + Escape + click-outside" | Also roving arrows/Home/End, Tab-close, focus return | A `role="menu"` without them misstates the widget; small and native-first |
+| 5 | §15.3: bootstrap reads the map "with `data-drawer-default` as the fallback" | Also honours `shell.operational.pin` and the below-XL rule | A8.19: required or it reintroduces A8.12 #4 |
+| 6 | Not in the plan | Bootstrap validates `theme` to `light`/`dark` | A malformed stored value used to be applied verbatim to the root attribute |
+| 7 | Not in the plan | WP4 seam-guard test corrected | It was vacuous (A10.12 #2); test-only, no product change |
+
+### A10.15 Validation results
+
+| Run | Result |
+|---|---|
+| Pest, focused (Blade shell, shell contract, navigation, configuration, support, login, Inertia foundation) | **206 passed / 2,286 assertions** |
+| Vitest, shell + panel hook | **183 / 183** |
+| Playwright, Blade-crossing specs (`blade-shell`, `shell`, `inertia-coexistence`, `time-migration`) | **31 / 31** |
+| Playwright, full suite, normal configuration (no `--workers` flag) | **74 / 74 passed**, 0 failed, 0 skipped, **3 workers, 2.0 min** |
+| nginx, full-suite window | **12 `POST /login`, all 302; 0 × 429; 0 × 419; 0 × 5xx.** Also: 2 × 403 (the two intentional `admin/users` authorization checks), 2 × 404 (`GET /projects/1493/board` and `DELETE /projects/1493` on an already-deleted project in the projects specs), 40 × 499 (requests abandoned by navigation, 35 of them `/time/timers/active` polls) |
+| Product data | `tasks` 40 → 41: one `E2E WP8 standalone task` row from `tasks-migration.spec.ts` — the known standalone-task cleanup gap (A8.18 #5, A9.7), unchanged |
+| `./dev check` | **All checks passed, exit 0**: CLI self-tests, `git diff --check`, Pint, `npm run check` (Wayfinder, `tsc`, ESLint, Prettier, **Vitest 672 / 672 in 69 files**, production build), **Pest 1,113 passed / 5,874 assertions** (269.6s). The first `./dev check` run on this tree failed only at Vitest, with 5,000ms `userEvent` timeouts in `milestone-form-dialog.test.tsx` and `form-dialog.test.tsx`: files WP5 did not change, which passed 12 / 12 in isolation and then passed in the full re-run. That is the load-sensitive pattern already recorded in A8.15 and A9.5; no timeout was raised and no assertion was weakened |
+| `git diff --check` | Clean |
+
+### A10.16 Known issues, not addressed here
+
+- **Dark-mode legibility of Blade page content**, e.g. the overdue-row highlight on the operator ticket
+  queue renders light text on a light tint in dark mode. That is page-body styling, unchanged by WP5
+  (§14.3), and belongs with the Blade contrast debts A6.24 records.
+- **Two `nav "Breadcrumb"` landmarks on the React task-detail page** (`pages/projects/tasks/show.tsx`'s
+  own breadcrumb plus the shell's). Pre-existing React page content, surfaced by the corrected seam
+  guard; not Blade and not WP5's to change.
+- **`account-menu.tsx`'s avatar** computes initials client-side with `initialsOf(user.name)` rather than
+  reading `auth.user.avatar.initials`, although A8.8 describes the latter. The two rules are identical
+  and asserted equal (A7.12), so the renderers cannot disagree; recorded rather than changed, because
+  WP5 does not modify WP4's React components.
+- **The timer strip can draw over the sticky utility bar while a timer runs**, on Blade pages only. The
+  pre-WP5 nav was `z-40`, above the strip's `z-30`; the utility bar is also `z-30` and sits later in the
+  DOM, so ties now resolve to the strip. Cosmetic, Blade-only, live only while a timer runs, and moot
+  once WP6 reworks the strip into the pill/tray (§18.4).
+- **No `pageshow`/`persisted` resync exists yet.** Neither the bootstrap nor `blade-shell.ts` listens for
+  a bfcache restore, so a Blade page restored from the browser's back/forward cache could in principle
+  repaint with a stale theme or an account menu left open from before the restore. Identified statically
+  from the code, not reproduced in a browser; suggested as WP8 lifecycle hardening.
+- **Two other Pest guards outside this diff share the `not->toContain($needle, $message)` defect this
+  amendment fixed in `ShellSeamContractTest`** (A10.12 #2): `BrowserAuthContractTest.php` and
+  `ProjectIntegrityTest.php`. Both accept a second argument as a second needle rather than a message, so
+  the negation cannot fail. Unrelated to the shell seam; separate test-hygiene follow-up, not WP5's to
+  fix here.
+- **The Blade icon map ([§12.3 rule 2](#123-contract-rules)) has no contract test tying its keys to
+  `NavigationBuilder`'s.** All nine current workspace icon keys match by inspection, but nothing asserts
+  that a future workspace's key exists in `shell/icon.blade.php` before it silently falls back to the
+  neutral glyph.
+
+**A deployment note, not a defect.** Both root views read `resources/js/shell/bootstrap.js` from disk
+on every render and inline its body (§14.4, `bootstrap.blade.php`). This is correct for the current
+bind-mounted `src` deployment. A future production image or build strategy that strips `resources/js`
+from the runtime container would need to preserve this file, or replace the read with a build-time
+inline step, or every page render breaks.
+
+### A10.17 Files changed
+
+**New:** `src/app/Support/BrandMark.php` · `src/resources/js/shell/{bootstrap.js,blade-shell.ts,bootstrap.test.ts,blade-shell.test.ts}` · `src/resources/views/layouts/partials/shell/{bootstrap,rail,drawer,utility-bar,account-menu,nav-sheet,brand-mark,icon}.blade.php` · `src/tests/Feature/BladeShellTest.php` · `src/tests/Unit/Support/BrandMarkTest.php` · `src/tests/Browser/blade-shell.spec.ts`
+
+**Modified:** `src/app/View/Composers/ShellComposer.php` · `src/app/Providers/AppServiceProvider.php` · `src/resources/views/layouts/app.blade.php` · `src/resources/views/app.blade.php` · `src/resources/css/app.css` (Blade-scoped block only) · `src/resources/js/app.js` · `src/resources/js/types/shared.ts` (comment) · tests `ShellContractTest.php`, `NavigationBuilderTest.php`, `ShellSeamContractTest.php`, `shell.spec.ts` · `docs/testing/e2e-browser-suite.md` · this document
+
+**Deleted:** `src/app/Shared/Navigation/LegacyShellNavigation.php` · `src/resources/views/layouts/partials/nav.blade.php` · `src/resources/views/layouts/partials/footer.blade.php`
+
+### A10.18 WP6 handoff
+
+WP6 (global timer shell integration) may start. What it inherits on Blade: the utility bar is
+`partials/shell/utility-bar.blade.php` (a `header[data-shell-utility]` with the breadcrumb in a
+`min-w-0 flex-1` slot and room on the right for the pill); `partials/timer-overlay.blade.php` still
+renders directly below it inside `[data-shell-canvas]`, with its `#timer-overlay`/`#timer-tiles` hooks,
+`timerStarted`/`timerStopped` events and decorative `PALETTE` untouched; `app.js` initialises
+`initBladeShell` and the timer overlay independently. An overlay-level widget inside the rail or bar
+must account for A10.12 #1: the sticky rail and bar are stacking contexts on Blade, where nothing is
+portaled.

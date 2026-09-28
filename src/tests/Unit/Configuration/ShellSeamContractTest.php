@@ -24,6 +24,27 @@ function shellPageFiles(): array
     return $files;
 }
 
+/** True when `source` imports the module or component `forbidden`, or renders it as JSX. */
+function shellSeamReferences(string $source, string $forbidden): bool
+{
+    if (str_starts_with($forbidden, '@/')) {
+        return (bool) preg_match('#from\s+[\'"]'.preg_quote($forbidden, '#').'[\'"]#', $source);
+    }
+
+    $name = preg_quote($forbidden, '#');
+
+    return (bool) preg_match('#\bimport\b[^;]*\b'.$name.'\b[^;]*\bfrom\b|<'.$name.'[\s/>]#', $source);
+}
+
+it('detects a shell reference, and only a real one', function () {
+    // The guard below must be able to fail: it is asserted against positive and negative samples.
+    expect(shellSeamReferences("import { Breadcrumb } from '@/components/shell/breadcrumb';", 'Breadcrumb'))->toBeTrue()
+        ->and(shellSeamReferences('return <Rail workspaces={x} />;', 'Rail'))->toBeTrue()
+        ->and(shellSeamReferences("import { Drawer } from '@/components/shell/drawer';", '@/components/shell/drawer'))->toBeTrue()
+        ->and(shellSeamReferences('<nav aria-label="Breadcrumb">', 'Breadcrumb'))->toBeFalse()
+        ->and(shellSeamReferences('const guardrail = 1;', 'Rail'))->toBeFalse();
+});
+
 it('finds the page tree it is asserting over', function () {
     // A rename that empties this list would make every assertion below vacuously true.
     expect(shellPageFiles())->not->toBeEmpty();
@@ -51,8 +72,17 @@ it('keeps pages chrome-agnostic', function (string $forbidden) {
         // Seam 3: a page composes primitives and page frames, never shell parts. Importing one would
         // couple that page to the Operational geometry and break the second presentation before it
         // is written.
-        expect((string) file_get_contents($file))
-            ->not->toContain($forbidden, "{$file} must not reference {$forbidden}");
+        //
+        // Asserted with the shellSeamReferences() regex helper rather than
+        // `->not->toContain($forbidden, $message)`: Pest's `toContain` is variadic, so a second
+        // argument is a second NEEDLE, not a message, and the negation then passes whenever either
+        // needle is absent — i.e. always. (Found in WP5: the earlier form of this guard could not fail.)
+        //
+        // "Reference" means code: importing a shell module or rendering a shell component. A page may
+        // still use the plain word in its own content — `projects/tasks/show.tsx` has carried its own
+        // `<nav aria-label="Breadcrumb">` since before this epic, which is page content, not chrome.
+        expect(shellSeamReferences((string) file_get_contents($file), $forbidden))
+            ->toBeFalse("{$file} must not reference {$forbidden}");
     }
 })->with([
     'Rail',
@@ -103,4 +133,44 @@ it('no longer ships the pre-WP4 shell', function () {
     expect(file_exists(resource_path('js/layouts/app-layout.tsx')))->toBeFalse()
         ->and(file_exists(resource_path('js/components/navigation/navigation-link.tsx')))->toBeFalse()
         ->and(file_exists(resource_path('js/types/navigation-legacy.ts')))->toBeFalse();
+});
+
+it('no longer ships the pre-WP5 Blade shell or its compatibility projection', function () {
+    // WP5 replaces the flat Blade bar with the Direction D shell partials, so the bar, the
+    // authenticated footer and the flattened `navigationLegacy` projection that only the bar read are
+    // all removed rather than kept "just in case" (EPIC-013 §14.4, A7.10).
+    expect(file_exists(resource_path('views/layouts/partials/nav.blade.php')))->toBeFalse()
+        ->and(file_exists(resource_path('views/layouts/partials/footer.blade.php')))->toBeFalse()
+        ->and(class_exists('App\\Shared\\Navigation\\LegacyShellNavigation'))->toBeFalse();
+
+    $sources = [];
+
+    foreach (['app', 'resources/js', 'resources/views'] as $directory) {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path($directory)));
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && preg_match('/\.(php|ts|tsx|js)$/', $file->getFilename())) {
+                $contents = (string) file_get_contents($file->getPathname());
+
+                if (str_contains($contents, 'navigationLegacy') || str_contains($contents, 'LegacyShellNavigation')) {
+                    $sources[] = $file->getPathname();
+                }
+            }
+        }
+    }
+
+    expect($sources)->toBe([]);
+});
+
+it('includes the one shared pre-paint bootstrap from both root views, before any asset', function () {
+    foreach (['views/app.blade.php', 'views/layouts/app.blade.php'] as $root) {
+        $view = (string) file_get_contents(resource_path($root));
+        $include = strpos($view, "@include('layouts.partials.shell.bootstrap')");
+
+        // One bootstrap for both renderers (§14.4), ahead of @vite so no stylesheet blocks it (A1.7).
+        expect(substr_count($view, "@include('layouts.partials.shell.bootstrap')"))->toBe(1)
+            ->and($include)->toBeLessThan((int) strpos($view, '@vite('))
+            // The per-root theme scripts it replaced must not come back beside it.
+            ->and(str_contains($view, 'localStorage'))->toBeFalse();
+    }
 });

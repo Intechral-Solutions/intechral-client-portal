@@ -37,8 +37,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Invoice::class, InvoicePolicy::class);
 
         // The Blade shell receives its navigation from the one builder, never by instantiating it
-        // inside a view (EPIC-013 §12.3 rule 11). WP5 adds the `layouts.partials.shell.*` partials
-        // to this binding as they replace `partials/nav`.
-        View::composer(['layouts.partials.nav'], ShellComposer::class);
+        // inside a view (EPIC-013 §12.3 rule 11). Bound to the Blade root once, so the builder runs
+        // once per request and every `layouts.partials.shell.*` include inherits the payload; the
+        // root <html> needs it too, for the pre-paint bootstrap's inputs (§15.3).
+        View::composer('layouts.app', ShellComposer::class);
     }
 }

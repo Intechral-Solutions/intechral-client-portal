@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Shared\Navigation\LegacyShellNavigation;
 use App\Shared\Navigation\NavigationBuilder;
 use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Http\Request;
@@ -600,50 +599,20 @@ it('emits navigation only, never account-menu items', function () {
 
     expect($hrefs)->not->toContain(route('profile.show'))
         ->and($hrefs)->not->toContain(route('logout'))
-        ->and(collect($navigation['workspaces'])->pluck('key')->all())->not->toContain('management', 'primary', 'manage');
+        // One needle per call: `toContain` is variadic, so a negated multi-needle call would pass as
+        // soon as any single needle was absent.
+        ->and(collect($navigation['workspaces'])->pluck('key')->all())->not->toContain('management')
+        ->and(collect($navigation['workspaces'])->pluck('key')->all())->not->toContain('primary')
+        ->and(collect($navigation['workspaces'])->pluck('key')->all())->not->toContain('manage');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Backward-compatibility seam for the pre-WP4 shell
+// Reachability through the reshape
 // ─────────────────────────────────────────────────────────────────────────────
 
-it('projects the canonical model into the flat shape the pre-WP4 shell renders', function () {
-    $navigation = navigationFor(actor('operator'), 'operator.tickets.index');
-    $groups = LegacyShellNavigation::groups($navigation);
-
-    expect(collect($groups)->pluck('key')->all())->toBe(['primary', 'overflow']);
-
-    foreach ($groups as $group) {
-        expect($group['label'])->toBeNull();
-
-        foreach ($group['items'] as $item) {
-            expect(array_keys($item))->toBe(['key', 'label', 'href', 'visit', 'isActive']);
-        }
-    }
-
-    $primary = collect($groups)->firstWhere('key', 'primary')['items'];
-    $overflow = collect($groups)->firstWhere('key', 'overflow')['items'];
-
-    expect(collect($primary)->pluck('key')->all())->toBe(collect($navigation['workspaces'])->pluck('key')->all())
-        // Labels stay distinguishable once flattened: two workspaces both have a "Reports" view.
-        ->and(collect($overflow)->pluck('label')->all())->toBe([
-            'Tasks My organization',
-            'Helpdesk Queue',
-            'Helpdesk Reports',
-            'Time Allocation',
-            'Time Reports',
-            'Directory Organizations',
-            'Directory Portal access',
-            'System Roles',
-            'System Pages',
-        ])
-        // An action is not a navigation destination and was never in the old shell.
-        ->and(collect($overflow)->pluck('key')->all())->not->toContain('projects.create')
-        // No group is renamed "Manage", and no group carries a heading at all.
-        ->and(collect($groups)->pluck('key')->all())->not->toContain('management');
-});
-
-it('keeps every pre-WP3 destination reachable through the compatibility seam', function () {
+it('keeps every pre-WP3 destination reachable in the canonical model', function () {
+    // WP3 pinned this against the flattened compatibility projection; WP5 deleted that projection
+    // with its last consumer, so the same guarantee is now asserted on the model both shells render.
     $before = [
         'operator' => [
             'tickets.index', 'projects.index', 'tasks.index', 'time.index', 'billing.invoices.index',
@@ -657,34 +626,10 @@ it('keeps every pre-WP3 destination reachable through the compatibility seam', f
     ];
 
     foreach ($before as $role => $routes) {
-        $groups = LegacyShellNavigation::groups(navigationFor(actor($role), 'dashboard'));
-        $hrefs = navigationValuesDeep($groups, 'href');
+        $hrefs = navigationValuesDeep(navigationFor(actor($role), 'dashboard'), 'href');
 
         foreach ($routes as $route) {
             expect($hrefs)->toContain(route($route));
         }
     }
-});
-
-it('leaks nothing through the compatibility seam that the canonical model withholds', function () {
-    $groups = LegacyShellNavigation::groups(navigationFor(actor('user'), 'dashboard'));
-
-    foreach (navigationValuesDeep($groups, 'href') as $href) {
-        expect($href)
-            ->not->toContain('/admin/')
-            ->not->toContain('/operator/')
-            ->not->toContain('/crm/')
-            ->not->toContain('/organizations');
-    }
-});
-
-it('omits the compatibility overflow group when nothing overflows', function () {
-    // A plain user's only contextual entries beyond the workspace destinations are Time Allocation
-    // and the Tasks org view; strip those capabilities and the group disappears rather than
-    // surviving empty.
-    $groups = LegacyShellNavigation::groups(navigationFor(actor('operator'), 'dashboard'));
-
-    expect(collect($groups)->pluck('key')->all())->toContain('overflow');
-
-    expect(LegacyShellNavigation::groups(['currentWorkspace' => null, 'workspaces' => []]))->toBe([]);
 });

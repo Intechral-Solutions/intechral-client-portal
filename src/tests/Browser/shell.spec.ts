@@ -98,16 +98,26 @@ test('a document destination leaves React and the Blade shell takes over', async
     await railLink(page, 'Helpdesk').click();
     await expect(page).toHaveURL(/\/tickets$/);
 
-    // React is gone: the Direction D shell is not on this page yet (Blade parity is WP5).
-    await expect(page.locator('[data-shell="operational"]')).toHaveCount(0);
+    // React is gone — no Inertia root on this document — and the Blade renderer of the same
+    // Direction D shell took over (WP5), with the server's active workspace.
+    await expect(page.locator('#app')).toHaveCount(0);
+    await expect(
+        page.locator('[data-shell="operational"][data-shell-renderer="blade"]'),
+    ).toHaveCount(1);
+    await expect(
+        page.getByRole('navigation', { name: 'Workspaces' }).locator('[aria-current="page"]'),
+    ).toHaveText('Helpdesk');
 
     // …and the theme survived the boundary, which is what the shared token layer exists for.
     await expect(page.locator('html')).toHaveAttribute('data-theme', /light|dark/);
 
-    // Back into React through the Blade shell's own navigation.
-    await page.getByRole('link', { name: 'Home', exact: true }).first().click();
+    // Back into React through the Blade shell's own rail.
+    await railLink(page, 'Home').click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.locator('[data-shell="operational"]')).toHaveCount(1);
+    await expect(page.locator('#app')).toHaveCount(1);
+    await expect(page.locator('[data-shell="operational"]:not([data-shell-renderer])')).toHaveCount(
+        1,
+    );
 });
 
 test('drawer state is remembered per workspace across a reload', async ({ page }) => {
@@ -271,6 +281,21 @@ test.describe('signing out', () => {
             await expect(page.getByRole('menu').getByText(absent, { exact: true })).toHaveCount(0);
         }
 
+        // The Blade renderer's menu holds the same boundary (WP5), so the sign-out this test exists
+        // for is taken from there; React's own sign-out stays covered by auth-migration.spec.ts.
+        await page.keyboard.press('Escape');
+        await railLink(page, 'Helpdesk').click();
+        await expect(page.locator('[data-shell-renderer="blade"]')).toHaveCount(1);
+        await openAccountMenu(page);
+
+        for (const item of ['Profile', 'Security & MFA', 'Connected accounts', 'Sessions']) {
+            await expect(page.getByRole('menuitem', { name: item })).toBeVisible();
+        }
+
+        for (const absent of ['Manage', 'Users', 'Roles', 'Organizations', 'Ticket Queue']) {
+            await expect(page.getByRole('menu').getByText(absent, { exact: true })).toHaveCount(0);
+        }
+
         await page.getByRole('menuitem', { name: 'Sign out' }).click();
         await expect(page).toHaveURL(/\/login$/);
     });
@@ -375,8 +400,16 @@ test.describe('as a member', () => {
         await railLink(page, 'Resources').click();
         await expect(page).toHaveURL(/\/pages$/);
 
-        // A single surface with no views: a full page load into Blade, and no panel anywhere.
-        await expect(page.locator('[data-shell="operational"]')).toHaveCount(0);
+        // A single surface with no views: a full page load into the Blade shell, and no panel.
+        await expect(page.locator('#app')).toHaveCount(0);
+        await expect(page.locator('[data-shell-renderer="blade"]')).toHaveAttribute(
+            'data-panel',
+            'false',
+        );
+        await expect(page.locator('[data-shell-drawer]')).toHaveCount(0);
+        await expect(
+            page.getByRole('navigation', { name: 'Workspaces' }).locator('[aria-current="page"]'),
+        ).toHaveText('Resources');
     });
 });
 
