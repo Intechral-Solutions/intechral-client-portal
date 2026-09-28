@@ -5,7 +5,8 @@
     It never carries workspace navigation. The breadcrumb is the server's truth: the current workspace,
     then its active contextual item — both read from the payload, never matched from the URL — and it
     always ends with the current page. The view switcher React shows while its panel is collapsed is not
-    required of Blade (§14.1). Search is NEXT and the timer pill is WP6, so neither renders.
+    required of Blade (§14.1). Search is NEXT and does not render; the timer pill sits on the right, as it
+    does on React (WP6, §18.4).
 --}}
 @php
     $shellActiveItem = null;
@@ -42,4 +43,6 @@
             <p class="truncate text-sm text-text-muted">Intechral</p>
         @endif
     </div>
+
+    @include('layouts.partials.shell.timer')
 </header>

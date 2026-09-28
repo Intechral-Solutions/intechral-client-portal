@@ -140,6 +140,11 @@
     --animate-dialog-out: ds-dialog-out var(--ds-anim-sheet-exit) var(--ds-motion-easing-exit) both;
     --animate-menu-in: ds-menu-in var(--ds-anim-base) var(--ds-motion-easing) both;
     --animate-menu-out: ds-fade-out var(--ds-anim-base-exit) var(--ds-motion-easing-exit) both;
+    /* The running-timer dot (EPIC-013 WP6, Direction D §12.1/§16). Deliberately slow and shallow
+       — it signals "live", it does not compete for attention — and it is only ever a supporting
+       cue: the pill also carries a ticking clock and a textual accessible name, so the animation
+       is never the sole indicator of a running timer. `none` under reduced motion (see below). */
+    --animate-live-pulse: ds-live-pulse 2.4s var(--ds-motion-easing) infinite;
 
     @keyframes ds-fade-in {
         from { opacity: 0; }
@@ -160,6 +165,9 @@
     @keyframes ds-menu-in {
         from { opacity: 0; transform: translateY(calc(var(--ds-shift) * -0.5)); }
         to { opacity: 1; transform: none; }
+    }
+    @keyframes ds-live-pulse {
+        50% { opacity: 0.45; }
     }
 
     /* Brand palette */
@@ -305,6 +313,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     :root {
+        /* The dot stays visible and fully opaque; only the animation stops. */
+        --animate-live-pulse: none;
         --ds-shift: 0px;
         --ds-anim-base: var(--ds-motion-fast);
         --ds-anim-base-exit: var(--ds-motion-fast);
@@ -680,6 +690,28 @@ body {
     border-bottom: 1px solid var(--ds-rule);
 }
 
+/* ── Timer pill (EPIC-013 WP6, Direction D §12.1) ─────────────
+   The pill renders BOTH its wide and its narrow elapsed form and CSS shows one,
+   so which form appears is decided by the same width classes that own every
+   other piece of shell geometry — no resize listener, no JS breakpoint query,
+   and no chance of React and Blade disagreeing about it.
+
+   Unlayered with the rest of the shell (A8.12 #2): the pill's parts also carry
+   Tailwind utilities, and a layered `display: none` would lose to `.flex`. ── */
+[data-shell='operational'] [data-shell-timer] [data-timer-elapsed='narrow'] {
+    display: none;
+}
+
+/* Blade's pill toggles its parts with the `hidden` ATTRIBUTE, and several of
+   them also carry a Tailwind display utility (`flex`, `inline-flex`) that would
+   otherwise win and show a part the script had just hidden. The UA stylesheet's
+   [hidden] rule is not enough against a utility class, so this unlayered rule
+   restores the attribute's authority for the pill's subtree — the same
+   layered-vs-unlayered trap A8.12 #2 records for the width classes. */
+[data-shell='operational'] [data-shell-timer] [hidden] {
+    display: none;
+}
+
 /* Overlay is the DEFAULT: it floats over the canvas with no scrim (§5.4), so
    content stays visible behind it. The width classes below un-overlay it where
    it is allowed to dock, which is what keeps docked-vs-overlay a pure CSS
@@ -766,6 +798,24 @@ body {
 
     /* Touch targets stay reachable at S (§16). */
     [data-shell-sheet] [data-shell-nav-row] {
+        min-height: 44px;
+    }
+
+    /* The narrow pill is dot + H:MM + +N: the seconds and the context label go,
+       which is what keeps the bar from overflowing at 390px. The tray still
+       carries both, so nothing is unreachable — only undrawn. */
+    [data-shell='operational'] [data-shell-timer] [data-timer-elapsed='wide'],
+    [data-shell='operational'] [data-shell-timer] [data-timer-label] {
+        display: none;
+    }
+
+    [data-shell='operational'] [data-shell-timer] [data-timer-elapsed='narrow'] {
+        display: inline;
+    }
+
+    /* The pill's own controls stay tappable at S (§16, WCAG 2.5.8). */
+    [data-shell='operational'] [data-shell-timer] [data-shell-timer-trigger],
+    [data-shell='operational'] [data-shell-timer] [data-shell-timer-stop] {
         min-height: 44px;
     }
 }

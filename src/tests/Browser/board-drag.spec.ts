@@ -237,7 +237,10 @@ test.describe('pointer drag (EPIC-011E WP6)', () => {
         // happened.
         await expect(backlog.getByRole('link', { name: 'E2E invalid drop task' })).toBeVisible();
         await expect(
-            page.locator('[aria-live="polite"].sr-only:not([data-shell-announcer])'),
+            page.locator(
+                // Excludes the shell's announcer and WP6's timer-pill announcer, leaving the board's.
+                '[aria-live="polite"].sr-only:not([data-shell-announcer]):not([data-shell-timer-announce])',
+            ),
         ).toHaveText('');
     });
 

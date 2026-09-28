@@ -18,8 +18,10 @@ import {
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
 vi.mock('@/routes', () => ({ logout: { url: () => '/logout' } }));
 vi.mock('@/routes/profile', () => ({ show: { url: () => '/profile' } }));
-// The timer is WP6's; the shell only has to keep its provider mounted (EPIC-011D reconciliation).
-vi.mock('@/components/time/running-timer-bar', () => ({ RunningTimerBar: () => null }));
+// The pill has its own tests; this file only asserts the shell keeps mounting it and its provider.
+vi.mock('@/components/time/timer-pill', () => ({
+    TimerPill: () => <span data-testid="timer-pill" />,
+}));
 
 const user = {
     id: 1,

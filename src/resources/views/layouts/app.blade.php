@@ -48,10 +48,9 @@
         @endif
 
         <div data-shell-canvas>
+            {{-- Carries the breadcrumb and, on its right, the timer pill (WP6, §18.4). The
+                 pre-Direction-D timer strip that used to follow it here is retired. --}}
             @include('layouts.partials.shell.utility-bar')
-
-            {{-- The pre-Direction-D timer strip, unchanged: its pill/tray rework is WP6 (§18.4). --}}
-            @include('layouts.partials.timer-overlay')
 
             {{-- `tabindex="-1"` makes it the skip link's focus target. --}}
             <main id="main-content" tabindex="-1" class="min-w-0 flex-1 outline-none">

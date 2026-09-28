@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
 import { signedIn } from './support/auth';
+import { timerPill } from './support/shell';
 
 /**
  * EPIC-011E WP7 critical flows: the project task detail page as a React/Inertia page (§24 item
@@ -46,7 +47,7 @@ test('board to task detail and back over Inertia, with the persistent timer surv
     const projectId = await createProject(page, cleanup, 'E2E WP7 task nav project');
     await quickAdd(page, 'Backlog', 'E2E WP7 nav task');
 
-    // exact: true — the running timer bar renders its own "Task: <title>" link once the timer
+    // exact: true — the timer pill renders its own "Task: <title>" label once the timer
     // starts below, which is otherwise a substring match for the same accessible name.
     await page.getByRole('link', { name: 'E2E WP7 nav task', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
@@ -54,22 +55,22 @@ test('board to task detail and back over Inertia, with the persistent timer surv
 
     // Start the task's own timer through the persistent provider, from the task page itself.
     await timePanel(page).getByRole('button', { name: 'Start timer' }).click();
-    await expect(page.getByText('Running for this task')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toContainText(
+    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
+    await expect(timerPill(page)).toContainText(
         'E2E WP7 nav task',
     );
 
-    // Board and back: an Inertia navigation, so the running timer bar is never remounted.
+    // Board and back: an Inertia navigation, so the timer pill is never remounted.
     await page.getByRole('link', { name: 'E2E WP7 task nav project', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/board$`));
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.getByRole('link', { name: 'E2E WP7 nav task', exact: true }).click();
     await expect(page).toHaveURL(taskUrl);
-    await expect(page.getByText('Running for this task')).toBeVisible();
+    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
 
     // Stop from the task panel; the summary updates without a full reload.
-    await timePanel(page).getByRole('button', { name: 'Stop timer' }).click();
+    await timePanel(page).getByRole('button', { name: /^Stop timer/ }).click();
     await expect(timePanel(page).getByRole('button', { name: 'Start timer' })).toBeVisible();
     await expect(timePanel(page).getByText(/time logged/)).toBeVisible();
 });
@@ -189,8 +190,8 @@ test('an unreferenced task deletes; a task with recorded time is blocked and his
     // Recorded time against the task (a completed entry, via start-then-stop): D4 must refuse
     // the delete even though the timer is no longer running.
     await timePanel(page).getByRole('button', { name: 'Start timer' }).click();
-    await expect(page.getByText('Running for this task')).toBeVisible();
-    await timePanel(page).getByRole('button', { name: 'Stop timer' }).click();
+    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
+    await timePanel(page).getByRole('button', { name: /^Stop timer/ }).click();
     await expect(timePanel(page).getByRole('button', { name: 'Start timer' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Delete task' }).click();

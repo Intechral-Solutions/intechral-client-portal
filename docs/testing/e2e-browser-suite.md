@@ -95,3 +95,25 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   0 `429`, 0 `419`, 0 application `5xx`.
 - After EPIC-013 WP5 (Amendment 10), with `blade-shell.spec.ts` added: 74/74 passed, 3 workers,
   2.0 minutes, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`.
+- After EPIC-013 WP6 (Amendment 11), with the timer pill/tray flows added: 81/81 passed, 3 workers,
+  2.8 minutes, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`. WP6 added seven
+  tests and no logins: its flows joined `time-migration.spec.ts` rather than taking a spec file — and
+  a persona — of their own. An eighth (the Blade pill at S) was added during WP6's audit follow-up,
+  taking the suite to **82**; it was verified on its own and the full suite has not been re-run for
+  it, so the 81/81 figure above stands as the last full-suite measurement rather than being restated.
+
+  **Timers are global per user, so one spec file owns the `member` persona's active-timer set.**
+  Spec files run concurrently across the three workers, so a second `member` spec that started or
+  stopped timers would race `time-migration.spec.ts`: an exact-count assertion would see the other
+  file's timer, and a stop-everything helper would stop it mid-test. Tests within a file run serially,
+  which is why that file holds them all. A new spec that starts timers as `member` belongs in it, or
+  must use a different actor.
+
+  **The `operator` persona has no such owner, and predates WP6.** `board-migration`,
+  `projects-migration`, `tasks-migration` and `task-detail-migration` all default to `operator` and
+  start and stop timers as their "did this navigate over Inertia?" signal, while the `as an operator`
+  group in `time-migration.spec.ts` both stops everything and asserts exact counts. Those files can
+  overlap across workers. It is pre-existing debt, not a WP6 regression — the pre-WP6 code did the
+  same — and it is recorded rather than redesigned. Do not assume operator timer state is isolated
+  because member state is: new exact-count or stop-everything assertions for `operator` need either a
+  single owning file or an assertion that does not depend on the actor's global timer set.

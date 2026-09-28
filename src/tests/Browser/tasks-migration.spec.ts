@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
 import { signedIn } from './support/auth';
+import { timerPill } from './support/shell';
 
 /**
  * EPIC-011E WP8 critical flows: the unified `/tasks` list as a React/Inertia page, replacing the
@@ -98,17 +99,17 @@ test('the tasks list loads and navigates over Inertia, both to a task page and b
     // The Inertia-ness this test is actually about is proven below, from this point onward.
     await page.goto('/tasks');
     await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     // The title link is the migrated React task page (WP7): an Inertia visit, never a document
-    // load, so the timer bar survives it.
+    // load, so the timer pill survives it.
     await page.getByRole('link', { name: 'E2E WP8 nav task' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL('/tasks');
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.evaluate(async (id) => {
         const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;

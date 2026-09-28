@@ -59,6 +59,7 @@
 - [Amendment 8: WP4 Results (2026-09-26)](#amendment-8-wp4-results-2026-09-26)
 - [Amendment 9: POST-WP4 E2E Hardening (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27)
 - [Amendment 10: WP5 Results (2026-09-27)](#amendment-10-wp5-results-2026-09-27)
+- [Amendment 11: WP6 Results (2026-09-28)](#amendment-11-wp6-results-2026-09-28)
 
 ---
 
@@ -1418,6 +1419,8 @@ Four independently revertible slices.
 
 **Exit:** zero/one/many states correct on both renderers; reconciliation behaviour unchanged; no NEXT feature present.
 
+- **Complete (2026-09-28) — results in [Amendment 11](#amendment-11-wp6-results-2026-09-28).** `TimerPill`, `TimerTray` (Radix Popover) and `TimerControl` render the Foundation scope on both renderers from one shared derivation module (`lib/timer-state.ts`), which also closes a pre-WP6 divergence: only React applied the clock offset. `RunningTimerBar`, `timer-overlay.js`, `timer-overlay.blade.php` and the decorative `PALETTE` are deleted; the `timerStarted`/`timerStopped` contract is preserved; `TimerProvider` reconciliation and the backend are untouched. One deviation: `TimerControl`'s **unavailable** state is deferred ([§31](#31-deferred-follow-on-work), A11.7). Implemented on the WP5 tree (`e10f2ab`); not yet committed.
+
 ### WP7 — Page frames and Home
 
 - `PageFrame` (canvas/grid/reading), `EntityHeader`, `Strata`.
@@ -1473,6 +1476,7 @@ Two notes this epic hands forward: the Playwright suite grows by roughly twelve 
 | Lightweight CI baseline | Next roadmap item ([§30](#30-ci-handoff)) |
 | Tasks overhaul (D2/D9 patterns), `DataTable` conventions, `BulkBar`, `FilterBar`, `Chip`/`FilterChip`, `J/K/X/E/T` shortcuts, Tasks peek inspector | Tasks overhaul |
 | Timer NEXT items: Stop all (needs an endpoint), long-running warning + threshold, global quick-start search, "Today N logged" | Timer UX improvement |
+| `TimerControl`'s **unavailable** state (§12.3: disabled, with the reason given). No WP6 surface reaches it — its callers gate the whole control on `time.log`, and the billing lock is a server rejection surfaced after the click, not a precondition known before it. WP6's authoritative scope ([§18.1](#181-in-and-out), Direction D §12.0), its Exit, [§29](#29-exit-criteria) criterion 9 and the [§25.2](#252-vitest--rtl) matrix none of them require it | The package that first ships a surface which can reach the state — or the package that owns the disabled-reason treatment generally, whichever comes first |
 | Projects expansion (D3), `StagePath`, `Priority`, project health, list view, Monitoring | Projects UX expansion |
 | `CustomerShell`, `TopNav`, customer routing topology, multi-organization switcher | Customer product work |
 | **Shell presentation parity / unification** — see [§31.1](#311-shell-presentation-parity--unification-future) | **Future** (own project; explicitly **not** EPIC-013) |
@@ -4236,6 +4240,8 @@ remains covered by `auth-migration.spec.ts`), on its existing single `e2e-signou
   pre-WP5 nav was `z-40`, above the strip's `z-30`; the utility bar is also `z-30` and sits later in the
   DOM, so ties now resolve to the strip. Cosmetic, Blade-only, live only while a timer runs, and moot
   once WP6 reworks the strip into the pill/tray (§18.4).
+  **RESOLVED by WP6 (A11.11).** Not patched: the strip was deleted, and the timer now lives *inside*
+  the utility bar, so there is no second stacking participant left to resolve a tie against.
 - **No `pageshow`/`persisted` resync exists yet.** Neither the bootstrap nor `blade-shell.ts` listens for
   a bfcache restore, so a Blade page restored from the browser's back/forward cache could in principle
   repaint with a stale theme or an account menu left open from before the restore. Identified statically
@@ -4274,3 +4280,398 @@ renders directly below it inside `[data-shell-canvas]`, with its `#timer-overlay
 `initBladeShell` and the timer overlay independently. An overlay-level widget inside the rail or bar
 must account for A10.12 #1: the sticky rail and bar are stacking contexts on Blade, where nothing is
 portaled.
+
+---
+
+## Amendment 11: WP6 Results (2026-09-28)
+
+**Status:** WP6 (global timer shell integration) implemented on the WP5 tree (`e10f2ab`). **This is the
+WP6 record; it does not revise Amendments 1–10.** No route, endpoint, migration, permission, policy,
+controller, model or service changed — §18.2 is explicit that the five existing timer endpoints already
+support every Foundation capability, and they were left exactly as they were. One dependency was added,
+with approval, because the committed plan requires it (A11.2). WP7 has not started.
+
+### A11.1 Method
+
+Audit before edit. The timer was traced end to end first — routes, controller, `TimeEntryService`,
+the `TimeEntry` model's billing lock, `TimerProvider`, `RunningTimerBar`, `timer-overlay.js`,
+`timer-overlay.blade.php`, `components/time-tracker.blade.php`, the WP4 React shell and the WP5 Blade
+shell — and only then replaced. Real Chromium then caught four defects that jsdom, Pest and review had
+all missed (A11.12), one of which was a genuine ordering bug in shared logic rather than a styling slip.
+
+### A11.2 The one dependency, and why it was not avoidable
+
+`@radix-ui/react-popover@^1.1.23`, one package. §4.7, §12.2, §18.3 and §26 all specify the tray as a
+Radix Popover, and the two already-installed alternatives are both wrong for this surface: Radix
+`DropdownMenu` is a composite menu whose roving focus and typeahead would swallow the keystrokes meant
+for the tray's inline description fields, and `dialog-shell` is modal and unanchored, which contradicts
+"non-modal popover". The cost is near-zero: every transitive dependency was already present through the
+existing `react-dropdown-menu` → `react-menu` chain, so `npm install` reported **"added 1 package"** and
+the lockfile gained exactly one entry. (`npm audit`'s four pre-existing high findings — `nanoid`,
+`postcss`, `shell-quote`, all build tooling — are unchanged by this and are not WP6's to fix.)
+
+### A11.3 Pre-WP6 timer architecture, as found
+
+**Server, authoritative and unchanged.** Five endpoints under `can:time.log`: `GET /time/timers/active`
+(the active set plus `server_now`), `POST /time/timer/start`, `POST /time/timer/{entry}/stop`,
+`PATCH /time/timer/{entry}/description`, `GET /time/context-options`. Stop and description edits assert
+`$entry->user_id === auth()->id()` and run inside a transaction with `lockForUpdate`; `ensureMutable()`
+raises the billing lock; stop is idempotent (a null `timer_started_at` returns early) and rounds any
+partial minute up. Multiple concurrent timers are supported; there is no pause and no stop-all.
+
+**React.** `TimerProvider` (the hardened EPIC-011D model) held the only client-side copy of the active
+set, with its two sequence refs, its re-read on every failure path and its `401/419` reload.
+`RunningTimerBar` drew a full-width strip under the header: one row per timer, its own `setInterval`,
+its own `formatElapsed`, and an `aria-live="polite"` region wrapped around a clock that changed every
+second.
+
+**Blade.** `timer-overlay.js` (273 lines) fetched the same endpoint, rendered coloured tiles into
+`partials/timer-overlay.blade.php` below the header, ticked its own interval, and dispatched and
+listened for `timerStarted`/`timerStopped`. It carried an eight-entry decorative `PALETTE` including
+four hard-coded hexes (`#8b5cf6`, `#ec4899`, `#14b8a6`, `#f97316`).
+
+**What the two renderers disagreed about.** Each carried its own `formatElapsed`, and only the React
+one applied the clock offset at all — so the same running timer could read differently on Blade than on
+React. That is the duplication WP6 removes, and it is the reason the shared module below exists.
+
+**The one legitimate non-shell consumer.** `resources/views/components/time-tracker.blade.php`, the
+embedded tracker on ticket pages, depends on the `timerStarted`/`timerStopped` window events. It was
+not touched, and the event contract is preserved verbatim (§18.4).
+
+### A11.4 Canonical timer state
+
+Laravel remains the sole authority on what a timer *is*. WP6 adds no server-side presentation contract,
+because none is needed and §18.2 forbids the backend work.
+
+What WP6 does add is one small, framework-free, DOM-free module — `resources/js/lib/timer-state.ts` —
+holding the handful of *derivations* both renderers need in order to draw the server's answer: the
+clock offset, elapsed seconds, the `H:MM:SS` and `H:MM` forms, which timer the pill shows, row order,
+the pill label and its truncation, the tray heading, and the pill's accessible name. React
+(`timer-pill.tsx`, `timer-tray.tsx`) and Blade (`shell/blade-timer.ts`) both import it. The renderers
+draw different markup — §26's accepted cost of coexistence — but they can no longer disagree about
+which timer is newest, how long it has run, or how its label reads.
+
+`TimerProvider`'s reconciliation is **unchanged**: same reducer, same `refreshSeq`/`mutationSeq`, same
+re-read on failure, same reload on `401/419`. Its one edit is a deletion — the private `offsetFrom`
+helper moved into the shared module as `clockOffsetFrom`, behaviour identical, so the Blade renderer
+estimates the server clock by the same rule instead of by a second copy of it.
+
+### A11.5 The timer pill
+
+Utility-bar right, on both renderers, gated on `time.log` exactly as the endpoints are.
+
+| State | What it draws |
+|---|---|
+| None | Ghost clock glyph + "Start timer"; opens the tray to its empty state |
+| One | Live dot + mono `H:MM:SS` + context label (≤28 chars) + a Stop naming that context |
+| Several | The **most recently started** timer, plus `+N` in `live-soft`/`live-text` and a chevron |
+| Pending | Hollow live ring + "Starting…"/"Stopping…", no elapsed value, Stop withdrawn |
+| Failed stop | Last confirmed state kept, `danger` border, "Couldn't stop", Stop becomes "Retry stop" |
+| Narrow (S) | Dot + `H:MM` + `+N`; seconds and label are CSS-hidden |
+
+Measured at 295×32 at XL/L/M and 135×44 at S — inside Direction D's ~360px ceiling at every width.
+
+**The tick lives inside the pill**, which is the EPIC-011D lesson and §18.3's hard requirement. A
+Vitest guard mounts a sentinel beside the pill and asserts it does not re-render when fake timers
+advance five seconds. The interval is not created at all when nothing is running and the tray is shut,
+so an idle shell runs no timer. Elapsed time is *derived* every tick from `started_at` plus the clock
+offset rather than incremented, so it cannot accumulate drift, and a remount reads what a tab open for
+an hour reads. The React tick is a self-scheduling `setTimeout` re-aligned to the second boundary each
+time — so the digits change when the clock's second changes, and a throttled background tab resumes on
+the boundary — and it reads the clock in the callback, never during render, so there is nothing for a
+future SSR pass to mismatch on.
+
+**Accessibility.** The accessible name deliberately excludes the elapsed value ("Running timer: Ticket:
+TKT-42. Show timers"): the name is re-read on change, so a clock in it would announce every second. The
+digits are visible text outside any live region, asserted in both Vitest and Chromium. A separate
+`sr-only` `aria-live="polite"` region announces only "Timer started."/"Timer stopped.", driven by the
+*count*, and stays silent on first render so hydrating a page with a timer already running announces
+nothing. Running state is never carried by colour or motion alone — there is a ticking numeric clock
+and a textual name. The dot's pulse is a new `--animate-live-pulse` token (2.4s, shallow) that resolves
+to `none` under `prefers-reduced-motion`, verified in Chromium (`dotAnim=none`, `opacity=1`: the dot
+stays fully visible, only the animation stops).
+
+### A11.6 The timer tray
+
+A non-modal Radix Popover, measured at 408px (inside the 400–420 band), level-2 elevation, anchored to
+the pill. Header "N running"; rows newest-first with live dot, context link, inline description field,
+elapsed and a context-named Stop; footer "Open Time →". Zero state names the absence and points at the
+existing start flow. A failed hydration surfaces in the tray with a Retry, so a broken read is visible
+rather than silently indistinguishable from "nothing is running".
+
+Open moves focus to **the tray itself**, not to the first row's description field — Chromium showed the
+caret landing in a text box for someone who opened the tray to press Stop (A11.12 #3). `Esc` closes and
+returns focus to the pill; an outside pointer press closes it without taking focus back. Tab walks the
+row controls in order. The pill's Stop is a **sibling** of the trigger, never nested inside it.
+
+**Escape has two meanings, resolved the same way on both renderers.** In a description field holding an
+unsaved draft it reverts the draft and keeps the tray open; with nothing to lose it closes the tray, as
+Escape does everywhere else. On React this is a `onEscapeKeyDown` veto keyed to a `data-draft`
+attribute, because Radix listens on the document and a synthetic `stopPropagation` never reaches it; on
+Blade it is a conditional `stopPropagation`. Both were defects first (A11.12 #2, #4).
+
+**Foundation only.** No Stop all, no "Today N logged", no "Start another…" search, no Switch. Asserted
+by absence in Vitest and Playwright.
+
+### A11.7 `TimerControl`
+
+The contextual control (§12.3) for surfaces that already start and stop timers — today the task detail
+page's time panel, which now draws its running state and Stop from the shared control and the Direction
+D `live` tokens instead of its own `--text-success` markup. It holds no timer state; `TimerProvider`
+remains the only client-side holder, so a timer started here appears in the pill without being told.
+Starting from a context never stops another timer.
+
+**Deviation:** the **unavailable** state (§12.3: disabled, with the reason given) is not implemented.
+
+The reason is scope and reachability, not dependency cost. WP6's authoritative in/out list
+([§18.1](#181-in-and-out), taken from Direction D §12.0) enumerates "contextual start/stop on surfaces
+that already have it; pending and error states" and does not include an unavailable state; neither
+WP6's **Exit**, nor [§29](#29-exit-criteria) criterion 9, nor the [§25.2](#252-vitest--rtl) matrix
+requires it. Nor can any current surface reach it: the callers gate the whole control on `time.log`,
+and the billing lock is a server rejection surfaced as an error after the click, not a precondition
+known before it. Building a state nothing can trigger, against no acceptance criterion, would be
+building blind.
+
+To be accurate about the cost, since the first draft of this amendment overstated it: the state does
+**not** necessarily require `@radix-ui/react-tooltip`. [A6.24](#a624-wp3-handoff) names
+`Tooltip`'s first consumer as the rail's unavailable items, so WP6 was never its owner, and a disabled
+control can carry its reason without Radix at all. The dependency was the wrong argument for the right
+conclusion. Registered in [§31](#31-deferred-follow-on-work).
+
+### A11.8 React integration
+
+`operator-shell.tsx` stops rendering `RunningTimerBar` below the utility bar and instead passes
+`<TimerPill />` into `UtilityBar`'s existing `children` slot, gated on `auth.permissions.includes('time.log')`
+— the same seam WP4 already provided, so no shell component was restructured. `utility-bar.tsx` changed
+only its docblock. No other WP4 component or hook was touched.
+
+### A11.9 Blade integration
+
+`partials/shell/timer.blade.php` renders the pill and tray inside `partials/shell/utility-bar.blade.php`,
+gated on `@can('time.log')`. `resources/js/shell/blade-timer.ts` drives it, mounted from `app.js`
+alongside `initBladeShell`, following the WP5 Blade-runtime conventions. It owns presentation only:
+every derivation comes from the shared module, every mutation goes through the existing endpoints with
+the CSRF token, `401/419` reloads, and a rejected request is resolved by re-reading the server rather
+than guessing locally. Tray rows are reused across refreshes rather than rebuilt, so a half-typed
+description is not destroyed by the next tick.
+
+The pill renders its **idle** state server-side and the script swaps in the running state once the
+active set arrives. Server-rendering the running state would mean a timer query on every Blade page
+render, which §18.2 rules out; nothing shifts when it swaps, because the pill is last in the bar.
+
+Two Blade-specific mechanics worth recording. `[hidden]` needed an unlayered `display: none` rule scoped
+to the pill, because several of its parts also carry a Tailwind display utility that would otherwise win
+and show a part the script had just hidden — the same layered-vs-unlayered trap A8.12 #2 records. And
+the icon map gained `chevron-down` and a **filled** `square-filled`, the outline square having read as
+an unchecked checkbox beside its "Stop" label (A11.12 #3).
+
+### A11.10 Renderer crossings
+
+Asserted on **state**, not appearance: both renderers expose the same `data-timer-count`,
+`data-timer-running` and accessible names, so the same selector must find the same timer on either side
+of a document navigation.
+
+| Crossing | Result |
+|---|---|
+| React → Blade, running | Same timer, same label, count preserved; elapsed non-zero and still ticking; one pill; no `#timer-overlay` |
+| Blade → React, running | Same timer and label; elapsed does not reset semantically; React shell mounts normally |
+| Back / Forward while running | Count preserved both ways — the timer is server state, so history cannot invent or lose it |
+| Stop, then cross | Stays stopped; the pill returns to its idle "Start timer" name |
+| Start on Blade (embedded tracker), cross to React | Reconstructed from the server; the preserved `timerStarted` event lets the Blade pill adopt it without a reload |
+| Description edited in the tray, then cross | The edit is server state and is shown by the other renderer's tray |
+
+### A11.11 Legacy retirement
+
+**Deleted:** `resources/js/components/time/running-timer-bar.tsx` and its test ·
+`resources/js/timer-overlay.js` · `resources/views/layouts/partials/timer-overlay.blade.php`.
+
+**Deleted with them:** the decorative `PALETTE` and its four hard-coded hexes, the two duplicate
+`formatElapsed` implementations, the strip's `aria-live` wrapper around a per-second clock, and the
+`#timer-overlay` / `#timer-tiles` / `.timer-tile` hooks.
+
+**Proof no live consumer remains.** Every consumer was searched before deletion: `operator-shell.tsx`
+and `app-shell.test.tsx` (React), `app.js` and `layouts/app.blade.php` (Blade), and five browser specs.
+All were migrated. A Pest guard now asserts the retired hooks and hexes are absent from rendered Blade
+and that exactly **one** `[data-shell-timer]` node exists per page. `time-tracker.blade.php` was
+identified as a legitimate non-shell consumer of the event contract and deliberately left unchanged.
+
+**A10.16's stacking follow-up is resolved by construction, not patched.** The strip is gone and the
+timer lives inside the sticky utility bar, so there is no second participant to lose a z-index tie.
+Blade has no portal, so a Chromium `elementFromPoint` assertion proves the open tray is actually the
+topmost element at its own coordinates.
+
+### A11.12 Defects found by real-browser validation
+
+1. **Tray rows were ordered wrongly whenever two timers started in the same second.** The pill showed
+   the newest while the tray listed the oldest first. `time_entries.timer_started_at` is a MySQL
+   `timestamp` with **no fractional seconds**, so concurrent timers carry byte-identical `started_at`
+   values; sorting on the timestamp alone left their order to the server's, while the pill's reduce
+   resolved the tie the other way. Fixed by one shared `compareRecency` used by both the pill and the
+   tray, breaking ties on the monotonic auto-increment id. The unit tests had missed it because they
+   only ever used distinct timestamps; a tie regression test was added.
+2. **Escape in a description field closed the whole tray on React.** Radix listens for Escape on the
+   document, so the field's synthetic `stopPropagation` never reached it. Fixed with an
+   `onEscapeKeyDown` veto — then narrowed a second time, because the first version vetoed *whenever* an
+   input had focus and so stopped Escape ever closing the tray. It now vetoes only for a field holding
+   an unsaved draft.
+3. **Two presentation defects seen only in a screenshot.** Opening the tray put the caret in the first
+   description field and selected its text; and the outline Stop square read as an unchecked checkbox
+   beside its label. Fixed by focusing the tray container itself and by filling the square.
+4. **The Blade tray could be left stuck open.** Its description field swallowed Escape
+   unconditionally, so with no draft the tray stayed open where React's closed — the exact
+   renderer-divergence the shared contract exists to prevent. Aligned with React's draft rule.
+
+Also found and fixed while migrating the suite: the pill's `aria-live` region would have collided with
+the board specs' `[aria-live="polite"].sr-only:not([data-shell-announcer])` selector, causing a
+strict-mode violation. The React announcer now carries `data-shell-timer-announce` (as the Blade one
+already did) and both board specs exclude it explicitly.
+
+### A11.13 Responsive, theme and contrast (measured in Chromium, both themes)
+
+| Width | Pill | Overflow | Overlap with breadcrumb / rail |
+|---|---|---|---|
+| XL 1440 | 295×32 | none | none / none |
+| L 1200 | 295×32 | none | none / none |
+| M 900 | 295×32 | none | none / none |
+| S 390 | 135×44 (narrow form) | none | none / none |
+| 200% zoom | — | none | — |
+
+Contrast, sRGB, rendered composites (measured after letting the theme transition settle — an immediate
+read returns an interpolated colour and understates it badly, which is worth recording for the next
+amendment that measures this way):
+
+| Surface | Light | Dark |
+|---|---|---|
+| Pill elapsed digits | 6.32:1 | 10.45:1 |
+| Pill context label | 10.08:1 | 10.17:1 |
+| Live dot vs backdrop (non-text, needs 3:1) | 4.29:1 | 10.45:1 |
+| Tray row title | 6.40:1 | 7.17:1 |
+| Tray elapsed | 6.32:1 | 10.91:1 |
+| Tray description field edge (non-text, needs 3:1) | 3.59:1 | 3.47:1 |
+
+Blade measured identically to React in both themes (6.32:1 light, 10.45:1 dark), which is the intended
+consequence of both renderers using the same tokens. Touch targets at S are 44px. No new colour token
+was introduced; the only new token is the motion one in A11.5.
+
+### A11.14 Tests
+
+**Pest (+5, all in existing files).** `BladeShellTest`: the pill mounts inside the utility bar with its
+idle server-rendered state and a closed, named, non-modal tray; it is withheld from an actor without
+`time.log`; the retired strip's hooks and hexes are gone and exactly one timer affordance survives.
+`ShellSeamContractTest`: `@/components/time/timer-pill` and `timer-tray` added to the page-chrome
+guard. **No new controller tests** — WP6 changes no server behaviour, and manufacturing them would
+inflate coverage without asserting anything new.
+
+**Vitest (+79, 672 → 751).** `lib/timer-state.test.ts` (27) — the pure contract, including the
+same-second tie, malformed timestamps, minute/hour/day boundaries and the no-clock-in-the-name rule.
+`timer-pill.test.tsx` (17) — the full zero/one/many/pending/failed matrix, malformed state,
+accessibility, and the **tick-localisation guard**. `timer-tray.test.tsx` (10) — description editing,
+Escape's two meanings, individual stop, absence of every NEXT feature. `timer-control.test.tsx` (6).
+`shell/blade-timer.test.ts` (24) — the Blade runtime, including the preserved event contract, the
+`419` reload, malformed payloads and no-interval-while-idle. `timer-provider.test.tsx` retargeted from
+the deleted `RunningTimerBar` onto `TimerPill`.
+
+**Playwright (+8, 74 → 82).** Eight WP6 flows covering §25.3 flow 9 and the timer half of flow 10.
+They live in a `describe` block **inside `time-migration.spec.ts`**, not in a spec of their own — see
+A11.15.
+
+The eighth was added after the WP6 audit and is worth its own note, because it exists to pin a cascade
+this epic does not own. The narrow-shell flow above runs on React, and jsdom sees no CSS at all, so
+nothing exercised the **Blade** pill at S with real stylesheets applied. The audit raised a hypothesis
+there: Blade toggles the pill's parts with the `hidden` **attribute**, and the two hand-written rules —
+the one enforcing `hidden` and the S rule that shows the narrow elapsed span — tie on specificity, with
+the S rule later, so it should win and leave a stale clock visible beside "Stopping…" and "Start timer"
+(`blade-timer.ts` hides that span, it never clears its text).
+
+**Measured in Chromium, the hypothesis is wrong and there is no defect.** The attribute wins, because
+Tailwind's preflight emits `[hidden]:where(:not([hidden="until-found"])){display:none!important}`, and
+an `!important` author declaration outranks every normal one regardless of specificity or order. The
+hand-written `[data-shell-timer] [hidden]` rule is belt-and-braces on top of it. **No CSS was changed.**
+
+What the episode did expose is that the behaviour rests on a third-party stylesheet's `!important` —
+which a Tailwind upgrade, or a `display` utility added to that span, could quietly remove. So the test
+stayed: at 390px on a Blade document it asserts the narrow form shows while running, that no elapsed
+value is drawn beside "Stopping…", and that the pill returns to "Start timer" with no stale clock
+behind it. It passes; the point is that it would stop passing if that guarantee ever moved.
+
+### A11.15 One spec file owns the member's timers
+
+Timers are global per user and Playwright runs spec files concurrently across its three workers. A
+second `member` spec that started and stopped timers would race `time-migration.spec.ts`: an exact-count
+assertion would see the other file's timer, and `stopAllTimers` would stop it mid-test. That is exactly
+what happened when the WP6 flows first lived in their own file — they passed alone and failed in the
+full suite.
+
+The fix was to give the member's active-timer set a single owning file, since tests within a file run
+serially. **No third persona was added** (one more identity is one more login against Fortify's
+per-email limiter for no behavioural gain), the suite was not serialised, and the three-worker
+architecture is untouched. The shared helpers in `support/shell.ts` are deliberately renderer-agnostic,
+which is what lets one assertion drive both renderers across a crossing.
+
+**The same is not true of the `operator` persona, and nothing here made it so.** Ownership was
+established for the member's timers because that is what WP6's new flows mutate. Operator timer state
+is mutated from several concurrently schedulable spec files — `board-migration`, `projects-migration`,
+`tasks-migration` and `task-detail-migration` all default to `operator` and start and stop timers as
+their navigation signal, and the `as an operator` group in this file both calls `stopAllTimers` and
+asserts exact running-timer counts. With `fullyParallel: false` those files are distributed across the
+three workers and can overlap, so an exact count here could in principle see another file's timer, and
+the broad cleanup could stop one mid-test.
+
+This is **pre-existing test-infrastructure debt, not a WP6 product defect and not a WP6 regression**:
+the pre-WP6 version of that group already did the same thing, stopping every React timer and asserting
+`#timer-overlay [data-timer-id]` had a count of exactly one. WP6 renamed the helpers and left the shape
+untouched. It is recorded here rather than redesigned because rebalancing the operator E2E architecture
+is not WP6's scope and would touch four specs WP6 otherwise only re-pointed at a new selector.
+
+The invariant future timer work needs to carry: **operator timer state is not isolated, and must not be
+assumed isolated merely because member state is.** Anything adding exact-count or stop-everything
+assertions for the operator should either move into a single owning file the way the member flows did,
+or stop relying on the actor's global timer set.
+
+The five other specs that used the retired strip's `region "Active timers"` as their
+"did this navigate over Inertia?" signal now use the pill's clock, which serves the same purpose and is
+equally persistent.
+
+### A11.16 Validation results
+
+- **Pest:** 1,118 passed / 5,964 assertions (baseline 1,113 / 5,874).
+- **Vitest:** 751 passed / 73 files (baseline 672 / 69).
+- **Playwright:** **81/81 passed, 3 workers, 2.8 minutes** (baseline 74/74, ~2.0 min). Auth traffic for
+  the run: **12 POST `/login`, 12 × 302, 0 × 429, 0 × 419, 0 application 5xx** — identical to the
+  accepted baseline, so WP6 added no login traffic.
+  - *Post-audit amendment.* That run covered the 81 tests present at the time. The Blade-at-S flow
+    added afterwards (A11.14) brings the suite to **82**, and it was verified on its own —
+    `--grep "the Blade pill hides its narrow clock"`, **1 passed**, product-data counts unchanged
+    before and after. The full suite has **not** been re-run for it: the only other changes in the
+    remediation are documentation and one test comment, none of which touch product code. The 81/81
+    figure above is reported as what it is — the accepted evidence for the implementation — and is not
+    restated as 82/82.
+- **`./dev check`:** all checks passed (CLI self-tests, `git diff --check`, Pint, `npm run check`, Pest).
+
+### A11.17 Known issues, not addressed here
+
+- **The `E2E … standalone task` fixture leak is unchanged and still pre-existing** (A9.7). One task row
+  leaks per full browser run; rows dating from 2026-09-27, before WP6, confirm it predates this work.
+  Not WP6's to fix, and it intersects nothing WP6 asserts.
+- **`tests/Browser` is neither type-checked nor linted.** `tsconfig.json` includes only
+  `resources/js/**` plus `vite.config.ts`, and the lint glob matches the same set, so a browser spec
+  can reference an undefined import and still pass `npm run check` — it fails only when Playwright runs
+  it. Observed while migrating the specs (an unimported helper type-checked clean). Pre-existing,
+  unrelated to the timer, and widening either glob is likely to surface unrelated errors, so it is
+  recorded rather than changed.
+- **The Vitest suite runs close to its default 5s per-test timeout under load.** Two tests in files WP6
+  does not touch (`pages/projects/create.test.tsx`, `components/projects/milestone-form-dialog.test.tsx`)
+  timed out once each while a browser suite ran concurrently, and passed in five consecutive full runs
+  afterwards. Vitest's own output notes jsdom creation is ~42% of tracked time across 73 environments.
+  WP6's four new test files add to that load without being its cause; if this recurs, the fix is the
+  environment strategy Vitest suggests, not a longer timeout.
+- **`TimerControl`'s unavailable state is deferred** — on scope and reachability, not dependency cost (A11.7); registered in [§31](#31-deferred-follow-on-work).
+
+### A11.18 WP7 handoff
+
+WP7 (page frames and Home) may start. What it inherits: the utility bar now has a populated right-hand
+slot (`UtilityBar`'s `children` on React, the `shell.timer` include on Blade), so a future search or
+command affordance shares that row with the pill and must fit beside it within the bar's 48px.
+`resources/js/lib/timer-state.ts` is the pattern for any further logic both renderers need — small,
+pure, server-derived, imported by both. `time-migration.spec.ts` owns the `member` persona's timer
+state; any new spec that starts timers as that persona belongs in it, or must use a different actor.

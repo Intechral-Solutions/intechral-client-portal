@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
 import { FlashRegion } from '@/components/feedback/flash-region';
-import { RunningTimerBar } from '@/components/time/running-timer-bar';
+import { TimerPill } from '@/components/time/timer-pill';
 import { TimerProvider } from '@/components/time/timer-provider';
 import { usePageAnnouncement } from '@/hooks/use-page-announcement';
 import { usePanelState } from '@/hooks/use-panel-state';
@@ -189,9 +189,10 @@ export function OperatorShell({ children }: PropsWithChildren) {
                 ) : null}
 
                 <div data-shell-canvas>
-                    <UtilityBar workspace={workspace} collapsed={collapsed} />
+                    <UtilityBar workspace={workspace} collapsed={collapsed}>
+                        {auth.permissions.includes('time.log') ? <TimerPill /> : null}
+                    </UtilityBar>
 
-                    <RunningTimerBar />
                     <FlashRegion flash={flash} />
 
                     {/* `tabIndex={-1}` makes this both the skip link's destination and the repair

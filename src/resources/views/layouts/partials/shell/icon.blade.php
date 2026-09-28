@@ -28,6 +28,10 @@
         'menu' => '<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>',
         'x' => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
         'chevron-right' => '<path d="m9 18 6-6-6-6"/>',
+        'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
+        'square' => '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+        // Filled: a stop control. The outline form reads as an unchecked checkbox beside its label.
+        'square-filled' => '<rect width="14" height="14" x="5" y="5" rx="1.5" fill="currentColor" stroke="none"/>',
     ];
     // The neutral fallback for a key this renderer does not know (lucide `handshake`, as in React).
     $shellIconFallback = '<path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>';

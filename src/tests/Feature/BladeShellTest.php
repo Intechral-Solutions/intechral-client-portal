@@ -367,3 +367,64 @@ it('stamps no workspace on a guest Inertia page', function () {
         ->and(str_contains($html, 'data-drawer-default='))->toBeFalse()
         ->and(substr_count($html, "readItem('theme')"))->toBe(1);
 });
+
+/*
+ * EPIC-013 WP6 — the timer pill in the Blade utility bar (§18.4).
+ *
+ * These assert the server-rendered contract only: that the pill's mount point is inside the utility bar,
+ * that it is gated on `time.log`, and that the retired strip leaves nothing behind. Everything the pill
+ * then *does* is client behaviour, covered by `resources/js/shell/blade-timer.test.ts` and
+ * `tests/Browser/time-migration.spec.ts`. WP6 changes no timer endpoint, so there are deliberately no new
+ * controller tests here.
+ */
+
+it('mounts the timer pill inside the utility bar for an actor who may log time', function () {
+    $page = bladeShellPage(bladeShellActor('operator'), 'operator.tickets.index');
+
+    // Inside the bar, not a sibling of it: the pill is part of the sticky chrome, which is precisely
+    // what retires the A10.16 stacking defect — there is no strip below the bar to draw over it.
+    expect($page->query('//header[@data-shell-utility]//*[@data-shell-timer]')->length)->toBe(1)
+        ->and($page->query('//*[@data-shell-timer-trigger]')->length)->toBe(1)
+        ->and($page->query('//*[@data-shell-timer-tray]')->length)->toBe(1);
+
+    // It renders its idle state, so nothing about a running timer is disclosed server-side.
+    $trigger = $page->query('//*[@data-shell-timer-trigger]')->item(0);
+    expect($trigger->getAttribute('aria-label'))->toBe('Start timer')
+        ->and($trigger->getAttribute('aria-expanded'))->toBe('false')
+        ->and($trigger->getAttribute('aria-haspopup'))->toBe('dialog');
+
+    // The tray is a non-modal dialog, named, and closed until asked for.
+    $tray = $page->query('//*[@data-shell-timer-tray]')->item(0);
+    expect($tray->getAttribute('role'))->toBe('dialog')
+        ->and($tray->getAttribute('aria-label'))->toBe('Running timers')
+        ->and($tray->hasAttribute('hidden'))->toBeTrue();
+});
+
+it('withholds the timer pill from an actor without time.log', function () {
+    $actor = bladeShellActor('operator');
+    $actor->revokePermissionTo('time.log');
+    $actor->roles->each(fn ($role) => $role->revokePermissionTo('time.log'));
+    $actor = $actor->fresh();
+    expect($actor->can('time.log'))->toBeFalse();
+
+    $page = bladeShellPage($actor, 'operator.tickets.index');
+
+    // Visibility is not authorization — the endpoints keep their own `can:time.log` middleware either
+    // way (§27) — but an affordance the actor may not use is not drawn.
+    expect($page->query('//*[@data-shell-timer]')->length)->toBe(0);
+});
+
+it('retires the pre-Direction-D timer strip entirely', function () {
+    $actor = bladeShellActor('operator');
+    $html = test()->actingAs($actor)->get(route('operator.tickets.index'))->getContent();
+
+    // The strip's mount points, its tile hooks and its decorative hard-coded palette are all gone.
+    foreach (['id="timer-overlay"', 'id="timer-tiles"', 'timer-tile', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'] as $retired) {
+        expect(str_contains($html, $retired))->toBeFalse("still renders {$retired}");
+    }
+
+    // And exactly one global timer affordance survives (Direction D §12.1). Counted as DOM nodes,
+    // not as substrings: these are bare attributes, so `data-shell-timer=` never appears.
+    $page = bladeShellPage($actor, 'operator.tickets.index');
+    expect($page->query('//*[@data-shell-timer]')->length)->toBe(1);
+});

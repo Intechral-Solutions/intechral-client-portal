@@ -39,3 +39,70 @@ export function hasHorizontalOverflow(page: Page) {
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
 }
+
+/*
+ * EPIC-013 WP6 — the global timer pill and tray (Direction D §12.1, §12.2).
+ *
+ * Deliberately renderer-agnostic. React and Blade draw different markup but expose the same hooks and
+ * the same accessible names, so one set of helpers drives both — which is also what makes a crossing
+ * assertion meaningful: the same selector must find the same timer on either side of a document
+ * navigation. `data-timer-count` and `data-timer-running` carry the pill's *state* rather than its
+ * pixels, so the crossing tests can assert identity instead of appearance.
+ */
+
+/** The one global timer affordance. There must never be more than one on a page. */
+export function timerPill(page: Page) {
+    return page.locator('[data-shell-timer]');
+}
+
+export function timerTrigger(page: Page) {
+    return page.locator('[data-shell-timer-trigger]');
+}
+
+/** The pill's own inline Stop, which acts on the timer the pill is showing. */
+export function timerStop(page: Page) {
+    return page.locator('[data-shell-timer-stop]');
+}
+
+export function timerTray(page: Page) {
+    return page.getByRole('dialog', { name: 'Running timers' });
+}
+
+/** How many timers the server-reconciled pill currently knows about. */
+export async function runningTimerCount(page: Page): Promise<number> {
+    await expect(timerPill(page)).toBeAttached();
+
+    return Number(await timerPill(page).getAttribute('data-timer-count'));
+}
+
+export async function expectRunningTimers(page: Page, count: number) {
+    await expect(timerPill(page)).toHaveAttribute('data-timer-count', String(count));
+    await expect(timerPill(page)).toHaveAttribute(
+        'data-timer-running',
+        count > 0 ? 'true' : 'false',
+    );
+}
+
+export async function openTimerTray(page: Page) {
+    await timerTrigger(page).click();
+    await expect(timerTray(page)).toBeVisible();
+
+    return timerTray(page);
+}
+
+/** Leaves the actor with no running timer, whichever renderer is showing. */
+export async function stopAllTimers(page: Page) {
+    if ((await runningTimerCount(page)) === 0) {
+        return;
+    }
+
+    const tray = await openTimerTray(page);
+    const stops = tray.getByRole('button', { name: /^Stop timer/ });
+
+    for (let remaining = await stops.count(); remaining > 0; remaining--) {
+        await stops.first().click();
+        await expect(stops).toHaveCount(remaining - 1);
+    }
+
+    await expectRunningTimers(page, 0);
+}

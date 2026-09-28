@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
 
 import { signedIn } from './support/auth';
+import { timerPill } from './support/shell';
 
 /**
  * EPIC-011E WP5 critical flows: the project board as a React/Inertia page, keyboard-accessible
@@ -44,10 +45,11 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
 
     // Start a timer for this project so its elapsed clock is the SPA-navigation signal: a full
     // document reload would remount the app and the clock would restart from what the server
-    // last rendered, not keep ticking client-side. The running timer bar also renders its own
-    // "Project: <name>" link, so every click on the project's own name below is `exact: true`
-    // to avoid matching that one instead (a Playwright accessible-name match is substring by
-    // default). D4 blocks deleting a project with a running (or any) time entry against it, so
+    // last rendered, not keep ticking client-side. Since WP6 the signal is the timer PILL's clock
+    // rather than the retired strip's; the pill also carries a "Project: <name>" label, so every
+    // click on the project's own name below stays `exact: true` to avoid matching it (a Playwright
+    // accessible-name match is substring by default). D4 blocks deleting a project with a running
+    // (or any) time entry against it, so
     // the timer is stopped before the test ends and the fixture teardown can remove the project.
     const entryId = await page.evaluate(async (id) => {
         const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
@@ -66,11 +68,11 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
 
     await page.goto('/projects');
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
-    const clock = page.getByRole('region', { name: 'Active timers' }).locator('span.font-mono');
+    const clock = timerPill(page).locator('[data-timer-elapsed="wide"]');
     const firstReading = await clock.textContent();
     await expect(clock).not.toHaveText(firstReading ?? '', { timeout: 3000 });
 
@@ -78,7 +80,7 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     // is an Inertia visit each way; the timer keeps ticking uninterrupted throughout.
     await page.getByRole('link', { name: 'Milestones' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
@@ -118,11 +120,14 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
     await expect(toDoColumn.getByRole('link', { name: 'E2E keyboard move task' })).toBeVisible();
 
     // Focus followed the card to its new location, and the live region announced the result.
-    // (`[aria-live="polite"]` alone also matches the persistent RunningTimerBar's "Active
-    // timers" region; `.sr-only` is what distinguishes the board's own live region from it.)
+    // (`[aria-live="polite"]` alone also matches the shell's own announcer and, since WP6, the timer
+    // pill's start/stop announcer. Both carry a `data-shell-*` hook, so excluding them by attribute
+    // is what leaves the board's own live region.)
     await expect(moveButton).toBeFocused();
     await expect(
-        page.locator('[aria-live="polite"].sr-only:not([data-shell-announcer])'),
+        page.locator(
+            '[aria-live="polite"].sr-only:not([data-shell-announcer]):not([data-shell-timer-announce])',
+        ),
     ).toHaveText('Moved "E2E keyboard move task" to To Do, position 1 of 1.');
 
     // Persists after a reload: the move was a real server round trip, not a client-only effect.

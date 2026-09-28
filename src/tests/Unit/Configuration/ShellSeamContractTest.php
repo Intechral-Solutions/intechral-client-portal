@@ -97,6 +97,10 @@ it('keeps pages chrome-agnostic', function (string $forbidden) {
     '@/components/shell/drawer',
     '@/components/shell/utility-bar',
     '@/components/shell/operator-shell',
+    // WP6: the pill is shell chrome mounted by the utility bar. A page reaching for it would be
+    // building a second global timer affordance, which Direction D §12.1 permits exactly one of.
+    '@/components/time/timer-pill',
+    '@/components/time/timer-tray',
 ]);
 
 it('lets no page branch on the presentation family', function () {

@@ -1,8 +1,8 @@
 import { router } from '@inertiajs/react';
-import { Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
+import { TimerControl } from '@/components/time/timer-control';
 import { useTimers } from '@/components/time/timer-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,9 +31,14 @@ function formatMinutes(totalMinutes: number): string {
  * The task time panel (EPIC-011E §11, D6), replacing the embedded Blade `x-time-tracker` with
  * the persistent React timer provider (EPIC-011D). Start/stop targets this task directly through
  * the same canonical timer mutation path the Time page uses; no second timer state is kept here.
+ *
+ * EPIC-013 WP6: while a timer runs for this task the running indicator and Stop are the shared
+ * `TimerControl` (Direction D §12.3), so this surface, the pill and the tray all draw the running
+ * state from the same component and the same tokens. The idle form stays local because it also
+ * collects a description, which the generic control does not.
  */
 export function TaskTimePanel({ taskId, canLog, timeSummary }: TaskTimePanelProps) {
-    const { timers, startTimer, stopTimer, starting, stopping } = useTimers();
+    const { timers, startTimer, starting } = useTimers();
     const [description, setDescription] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -70,39 +75,15 @@ export function TaskTimePanel({ taskId, canLog, timeSummary }: TaskTimePanelProp
         }
     }
 
-    async function handleStop() {
-        if (!runningTimer) return;
-        setError(null);
-
-        try {
-            await stopTimer(runningTimer.id);
-        } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'Unable to stop timer.');
-        }
-    }
-
     return (
         <div className="space-y-3">
             {canLog ? (
                 runningTimer ? (
-                    <div className="flex items-center gap-2 text-sm text-[var(--text-success)]">
-                        <span
-                            className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--text-success)]"
-                            aria-hidden="true"
-                        />
-                        Running for this task
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto"
-                            disabled={stopping.includes(runningTimer.id)}
-                            onClick={() => void handleStop()}
-                        >
-                            <Square aria-hidden="true" />
-                            Stop timer
-                        </Button>
-                    </div>
+                    <TimerControl
+                        label="this task"
+                        payload={{ task_id: taskId }}
+                        running={runningTimer}
+                    />
                 ) : (
                     <form
                         onSubmit={(event) => void handleStart(event)}

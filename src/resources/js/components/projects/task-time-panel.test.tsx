@@ -44,12 +44,16 @@ it('shows a Start timer form when logTime is allowed and nothing is running for 
     await screen.findByRole('button', { name: 'Start timer' });
 });
 
-it('shows Running for this task and a Stop control when the timer bar has one for this task', async () => {
+it('shows the running indicator and a Stop control when a timer runs for this task', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([runningForTask(1)])));
     renderPanel();
 
-    await screen.findByText('Running for this task');
-    expect(screen.getByRole('button', { name: /Stop timer/ })).toBeInTheDocument();
+    // WP6: the shared `TimerControl` draws this state, so the Stop action names its context rather
+    // than repeating it as prose beside the button.
+    expect(
+        await screen.findByRole('button', { name: 'Stop timer: this task' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Running')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument();
 });
 
@@ -58,7 +62,7 @@ it('does not treat a timer running for a different task as running here', async 
     renderPanel({ taskId: 1 });
 
     await screen.findByRole('button', { name: 'Start timer' });
-    expect(screen.queryByText('Running for this task')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Stop timer/ })).not.toBeInTheDocument();
 });
 
 it('shows no controls without logTime, only the read-only summary', async () => {
