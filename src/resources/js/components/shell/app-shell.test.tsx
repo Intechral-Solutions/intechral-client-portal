@@ -190,6 +190,50 @@ it('dismisses a floating drawer on a click into the content', async () => {
     expect(screen.queryByRole('navigation', { name: 'Projects views' })).toBeNull();
 });
 
+describe('following a link inside the drawer', () => {
+    // jsdom does not navigate; stop the default so only the shell's own handling is observed.
+    function holdNavigation(event: Event) {
+        event.preventDefault();
+    }
+
+    beforeEach(() => document.addEventListener('click', holdNavigation, true));
+    afterEach(() => document.removeEventListener('click', holdNavigation, true));
+
+    it('dismisses a floating drawer, so it never covers the page it opened (§16)', async () => {
+        const actor = userEvent.setup();
+        mount(navigation([tasks], 'tasks'));
+
+        await actor.click(screen.getByRole('button', { name: 'Show workspace views' }));
+        setPanelFloating(true);
+        await actor.click(screen.getByRole('link', { name: 'My organization' }));
+
+        expect(screen.queryByRole('navigation', { name: 'Tasks views' })).toBeNull();
+    });
+
+    it('leaves a docked drawer where it is', async () => {
+        const actor = userEvent.setup();
+        mount(navigation([projects], 'projects'));
+
+        setPanelFloating(false);
+        await actor.click(screen.getByRole('link', { name: 'New project' }));
+
+        expect(screen.getByRole('navigation', { name: 'Projects views' })).toBeInTheDocument();
+    });
+
+    it('ignores a modified click, which opens a new tab and leaves this page in place', async () => {
+        const actor = userEvent.setup();
+        mount(navigation([tasks], 'tasks'));
+
+        await actor.click(screen.getByRole('button', { name: 'Show workspace views' }));
+        setPanelFloating(true);
+        await actor.keyboard('{Control>}');
+        await actor.click(screen.getByRole('link', { name: 'My organization' }));
+        await actor.keyboard('{/Control}');
+
+        expect(screen.getByRole('navigation', { name: 'Tasks views' })).toBeInTheDocument();
+    });
+});
+
 it('toggles the drawer with Ctrl+backslash but never while a field has focus', async () => {
     const actor = userEvent.setup();
     mount(navigation([tasks], 'tasks'));

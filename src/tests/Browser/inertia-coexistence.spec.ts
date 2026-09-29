@@ -14,7 +14,7 @@ test('Dashboard and Profile coexist with Blade pages and a persistent theme', as
 
     // WP4: the standalone header toggle is gone; Appearance lives in the account menu (§17.2).
     await openAccountMenu(page);
-    await page.getByRole('radio', { name: 'dark' }).click();
+    await page.getByRole('menuitemradio', { name: 'dark' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.keyboard.press('Escape');
     await page.reload();

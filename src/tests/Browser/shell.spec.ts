@@ -204,6 +204,148 @@ test('the drawer floats as an overlay at L and pinning docks it', async ({ page 
     ).toMatchObject({ projects: true });
 });
 
+test('following a floating drawer link closes the drawer over the page it opened', async ({
+    page,
+}) => {
+    // §16 / §25.3 flow 4: the overlay closes on navigation, not only on Esc and outside click.
+    // EPIC-013 WP8 found it staying open over the new page for a view in the same workspace.
+    await page.setViewportSize(L);
+    await signedIn(page);
+
+    await railLink(page, 'Tasks').click();
+    await expect(page).toHaveURL(/\/tasks$/);
+
+    await page.getByRole('button', { name: 'Show workspace views' }).click();
+    await drawerLink(page, 'Tasks', 'My organization').click();
+
+    await expect(page).toHaveURL(/\/tasks\?view=org$/);
+    await expect(page.getByRole('navigation', { name: 'Tasks views' })).toHaveCount(0);
+    // Nothing floats over the canvas, and the toggle is back for the next deliberate open.
+    expect((await page.locator('[data-shell-canvas]').boundingBox())?.x).toBeCloseTo(64, 0);
+    await expect(page.getByRole('button', { name: 'Show workspace views' })).toBeVisible();
+});
+
+test('an Inertia page paints with the remembered theme and panel state, without shell shift', async ({
+    page,
+}) => {
+    // §25.3 flow 1 on the Inertia renderer; `blade-shell.spec.ts` asserts the Blade half.
+    await page.setViewportSize(XL);
+    await signedIn(page);
+
+    for (const [theme, panel, canvasX] of [
+        ['dark', 'collapsed', 64],
+        ['light', 'open', 64 + 248],
+    ] as const) {
+        await page.addInitScript(
+            ([storedTheme, storedPanel]) => {
+                localStorage.setItem('theme', storedTheme);
+                localStorage.setItem(
+                    'shell.operational.panel',
+                    JSON.stringify({ projects: storedPanel }),
+                );
+
+                // Nothing of the React shell paints before JavaScript (no SSR), so every frame is
+                // recorded until the canvas exists and a few after; every one must already agree.
+                const probe = { themes: [] as string[], canvasX: [] as number[], shellShift: 0 };
+                (window as unknown as { __probe: typeof probe }).__probe = probe;
+
+                const frame = () => {
+                    const canvas = document.querySelector('[data-shell-canvas]');
+
+                    probe.themes.push(document.documentElement.dataset.theme ?? '');
+
+                    if (canvas) {
+                        probe.canvasX.push(Math.round(canvas.getBoundingClientRect().x));
+                    }
+
+                    if (probe.canvasX.length < 10) {
+                        requestAnimationFrame(frame);
+                    }
+                };
+
+                requestAnimationFrame(frame);
+
+                // Only shell chrome counts here: page bodies reflow once when the swap fonts land
+                // (`font-display: swap`, EPIC-013 A5.7), which is not a shell shift.
+                new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries() as unknown as {
+                        value: number;
+                        sources: { node: Node | null }[];
+                    }[]) {
+                        const inShell = entry.sources.some((source) =>
+                            (source.node as Element | null)?.closest?.(
+                                '[data-shell-rail], [data-shell-drawer], [data-shell-utility]',
+                            ),
+                        );
+                        const isCanvas = entry.sources.some((source) =>
+                            (source.node as Element | null)?.hasAttribute?.('data-shell-canvas'),
+                        );
+
+                        if (inShell || isCanvas) {
+                            probe.shellShift += entry.value;
+                        }
+                    }
+                }).observe({ type: 'layout-shift', buffered: true });
+            },
+            [theme, panel] as const,
+        );
+
+        await page.goto('/projects');
+        await expect(page.locator('[data-shell-canvas]')).toBeVisible();
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () =>
+                        (window as unknown as { __probe: { canvasX: number[] } }).__probe.canvasX
+                            .length,
+                ),
+            )
+            .toBeGreaterThanOrEqual(10);
+
+        const probe = await page.evaluate(
+            () =>
+                (
+                    window as unknown as {
+                        __probe: { themes: string[]; canvasX: number[]; shellShift: number };
+                    }
+                ).__probe,
+        );
+
+        expect(new Set(probe.themes)).toEqual(new Set([theme]));
+        expect(new Set(probe.canvasX)).toEqual(new Set([canvasX]));
+        expect(probe.shellShift).toBe(0);
+    }
+});
+
+test('an Inertia visit is announced, and focus is repaired only when the visit destroyed it', async ({
+    page,
+}) => {
+    // §25.3 flow 5, the S2 policy (A1.8), in a real browser.
+    await page.setViewportSize(XL);
+    await signedIn(page);
+
+    const announcer = page.locator('[data-shell-announcer]');
+
+    // A rail link survives the visit, so focus stays on it.
+    await railLink(page, 'Projects').focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/projects$/);
+    await expect(announcer).toHaveText('Projects');
+    await expect(railLink(page, 'Projects')).toBeFocused();
+
+    // An in-page link is inside the subtree the visit replaces, so focus is repaired to main.
+    await page.locator('main a[href*="/board"]').first().focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/board$/);
+    await expect(page.locator('main#main-content')).toBeFocused();
+    await expect(announcer).toHaveText((await page.locator('main h1').textContent())?.trim() ?? '');
+
+    // History traversal is announced too.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/projects$/);
+    await expect(announcer).toHaveText('Projects');
+});
+
 test('Escape dismisses a floating drawer and returns focus to the rail toggle', async ({
     page,
 }) => {

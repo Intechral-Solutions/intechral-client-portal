@@ -90,7 +90,7 @@ test('React → Blade → React keeps theme, panel state, active state and histo
 
     // Choices made in React…
     await openAccountMenu(page);
-    await page.getByRole('radio', { name: 'dark' }).click();
+    await page.getByRole('menuitemradio', { name: 'dark' }).click();
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Collapse workspace views' }).click();
     await expect(page.getByRole('navigation', { name: 'Projects views' })).toHaveCount(0);
@@ -355,7 +355,10 @@ test('the Blade account menu is personal, keyboard-operable, and owns Appearance
     await expect(reactShell(page)).toHaveCount(1);
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await openAccountMenu(page);
-    await expect(page.getByRole('radio', { name: 'dark' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('menuitemradio', { name: 'dark' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
 });
 
 test('keyboard: the skip link is first, and the rail and panel are plain Tab stops', async ({

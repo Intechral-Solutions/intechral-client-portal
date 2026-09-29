@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { inertiaSpies, resetInertiaMock } from '@/test/inertia';
@@ -113,26 +113,63 @@ it('anchors security, connected accounts and sessions into the existing profile 
     );
 });
 
-it('absorbs the theme toggle as an Appearance radiogroup with Light and Dark only', async () => {
+it('absorbs the theme toggle as an Appearance group of Light and Dark menu radios only', async () => {
     const actor = userEvent.setup();
     render(<AccountMenu user={user} />);
 
     await openMenu(actor);
 
-    const group = await screen.findByRole('radiogroup', { name: 'Appearance' });
-    const options = screen.getAllByRole('radio');
+    // Menu-owned radios, as the Blade menu renders them: a radiogroup is not a permitted child of a
+    // menu, and a plain radio sits outside the menu's keyboard focus.
+    const group = await screen.findByRole('group', { name: 'Appearance' });
+    const options = within(group).getAllByRole('menuitemradio');
 
     expect(options.map((option) => option.textContent)).toEqual(['light', 'dark']);
-    expect(group).toBeInTheDocument();
     // L6: a System theme is NEXT and is not pulled into this foundation.
-    expect(screen.queryByRole('radio', { name: 'system' })).toBeNull();
+    expect(screen.queryByRole('menuitemradio', { name: 'system' })).toBeNull();
 
-    expect(screen.getByRole('radio', { name: 'light' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('menuitemradio', { name: 'light' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
 
-    await actor.click(screen.getByRole('radio', { name: 'dark' }));
+    await actor.click(screen.getByRole('menuitemradio', { name: 'dark' }));
 
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(localStorage.getItem('theme')).toBe('dark');
+    expect(screen.getByRole('menuitemradio', { name: 'dark' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    // Choosing an appearance keeps the menu open, as the toggle it replaced did.
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+});
+
+it('reaches Appearance from the keyboard, inside the menu’s own arrow-key focus', async () => {
+    // EPIC-013 WP8: plain radio buttons inside the menu were skipped by the arrow keys and
+    // unreachable by Tab, so the theme could not be changed without a pointer.
+    localStorage.setItem('theme', 'light');
+    document.documentElement.dataset.theme = 'light';
+    const actor = userEvent.setup();
+    render(<AccountMenu user={user} />);
+
+    screen.getByRole('button', { name: /^Account menu:/ }).focus();
+    await actor.keyboard('{Enter}');
+    await screen.findByRole('menu');
+
+    const dark = screen.getByRole('menuitemradio', { name: 'dark' });
+
+    expect(dark).toHaveAttribute('aria-checked', 'false');
+
+    for (let step = 0; step < 8 && document.activeElement !== dark; step++) {
+        await actor.keyboard('{ArrowDown}');
+    }
+
+    expect(dark).toHaveFocus();
+
+    await actor.keyboard('{Enter}');
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
 });
 
 it('signs out by posting, never by navigating', async () => {

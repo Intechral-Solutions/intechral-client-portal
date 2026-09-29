@@ -119,12 +119,41 @@ export function OperatorShell({ children }: PropsWithChildren) {
             }
         }
 
+        /**
+         * Following one of the panel's own links also dismisses it while it floats (§16), so the
+         * overlay never covers the page it just opened. Like the nav sheet this is a click handler,
+         * not an effect: a view within the same workspace changes no prop an effect could watch.
+         * A modified click opens a new tab and leaves this page where it is, so it is ignored. Focus
+         * is left to the navigation policy (A1.8), which repairs it once the visit lands.
+         */
+        function onClick(event: MouseEvent) {
+            const target = event.target as Element | null;
+
+            if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey ||
+                !target?.closest('[data-shell-drawer] a[href]') ||
+                !panelIsFloating()
+            ) {
+                return;
+            }
+
+            setOpenedByUser(false);
+            returnFocus.current = false;
+            close();
+        }
+
         document.addEventListener('keydown', onKeyDown);
         document.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('click', onClick);
 
         return () => {
             document.removeEventListener('keydown', onKeyDown);
             document.removeEventListener('pointerdown', onPointerDown);
+            document.removeEventListener('click', onClick);
         };
     }, [collapsed, close]);
 

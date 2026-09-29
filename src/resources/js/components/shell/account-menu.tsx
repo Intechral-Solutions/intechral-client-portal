@@ -4,12 +4,15 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar } from '@/components/ui/avatar';
 import { focusRing } from '@/components/ui/control-metrics';
 import { useAppearance } from '@/hooks/use-appearance';
+import type { Appearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
 import { logout } from '@/routes';
 import { show as profile } from '@/routes/profile';
@@ -111,36 +114,39 @@ function AccountTrigger({ user }: { user: AuthUser }) {
 /**
  * Appearance absorbs the standalone theme toggle the pre-WP4 shell carried in its header (§17.2).
  * Light and Dark only — a System theme is NEXT and is not pulled into this foundation (L6).
+ *
+ * The options are the menu's own radio items (`group` > `menuitemradio`, as the Blade menu renders
+ * them), so they sit in the menu's arrow-key focus. Plain radio buttons inside a menu were
+ * unreachable from the keyboard: the menu owns focus, so Arrow keys skipped them and Tab could not
+ * reach them (EPIC-013 WP8). Choosing one keeps the menu open, as the toggle it replaced did.
  */
 function AppearanceControl() {
     const { appearance, setAppearance } = useAppearance();
 
     return (
         <div className="px-3 py-2">
-            <div
-                role="radiogroup"
+            <DropdownMenuRadioGroup
                 aria-label="Appearance"
+                value={appearance}
+                onValueChange={(value) => setAppearance(value as Appearance)}
                 className="flex items-center gap-1 rounded-control bg-surface-sunken p-0.5"
             >
                 {(['light', 'dark'] as const).map((option) => (
-                    <button
+                    <DropdownMenuRadioItem
                         key={option}
-                        type="button"
-                        role="radio"
-                        aria-checked={appearance === option}
-                        onClick={() => setAppearance(option)}
+                        value={option}
+                        onSelect={(event) => event.preventDefault()}
                         className={cn(
-                            'flex-1 rounded-[3px] px-2 py-1 text-xs font-medium capitalize transition-colors duration-motion-fast',
-                            appearance === option
-                                ? 'bg-ink text-on-ink'
-                                : 'text-text-secondary hover:text-text',
+                            'flex-1 cursor-pointer rounded-[3px] px-2 py-1 text-center text-xs font-medium capitalize transition-colors duration-motion-fast',
+                            'text-text-secondary hover:text-text data-[highlighted]:text-text',
+                            'data-[state=checked]:bg-ink data-[state=checked]:text-on-ink',
                             focusRing,
                         )}
                     >
                         {option}
-                    </button>
+                    </DropdownMenuRadioItem>
                 ))}
-            </div>
+            </DropdownMenuRadioGroup>
         </div>
     );
 }

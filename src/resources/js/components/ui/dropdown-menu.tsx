@@ -13,6 +13,9 @@ import { cn } from '@/lib/utils';
 export const DropdownMenu = Menu.Root;
 export const DropdownMenuTrigger = Menu.Trigger;
 export const DropdownMenuGroup = Menu.Group;
+/** Radio rows inside a menu (`group` > `menuitemradio`), so they join the menu's arrow-key focus. */
+export const DropdownMenuRadioGroup = Menu.RadioGroup;
+export const DropdownMenuRadioItem = Menu.RadioItem;
 
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof Menu.Content>,

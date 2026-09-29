@@ -24,7 +24,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-011D](./EPIC-011D-time-tracking-timer.md) | Time Tracking and Persistent Timer Migration (EPIC-011 Phase D) | **Verified** |
 | [EPIC-011E](./EPIC-011E-projects-kanban.md) | Projects and Kanban Migration (EPIC-011 Phase E) | **Verified** |
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
-| [EPIC-013](./EPIC-013-direction-d-shell-design-system.md) | Direction D Application Shell and Design System Foundation | **Planned** |
+| [EPIC-013](./EPIC-013-direction-d-shell-design-system.md) | Direction D Application Shell and Design System Foundation | **Verified** |
 
 ## Epic Lifecycle
 

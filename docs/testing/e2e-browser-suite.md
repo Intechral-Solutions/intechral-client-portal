@@ -132,3 +132,8 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   `home.spec.ts` holds no shared-resource ownership: Home is read-only, creates no fixture and starts
   no timer. The board's page-frame flow lives in `board-migration.spec.ts`, which already owns project
   fixtures and their cleanup.
+- After EPIC-013 WP8 (Amendment 13), with three shell flows added to `shell.spec.ts`: **92/92 passed,
+  3 workers, 4.5 minutes**, 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 application `5xx`. WP8 added
+  three tests and no logins: all three use the default `operator` persona and create no fixture and no
+  timer. This is the authoritative full-suite figure at the close of EPIC-013 (A12.14's 89/89 predated
+  WP7's remediation).

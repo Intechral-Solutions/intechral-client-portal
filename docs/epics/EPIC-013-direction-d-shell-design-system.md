@@ -1,6 +1,6 @@
 # EPIC-013: Direction D Application Shell and Design System Foundation
 
-**Status:** Planned
+**Status:** Verified (WP0–WP8 complete, 2026-09-28: every [§29](#29-exit-criteria) exit criterion checked, four with a documented deviation, and the one NVDA smoke pass run by the owner on Windows; exhaustive assistive-technology, real-device and cross-browser testing stays with FINAL HARDENING per §22.3 — see [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28))
 **Class:** UX foundation (Product Roadmap [NEXT — Product/UX foundation](../product/product-roadmap.md#next--productux-foundation): *New application shell* + *Design system*)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (canonical, approved 2026-09-25, revision 2)
 **Product direction:** [Platform Product & UX Direction](../product/platform-product-ux-direction.md) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
@@ -8,7 +8,7 @@
 **Prerequisites:** [EPIC-011A](./EPIC-011A-react-foundation-coexistence.md) (Implemented), [EPIC-011B](./EPIC-011B-dashboard-profile.md) (Implemented), [EPIC-011C](./EPIC-011C-authentication-invitations.md) (Verified), [EPIC-011D](./EPIC-011D-time-tracking-timer.md) (Verified), [EPIC-011E](./EPIC-011E-projects-kanban.md) (Verified), [EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md) (Verified)
 **Brand prerequisite:** Satisfied — canonical owner-supplied SVGs are committed at `src/resources/images/brand/` (path reconciled in WP0, gate G2)
 **Planning baseline:** `main` @ `6ea4135`, working tree clean, verified 2026-09-25
-**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist** · [Amendment 9 (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27): POST-WP4 E2E hardening (not WP4, not WP5) — diagnosed why the six-spec failure group from A8.18 passed individually but failed together: parallel Playwright workers shared one Laravel session per persona, so one worker's flash/validation state could land in another's page, and a separate defect let a "fresh" manager context inherit the project's own operator auth. Remediated with a session minted per worker per persona (`support/auth.ts`), cookies-only and never written to disk; an explicit `contextFor('anonymous')` for contexts that must start signed out; and an explicit `workers: 3` cap, because a worker mints a persona's session at most once for its whole lifetime, so the cap bounds that persona's total real logins for the run regardless of spec-file count or machine core count. Three dedicated seeded fixtures (`e2e-login-flow`, `e2e-profile-mutation`, `e2e-signout`, via `DevSeeder`) moved authentication-subject flows off the reusable operator/member personas' own Fortify buckets. Full suite now 64/64 at normal parallel configuration (3 workers, ~3.3 min), 12 `POST /login` all 302, 0 `429`/`419`/5xx. `BrowserAuthContractTest` rewritten for the new architecture; login budget and identity table recorded in `docs/testing/e2e-browser-suite.md`. A separately reported dev-environment HTTP 400 was traced to the owner's browser sending a Cookie header nginx's default header-buffer limit rejects — unrelated to this work, no repository change · [Amendment 10 (2026-09-27)](#amendment-10-wp5-results-2026-09-27): WP5 results — Blade renders the canonical WP3 navigation model through Direction D shell partials (rail, docked-or-hidden panel, utility bar with breadcrumb, personal account menu, native-dialog nav sheet, brand mark) using the same `data-shell-*` hooks as React, so one unlayered geometry block lays out both renderers; `ShellComposer` bound once to `layouts.app`; one shared pre-paint bootstrap (`resources/js/shell/bootstrap.js`) inlined first in both roots, parity-tested against React's `resolvePanel` over 144 cases, 0 CLS measured; `LegacyShellNavigation`, `navigationLegacy`, the old nav bar, theme toggle and footer deleted; React→Blade→React with history, authorization, Resources, keyboard, XL/L/M/S and 200% reflow verified in Chromium; one Blade stacking defect and one vacuous WP4 seam guard found and fixed; full Playwright 74/74 on 3 workers, 12 logins all 302, 0 × 429/419/5xx
+**Amendments:** [Amendment 1 (2026-09-25)](#amendment-1-wp0-results-2026-09-25): WP0 results — G1 font delivery locked with measured payloads, G2 brand assets moved and consumption proven, G3 confirmed across seven actor profiles, S1 confirmed, S2 overturned in part, token and navigation baselines, fourteen plan corrections, WP1a handoff · [Amendment 2 (2026-09-25)](#amendment-2-wp1a-results-2026-09-25): WP1a results — legacy-namespace rename landed (13 utilities, 59+ call sites), the F1 census corrected again (a live `hover:bg-surface` collision-in-waiting found and neutralized, undercounted by the Amendment 1 methodology), all ten React `text-primary` sites individually and deliberately resolved, `./dev check` green · [Amendment 3 (2026-09-25)](#amendment-3-wp1b-results-2026-09-25): WP1b results — F2 census reproduced exactly (50+1 sites), six compatibility variables defined, `--surface-elevated → var(--bg-surface)` correction verified in Chromium, `--accent-success → var(--success)` verified, a second (previously undocumented) contrast debt found on the `--surface-accent`/`--accent` dark-mode pairing alongside the known `--surface-muted`/`--text-muted` one, both handed forward undisguised, `./dev check` green · [Amendment 4 (2026-09-25)](#amendment-4-wp1c-results-2026-09-25): WP1c results — the Direction D semantic layer lands (35 colour + 2 shadow + 6 motion tokens, light and dark, `--ds-*` custom properties exposed through `@theme inline`); a custom-property collision (F3) and a Tailwind-token collision (F4) found and resolved inside the slice; `ring → focus` and `destructive → danger` remapped on measured evidence, every other alias held, `primary` held; the ten-screen matrix plus CMS run in both themes on seeded fixtures with no regression; full gate green on the WP1c tree (the literal `./dev check` blocked only by two pre-existing environment conditions, A4.17) · [Amendment 5 (2026-09-25)](#amendment-5-wp1d-results-2026-09-25): WP1d results — IBM Plex Sans/Mono and static Newsreader self-hosted as ten WOFF2 faces (latin 143.3 KiB of the 180 KB budget, Plex Sans latin-ext conditional), OFL licences committed, fonts.bunny.net removed from both root views, Plex Sans 400/500 preloaded through one shared partial; zero external font requests, density gate 0 px and the matrix regression-free in both themes, no metric adjustment, WP1a–WP1c layers byte-identical, `./dev check` green · [Amendment 6 (2026-09-25)](#amendment-6-wp2-results-2026-09-25): WP2 results — `primary` flipped from indigo to Direction D ink after all 13 accent-meaning consumer groups were made explicit, Button/Input/Textarea/NativeSelect on one explicit control-height scale (36 px, font-independent), dialog/menu/alert/pagination restyled on the scrim/overlay/motion tokens with reduced-motion handled in the token layer, canonical `Status` (glyph + label + tone) and `Avatar` created and adopted by their live consumers, `Progress` reworked in place, `Section`/`PageHeader` reworked, `Tabs`/`Tooltip`/`Popover`/`Tag`/`Skeleton`/`EmptyState`/`ErrorState` deferred for want of a live consumer (no dependency added), the 21-route matrix regression-free (Blade pixel-identical), `./dev check` green (with a post-review remediation, A6.25: a dedicated `control-edge` token gives interactive control boundaries ≥ 3:1; the owner confirmed the narrowed component scope) · [Amendment 7 (2026-09-25)](#amendment-7-wp3-results-2026-09-25): WP3 results — `NavigationBuilder` reshaped to the presentation-neutral workspace contract (nine workspaces including the transitional G3 `resources` item, `context`/`presentation` split, `ContextKind`/`PanelDefault` enums, server-computed active state with explicit route names and most-specific-wins resolution, the three A1.10 collisions fixed and pinned), the "Manage" grouping retired from the payload and from both renderers with all six destinations preserved, `shell` + `auth.user.avatar` shared props added and the Blade `ShellComposer` replacing the `@php` builder call in the view layer, one temporary `LegacyShellNavigation` seam so WP3 ships before the shell exists, the R9 leakage and collision tests written **before** the reshape and then rewritten as the new contract's assertions (NavigationBuilderTest 3 → 60 cases, plus ShellContractTest and InitialsTest), no cookie added (S1 stands), `./dev check` green. **WP4 is not started: no Direction D shell exists** · [Amendment 8 (2026-09-26)](#amendment-8-wp4-results-2026-09-26): WP4 results — the Direction D operator shell is live for every Inertia page (`AppShell` as the single presentation boundary, `Rail`, `Drawer`, `UtilityBar`, `Breadcrumb`, `ViewSwitcher`, `NavSheet`, `AccountMenu`, `SkipLink`, `BrandMark`, `ShellLink`), all 12 `Page.layout` lines flipped and the pre-WP4 header, `NavigationLink` and the 0-byte favicon deleted; the panel's state, persistence and L pin land in `localStorage` with no cookie (S1 stands) and twelve malformed-storage cases asserted; the account menu is personal-only with server-derived initials and Appearance absorbing the theme toggle; width classes XL/L/M/S are CSS-only, with docked-vs-overlay decided by CSS alone; the S2 announce-and-repair focus policy implemented. **Real-browser validation earned its keep: six defects passed a green jsdom suite and were caught only in Chromium** (A8.12) — initial focus stolen from the first Tab, every width class inert because the shell CSS sat in `@layer components`, a docked panel dismissed by content clicks (breaking board drags), an unbidden 248px overlay covering the canvas at L/M, a duplicated heading outline, and an invented `+ ` label prefix. `navigationLegacy` left the Inertia payload and survives only for the Blade partial WP5 replaces. `./dev check` green. Post-review remediation (A8.18): the browser suite was found to be structurally overrunning Fortify's login limiter — 114 `POST /login` per run, 45 refused, 13 of them added by WP4's own spec — and now authenticates once per persona and reuses the cookies, taking logins to 10 per run with 1 refusal; the full suite remains at **50 passed / 13 failed** in six older specs whose root cause is unresolved, plus one unexplained HTTP 429 in 10 logins — recorded as outstanding follow-up (A8.18), not as a passing gate. **WP5 is not started: no Blade shell partials exist** · [Amendment 9 (2026-09-27)](#amendment-9-post-wp4-e2e-hardening-2026-09-27): POST-WP4 E2E hardening (not WP4, not WP5) — diagnosed why the six-spec failure group from A8.18 passed individually but failed together: parallel Playwright workers shared one Laravel session per persona, so one worker's flash/validation state could land in another's page, and a separate defect let a "fresh" manager context inherit the project's own operator auth. Remediated with a session minted per worker per persona (`support/auth.ts`), cookies-only and never written to disk; an explicit `contextFor('anonymous')` for contexts that must start signed out; and an explicit `workers: 3` cap, because a worker mints a persona's session at most once for its whole lifetime, so the cap bounds that persona's total real logins for the run regardless of spec-file count or machine core count. Three dedicated seeded fixtures (`e2e-login-flow`, `e2e-profile-mutation`, `e2e-signout`, via `DevSeeder`) moved authentication-subject flows off the reusable operator/member personas' own Fortify buckets. Full suite now 64/64 at normal parallel configuration (3 workers, ~3.3 min), 12 `POST /login` all 302, 0 `429`/`419`/5xx. `BrowserAuthContractTest` rewritten for the new architecture; login budget and identity table recorded in `docs/testing/e2e-browser-suite.md`. A separately reported dev-environment HTTP 400 was traced to the owner's browser sending a Cookie header nginx's default header-buffer limit rejects — unrelated to this work, no repository change · [Amendment 10 (2026-09-27)](#amendment-10-wp5-results-2026-09-27): WP5 results — Blade renders the canonical WP3 navigation model through Direction D shell partials (rail, docked-or-hidden panel, utility bar with breadcrumb, personal account menu, native-dialog nav sheet, brand mark) using the same `data-shell-*` hooks as React, so one unlayered geometry block lays out both renderers; `ShellComposer` bound once to `layouts.app`; one shared pre-paint bootstrap (`resources/js/shell/bootstrap.js`) inlined first in both roots, parity-tested against React's `resolvePanel` over 144 cases, 0 CLS measured; `LegacyShellNavigation`, `navigationLegacy`, the old nav bar, theme toggle and footer deleted; React→Blade→React with history, authorization, Resources, keyboard, XL/L/M/S and 200% reflow verified in Chromium; one Blade stacking defect and one vacuous WP4 seam guard found and fixed; full Playwright 74/74 on 3 workers, 12 logins all 302, 0 × 429/419/5xx · [Amendment 11 (2026-09-28)](#amendment-11-wp6-results-2026-09-28): WP6 results · [Amendment 12 (2026-09-28)](#amendment-12-wp7-results-2026-09-28): WP7 results · [Amendment 13 (2026-09-28)](#amendment-13-wp8-hardening-and-verification-2026-09-28): WP8 hardening and verification — ten-screen matrix, responsive, keyboard, renderer continuity and performance re-run against WP0; two shell defects found in Chromium and fixed (floating drawer not closing on navigation; React Appearance unreachable by keyboard); legacy Blade contrast debt inventoried, not relabelled; alias/width register, CI handoff and deferred-work list closed; the owner's NVDA smoke pass passed on both renderers; every §29 criterion checked; **status Verified**
 
 ---
 
@@ -89,7 +89,7 @@ This epic delivers two adjacent [Product Roadmap](../product/product-roadmap.md)
 |---|---|---|
 | NOW | Critical Helpdesk hardening ([EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md)) | Complete (Verified) |
 | NOW | Product/UX rebase; Claude Design brief and exploration | Complete (Direction D approved) |
-| **NEXT** | **Direction D shell + design system (this epic)** | **Planned** |
+| **NEXT** | **Direction D shell + design system (this epic)** | **Verified** (2026-09-28, [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28)) |
 | NEXT | Lightweight CI baseline | Follows this epic ([§30](#30-ci-handoff)) |
 | NEXT | Tasks overhaul · Timer UX · Projects UX expansion | After CI |
 | LATER | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS | Unchanged |
@@ -1444,6 +1444,8 @@ Four independently revertible slices.
 
 **Exit:** [§29](#29-exit-criteria) satisfied.
 
+- **Verification run (2026-09-28) — results in [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28).** Every item above is done, including the one NVDA smoke pass, run by the owner on Windows on both renderers (A13.7). The ten-screen matrix shows no regression and inventories the legacy Blade contrast debt it carries; the responsive pass and keyboard walkthrough found two Direction D shell defects, both fixed with coverage (A13.10): a floating drawer that stayed open over the page it had just opened, and a React Appearance control that could not be reached from the keyboard. Shell chunk +7.6 KB gzip against WP0, fonts within budget with no external origin, zero shell layout shift. No page was migrated. §29 is met, four criteria with a documented deviation (A13.16), and the epic is **Verified**. Implemented on the WP7 tree (`4def7c6`); not yet committed.
+
 ## 29. Exit criteria
 
 1. Direction D semantic tokens exist for light and dark on the existing `data-theme` no-flash contract, exposed through `@theme inline`, with no component referencing a hex value.
@@ -1471,6 +1473,8 @@ The [Product Roadmap](../product/product-roadmap.md#lightweight-ci-baseline) pla
 
 Two notes this epic hands forward: the Playwright suite grows by roughly twelve shell flows, which affects CI runtime budgeting; and the production build now emits self-hosted font assets, which the clean-checkout build must produce correctly.
 
+**Recorded at epic close:** [A13.18](#a1318-ci-handoff-30-as-the-epic-closes) gives the final gate list, the browser suite's real size and runtime (92 tests, 3 workers, 4.5 minutes), the constraints CI must keep (the worker cap, never running the full Vitest and Playwright suites at once, the self-hosted fonts and the disk-read bootstrap), and the known debts it inherits.
+
 ## 31. Deferred follow-on work
 
 | Deferred | Goes to |
@@ -1494,6 +1498,14 @@ Two notes this epic hands forward: the Playwright suite grows by roughly twelve 
 | The ten remaining `max-w-*` pages | Their product epics |
 | Exhaustive screen-reader matrix, real-device, cross-browser | FINAL HARDENING |
 | Two optional shell visual snapshots | Proposed separately ([§25.3](#253-playwright)) |
+| **Legacy Blade page-body contrast** (A13.4): `--text-muted` used as text, hard-coded priority pills, the dark-mode overdue queue row (1.05:1), white on legacy `--accent`, sub-3:1 legacy field edges; plus A4.8's `draft` and `open`/`Built-in` badges | Each Blade module's product epic (Helpdesk, Finance, Directory, System); the two badges with their `Status` adoption |
+| `tasks.index` table clipped, not scrollable, at S inside its own `overflow-hidden` wrapper (A13.5) | Tasks overhaul (`DataTable` conventions) |
+| Duplicate `Breadcrumb` landmark on `projects/tasks/show.tsx` (A13.12) — created when WP4's shell breadcrumb joined the page's pre-epic trail; retained out of scope by owner decision | The Projects/Tasks product epic, together with §13.2's page-supplied trail segment |
+| Vacuous Pest guards: `BrowserAuthContractTest.php:84`, `ProjectIntegrityTest.php:323` (A13.13) | Test-hygiene follow-up |
+| `tests/Browser` neither type-checked nor linted; Vitest/jsdom load sensitivity (A11.17, A12.14 — reproduced again in A13.15) | Lightweight CI baseline / test infrastructure |
+| Standalone-task E2E fixture leak, one row per full run (A9.7); operator-persona timer isolation (A11.15) | Test infrastructure |
+| Lockfile caret inconsistency (A11.2) | Next dependency change |
+| `pageshow`/bfcache resync for the Blade shell (A10.16; not reproduced in Chromium, A13.8) | Final hardening |
 
 ### 31.1 Shell presentation parity / unification (Future)
 
@@ -5104,3 +5116,437 @@ with fixture counts unchanged. The 89/89 figure in A12.14 stands as evidence for
 not as something this remediation pass re-produced.
 
 **Recommendation: WP7 is ready to commit.**
+
+---
+
+## Amendment 13: WP8 Hardening and Verification (2026-09-28)
+
+**Status:** WP8 (hardening and verification) run on the committed WP7 tree (`4def7c6`); **not yet
+committed**. This is the WP8 record; it does not revise Amendments 1–12. Every §28 WP8 item is done.
+The one NVDA smoke pass could not be run from this Linux/WSL environment, so it was held open as a
+manual gate until the owner ran it on Windows; it passed (A13.7). With it, every §29 criterion is
+checked (A13.16) and the epic is **Verified** (A13.20).
+
+WP8 is the last work package; there is no WP9. It migrated no page, adopted `PageFrame` nowhere new,
+created no `EntityHeader` consumer and gave `reading` no consumer. No route, endpoint, migration,
+permission, policy, controller, model, service, middleware, Docker or CI file changed, and no
+dependency was added.
+
+### A13.1 Scope, as the committed plan defines it
+
+[§28 WP8](#wp8--hardening-and-verification): re-run the ten-screen matrix in both themes and both
+renderers; a full responsive pass at XL/L/M/S including 390 px; a keyboard walkthrough plus one NVDA
+smoke pass on the shell; mixed Blade/Inertia continuity; re-measure shell chunk, first paint and font
+payload against WP0; audit the Pest, Vitest and Playwright suites for regressions; close the alias/width
+register, the CI handoff note, the deferred-work list and the epic status. Exit: [§29](#29-exit-criteria).
+
+The first WP8 brief framed it as a page-migration package with a WP9 after it. The committed plan says
+neither — §28, §19.3, §31 and R11 leave the ten `max-w-*` pages to their product epics, and the epic
+ends at WP8 — so implementation stopped before any change and the owner confirmed this reading.
+
+Handoffs honoured: A1.15 (seed the matrix fixtures, A13.2), A1.3/A2.17/A4.8 (the muted badge debt,
+A13.4), A12.15 (`reading` has no consumer, A13.17), A10.16 (the bfcache concern, A13.8).
+
+### A13.2 Local verification fixtures
+
+The development database again held 0 invoices, 0 CRM companies and 0 CMS pages, so screens 8 and 9
+(and `cms.show`) would have been vacuous. Created with the existing factories exactly as A4.10/A5.12
+did, pinned to existing users, no repository change:
+
+| Row | Mechanism | Purpose |
+|---|---|---|
+| invoice #6 `INV-WP8` (draft, client user 2, created by 1) + items #9, #10 | `Invoice::factory()->draft()`, `InvoiceItem::factory()->count(2)` | Screen 8 (edit, show) and the `draft` badge debt |
+| CRM company #5, a 67-character name with latin-ext glyphs, + contact #5 "Łukasz Wójcik" | `CrmCompany::factory()`, `CrmContact::factory()` | Screen 9, long-name wrapping, latin-ext font path |
+| CMS page #5 `wp8-fixture-page` (published) | `CmsPage::factory()->published()` | `cms.show` |
+
+Screen 5 used the existing ticket #4, screen 7 role #2 and screen 3 project #468. All six rows are
+deleted after verification (A13.15). Pre-existing E2E residue was left untouched.
+
+### A13.3 Ten-screen compatibility matrix
+
+§25.4's screens (A1.15's route names; screen 8 run on both `edit` and `show`), as `operator` (guest for
+`login`), light and dark, at XL 1440 / L 1200 / M 900 / S 390, on the production build of this tree.
+Per case, in Chromium: HTTP status and `data-theme`; every visible text node's rendered contrast
+against its composited background (colours resolved through a canvas so `oklch` tokens compare
+correctly); every enabled field's boundary against its surround (1.4.11); twelve keyboard Tab stops at
+XL with a drawn outline or ring; document overflow; elements escaping the viewport; `h1` and breadcrumb
+landmark counts. 88 cases.
+
+| # | Screen | Renderer | Fixture | Light / dark | XL · L · M · S | Keyboard focus (XL) | Result |
+|---|---|---|---|---|---|---|---|
+| 1 | `projects.create` | Inertia | — | clean / clean | no overflow at any width | 12/12 visible | **pass** |
+| 2 | `tasks.index` | Inertia | — | clean / clean | no document overflow; at S the table is clipped (below) | 12/12 | **pass**, legacy debt |
+| 3 | `projects.board` (#468) | Inertia | — | clean / clean | clean | 12/12 | **pass** |
+| 4 | `profile.show` | Inertia | — | clean / clean | clean | 12/12 | **pass** |
+| 5 | `tickets.show` (#4) | Blade | ticket #4 | legacy debts (A13.4) | clean | 12/12 | **pass**, legacy debt |
+| 6 | `operator.tickets.index` | Blade | tickets #4, #5 | legacy debts; overdue row illegible in dark (A13.4) | clean | 12/12 | **pass**, legacy debt |
+| 7 | `roles.edit` (#2) | Blade | role #2 | clean / `Built-in` 3.28 (A4.8) | clean | 12/12 | **pass**, legacy debt |
+| 8 | `billing.invoices.edit` / `show` (#6) | Blade | A13.2 | legacy debts incl. `draft` 2.49 / 2.35 (A4.8) | clean | 12/12 | **pass**, legacy debt |
+| 9 | `crm.companies.show` (#5) | Blade | A13.2 | legacy debts | clean; the long name wraps | 12/12 | **pass**, legacy debt |
+| 10 | `login` | Inertia (guest) | — | clean / clean | clean | 11/11 | **pass** |
+
+Every case returned 200 with the requested `data-theme`; **0 document overflow in 88 cases; one
+`h1` on every screen; one breadcrumb landmark on every workspace screen** (`profile.show` and `login`
+have none by design — no workspace, so the utility bar shows the product name, A8.14 #6). Every React
+screen and `login` has **zero** text below AA and **zero** weak field boundaries in both themes.
+
+**No regression.** Every Blade finding is in page-body markup no EPIC-013 package has touched since the
+matrix WP2 measured (A6.12: "no text pair got worse … none newly fell below 4.5"): since `9fd50da` no
+Blade view outside `layouts/` changed, and `app.css` gained only additions, none touching a legacy name.
+§25.4's own purpose is "to prove the compatibility aliases work — not to make these screens look
+Direction D-complete", and that is what the matrix shows. The legacy failures are not, however, relabelled
+as passing: they are inventoried in A13.4 and carried in §31.
+
+**`reading` width.** No page adopts it (A12.15); it remains asserted by `page-frame.test.tsx`, which is
+green. No consumer was manufactured.
+
+### A13.4 Contrast debt disposition
+
+The A1.3 wording hands the `--surface-muted` / `--text-muted` pair "to WP8 and the Finance epic" with
+the fix itself — "changed to `--text-secondary` when Finance adopts `Status`" — belonging to Finance.
+WP8 therefore **re-measures and records; it does not change the tokens.** Re-measured on real rendered
+pixels, both A4.8 debts reproduce exactly:
+
+| Debt | Light | Dark | Measured on | Owner |
+|---|---:|---:|---|---|
+| `--surface-muted` / `--text-muted` — invoice `draft` badge | **2.49** | **2.35** | `billing.invoices.show` #6 | Finance `Status` adoption |
+| `--surface-accent` / `--accent` — `open` ticket, `Built-in` role chips | 5.78 (passes) | **3.28** | `tickets.show`, `operator.tickets.index`, `roles.edit` | Helpdesk / System `Status` adoption |
+
+Both fail AA and are **retained, documented debt — not a passing result.**
+
+The matrix also shows that the legacy Blade page bodies carry more AA debt than A4.8's two badges.
+None is new, none changed during this epic, and each belongs to its module's product epic:
+
+| Pattern | Contrast (light / dark) | Where |
+|---|---:|---|
+| `--text-muted` (gray-400 / gray-600) used as *text* — uppercase section labels, table headers, field labels, meta lines, "No payment due." | 2.60 / 1.94 | screens 5, 8, 9 (and 8's `show`) |
+| Hard-coded priority pills: `low` green-600 on green-50, `medium` yellow-600 on yellow-50, unchanged in dark | 3.15, 2.84 (both themes) | screens 5, 6 |
+| Overdue ticket row `bg-red-50` kept in dark under theme text — **1.05:1, effectively invisible** — present since before the epic (`40bdb4d`), first observed here because ticket #5's SLA lapsed after WP1d; A10.16 named it from code | — / 1.05–2.64 | screen 6 |
+| White on legacy `--accent` fill (Blade primary buttons) and `--accent` link text in dark | — / 4.47, 4.08–4.16, 3.28 | screens 5, 6, 7, 8, 9 |
+| Legacy Blade field boundaries (`--border-base`) — below 3:1, visible | 1.35–1.47 / 1.42–1.95 | screens 5, 6, 8 |
+
+### A13.5 Responsive pass
+
+Six shell routes (Inertia `/dashboard`, `/projects`, `/tasks`, `/time`; Blade `/operator/tickets`,
+`/billing/invoices`) at **1440, 1360 (XL edge), 1359 (L edge), 1024, 1023 (M edge), 768, 767 (S edge),
+390**, and 200 % zoom at 1280 and 1440 (640 × 450, 720 × 450 CSS px): 60 cases. Per case: rail 64 px
+(56 px top bar at S), utility bar 48 px, no region overlap, canvas origin, exactly one timer pill inside
+the viewport, account menu opened and hit-tested on top and inside the viewport with focus returned on
+`Esc`, the timer tray the same, the nav sheet (M/S) opened with its workspaces and ≥ 44 px targets at S
+and focus returned, and at L/M the floating drawer opened, dismissed by an outside click, and followed
+through one of its links.
+
+**All 60 held the geometry with 0 document overflow**, the Blade panel docks at L only when opened and
+is reached through the nav sheet at M exactly as A10.5 designed, and the XL→L→M→S transitions land on
+the correct side of every boundary. **One defect: at L and M a React floating drawer stayed open, over
+the page, after following one of its own links** (A13.10, D1). `tasks.index`'s table is clipped rather
+than scrollable at S inside its own pre-epic `overflow-hidden` wrapper (`520a82f`, EPIC-011E): page-body
+debt for the Tasks overhaul's `DataTable` work, not a shell regression — the shell gives page content the
+full 390 px at S, as the pre-WP4 layout did.
+
+### A13.6 Keyboard walkthrough
+
+Keyboard only, both renderers, in Chromium: XL tab order from a cold load, skip link, account menu,
+timer tray, drawer controls, `Ctrl+\`, and the S nav sheet.
+
+- **Order** (both renderers): skip link → nine rail workspaces → account trigger → drawer controls →
+  drawer links → breadcrumb → timer pill → page. Every stop draws the 2 px `focus` outline.
+- **Skip link** is the first stop and lands in `main`.
+- **Escape** closes the account menu, the timer tray, the floating drawer and the nav sheet, and focus
+  returns to the trigger in every case (the tray 6/6, the sheet 3/3 on re-probe).
+- **Drawer**: collapse via `Enter` returns focus to the rail toggle; re-opening focuses the current
+  item; `Ctrl+\` toggles on both renderers.
+- **Blade account menu**: arrow keys cycle Profile → Security & MFA → Connected accounts → Sessions →
+  light → dark → Sign out.
+- **One defect: the React account menu's Appearance options were unreachable from the keyboard** —
+  arrow keys skipped them and the menu held Tab, so on an Inertia page the theme could not be changed
+  without a pointer (A13.10, D2).
+
+### A13.7 NVDA smoke pass — manual gate, **passed**
+
+§22.3 and §28 require "one NVDA smoke pass on the shell", matching the EPIC-011E precedent. NVDA is a
+Windows screen reader and cannot run in this environment. **It has not been run, and nothing here
+substitutes for it** — not the Chromium accessibility tree, not the keyboard walkthrough, not jsdom.
+The owner will run the short checklist below on Windows; its result is recorded here when supplied.
+
+| # | Where | Do | Expect | Fail if |
+|---|---|---|---|---|
+| 1 | `/projects`, XL, fresh load | `Tab` once, `Enter` | "Skip to content, link"; then reading starts inside main | the skip link isn't first, or focus doesn't land in main |
+| 2 | same | `D` / `NVDA+F7` → Landmarks | "Workspaces" navigation, "Projects views" navigation, "Breadcrumb" navigation, main — one of each | a landmark is missing, unnamed or doubled |
+| 3 | same | `Tab` through the rail | each read as "link"; "Projects, link, current page" | no "current page", or a rail item read as a button/menu item |
+| 4 | same | activate rail "Tasks" | the heading "Tasks" is announced without moving focus off the rail link | silence, or focus jumps into the page |
+| 5 | same | `Tab` to "Account menu: …", `Enter`, arrow down | "menu"; each personal item; "light, radio, checked/not checked", "dark, radio …"; no administrative item | Appearance is skipped or unannounced, or an admin item appears |
+| 6 | same | `Esc` | back on "Account menu: …, button" | focus lost |
+| 7 | same | `Tab` to the timer pill, `Enter`, `Esc` | "Start timer" (or the running timer's label), "Running timers, dialog"; focus back on the pill | tray unnamed, or focus not returned |
+| 8 | `/operator/tickets` (Blade) | repeat 1–3 and 5–6 | same announcements on the Blade shell | any difference in names, roles or current-page state |
+
+Record per row: pass/fail and, for a fail, what NVDA said. Browser and NVDA versions go with the result.
+
+**Result (2026-09-28): all eight rows passed**, run by the owner on Windows with NVDA and Chrome at
+desktop width, signed in as `operator@intechral.test`, on this tree's production build. Recorded as
+the owner reported it; nothing here was inferred or simulated.
+
+- **Row 2 needed a second look, and the first reading was a false alarm.** NVDA's Elements List showed
+  "banner" with no children, so the breadcrumb appeared missing, while Chromium's accessibility tree
+  had `navigation "Breadcrumb"` inside the banner on both renderers. Walking landmarks with `D`
+  settled it — NVDA announced, in order: Workspaces navigation, Projects views navigation, banner,
+  **Breadcrumb navigation**, main, then the page's own "Projects" region. Every shell landmark appears
+  once and named. That sequence was captured by the owner's recording of the session, transcribed by
+  another assistant, and is recorded as such. The table above under-specified row 2: the utility bar is
+  an unnamed `header` (banner), and a page may contribute its own labelled regions inside main (the
+  projects list is `section aria-label="Projects"`); neither is a defect.
+- NVDA's "same page link" on the skip link (`#main-content`) and on the breadcrumb's workspace link
+  while on that workspace's page is expected.
+- **Rows 1 and 3–8 passed without issue**, owner-reported, including the Appearance options read as
+  radio items with their checked state inside the React account menu — the path D2 repaired — and the
+  same announcements on the Blade shell.
+- Browser: Chrome 153.0.8010.54, as reported by the owner. The NVDA version was not reported.
+
+### A13.8 Blade ↔ Inertia continuity
+
+Both directions, real links, in Chromium, reading `data-theme`, `data-drawer`, `data-workspace`, the
+canvas origin, the current rail item and the account identity at each step:
+
+- Blade `/operator/tickets` (collapse Helpdesk, choose dark) → Inertia `/projects` → Blade Helpdesk →
+  **Back** → **Forward**: theme dark throughout; Helpdesk collapsed (64) and Projects open (312) each
+  kept per workspace; current workspace and account correct on every document.
+- At L, pin Projects in React → Blade Helpdesk (collapsed, correct) → React Projects (still pinned,
+  docked at 312) → Blade Finance (collapsed): the L pin survives both crossings.
+- Timer identity across both crossings is `time-migration.spec.ts`'s (green); no first-frame flash or
+  shell shift is `blade-shell.spec.ts` (Blade) and, new in WP8, `shell.spec.ts` (Inertia).
+- **A10.16's bfcache concern — not reproduced.** Blade dark → React, switch to light → Back: Chromium did
+  not restore the Blade page from the back/forward cache (a page-scoped marker did not survive), so it
+  re-ran the pre-paint bootstrap and painted light. The listener A10.16 suggests remains a low follow-up
+  for browsers that do restore it (§31).
+
+### A13.9 Performance against WP0
+
+Same method as A1.12/A6.17: `vite build` from a clean container copy (no `storage/framework/views`
+residue feeding Tailwind), `gzip -9`.
+
+| Asset | WP0 (A1.12) raw / gzip | WP8 raw / gzip-9 | Δ gzip | Note |
+|---|---:|---:|---:|---|
+| **Shell chunk** (`app-layout` → `app-shell`, renamed in WP4) | 102.0 / 34.2 KB | **134.9 / 41.8 KB** | **+7.6 KB** | The whole operator shell (rail, drawer, utility bar, nav sheet, account menu), the timer pill and tray, and Radix Popover (A11.2, the epic's one added dependency) |
+| `app.tsx` entry | 350.5 / 110.1 KB | 350.6 / 108.7 KB | ≈ 0 | |
+| `app.js` (Blade entry) | 49.3 / 18.6 KB | 55.7 / 20.2 KB | +1.6 KB | Blade shell behaviour and the timer pill that replaced `timer-overlay.js` |
+| `app.css` (both renderers) | 78.2 / 15.6 KB | 85.5 / 17.5 KB | +1.9 KB | Direction D tokens, shell geometry, page grammar |
+| `allocation` (Chart.js) / `board` (dnd-kit) | 234.3 / 61.3 KB | 234.3 / 61.7 KB | ≈ 0 | **Still isolated**: Chart.js only in `allocation`, dnd-kit only in `board`, neither in the shell chunk |
+
+**Font payload.** The build ships exactly WP1d's ten WOFF2 faces (latin 146,724 B = 143.3 KiB against
+the 180 KB budget, unchanged since A5.6); no variant was added. Measured transfer on a cold load, cache
+disabled, five runs: `login`, `/projects`, `/operator/tickets` fetch **3 files / 72,071 B** (Plex Sans
+400/500/600) — WP0 fetched 70.7 KB (React) and 94.5 KB (Blade) of Inter from a third party. Home
+(`/dashboard`) adds Plex Mono 400/500 for its figure row (102,365 B), CRM adds latin-ext 500 on demand
+for "Wójcik" (88,876 B), the invoice adds Mono 500 for its number (87,308 B). **Zero requests to any
+external font origin.**
+
+**First paint.** WP0 captured first paint as behaviour, not milliseconds (A1.7, A1.13: correct theme
+and drawer geometry on the first frame, CLS 0), so that is what is re-measured: **theme and canvas
+geometry are correct on every frame from the first, on Inertia and Blade, cold, in both themes, with
+stored and default panel state; shell layout shift is 0.** Whole-page CLS on some pages is 0.0010–0.0155,
+entirely page-body text reflowing when the swap faces land (`font-display: swap`, A5.7): blocking the
+font files takes it to 0 on every route. For the record, median first paint / FCP on this local stack
+were 196–412 ms / 280–524 ms — a development machine, not a benchmark, and there is no WP0 number to
+compare them with.
+
+### A13.10 Defects found and fixed
+
+Both are Direction D shell regressions against the epic's own contract, both passed a green jsdom suite,
+and both were found only by driving real Chromium.
+
+**D1 — a floating drawer stayed open over the page it had just opened (Medium).** §16 says the overlay
+"closes on `Esc`, outside click and navigation", and §25.3 flow 4 tests exactly that. `Esc` and outside
+click were implemented and tested (A8.13); navigation was not. A visit to another workspace collapsed it
+anyway (below XL the state is re-resolved), which is why it went unnoticed — but following one of the
+panel's own views, the common case, kept it floating over the new page's heading and first columns at L
+and M. **Fix:** `operator-shell.tsx` dismisses a *floating* panel when one of its links is followed, as
+a click handler inside the existing float-only dismissal effect — the same pattern and reasoning as the
+nav sheet's (`nav-sheet.tsx`): a view in the same workspace changes no prop an effect could watch.
+Modified clicks (new tab) are ignored; focus is left to the S2 policy, which repairs it to `main` once
+the visit lands. A docked panel is untouched. **Coverage:** three Vitest cases (floating closes; docked
+stays; modified click ignored) — the first fails on the unfixed shell — and a Chromium flow in
+`shell.spec.ts`, which failed against the pre-fix build.
+
+**D2 — the React account menu's Appearance could not be reached from the keyboard (High: WCAG 2.1.1).**
+Appearance absorbed the pre-WP4 header's theme toggle (§17.2), which was a keyboard-reachable button. In
+the React menu it became two plain `role="radio"` buttons inside a Radix menu; the menu owns focus, so
+arrow keys skipped them and Tab could not leave the menu. Blade's menu was right all along
+(`menuitemradio` in the menu's own cycle). **Fix:** the options are now Radix's own menu radio items —
+`group "Appearance"` > `menuitemradio`, the roles Blade renders — so they join the arrow-key cycle;
+choosing one still keeps the menu open. The WP2 `dropdown-menu.tsx` wrapper gains two plain re-exports
+(`DropdownMenuRadioGroup`, `DropdownMenuRadioItem`) in the style of its existing `DropdownMenuGroup`; the
+package was already installed. **Coverage:** the Vitest case now asserts the menu-radio roles, and a new
+case reaches "dark" by arrow keys and selects it with `Enter` (it fails on the old component); three
+browser selectors moved from `radio` to `menuitemradio`.
+
+**Deviation from §25.2's wording.** §25.2 reads "Appearance control — a `radiogroup` with Light and Dark
+only". ARIA does not permit a `radiogroup` inside a `menu`, and the plain radios it produced were the
+defect. The React control now matches Blade's `group` > `menuitemradio`; Light and Dark only, as §25.2
+requires.
+
+### A13.11 False alarms, recorded because the first reading was wrong
+
+1. *Timer tray focus not restored on `/time`* — one case in 60. The probe waited a fixed 150 ms; waiting
+   for the tray to close, focus returned 6/6.
+2. *Nav sheet focus lost at S* — a fixed 200 ms wait again; re-probed, 3/3 returned to "Open navigation".
+3. *The bfcache probe's first reading was invalid*: its own init script rewrote the stored theme on
+   every document. Re-run without it (A13.8).
+4. *CLS 0.0155 on Inertia pages* looked like a drawer shift; attributed by source, it was page-body font
+   swap (A13.9).
+
+### A13.12 The duplicate breadcrumb on `projects/tasks/show.tsx` — retained out of scope
+
+Provenance, established rather than assumed:
+
+1. The page's own `<nav aria-label="Breadcrumb">` (project → task) predates Direction D: `cb7106c`,
+   2026-09-22, EPIC-011E.
+2. The pre-WP4 `AppLayout` drew **no** breadcrumb landmark; WP4 (`27f151a`) added the shell's, per
+   Direction D, and changed only the page's `layout` line. **So the duplicate landmark was created by
+   this epic.** A10.16 and A12.10 called it "pre-existing"; the *trail* is, the *duplication* is not.
+3. No §29 criterion names it — criterion 3's matrix does not include this page — and §28 WP8 lists no
+   such fix. Direction D says "there is one way to show 'you are here' … the breadcrumb (full trail)",
+   which the page now contradicts.
+4. §31 assigns the page's container migration to its product epic; the correct Direction D repair — the
+   page supplying its task segment to the shell breadcrumb (§13.2's page-supplied trail, deferred in
+   A8.14 #6) — is shell API work that no WP8 item covers.
+
+WP8 first classified it as ambiguous and put it to the owner, who decided: **B — retained out of
+scope.** WP8 performs no page migrations; the page belongs to the Projects/Tasks product epic, where the
+finding is recorded (§31); it does not stop any WP8 gate from passing; and final Direction D hardening
+should not cross a product-epic boundary merely because the fix is small. `projects/tasks/show.tsx` is
+unchanged. The record above stands so that epic inherits the provenance, not just the symptom.
+
+### A13.13 Test-suite audit
+
+Against §25.1–§25.3 and §29, by reading the suites and by running them:
+
+| Finding | Class | Disposition |
+|---|---|---|
+| §25.3 flow 1 (no flash, no drawer shift) had a Blade browser test only | missing acceptance coverage | **added** for Inertia (`shell.spec.ts`) |
+| §25.3 flow 4 (overlay closes on navigation) had no test at any layer | missing coverage **hiding D1** | **added** (Vitest + Chromium) |
+| §25.3 flow 5 (focus per S2) was Vitest-only | missing browser coverage | **added** (`shell.spec.ts`) |
+| Appearance tested by pointer only, in jsdom, as `radio` | test defect **hiding D2** | **fixed** (roles + a keyboard case) |
+| `BrowserAuthContractTest.php:84` — `not->toContain($needle, $message)` treats the message as a second needle, so the guard cannot fail | test defect (A10.16), E2E infrastructure | retained, §31 |
+| `ProjectIntegrityTest.php:323` — three needles to a negated `toContain` fail only if all three appear | test defect, Projects domain, pre-epic | retained, §31 |
+| Everything else in §25.1/§25.2 has a named, non-vacuous owner (the navigation matrix, presentation-authority, Blade/Inertia payload equality, Home DTO minimality, seam and Strata guards, the tick-localisation sentinel, `PageFrame` widths) | — | no change |
+
+### A13.14 Tests added or changed
+
+- **Vitest** — `app-shell.test.tsx` +3 (D1); `account-menu.test.tsx` 1 rewritten + 1 added (D2).
+- **Playwright** — `shell.spec.ts` +3: the floating drawer closes on navigation (flow 4), an Inertia
+  cold load paints the remembered theme and panel with no shell shift in both themes (flow 1), and an
+  Inertia visit is announced with focus repaired only when destroyed, including Back (flow 5). All use
+  the default `operator` persona each worker has already minted: **no login added**, no mutable
+  resource, no timer. `blade-shell.spec.ts` and `inertia-coexistence.spec.ts` changed selector only.
+- **Pest** — none: WP8 changed no server contract.
+
+### A13.15 Validation
+
+- **Full Playwright, run alone, normal configuration: 92 passed, 0 failed, 0 skipped, 3 workers,
+  4.5 minutes** (4 m 36 s wall) — the new authoritative baseline, replacing A12.14's 89 (which predated
+  WP7's remediation). Auth and HTTP from the nginx log over exactly the run window: **12 `POST /login`,
+  12 × 302, 0 × 429, 0 × 419, 0 × 5xx**; 915 × 200, 148 × 302, 38 × 303, 2 × 403 (the deliberate
+  `admin/users` flow), 2 × 404 (fixture teardown), 71 × 499 (client navigated away). Product counts:
+  `tasks` +1, the pre-existing standalone-task leak (A9.7), unchanged by WP8.
+- **`./dev check`, run alone afterwards:** **all five gates passed** — CLI self-tests (196 assertions), `git diff --check`, Pint, `npm run check` (Wayfinder, typecheck, lint, format check, **Vitest 781 passed / 76 files**, production build) and **Pest 1,121 passed / 5,980 assertions** (baseline 777 / 76 and 1,121 / 5,980: the four new Vitest cases are A13.14's). **The first `./dev check` failed**, and that is recorded rather than smoothed over: one Vitest test in a file WP8 did not touch (`milestone-form-dialog.test.tsx`, "opens empty for create …") hit the 5,000 ms test timeout at 5,461 ms, which stopped the chain before the build (Pest still passed 1,121 / 5,980). Run alone it passed 3/3 in 658–676 ms; the host was carrying another project's container at ~65 % CPU with a load average near 5, and the whole Vitest run took 90.5 s against 55.8 s on the green re-run. That is A11.17/A12.14's documented jsdom load sensitivity, reproduced — not a WP8 regression, and not "flaky" by assertion.
+- Focused before the full runs: `app-shell` + `account-menu` + `dropdown-menu` Vitest green; `shell`,
+  `blade-shell`, `inertia-coexistence` 31/31 in Chromium.
+- Fixtures: the six A13.2 rows deleted after verification; invoice/CRM/CMS counts back to 0.
+
+### A13.16 §29 closeout
+
+| # | Criterion (§29) | Evidence | Status |
+|---|---|---|---|
+| 1 | Direction D tokens, light + dark, on `data-theme`, via `@theme inline`, **no component referencing a hex value** | A4.2–A4.3; `DirectionDThemeContractTest`; no hex in any shell, primitive, page-grammar or timer component. Two pre-epic product components keep hex (`allocation-chart.tsx`'s chart palette, `board-column.tsx`'s `var()` fallback), and the Inertia progress bar keeps one literal (A8.14 #8) | **PASS WITH DOCUMENTED DEVIATION** |
+| 2 | Legacy aliases, raw families, renamed utilities remain; F2 orphans defined; alias/width register exists | A13.17 | **PASS** |
+| 3 | Ten-screen matrix, both themes, both renderers: AA, boundaries, focus, layout, dark — no intentional regression | A13.3; no regression, focus 12/12 everywhere, 0 overflow; AA **not** met on legacy Blade page bodies and A4.8's two badges, all pre-existing and inventoried (A13.4) | **PASS WITH DOCUMENTED DEVIATION** |
+| 4 | Plex Sans/Mono + Newsreader per G1, within budget, no clipping on dense screens | A13.9 (146,724 B ≤ 180 KB, no external origin); A5.8 density gate; 0 overflow across A13.3 | **PASS** |
+| 5 | Workspace contract; one payload; no Manage; filtering and leakage tests pass | `NavigationBuilderTest`, `ShellContractTest` in `./dev check` | **PASS** |
+| 6 | React shell live on all 12 Inertia pages: rail, drawer (docked/collapsed/overlay), utility bar, breadcrumb, skip link, landmarks, `aria-current`, per-workspace persistence with no flash | `ShellSeamContractTest` (12 layouts); A13.5–A13.8; D1 and D2 fixed; flow 1/4/5 now in Chromium; the owner's NVDA smoke pass passed on both renderers (A13.7). The duplicate landmark on `projects/tasks/show.tsx` is page markup retained for its product epic (A13.12) | **PASS** |
+| 7 | Blade: same rail, utility bar, tokens, mark, skip link, navigation; simplified drawer OK; theme and drawer survive React→Blade→React | A10; A13.8 both directions incl. history and the L pin | **PASS** |
+| 8 | Account menu personal-only on both renderers, absence asserted; Appearance replaces the toggle | `account-menu.test.tsx`, `shell.spec.ts`, `blade-shell.spec.ts`; D2 makes the React Appearance keyboard-operable | **PASS** (after D2) |
+| 9 | Pill + tray Foundation scope on both renderers; reconciliation unchanged; no backend change; no NEXT; tick localised and guarded | A11; `timer-pill.test.tsx` sentinel; `time-migration.spec.ts`. `TimerControl`'s unavailable state deferred (§31) | **PASS WITH DOCUMENTED DEVIATION** |
+| 10 | `PageFrame` with all three widths; Home on existing DTO only; nothing fabricated | A12; `page-frame.test.tsx`; `DashboardInertiaTest` minimality. `reading` has no product consumer yet (A12.15); no timer section on Home (A12.6, acceptable documented deviation) | **PASS WITH DOCUMENTED DEVIATION** |
+| 11 | The shell seam: `shell.presentation`, `AppShell` the one boundary, no page branching; `context` neutral, `presentation` namespaced; no Focused shell, no persisted preference | `ShellSeamContractTest`, `NavigationBuilderTest` presentation rows | **PASS** |
+| 12 | `./dev check` green; Playwright incl. the new shell flows green | A13.15 | **PASS** |
+| 13 | No new route, endpoint, migration, permission, Docker or CI file | `git diff f1476fb HEAD`: nothing under `routes/`, `database/migrations/`, Docker, `.github`, or the permission seeders; the one middleware diff is WP3's shared props in `HandleInertiaRequests` | **PASS** |
+| 14 | CI handoff note recorded | §30 and A13.18 | **PASS** |
+
+**All 14 are met: ten pass outright and four pass with a documented deviation (1, 3, 9 and 10). No criterion is blocked.**
+
+### A13.17 Alias and width register (§24.2) — at epic close
+
+Counted from the tree, not carried forward. "Consumers" are utility occurrences outside tests.
+
+| Name | Kind | Current mapping | Consumers | Retires with |
+|---|---|---|---:|---|
+| `muted-foreground` | shadcn alias | `--text-secondary` (held, A4.5) | 72 | each React page's product epic |
+| `border` | shadcn alias | `--border-base` (held) | 44 | same |
+| `foreground` / `card-foreground` | shadcn alias | `--text-primary` (held) | 14 / 5 | same |
+| `card` / `muted` | shadcn alias | `--bg-elevated` / legacy (held) | 7 / 6 | same |
+| `destructive` / `-foreground` | shadcn alias | `--ds-danger` (WP1c) / unchanged | 8 / 1 | same |
+| `input`, `ring`, `secondary-foreground` | shadcn alias | held; `ring` → `--ds-focus` (WP1c) | 2 / 2 / 2 | same |
+| `primary` / `-foreground` | shadcn alias | `--ds-ink` / `--ds-on-ink` (WP2) | 0 utility consumers | the next alias sweep; kept defined for compatibility |
+| `background`, `secondary`, `accent-foreground`, `info`, `popover` | shadcn alias | held | 0 | the next alias sweep; kept defined |
+| `legacy-bg-surface` | WP1a utility | byte-identical | 26 | the Blade page bodies' epics |
+| `legacy-accent` | WP1c isolation name | legacy indigo | 7 (Blade checkboxes) | Helpdesk / System |
+| `legacy-text-primary` | WP1a utility | byte-identical | 5 | the Blade page bodies' epics |
+| other WP1a `legacy-*` utilities | WP1a utility | byte-identical | 0 | the next alias sweep; kept defined |
+| raw `--bg/text/border/surface/accent/status/shadow/brand-*` | variable families | frozen | 1,103 Blade + 38 React `var()` sites | each module's product epic |
+| `--surface-base`, `--surface-muted`, `--surface-elevated`, `--border-muted`, `--surface-accent`, `--accent-success` | WP1b orphans | A3.3 | 24 / 10 / 9 / 4 / 3 / 0 | their Blade pages; `--surface-muted` and `--surface-accent` with the A13.4 badge fixes |
+
+**Widths.** `PageFrame`: `canvas` — `projects/board`; `grid` — Home; `reading` (640/700/720/760) —
+**no consumer**. The ten pages keeping their own container, per §19.3, each converted by the epic that
+redesigns it: `max-w-7xl` — `projects/index`, `time/index`, `time/allocation`, `operator/time/index`;
+`max-w-5xl` — `tasks/index`, `projects/create`, `projects/edit`, `projects/tasks/show`, `profile/show`;
+`max-w-4xl` — `projects/milestones/index`.
+
+### A13.18 CI handoff (§30), as the epic closes
+
+For the *Lightweight CI baseline* — the next roadmap item, not started here:
+
+- **The gates are `./dev check`'s**: CLI self-tests, `git diff --check`, Pint, `npm run check`
+  (Wayfinder generation, typecheck, lint, format check, Vitest, production build), then full Pest against
+  the MariaDB **testing** database. At close: Vitest 781 / 76 files, Pest 1,121 / 5,980 assertions.
+- **Browser suite:** 92 tests, 3 workers, 4.5 minutes locally. It runs against a real app and database
+  with seeded personas and three `e2e-*` fixtures from `DevSeeder` (local/testing only), and signs in
+  through the real login form. Keep `workers: 3`: the cap is what keeps each persona under Fortify's
+  5-per-minute limiter (`docs/testing/e2e-browser-suite.md`). Do not serialise the suite, raise timeouts
+  or weaken throttling to make CI pass.
+- **Run the full Vitest and full Playwright suites one after the other, never at the same time** —
+  measured contention produces false failures (A12.14).
+- The production build emits the ten self-hosted WOFF2 faces and the Blade roots read
+  `resources/js/shell/bootstrap.js` from disk at render time (A10.16): a clean-checkout build and any
+  runtime image must keep both.
+- Known debts CI will inherit rather than cause: `tests/Browser` is neither type-checked nor linted; the
+  standalone-task fixture leaks one row per browser run (A9.7); two Pest guards are vacuous (A13.13).
+
+### A13.19 Deferred work, reconciled (§31)
+
+Rows added to §31 by this amendment: the legacy Blade page-body contrast debt (A13.4), the `tasks.index`
+table clipped at S, the React `projects/tasks/show` breadcrumb (retained by owner decision, A13.12), the two vacuous Pest guards, `tests/Browser` lint/typecheck, the Vitest/jsdom load
+sensitivity, the standalone-task fixture leak, the operator-persona timer isolation, the lockfile caret,
+and the bfcache resync listener. **Removed: none** — WP8 resolved no existing §31 item; D1 and D2 were
+never on the list.
+
+### A13.20 Epic status
+
+**Verified (2026-09-28).** The repository's lifecycle ([epics README](./README.md#epic-lifecycle))
+defines *Implemented* as "code committed; acceptance criteria not yet formally verified" and *Verified*
+as "all acceptance criteria checked and passing tests", with merge to `main` being *Done*. WP8 is the
+epic's verification package and every §29 criterion is now checked with passing tests, so the owner
+chose **Verified**, superseding an earlier tentative *Implemented*; EPIC-011E took the same step after
+its own NVDA-inclusive closeout. *Done* remains a separate event: merge to `main` via PR with review.
+The status was changed only after the NVDA result was supplied, and moved together in the header of this
+document, §2's table, [the epics README](./README.md) and the
+[Product Roadmap](../product/product-roadmap.md)'s EPIC-013 vehicle line.
+
+### A13.21 Files changed
+
+- **Shell fixes:** `components/shell/operator-shell.tsx` (D1), `components/shell/account-menu.tsx` (D2),
+  `components/ui/dropdown-menu.tsx` (two re-exports for D2).
+- **Tests:** `components/shell/app-shell.test.tsx`, `components/shell/account-menu.test.tsx`,
+  `tests/Browser/shell.spec.ts`, `tests/Browser/blade-shell.spec.ts`,
+  `tests/Browser/inertia-coexistence.spec.ts`.
+- **Documentation:** this amendment, §28 WP8, §30, §31 and the header's amendment list;
+  `docs/testing/e2e-browser-suite.md`.
