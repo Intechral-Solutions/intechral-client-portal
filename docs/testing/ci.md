@@ -138,15 +138,34 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   guards are vacuous (A13.13); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
   runners are smaller than the development machine, so a `userEvent` timeout in CI should be
   reproduced alone before being treated as a regression.
-- **Only the Blade no-shift test measures a cold paint.** `blade-shell.spec.ts` loads
-  `/operator/tickets` as the first document of a fresh context (session cookies only, empty HTTP cache)
-  and counts shell-owned layout shift only, as `shell.spec.ts` always has: page-body reflow when the
-  swap fonts land is not shell shift (EPIC-013 A13.9). The Inertia no-shift test in `shell.spec.ts`
-  still visits `/dashboard` first, so it measures a warm-cache paint. **The true-cold Inertia shell
-  shift requirement remains blocked by the separately tracked Plex Sans 600 first-use issue:** on a
-  genuinely first document the active rail label (weight 600, not preloaded) paints in the fallback
-  bold and re-centres ~3.5px when the face arrives (shell shift ~9.607e-7). It is not fixed; that test
-  is made cold when it is.
+- **Only the Blade no-shift test measures a cold paint; the Inertia one does not.**
+  `blade-shell.spec.ts` loads `/operator/tickets` as the first document of a fresh context (session
+  cookies only, empty HTTP cache) and counts shell-owned layout shift only, as `shell.spec.ts` always
+  has: page-body reflow when the swap fonts land is not shell shift (EPIC-013 A13.9). The Inertia
+  no-shift test in `shell.spec.ts` visits `/dashboard` first, so CSS and the preloaded Plex Sans
+  400/500 are cached when it measures. **True-cold Inertia shell-shift verification remains blocked by
+  the known Plex Sans 600 first-use re-centring issue (M2, below); the current Inertia flow warms
+  fonts before the measured navigation, and its zero must not be read as a cold-load result.**
+- **Two separate shell-shift incidents, kept distinct.**
+  - **M1 — fixed.** Parser partial-paint of a rail item: the parser paused inside an item and Chromium
+    painted it with the icon but not the label, so the icon moved (~1.7e-6, the hosted CI failure of
+    2026-09-29). Fixed by label-independent rail item geometry in both renderers; not a font issue.
+  - **M2 — deliberately deferred.** True-cold first use of Plex Sans 600: the active rail label
+    (weight 600, not preloaded) paints in the fallback bold and re-centres by about 3.5 px when the
+    face arrives, a shell shift of approximately 9.8e-7 (the exact decimal varies with Chromium and is
+    not an invariant). Preloading 600 removes it but moves 24,252 B onto the early critical path,
+    which measured roughly +100–170 ms to first paint / shell frame on constrained profiles (Slow 4G,
+    Fast 3G) with total font bytes unchanged; that cold-first-paint cost was judged not worth a
+    sub-perceptual shift. Other simple remedies were rejected (weight 500 breaks the active-label
+    typography, `font-display` and hiding the shell break the locked swap and immediate-shell
+    contracts, metric overrides are fallback-specific, subsetting needs new tooling and licence work).
+    Revisit when the Inertia flow is to be made genuinely cold.
+- **The shared shell-shift probe accounts for text-node sources.** A layout-shift source can be a Text
+  node (a label re-centring reports its text run). The probe (`installShellShiftProbe`) once tested
+  the raw node, and text has no `closest()`, so every text-node shift was silently dropped and could
+  read as `shellShift = 0`; sources are now normalised to their owning element first. Regression
+  coverage is `shell-shift-probe.spec.ts` (Chromium is authoritative for real LayoutShift behaviour).
+  Which regions count, the zero threshold and the observer timing are unchanged.
 - **Frontend failures cascade into Pest.** Pest's Blade and Inertia responses need the Vite manifest
   that `npm run check` builds last. If that chain fails before `vite build`, hundreds of Pest tests fail
   with `ViteManifestNotFoundException` (or "Not a valid Inertia response"), and the volume of failure
