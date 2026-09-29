@@ -177,6 +177,140 @@ describe('several running timers', () => {
     });
 });
 
+describe('first paint: the last confirmed state, or nothing (Direction D §15.1)', () => {
+    /** A `fetch` whose responses the test releases one at a time, in call order. */
+    function controlledFetch() {
+        const pending: ((response: Response) => void)[] = [];
+        const fetchMock = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+
+        return {
+            fetchMock,
+            async respond(body: unknown, status = 200) {
+                await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+                await act(async () => pending.shift()!(jsonResponse(body, status)));
+            },
+        };
+    }
+
+    function Reload() {
+        const { refreshTimers } = useTimers();
+
+        return (
+            <button type="button" onClick={() => void refreshTimers()}>
+                Reload timers
+            </button>
+        );
+    }
+
+    function mountControlled() {
+        const controlled = controlledFetch();
+        vi.stubGlobal('fetch', controlled.fetchMock);
+        const view = render(
+            <TimerProvider enabled>
+                <TimerPill />
+                <Reload />
+            </TimerProvider>,
+        );
+
+        return { ...controlled, pill: () => view.container.querySelector('[data-shell-timer]') };
+    }
+
+    it('renders no timer control at all until the first read resolves', async () => {
+        const { pill } = mountControlled();
+        await settle();
+
+        // Not a ghost, not a skeleton: nothing is known yet, so nothing is claimed.
+        expect(pill()).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument();
+    });
+
+    it('shows the idle affordance once an empty set is confirmed', async () => {
+        const { pill, respond } = mountControlled();
+
+        await respond([]);
+
+        expect(pill()).toHaveAttribute('data-timer-running', 'false');
+        expect(screen.getByRole('button', { name: 'Start timer' })).toBeInTheDocument();
+    });
+
+    it('goes straight from nothing to the running pill, never through Start timer', async () => {
+        const { pill, respond } = mountControlled();
+        await settle();
+        expect(screen.queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument();
+
+        await respond([timer({ description: 'Long running work' })]);
+
+        expect(pill()).toHaveAttribute('data-timer-running', 'true');
+        expect(
+            screen.getByRole('button', { name: 'Running timer: Long running work. Show timers' }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument();
+    });
+
+    it('keeps a confirmed running pill while a refresh is in flight, then shows the newer result', async () => {
+        const { pill, respond } = mountControlled();
+        await respond([timer({ description: 'Long running work' })]);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Reload timers' }));
+
+        // Revalidating is not "unknown": the last confirmed state stays exactly as it was.
+        expect(pill()).toHaveAttribute('data-timer-running', 'true');
+        expect(
+            screen.getByRole('button', { name: 'Running timer: Long running work. Show timers' }),
+        ).toBeInTheDocument();
+
+        await respond([]);
+
+        expect(pill()).toHaveAttribute('data-timer-running', 'false');
+        expect(screen.getByRole('button', { name: 'Start timer' })).toBeInTheDocument();
+    });
+
+    it('keeps a confirmed idle pill while a refresh is in flight, then shows the newer result', async () => {
+        const { pill, respond } = mountControlled();
+        await respond([]);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Reload timers' }));
+
+        expect(pill()).toHaveAttribute('data-timer-running', 'false');
+        expect(screen.getByRole('button', { name: 'Start timer' })).toBeInTheDocument();
+
+        await respond([timer({ description: 'Started elsewhere' })]);
+
+        expect(pill()).toHaveAttribute('data-timer-running', 'true');
+        expect(
+            screen.getByRole('button', { name: 'Running timer: Started elsewhere. Show timers' }),
+        ).toBeInTheDocument();
+    });
+
+    it('shows a failed first read as an error, and does not dress a retry up as idle', async () => {
+        const { respond } = mountControlled();
+        await respond({ message: 'Unavailable' }, 503);
+
+        // A failed read is a result: the pill mounts so the tray can offer Retry (A11.6) …
+        const trigger = screen.getByRole('button', { name: 'Start timer' });
+        expect(trigger).toHaveClass('border-danger');
+
+        // … and while that retry is in flight nothing has been confirmed, so it stays an error
+        // rather than turning into a plain "Start timer" that claims nothing is running.
+        await userEvent.click(screen.getByRole('button', { name: 'Reload timers' }));
+        expect(screen.getByRole('button', { name: 'Start timer' })).toHaveClass('border-danger');
+
+        await respond([]);
+        expect(screen.getByRole('button', { name: 'Start timer' })).not.toHaveClass(
+            'border-danger',
+        );
+    });
+
+    it('does not announce a start when the first confirmed set already has a timer running', async () => {
+        const { respond } = mountControlled();
+
+        await respond([timer()]);
+
+        // Hydrating is not starting: the first confirmed count is only the baseline.
+        expect(document.querySelector('[data-shell-timer-announce]')).toHaveTextContent('');
+    });
+});
+
 describe('pending and failed states', () => {
     it('shows Stopping… with no elapsed time and no Stop control while a stop is in flight', async () => {
         let release!: () => void;

@@ -169,10 +169,12 @@ it('keeps the application usable and offers retry after hydration failure', asyn
         </TimerProvider>,
     );
 
-    // The page stays usable and the pill stays mounted; the failure and its retry are in the tray.
+    // The page stays usable; once the read has failed the pill mounts in its error presentation
+    // (Direction D §15.1: nothing before the first read resolves), with the failure and its retry in
+    // the tray.
     expect(screen.getByText('Application content')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Start timer/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Start timer/ }));
     expect(await screen.findByText('Unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });

@@ -34,7 +34,8 @@ import {
  * WP5 follow for every other piece of shell geometry.
  */
 export function TimerPill() {
-    const { timers, status, starting, stopping, stopTimer, clockOffsetMs } = useTimers();
+    const { timers, status, confirmation, starting, stopping, stopTimer, clockOffsetMs } =
+        useTimers();
     const [open, setOpen] = useState(false);
     // Keyed by the timer it belongs to, so the message is *derived* away when that timer stops
     // rather than cleared by an effect: a stopped timer has nothing left to retry.
@@ -72,7 +73,9 @@ export function TimerPill() {
 
     const stopError = shown !== null && failedStop === shown.id;
     const seconds = shown ? elapsedSeconds(shown.started_at, nowMs + clockOffsetMs) : null;
-    const announcement = useStartStopAnnouncement(timers.length);
+    const announcement = useStartStopAnnouncement(
+        confirmation === 'confirmed' ? timers.length : null,
+    );
 
     function stop() {
         if (!shown) return;
@@ -82,6 +85,12 @@ export function TimerPill() {
 
         void stopTimer(id).catch(() => setFailedStop(id));
     }
+
+    // Direction D §15.1: the last confirmed state, or nothing on first load. Until the first read
+    // resolves there is no state to show, and a "Start timer" painted now would be a claim that
+    // nothing is running — then move when a running timer arrives (a shell layout shift). A failed
+    // first read is a result, so the pill renders in its error presentation and the tray keeps Retry.
+    if (confirmation === 'pending') return null;
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
@@ -105,7 +114,7 @@ export function TimerPill() {
                         data-shell-timer-trigger
                         aria-label={pillAccessibleName(timers)}
                         className={`flex min-w-0 items-center gap-1.5 rounded-control border px-2 py-1 text-sm transition-[color,background-color,border-color] duration-motion-fast ease-motion hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                            stopError || status === 'error'
+                            stopError || status === 'error' || confirmation === 'failed'
                                 ? 'border-danger'
                                 : shown
                                   ? 'border-control-edge bg-surface'
@@ -214,14 +223,17 @@ export function TimerPill() {
  * "Timer started" / "Timer stopped" for screen readers (Direction D §12.2).
  *
  * Driven by the **count**, not by the elapsed value, so the live region updates a handful of times a
- * session rather than once a second. It stays empty on first render so hydrating a page with a timer
- * already running does not announce a start that did not just happen.
+ * session rather than once a second. `count` is `null` until the provider has confirmed a timer set,
+ * and the first confirmed count is only the baseline: hydrating a page with a timer already running
+ * does not announce a start that did not just happen.
  */
-function useStartStopAnnouncement(count: number): string {
+function useStartStopAnnouncement(count: number | null): string {
     const [message, setMessage] = useState('');
     const previous = useRef<number | null>(null);
 
     useEffect(() => {
+        if (count === null) return;
+
         const before = previous.current;
         previous.current = count;
 

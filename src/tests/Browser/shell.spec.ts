@@ -7,8 +7,11 @@ import {
     accountTrigger,
     drawerLink,
     hasHorizontalOverflow,
+    installShellShiftProbe,
     openAccountMenu,
     railLink,
+    readShellShift,
+    timerPill,
 } from './support/shell';
 
 /**
@@ -251,6 +254,7 @@ test('an Inertia page paints with the remembered theme and panel state, without 
     // §25.3 flow 1 on the Inertia renderer; `blade-shell.spec.ts` asserts the Blade half.
     await page.setViewportSize(XL);
     await signedIn(page);
+    await installShellShiftProbe(page);
 
     for (const [theme, panel, canvasX] of [
         ['dark', 'collapsed', 64],
@@ -266,7 +270,7 @@ test('an Inertia page paints with the remembered theme and panel state, without 
 
                 // Nothing of the React shell paints before JavaScript (no SSR), so every frame is
                 // recorded until the canvas exists and a few after; every one must already agree.
-                const probe = { themes: [] as string[], canvasX: [] as number[], shellShift: 0 };
+                const probe = { themes: [] as string[], canvasX: [] as number[] };
                 (window as unknown as { __probe: typeof probe }).__probe = probe;
 
                 const frame = () => {
@@ -284,28 +288,6 @@ test('an Inertia page paints with the remembered theme and panel state, without 
                 };
 
                 requestAnimationFrame(frame);
-
-                // Only shell chrome counts here: page bodies reflow once when the swap fonts land
-                // (`font-display: swap`, EPIC-013 A5.7), which is not a shell shift.
-                new PerformanceObserver((list) => {
-                    for (const entry of list.getEntries() as unknown as {
-                        value: number;
-                        sources: { node: Node | null }[];
-                    }[]) {
-                        const inShell = entry.sources.some((source) =>
-                            (source.node as Element | null)?.closest?.(
-                                '[data-shell-rail], [data-shell-drawer], [data-shell-utility]',
-                            ),
-                        );
-                        const isCanvas = entry.sources.some((source) =>
-                            (source.node as Element | null)?.hasAttribute?.('data-shell-canvas'),
-                        );
-
-                        if (inShell || isCanvas) {
-                            probe.shellShift += entry.value;
-                        }
-                    }
-                }).observe({ type: 'layout-shift', buffered: true });
             },
             [theme, panel] as const,
         );
@@ -323,17 +305,20 @@ test('an Inertia page paints with the remembered theme and panel state, without 
             .toBeGreaterThanOrEqual(10);
 
         const probe = await page.evaluate(
-            () =>
-                (
-                    window as unknown as {
-                        __probe: { themes: string[]; canvasX: number[]; shellShift: number };
-                    }
-                ).__probe,
+            () => (window as unknown as { __probe: { themes: string[]; canvasX: number[] } }).__probe,
         );
 
         expect(new Set(probe.themes)).toEqual(new Set([theme]));
         expect(new Set(probe.canvasX)).toEqual(new Set([canvasX]));
-        expect(probe.shellShift).toBe(0);
+
+        // The timer pill arrives after the first paint, once the provider's first read resolves, and
+        // it exists only from then on (Direction D §15.1): wait for that, not a clock, so the
+        // measurement always covers it. Whether this user has a timer running is not ours to control
+        // here (the owning spec, time-migration.spec.ts, covers both states deterministically); either
+        // way the shell must not move.
+        await expect(timerPill(page)).toHaveCount(1);
+        const shift = await readShellShift(page);
+        expect(shift.value, `shell shift sources: ${shift.sources.join('; ')}`).toBe(0);
     }
 });
 
