@@ -56,7 +56,7 @@ Each item becomes one or more implementation epics before work begins, consisten
 | Bucket | Items | Class |
 |--------|-------|-------|
 | **NOW** | Critical Helpdesk hardening · Product/UX rebase (this) · Claude Design brief and exploration | Security/integrity · Direction · UX foundation |
-| **NEXT** | New application shell · Design system · Lightweight CI baseline | UX foundation · Platform capability |
+| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) | UX foundation · Platform capability |
 | **NEXT** | Tasks overhaul · Timer UX improvement · Projects UX expansion | Product functionality |
 | **LATER** | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS evolution | Product functionality (+ first platform-capability consumers) |
 | **FUTURE** | Reusable approvals, notifications, global search, integrations, external API, observability, audit/history, automation · Deployment/release engineering (trigger-based) | Platform capability |
@@ -135,7 +135,9 @@ Semantic tokens; typography; spacing; surfaces and elevation; tables (compact an
 
 **Class:** Platform capability.
 
-**Timing:** introduced **alongside or immediately after the first merged slice of the shell/design system**, and **required before the Tasks overhaul begins**. Early enough to protect the redesign; late enough that the build it verifies has settled. [EPIC-013 → CI handoff](../epics/EPIC-013-direction-d-shell-design-system.md#30-ci-handoff) records this explicitly so it is not skipped when the shell foundation closes.
+**Status:** **Done** (2026-09-29) — merged to `main` via [PR #2](https://github.com/Intechral-Solutions/intechral-client-portal/pull/2) (merge commit `e8743f2`), following [EPIC-013 → CI handoff](../epics/EPIC-013-direction-d-shell-design-system.md#30-ci-handoff). Both configured triggers (`pull_request` targeting `main`, `push` to `main`) have passed on GitHub Actions. The baseline is live: every PR and every push to `main` now runs it. Full detail — gates, environment, triggers, caching, security, known limitations — is authoritative at [`docs/testing/ci.md`](../testing/ci.md); this entry only records that the roadmap item is complete.
+
+**Timing:** introduced **alongside or immediately after the first merged slice of the shell/design system**, and **required before the Tasks overhaul begins**. Early enough to protect the redesign; late enough that the build it verifies has settled.
 
 **Scope, deliberately simple:**
 
@@ -157,7 +159,7 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Class:** Product functionality. My Tasks; All Tasks (capability-gated); project tasks included; explicit Complete/Reopen (board tasks move to the project's designated Done column through the canonical project-task service); search, sort, filter; assignment; contextual time. See [Task direction](./platform-product-ux-direction.md#task-direction).
 
-**Depends on:** shell, design system, CI baseline. **Needs design:** designated Done column and Reopen policy.
+**Depends on:** shell, design system, CI baseline (all three Done — dependency satisfied). **Needs design:** designated Done column and Reopen policy.
 
 ### Timer UX improvement
 
@@ -297,7 +299,7 @@ System → Users/Roles renderer migration (EPIC-011 Phase J) is folded into the 
 | Claude Design brief/exploration | Rebase approval | Shell, design system |
 | New application shell | Design direction | Everything on the new UI |
 | Design system | Design direction | Everything on the new UI |
-| Lightweight CI baseline | First shell/design-system slice | Tasks overhaul and all later product work |
+| Lightweight CI baseline (**Done**) | First shell/design-system slice | Tasks overhaul and all later product work |
 | Tasks overhaul | Shell, design system, CI | Timer UX, Projects UX, Helpdesk (ticket tasks) |
 | Timer UX improvement | Shell; best with Tasks | Contextual time everywhere |
 | Projects UX expansion | Shell, design system | Advanced Projects |

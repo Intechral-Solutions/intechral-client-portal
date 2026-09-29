@@ -116,9 +116,11 @@ build and in-container installs run cold every time (see *Deferred* for the cost
 
 ## Runtime
 
-Not yet measured on GitHub. Local reference points on the owner's machine: `./dev check` 6.3 minutes
-(Pest 4.3), the browser suite 5.6 minutes. On a hosted runner, expect the `browser` job to add the
-cold image build (Chromium and PHP extensions compile) to that. Record the first real runs here.
+Measured on the first two hosted runs, both cold cache (PR [#2](https://github.com/Intechral-Solutions/intechral-client-portal/pull/2)):
+the `pull_request` run took `checks` 6m39s and `browser` 6m52s; the following `push`-to-`main` run took
+`checks` 6m44s and `browser` 7m47s. Local reference points on the owner's machine: `./dev check`
+6.3 minutes (Pest 4.3), the browser suite 5.6 minutes — the hosted `browser` job's extra time is mostly
+its cold image build (Chromium and PHP extensions compile).
 
 ## Reproducing a CI failure locally
 

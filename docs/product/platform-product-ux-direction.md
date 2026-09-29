@@ -57,7 +57,7 @@ The platform is becoming a **professional services operating system with a clien
 - Inertia 3 + React 19 + TypeScript foundation ([ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)). Auth, invitations, dashboard, profile, time, timer, projects, board, milestones, project task detail, and the unified `/tasks` list are React ([EPIC-011A–E](../epics/README.md)).
 - Tickets, operator ticket queue/reports, billing/invoices/Stripe payment, CRM companies/contacts, organizations, CMS, users, and roles are still Blade.
 - A single navigation model (`NavigationBuilder`) serves both renderers: a flat primary list (Tickets, Projects, Tasks, Time, Billing, CRM, Pages) plus a "Manage" group (Ticket Queue, Time Reports, Organizations, CMS Pages, Users, Roles), filtered by permission.
-- A strong local quality gate (`./dev check`: Pint, Wayfinder, tsc, ESLint, Prettier, Vitest, production build, full Pest; `./dev test:e2e` for Playwright). **There is no CI.** Deployment targets cPanel-compatible hosting and is manual.
+- A strong local quality gate (`./dev check`: Pint, Wayfinder, tsc, ESLint, Prettier, Vitest, production build, full Pest; `./dev test:e2e` for Playwright), now also run in GitHub Actions on every pull request and push to `main` ([Lightweight CI baseline](./product-roadmap.md#lightweight-ci-baseline), Done; detail at [`docs/testing/ci.md`](../testing/ci.md)). Deployment targets cPanel-compatible hosting and is manual.
 
 The owner's assessment after exercising the platform: the foundation is sound, but **the UI needs a full overhaul** and several domains (Tasks, Projects, Helpdesk, Time UX, Directory, Finance, Knowledge) need real product evolution, not a faithful re-render of the legacy screens.
 
