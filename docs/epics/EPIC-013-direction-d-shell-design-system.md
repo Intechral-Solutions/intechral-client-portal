@@ -1,6 +1,6 @@
 # EPIC-013: Direction D Application Shell and Design System Foundation
 
-**Status:** Verified (WP0–WP8 complete, 2026-09-28: every [§29](#29-exit-criteria) exit criterion checked, four with a documented deviation, and the one NVDA smoke pass run by the owner on Windows; exhaustive assistive-technology, real-device and cross-browser testing stays with FINAL HARDENING per §22.3 — see [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28))
+**Status:** Done (Verified 2026-09-28 — every [§29](#29-exit-criteria) exit criterion checked, four with a documented deviation, and the one NVDA smoke pass run by the owner on Windows; exhaustive assistive-technology, real-device and cross-browser testing stays with FINAL HARDENING per §22.3 — then merged to `main` via [PR #1](https://github.com/Intechral-Solutions/intechral-client-portal/pull/1), 2026-09-28 — see [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28))
 **Class:** UX foundation (Product Roadmap [NEXT — Product/UX foundation](../product/product-roadmap.md#next--productux-foundation): *New application shell* + *Design system*)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (canonical, approved 2026-09-25, revision 2)
 **Product direction:** [Platform Product & UX Direction](../product/platform-product-ux-direction.md) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
@@ -89,7 +89,7 @@ This epic delivers two adjacent [Product Roadmap](../product/product-roadmap.md)
 |---|---|---|
 | NOW | Critical Helpdesk hardening ([EPIC-010D](./EPIC-010D-helpdesk-security-hardening.md)) | Complete (Verified) |
 | NOW | Product/UX rebase; Claude Design brief and exploration | Complete (Direction D approved) |
-| **NEXT** | **Direction D shell + design system (this epic)** | **Verified** (2026-09-28, [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28)) |
+| **NEXT** | **Direction D shell + design system (this epic)** | **Done** (Verified 2026-09-28, [Amendment 13](#amendment-13-wp8-hardening-and-verification-2026-09-28); merged [PR #1](https://github.com/Intechral-Solutions/intechral-client-portal/pull/1)) |
 | NEXT | Lightweight CI baseline | Follows this epic ([§30](#30-ci-handoff)) |
 | NEXT | Tasks overhaul · Timer UX · Projects UX expansion | After CI |
 | LATER | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS | Unchanged |
@@ -5540,6 +5540,17 @@ its own NVDA-inclusive closeout. *Done* remains a separate event: merge to `main
 The status was changed only after the NVDA result was supplied, and moved together in the header of this
 document, §2's table, [the epics README](./README.md) and the
 [Product Roadmap](../product/product-roadmap.md)'s EPIC-013 vehicle line.
+
+**Done (2026-09-28).** `f51cd28`, the WP8 commit above, was opened as
+[PR #1](https://github.com/Intechral-Solutions/intechral-client-portal/pull/1) against `main` and merged
+via `29d7ac9`. That satisfies the lifecycle's own *Done* definition — merged to `main` via PR — so the
+epic moved from Verified to **Done**, changed together in the same four places as the Verified step
+above. This is the repository's first epic to reach Done through that route: no GitHub remote existed
+before this branch's session, so every earlier epic's merge to `main` was a local `git merge` rather than
+a reviewed pull request, and each remains recorded at Verified rather than being relabelled after the
+fact. Verified and Done are kept as two distinct, separately dated events here, not collapsed into one —
+WP8 reached Verified on its own tree before any remote existed; Done followed only once that tree was
+actually merged.
 
 ### A13.21 Files changed
 
