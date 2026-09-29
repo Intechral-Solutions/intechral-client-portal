@@ -159,7 +159,9 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Class:** Product functionality. My Tasks; All Tasks (capability-gated); project tasks included; explicit Complete/Reopen (board tasks move to the project's designated Done column through the canonical project-task service); search, sort, filter; assignment; contextual time. See [Task direction](./platform-product-ux-direction.md#task-direction).
 
-**Depends on:** shell, design system, CI baseline (all three Done — dependency satisfied). **Needs design:** designated Done column and Reopen policy.
+**Depends on:** shell, design system, CI baseline (all three Done — dependency satisfied). **Needs design:** designated Done column and Reopen policy — resolved by owner decision Q2 in EPIC-014 (Q1 locks who may Complete/Reopen).
+
+**Vehicle:** [EPIC-014: Tasks Workspace Overhaul](../epics/EPIC-014-tasks-workspace-overhaul.md) (**Planned** 2026-09-29). It locks the Complete/Reopen authorization, the Done-column and Reopen rules, `tasks.view_all` for All Tasks, the standalone-task lifecycle (superseding EPIC-011E D3) and the retirement of the "My organization" view in favour of an organization filter; ticket-task product UX stays Future.
 
 ### Timer UX improvement
 

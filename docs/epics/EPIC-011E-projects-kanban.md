@@ -28,6 +28,8 @@ Owner decisions D1 to D6 are **locked**. At the time of this amendment, D7 remai
 | dnd-kit | Stable `core` + `sortable` + `utilities`, versions pinned by lockfile, library types confined to two adapter files | §9 |
 | WP1 | Backend and Blade-visible defects are fixed and regression-tested before any React route flip | §29 |
 
+> **Forward note (2026-09-29).** D3 is superseded for future work by [EPIC-014 Q4](./EPIC-014-tasks-workspace-overhaul.md#191-epic-011e-d3-standalone-tasks-are-createlist-only): standalone tasks gain detail, edit, Complete/Reopen and delete for their creator or current assignee, under the recorded-time guard. D3 remains the accurate record of this epic's scope; the behaviour changes in EPIC-014 WP2/WP5.
+
 ### Conflicts and corrections found while amending
 
 | # | Finding | Consequence and resolution |
