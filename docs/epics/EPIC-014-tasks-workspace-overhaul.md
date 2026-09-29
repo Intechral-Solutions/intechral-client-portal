@@ -212,10 +212,10 @@ Locked 2026-09-29. Where later wording in this document seems to disagree, **thi
 |---|---|
 | **Q1** | **Board Complete/Reopen authorization.** A board task may be explicitly Completed or Reopened by (1) an actor who can manage the project under the existing `ProjectPolicy::manage`, or (2) the task's **current assignee, provided that assignee is still a member of the project**. This grants **no** arbitrary board movement. A non-manager assignee receives only the semantic Complete/Reopen operation; column movement stays governed by `ProjectPolicy::manage`. Complete/Reopen is **server-authorized**. |
 | **Q2** | **Done column and Reopen destination.** Done destination: the project's single `is_done_column`. The service requires **exactly one**. With zero or several it fails safely with a clear domain/configuration error and never silently picks one. Board completion uses the canonical `ProjectService` move/ordering logic and never writes `tasks.status` for a column-backed task. Reopen destination: **the first non-Done column by position**. No previous-column history or schema is added in this epic; a future workflow epic may introduce configurable or historical destinations. |
-| **Q3** | **All Tasks.** A new permission `tasks.view_all`, granted initially to the built-in `operator` role, gates All Tasks. It is **not** an authorization bypass: a row appears only when the actor can legitimately view that task through the applicable Task/Project/Ticket rules. Other users' standalone (personal) tasks are **not** included because the actor holds `tasks.view_all`. |
+| **Q3** | **All Tasks.** A new permission `tasks.view_all`, granted initially to the built-in `operator` role, gates All Tasks. It is **not** an authorization bypass: a row appears only when the actor can legitimately view that task through the applicable Task/Project/Ticket rules. Other users' standalone (personal) tasks are **not** included because the actor holds `tasks.view_all`. Ticket-kind tasks are excluded from All Tasks in this epic under Q6, whatever the actor's ticket authority. |
 | **Q4** | **Standalone lifecycle and My Tasks.** Standalone tasks gain detail, edit, Complete/Reopen and delete, superseding EPIC-011E D3. The authorized actor is the **creator or the current assignee**, subject to every time/billing integrity rule. Delete reuses the existing recorded-time guard and FK-safe behaviour; no bare delete path may bypass it. Standalone assignment keeps its personal character and is not broadened to organization-wide assignment. **My Tasks** = (1) tasks currently assigned to me, **plus** (2) standalone tasks I created that are currently unassigned. It does **not** include every task I once created after it was intentionally assigned elsewhere. Creating a project task confers no My Tasks visibility on its own. |
 | **Q5** | **Retire "My organization"** as a first-class Tasks view. The top-level views are **My Tasks** and **All Tasks** (when `tasks.view_all` is held). Organization becomes a **filter** within the query model where applicable. The old org view is not preserved for migration compatibility. |
-| **Q6** | **Ticket-task scope lock.** Ticket-task **product UX remains Future**. This epic adds no ticket-task creation, no ticket-task navigation, no new ticket-task list surface and no new customer-facing ticket-task presentation. The shared domain may understand existing `ticket`-kind rows as needed for correctness, authorization and future-proof invariants. §11 records exactly what is internal support and what is user-facing. |
+| **Q6** | **Ticket-task scope lock.** Ticket-task **product UX remains Future**. This epic adds no ticket-task creation, no ticket-task navigation, no new ticket-task list surface and no new customer-facing ticket-task presentation. The shared domain may understand existing `ticket`-kind rows as needed for correctness, authorization and future-proof invariants. §11 records exactly what is internal support and what is user-facing. **Consequence, made explicit (2026-09-29 review):** the Tasks workspace query (`TaskQuery`) **excludes ticket-kind tasks from every result**: My Tasks, All Tasks and every filter (§9.1). `tasks.view_all` never causes a ticket task to appear. |
 
 ## 5. Scope
 
@@ -223,7 +223,7 @@ Locked 2026-09-29. Where later wording in this document seems to disagree, **thi
 
 | # | Outcome | Roadmap source |
 |---|---|---|
-| R1 | Task authorization boundary: `TaskPolicy` over all three kinds (§7) | Precondition for every item below |
+| R1 | Task authorization boundary: `TaskPolicy` that understands all three kinds internally; only board and standalone are product-surfaced (§7, §11) | Precondition for every item below |
 | R2 | Explicit Complete/Reopen per Q1/Q2, from task detail and from the Tasks list | "explicit Complete/Reopen" |
 | R3 | My Tasks (Q4 rule) and All Tasks (Q3) as the two Tasks views; "My organization" retired (Q5) | "My Tasks; All Tasks (capability-gated); project tasks included" |
 | R4 | Server-side search, sort and filters, URL-backed and validated, narrowing only (§9) | "search, sort, filter" |
@@ -231,7 +231,7 @@ Locked 2026-09-29. Where later wording in this document seems to disagree, **thi
 | R6 | Assignment where the domain permits it, from detail and, for authorized actors, from the list (§7.3) | "assignment" |
 | R7 | Tasks list on Direction D: canvas `PageFrame`, `PageHeader`, drawer-owned views, `FilterBar`, `DataTable` conventions, `Status`, `EmptyState`, D9 rows at S (fixes A13.5) | Direction D §19 step 9; EPIC-013 §31 |
 | R8 | Task detail on Direction D: `EntityHeader` + `Strata`, grid `PageFrame` with a labelled aside, `Section`s; the page-owned breadcrumb removed (fixes A13.12) | EPIC-013 §31 |
-| R9 | Contextual time in a meaningful form: the time panel on every task detail kind, and the viewer's running timer visible on list rows (§15.3) | "contextual time" |
+| R9 | Contextual time in a meaningful form: the time panel on every task detail surface this epic delivers (board/project task detail and standalone task detail; ticket task detail is Future and is not an EPIC-014 surface), and the viewer's running timer visible on list rows (§15.3) | "contextual time" |
 | R10 | Minimum keyboard and bulk behaviour satisfying the Task direction's "useful bulk/keyboard interactions": row keyboard navigation and Complete, row selection, and bulk Complete/Reopen (§15.1, §15.2) | Task direction |
 | R11 | Every project-board invariant preserved (§6) | EPIC-011E |
 | R12 | Every time/billing invariant preserved (§6, §12) | EPIC-010C, EPIC-011E D4 |
@@ -304,7 +304,7 @@ Registered for `App\Models\Task`. For board tasks the policy **delegates to `Pro
 
 | Ability | Board task | Standalone task | Ticket task (Q6; §11) |
 |---|---|---|---|
-| `view` | `ProjectPolicy::view(project)` | creator **or** current assignee | `TicketPolicy::view(ticket)` |
+| `view` | `ProjectPolicy::view(project)` | creator **or** current assignee | may delegate to `TicketPolicy::view(ticket)` for existing/internal code only; grants **no** Tasks-workspace exposure (§9.1) |
 | `update` (fields) | `ProjectPolicy::manage(project)` | creator or current assignee | **deny** (no surface) |
 | `complete` | `manage(project)` **or** member-assignee (Q1) | creator or current assignee | **deny** |
 | `reopen` | `manage(project)` **or** member-assignee (Q1) | creator or current assignee | **deny** |
@@ -316,7 +316,7 @@ Registered for `App\Models\Task`. For board tasks the policy **delegates to `Pro
 
 Rules:
 - A board task whose assignee has left the project is **not** viewable by that former assignee. This keeps today's matrix row `assignee → DENY` on project task routes. The row still appears in their My Tasks, unlinked and with no actions, exactly as today (EPIC-011E §5).
-- `viewAll` gates the **surface** only. The rows inside it come from `view` (Q3).
+- `viewAll` gates the **surface** only. The rows inside it come from `view` (Q3), restricted to the kinds the workspace surfaces: board and standalone (§9.1). `TaskPolicy` understanding a ticket-kind task internally is authorization support, never product exposure (Q6).
 - Comment and checklist abilities stay on `ProjectPolicy` in `ProjectTaskController` and are **unchanged**.
 - `ProjectTaskController`'s existing structural routes keep `ProjectPolicy::manage`. Those controllers are not refactored to call `TaskPolicy` unless a WP needs it; if one does, the result must be identical, proven by `ProjectAuthorizationMatrixTest`.
 
@@ -335,7 +335,7 @@ The board assignee-validation closure in `taskRules()` is **extracted and shared
 
 | Actor | My Tasks | All Tasks | Complete/Reopen board task | Edit/assign/delete board task | Standalone lifecycle |
 |---|---|---|---|---|---|
-| `operator` (all permissions, incl. `projects.admin`) | yes | yes: every board task (all projects are visible to `projects.admin`), ticket tasks per `TicketPolicy`, and only **own** standalone tasks | yes | yes | own only |
+| `operator` (all permissions, incl. `projects.admin`) | yes | yes: every board task (all projects are visible to `projects.admin`) and only **own** standalone tasks; never ticket tasks (Q6) | yes | yes | own only |
 | `user`, project manager (`projects.manage` + manager role) | yes | no | own projects: yes | own projects: yes | own only |
 | `user`, plain member | yes | no | only as member-assignee | no | own only |
 | `user`, former member still assigned | row listed, unlinked | no | no | no | own only |
@@ -352,7 +352,7 @@ The board assignee-validation closure in `taskRules()` is **extracted and shared
 | Board, column-backed | Resolve the Done column (below). If the task is already in it: **no-op success**, no move and no reorder. Otherwise `ProjectService::moveTask(task, doneColumnId, PHP_INT_MAX)`, which appends at the tail (clamped). `status` is **not** written (INV-2). | Resolve the first non-Done column by `position` (ties broken by `id`). If the task is not done: **no-op success**. Otherwise `moveTask(task, firstOpenColumnId, PHP_INT_MAX)` to the tail. `status` is not written. |
 | Board, null column (the column was deleted; pinned edge, unreachable while no column-management route exists) | Placed into the Done column through the same `moveTask` (the service already handles a null source). It rejoins the board rather than gaining a status-only completion. | n/a: a null-column board task is done only if `status = done`, and Complete never produces that state. If one exists (legacy), Reopen places it in the first open column through `moveTask`. |
 | Standalone | `status = done`. Idempotent. | `status = todo`. Idempotent. |
-| Ticket | Service support only, as `status = done` (§11). **No route grants it** in this epic. | `status = todo`; service only. |
+| Ticket | **Refused.** The service recognizes the kind and throws a domain exception without changing anything (§11). No route reaches it. | **Refused**, same as Complete. |
 
 **Done-column resolution (Q2, INV-8)**
 - Query `project_columns where project_id = ? and is_done_column = true`. Exactly one row → proceed.
@@ -376,31 +376,40 @@ One query layer (working name `App\Queries\TaskQuery`) builds every Tasks-worksp
 3. **Search**, `AND`-ed.
 4. **Sort**, then **pagination** (30 per page, `withQueryString`, as today).
 
+**Surfaced kinds (Q6).** Step 1 always begins with the *surfaced-kinds predicate*, `project_id IS NOT NULL OR ticket_id IS NULL` (board and standalone). `TaskQuery` therefore returns **no ticket-kind task in any Tasks-workspace result**: not in My Tasks, not in All Tasks, not under any filter, and not because the actor holds `tasks.view_all`. This is a deliberate narrowing of today's `/tasks`, which can list ticket rows (assigned to the viewer, or reached through the org view). Ticket-task product UX remains Future, and the queries, filter options and DTOs model only the two surfaced kinds. EPIC-014 adds **no** `Ticket::scopeVisibleTo`; if a later package finds an independent concrete need for a canonical Ticket visibility scope, it is proposed and characterized then.
+
 The view's visibility set is wrapped in a single parenthesised `where(fn …)` group, so a filter can never escape it through operator precedence. A test pins that every filter combination returns a subset of the unfiltered view (§16.2).
 
 ### 9.2 My Tasks (Q4)
 
 ```
-assignee_id = me
-OR (project_id IS NULL AND ticket_id IS NULL AND created_by = me AND assignee_id IS NULL)
+surfaced kinds (project_id IS NOT NULL OR ticket_id IS NULL)
+AND (
+      assignee_id = me                       -- board or standalone tasks assigned to me
+   OR (project_id IS NULL AND ticket_id IS NULL AND created_by = me AND assignee_id IS NULL)
+)
 ```
 
+- Board/project tasks currently assigned to me; standalone tasks currently assigned to me; unassigned standalone tasks I created (Q4). **No ticket tasks.**
 - No company or organization widening. Being the creator of a project task grants nothing.
 - Rows the viewer cannot open (a former member still assigned) are listed **unlinked and without actions** (INV-17), as today.
 
 ### 9.3 All Tasks (Q3)
 
-Available only with `tasks.view_all`. The set is the union of rows the actor can `view` (§7.2):
+Available only with `tasks.view_all`. The set is the union of the surfaced-kind rows the actor can `view` (§7.2):
 
 ```
-(project_id IS NOT NULL AND project_id IN Project::visibleTo(actor))
-OR (project_id IS NULL AND ticket_id IS NOT NULL AND <TicketPolicy::view as SQL>)
-OR (<My Tasks standalone arm>, i.e. standalone rows where actor is creator or current assignee)
-OR assignee_id = me                      -- keeps All ⊇ Mine
+surfaced kinds (project_id IS NOT NULL OR ticket_id IS NULL)
+AND (
+      project_id IN Project::visibleTo(actor)                       -- board tasks the actor may view
+   OR (project_id IS NULL AND ticket_id IS NULL
+       AND (created_by = me OR assignee_id = me))                   -- the actor's own standalone tasks
+   OR assignee_id = me                                              -- keeps All ⊇ Mine
+)
 ```
 
 - `Project::visibleTo` already exists and equals `ProjectPolicy::view` (pinned by `ProjectVisibilityTest`).
-- `TicketPolicy::view` is "ticket owner, or an actor who works tickets". It has an SQL form (`tickets.user_id = me`, or all when the actor works tickets). WP3 adds a `Ticket::scopeVisibleTo` pinned equal to the policy, following the project precedent. It must not reintroduce EPIC-010D's H4 list/policy mismatch.
+- **Ticket tasks are excluded** (Q6). No ticket authorization query is part of this epic, so no `Ticket::scopeVisibleTo` is planned.
 - Other users' standalone tasks never appear.
 
 ### 9.4 View state
@@ -417,11 +426,11 @@ Every filter is optional, URL-backed, validated and clamped (an unknown value is
 | Completion | `open` (default) · `done` · `any` | `scopeOpen` / `scopeDone` | The single done rule (INV-1). The default is open, so a completed row leaves the default view (Direction D §14.2, "row completed → focus next row") |
 | Priority | subset of `Task::PRIORITIES` | `whereIn('priority')` | |
 | Due | `overdue` · `today` · `next7` · `none` | `scopeOverdue`; date comparisons in the application timezone; `whereNull` | Presets only; no free date range in this epic |
-| Kind | `project` · `standalone` | `whereNotNull('project_id')` / standalone predicate | `ticket` is **not offered** (Q6). Ticket rows remain in "all kinds" with their source tag |
+| Kind | `project` · `standalone` | `whereNotNull('project_id')` / standalone predicate | `ticket` is **not offered** and is not a value of the filter DTO (Q6). Ticket tasks are not in the result set at all (§9.1) |
 | Project | a project id | `where('project_id')` | Options: projects in `Project::visibleTo(actor)` that have at least one row in the current view |
 | Milestone | a milestone id | `where('milestone_id')` | **Offered only when exactly one project is selected**; the server ignores a milestone that does not belong to it. Milestones are per project, and a cross-project milestone filter has no clean meaning |
 | Assignee | a user id, or `none` | `where('assignee_id')` / `whereNull` | **All Tasks only**; My Tasks is already scoped to the viewer. Options: distinct assignees of rows in the current visible set, names only (INV-17) |
-| Organization | a CRM company id (Directory "Organizations") | board: `project.companies` contains it; ticket: `ticket.company_id`; standalone: never matches | Replaces the retired org view (Q5). A company link is **metadata that narrows, never grants** (EPIC-011E D2). Options: companies linked to projects the actor can view |
+| Organization | a CRM company id (Directory "Organizations") | board: `project.companies` contains it; standalone: never matches | Replaces the retired org view (Q5). A company link is **metadata that narrows, never grants** (EPIC-011E D2). Options: companies linked to projects the actor can view |
 
 Filter option lists are computed from already-authorized sets, so they cannot enumerate unauthorized records (INV-17). Each option query is bounded and counted in the query budget.
 
@@ -471,17 +480,18 @@ Standalone tasks have **no** checklist, comments, milestone or board position in
 
 ## 11. Ticket-kind tasks: internal support versus product scope
 
-Nothing in application code creates ticket tasks; only factories do (EPIC-011E §3.1). Q6 applies.
+Nothing in application code creates ticket tasks; only factories do (EPIC-011E §3.1). Q6 applies: **ticket-task product UX remains Future.** EPIC-014 lists no ticket task, offers none in My Tasks or All Tasks, filters by no ticket kind, adds no ticket-task detail surface and no ticket-task mutation UX.
 
 | Concern | Internal domain support (in scope) | User-facing (out of scope) |
 |---|---|---|
-| Kind detection, done/overdue rules | Unchanged: `status`-based | n/a |
-| `TaskPolicy::view` | Delegates to `TicketPolicy::view`, so All Tasks and link rendering are correct | No new ticket-task list |
-| `TaskPolicy` mutations | All **deny** | No Complete/Edit/Delete/Assign control on ticket rows |
-| `TaskService` complete/reopen | The `status` path is generic for status-sourced kinds and unit-tested on a ticket row to prove kind coherence | No route reaches it for a ticket task |
-| Delete guard | Generic (INV-11) | No delete route for a ticket task |
-| List rows | Unchanged: listed where the query admits them, source tag `TICKET`, context link to the ticket only when `TicketPolicy::view` allows (C8), no title link | No ticket-task detail page (`GET /tasks/{task}` → 404) |
-| Filters | `kind` does not offer `ticket` | |
+| Kind detection (`Task::kind()`), done/overdue rules | Unchanged: `status`-based | n/a |
+| `TaskPolicy::view` | May delegate to `TicketPolicy::view` where existing or internal code needs an answer | Grants **no** Tasks-workspace exposure: `TaskQuery` excludes ticket tasks (§9.1) |
+| `TaskPolicy` mutations (`update`, `complete`, `reopen`, `delete`, `assign`) | All **deny** | No Complete/Edit/Delete/Assign control or route for a ticket task |
+| `TaskService` | Recognizes a ticket-kind task sufficiently to **fail safely**: every EPIC-014 operation refuses it with a domain exception and changes nothing | No ticket-task mutation behaviour |
+| Delete guard | Generic (INV-11): it keys on `time_entries.task_id`, whatever the kind | No delete route for a ticket task |
+| Tasks list, My Tasks, All Tasks | **Excluded** (§9.1) | No ticket rows, no `TICKET` source tag in the workspace, no ticket kind in the filter DTO |
+| Task detail | `GET /tasks/{task}` → 404 for a ticket task | No ticket-task detail page; contextual time does not apply to a surface that does not exist |
+| Filters | `kind` offers `project` and `standalone` only | |
 
 ## 12. Time and billing boundary
 
@@ -498,7 +508,7 @@ There is **no second copy** and no bare `$task->delete()` anywhere on a request 
 
 | Interaction | Risk | Plan |
 |---|---|---|
-| Task delete | Silently nulled or lost history | INV-11/INV-12; guard shared (§12.1); `ProjectDeletionGuardTest` extended to standalone and ticket rows |
+| Task delete | Silently nulled or lost history | INV-11/INV-12; guard shared (§12.1); `ProjectDeletionGuardTest` extended to standalone rows (the guard keys on `time_entries.task_id`, so it is kind-agnostic) |
 | Changing project or kind | Re-attributes historical and billed time to another project | Forbidden (INV-9). No endpoint accepts `project_id`/`ticket_id` on update; pinned |
 | Complete while a timer runs | Stopping someone else's timer breaks timer ownership | INV-15: no time entry is touched |
 | Standalone reassignment (actor ↔ null) | `AccessibleTimeContext::canUseTask` admits the assignee, so releasing a task removes the releaser's eligibility for **new** entries; an existing unbilled entry re-validated on edit could then fail | **Characterize first (WP1):** pin what `TimeEntryService::update` does when an entry's task is no longer eligible. Billed/invoiced entries remain locked regardless (INV-14). If the characterization shows an edit of an unrelated field is rejected, WP2 records it and the owner decides; it is **not** silently "fixed" in the time domain |
@@ -517,8 +527,8 @@ There is **no second copy** and no bare `$task->delete()` anywhere on a request 
 | GET | `/tasks/{task}` | `tasks.show` | `TaskPolicy::view`; board → redirect, ticket → 404 | WP2 (backend), WP5 (page) |
 | PUT | `/tasks/{task}` | `tasks.update` | `TaskPolicy::update`; standalone only (board → 404: board edits stay on `projects.tasks.update`) | WP2 |
 | DELETE | `/tasks/{task}` | `tasks.destroy` | `TaskPolicy::delete`; standalone only (board → 404: board delete stays on `projects.tasks.destroy`) | WP2 |
-| PUT | `/tasks/{task}/complete` | `tasks.complete` | `TaskPolicy::complete`; all kinds (ticket denied) | WP2 |
-| PUT | `/tasks/{task}/reopen` | `tasks.reopen` | `TaskPolicy::reopen`; all kinds (ticket denied) | WP2 |
+| PUT | `/tasks/{task}/complete` | `tasks.complete` | `TaskPolicy::complete`; board and standalone (ticket denied) | WP2 |
+| PUT | `/tasks/{task}/reopen` | `tasks.reopen` | `TaskPolicy::reopen`; board and standalone (ticket denied) | WP2 |
 | PUT | `/tasks/{task}/assignee` | `tasks.assignee.update` | `TaskPolicy::assign`; §7.3 target rules | WP2 |
 | POST | `/tasks/bulk` | `tasks.bulk` | per task, each through `TaskPolicy` (§15.2) | WP2 |
 
@@ -531,7 +541,7 @@ Every existing `projects.tasks.*` route is **unchanged**. The `{task}` bindings 
 ### 13.3 DTOs
 
 **`TaskRow`** (the list) keeps every current field: id, title, priority, status DTO, dueDate, overdue, assignee `{id,name}`, context `{kind,label,url}`, url. It gains:
-- `kind` (`board|ticket|standalone`), which the source tag needs;
+- `kind` (`board|standalone`; the only kinds the workspace surfaces, Q6), which the source tag needs;
 - `abilities: {complete, reopen, assign}`, computed in **batch** (one membership lookup per page, as `openableProjects` already does; never a policy query per row);
 - `url` for standalone rows (`tasks.show`) when viewable.
 
@@ -568,7 +578,7 @@ PageFrame width="canvas"
   - Done shows a ring with a check (`success-glyph`) and muted row text;
   - Overdue shows a clock glyph plus the due date in `danger` at weight 500; "Today" is plain;
   - a Running row uses `live-soft`;
-  - the source tag is mono (`BOARD`/`TICKET`/`STANDALONE`);
+  - the source tag is mono (`BOARD`/`STANDALONE`; `TICKET` is a Direction D kind this epic does not surface, Q6);
   - a board status shows the column name;
   - priority uses the three-bar glyph.
 - **S width (D9):** rows reflow to two-line rows (title and complete on the first line; status, due and context on the second). There is no document-level horizontal scroll, which closes A13.5. The clipping `overflow-hidden` wrapper goes.
@@ -623,7 +633,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 
 ### 15.3 Contextual time (required minimum, R9)
 
-- **Task detail (both kinds):** `TaskTimePanel` with the shared `TimerControl`, exactly as EPIC-011D/013 built it. Start is offered only when the server-provided eligibility (`time.log` + `AccessibleTimeContext`) allows it.
+- **Every task detail surface EPIC-014 delivers, board/project task detail and standalone task detail:** `TaskTimePanel` with the shared `TimerControl`, exactly as EPIC-011D/013 built it. Start is offered only when the server-provided eligibility (`time.log` + `AccessibleTimeContext`) allows it.
 - **Tasks list:** a row whose task has the **viewer's** running timer shows the Direction D running state (`live-soft` row, time in `live-text`). This comes from the existing `TimerProvider` client state: no new server query and no second timer state.
 - Row-level start/stop (S1) is separable. Timer UX NEXT items are out (§5.3).
 
@@ -658,7 +668,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 | Guard uniqueness: no request-path `Task` delete outside the guarded services | Pest (static/architectural) | WP1 |
 | INV-9: update rejects/ignores `project_id`, `ticket_id` on every task update route | Pest | WP1 |
 | INV-15: Complete leaves every time entry, running ones included, byte-identical | Pest | WP2 |
-| Ticket task: view per `TicketPolicy`; every mutation route 403; `tasks.show` 404; service status path coherent | Pest | WP1/WP2 |
+| Ticket task: absent from My Tasks and All Tasks for every actor (including a `tasks.view_all` holder and the ticket's owner) and from every filter combination; every mutation route denied; `tasks.show` 404; `TaskService` refuses it without changing anything; `TaskPolicy` `view` delegation and mutation denials pinned | Pest | WP1/WP2/WP3 |
 | All Tasks: gated by `tasks.view_all`; clamps without it; excludes others' standalone; equals the union of `view`-able rows | Pest | WP3 |
 | **Filters never widen**: property-style, every filter/search/sort combination ⊆ unfiltered view, for several actors | Pest | WP3 |
 | Search escaping; sort determinism; filter clamping; `view=org` clamps to mine | Pest | WP3 |
@@ -678,6 +688,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 | `ProjectPinnedBehaviorTest` "PINNED (D3): standalone tasks have no route beyond tasks.index and tasks.store" | The standalone route surface is exactly §13.1's set, each with its `TaskPolicy` ability (re-pinned under Q4) |
 | `ProjectIntegrityTest` "accepts a standalone assignee only when it is the actor or none" / "keeps standalone validation unchanged" | Kept on create, and extended to update/assign per §7.3 |
 | `ProjectVisibilityTest` org-tab cases ("limits the org tab…", "gives an admin the org tab…", "shows no org rows to a user without tasks.view_org…") | Rewritten to the organization **filter** (narrows only, grants nothing) and to All Tasks visibility |
+| `TaskListInertiaTest` ticket-row cases ("derives a ticket row's status from its raw status field…", the ticket arm of "reports context.kind…") and `ProjectVisibilityTest` "renders no ticket link that TicketPolicy would deny" | Rewritten to the Q6 rule: a ticket-kind task is absent from My Tasks and All Tasks (WP3). Ticket-kind status semantics stay pinned at the model/presenter level (`ProjectPinnedBehaviorTest`), which the workspace does not exercise. Nothing is deleted without its replacement assertion |
 | `ProjectVisibilityTest` "keeps standalone tasks unlinked and the mine tab scoped to the assignee" | Standalone rows link to `tasks.show` when viewable; My Tasks follows the Q4 rule |
 | `NavigationBuilderTest` "tasks org view" | Replaced by `tasks.all` (`view=all`) active-state cases |
 | `ProjectAuthorizationMatrixTest` `tasks.index`/`tasks.store` rows | Extended with every new `tasks.*` route |
@@ -742,7 +753,7 @@ The discovery structure is kept with one boundary change: **bulk Complete/Reopen
 
 - **Objective:** implement §9 in full, the `tasks.view_all` permission and the §9.8 navigation contract.
 - **In scope:**
-  - `TaskQuery`; `Ticket::scopeVisibleTo` (pinned equal to `TicketPolicy::view`);
+  - `TaskQuery` (with the surfaced-kinds predicate, §9.1);
   - `TaskController::index` props (`filters`, `filterOptions`, `sort`, `canViewAll`; remove `canViewOrg`);
   - `PermissionCatalogue` + seeder impact; `NavigationBuilder` (`tasks.all`, retire `tasks.org`);
   - `EXPLAIN`-justified indexes only (a migration only if justified);
@@ -819,14 +830,14 @@ The discovery structure is kept with one boundary change: **bulk Complete/Reopen
 EPIC-014 is **Verified** when all of these hold. S1–S5 (WP6) are **not** criteria.
 
 1. `TaskPolicy` exists and governs every `tasks.*` route; its matrix test covers every ability × kind × actor; board abilities delegate to `ProjectPolicy`; `ProjectAuthorizationMatrixTest` is unchanged for every `projects.*` route.
-2. Complete/Reopen work per §8 for board and standalone tasks, from the list and from detail, for managers and member-assignees; member-assignees cannot move; ticket tasks cannot be mutated.
+2. Complete/Reopen work per §8 for board and standalone tasks, from the list and from detail, for managers and member-assignees; member-assignees cannot move; ticket tasks are not surfaced and cannot be mutated.
 3. A project with zero or several Done columns fails Complete/Reopen with the clear configuration error, never a 500 or a guess, and is listed by `ProjectIntegrityAudit`.
 4. My Tasks follows Q4 exactly (F1 fixed); All Tasks is gated by `tasks.view_all`, equals the union of `view`-able rows, and excludes others' standalone tasks; "My organization" is gone as a view.
 5. Search, sort and every §9.5 filter work server-side from URL state, are validated/clamped, and are proven never to widen visibility; the query budget holds; any added index is justified by `EXPLAIN`.
 6. Standalone detail, edit, Complete/Reopen and delete work for creator and assignee only; delete is refused when time exists, through the shared guard.
 7. Assignment works per §7.3 from detail and from the list for authorized actors.
 8. The Tasks list uses the §14.1 grammar; A13.5 is closed; truly empty and filtered empty states are distinct.
-9. Task detail uses the §14.2 grammar for both kinds; A13.12 is closed (exactly one Breadcrumb landmark).
+9. Task detail uses the §14.2 grammar for board and standalone tasks; A13.12 is closed (exactly one Breadcrumb landmark).
 10. R9 contextual time and R10 keyboard/bulk minimums are present and tested.
 11. INV-1 to INV-19 hold, each with a named test.
 12. A9.7 is closed: the browser suite leaves no standalone-task residue, cleaned through the supported delete route.
@@ -849,10 +860,10 @@ EPIC-014 is **Verified** when all of these hold. S1–S5 (WP6) are **not** crite
 - **New rule:** §9.8. My tasks + All tasks (`tasks.view_all`); organization becomes a filter.
 - **When:** decided 2026-09-29; implemented in **WP3**. EPIC-013 is Done and is not rewritten; a forward-pointer note is added.
 
-### 19.3 Tasks list "mine" semantics (EPIC-011E WP8)
+### 19.3 Tasks list "mine" semantics and ticket rows (EPIC-011E WP8)
 
-- **Original:** "mine" = `assignee_id = me`.
-- **New:** Q4's two-arm rule (§9.2).
+- **Original:** "mine" = `assignee_id = me`, and the list could show ticket-kind rows (assigned to the viewer, or reached through the org view) with a context link.
+- **New:** Q4's two-arm rule over the surfaced kinds (§9.2). Ticket-kind tasks leave the workspace list under Q6 (§9.1) until ticket-task UX is designed; no ticket data is changed.
 - **When:** WP3.
 
 ### 19.4 Discovery-report correction (not a prior decision)
@@ -879,7 +890,7 @@ The discovery report's "missing indexes on `assignee_id`/`created_by`" was wrong
 |---|---|---|---|---|---|
 | R1 | A second source of task-authorization truth diverges from `ProjectPolicy` | Medium | High | Board abilities delegate; `ProjectAuthorizationMatrixTest` unchanged; `TaskPolicy` matrix shares its actors | Revert the WP; no data change |
 | R2 | Complete via `moveTask` regresses board ordering or concurrency | Low | High | No new ordering code; concurrency worker re-run in WP1/WP2 | Revert WP2's routes; the board is untouched |
-| R3 | A filter or All Tasks leaks rows | Medium | High | Fixed composition order; property test; `Ticket::scopeVisibleTo` pinned to the policy | Revert WP3; the list falls back to the prior query |
+| R3 | A filter or All Tasks leaks rows | Medium | High | Fixed composition order and surfaced-kinds predicate (§9.1); property test | Revert WP3; the list falls back to the prior query |
 | R4 | Standalone delete bypasses the time guard | Low | High | One shared guard; static test; RESTRICT backstop | Revert WP2 |
 | R5 | Shared `DataTable`/`FilterBar` over-generalized, slowing WP4 | Medium | Medium | Build only what Tasks uses; presentation-only contract | Keep them in `components/tasks/` and promote later |
 | R6 | Standalone reassignment affects time-entry edits (§12.2) | Low | Medium | WP1 characterization first; owner decision if a real regression shows | Keep the pre-existing assignment rule |
