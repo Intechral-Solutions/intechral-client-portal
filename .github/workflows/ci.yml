@@ -23,7 +23,7 @@ jobs:
   # does not stop the later ones, so one run reports every failure.
   checks:
     name: ./dev check gates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       # Depth 2: the git diff --check gate compares HEAD with its parent.
@@ -92,9 +92,14 @@ jobs:
         run: ./vendor/bin/pint --test
 
       # Wayfinder generation, typecheck, lint, format check, Vitest, production build.
+      # laravel-vite-plugin refuses to start Vite's dev (HMR) server when CI is set, and Vitest
+      # loads vite.config.ts in serve mode; the plugin's own bypass lets Vitest start. It does not
+      # affect `vite build`, which the check never guards.
       - name: 'Frontend: npm run check'
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: src
+        env:
+          LARAVEL_BYPASS_ENV_CHECK: '1'
         run: npm run check
 
       # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
@@ -110,7 +115,7 @@ jobs:
   # the committed `workers: 3` are untouched.
   browser:
     name: Playwright browser suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7

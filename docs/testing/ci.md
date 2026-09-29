@@ -23,7 +23,8 @@ blocking by convention until required checks can be configured.
 
 ## What runs
 
-Two jobs, in parallel, on separate `ubuntu-latest` runners.
+Two jobs, in parallel, on separate runners pinned to `ubuntu-24.04` (not `ubuntu-latest`, so the
+OS and its tooling — Docker/Compose, ShellCheck — do not change underneath the baseline).
 
 ### `checks` — the `./dev check` gates
 
@@ -138,5 +139,12 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
 - **The no-shift browser tests measure a warm-cache paint.** They pass only when fonts and CSS are
   reusable from the HTTP cache, as nginx's headers allow (above). Whether a first, cold visit is
   shift-free is not covered; recorded, not changed.
+- **Frontend failures cascade into Pest.** Pest's Blade and Inertia responses need the Vite manifest
+  that `npm run check` builds last. If that chain fails before `vite build`, hundreds of Pest tests fail
+  with `ViteManifestNotFoundException` (or "Not a valid Inertia response"), and the volume of failure
+  output can push the job towards its timeout. Fix the first frontend failure; the Pest failures follow
+  from it. (Locally a leftover `public/build` hides this.)
+- **Ubuntu 26.** GitHub moves `ubuntu-latest` to Ubuntu 26.04 from 19 October 2026. The pin stays on
+  24.04 until a deliberate trial run on 26.04 shows the baseline still passes there.
 - **Deferred:** Docker layer caching for the `browser` job's image build; uploading Playwright traces
   on failure; a manual (`workflow_dispatch`) trigger; required-check enforcement once the plan allows.
