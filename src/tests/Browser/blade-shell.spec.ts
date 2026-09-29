@@ -159,20 +159,36 @@ test('a Blade page paints with the remembered theme and panel state, without lay
             probe.firstFrame = `${root.dataset.theme}/${root.dataset.drawer}`;
         });
 
-        new PerformanceObserver((list) => {
-            for (const entry of list.getEntries() as unknown as { value: number }[]) {
+        const record = (entries: PerformanceEntryList) => {
+            for (const entry of entries as unknown as { value: number }[]) {
                 probe.shift += entry.value;
             }
-        }).observe({ type: 'layout-shift', buffered: true });
+        };
+        const observer = new PerformanceObserver((list) => record(list.getEntries()));
+        observer.observe({ type: 'layout-shift', buffered: true });
+
+        // Reading, not resetting: entries the observer has queued but not yet delivered are added to
+        // the running total, so nothing recorded since the first paint can be missed or discarded.
+        (window as unknown as { __flushShift: () => void }).__flushShift = () =>
+            record(observer.takeRecords());
     });
 
     await page.goto('/operator/tickets');
     await expect(bladeShell(page)).toHaveCount(1);
-    await page.waitForLoadState('load');
 
-    const probe = await page.evaluate(
-        () => (window as unknown as { __probe: { firstFrame: string; shift: number } }).__probe,
-    );
+    // `load` does not wait for the timer pill's first read (`GET /time/timers/active`), so reading the
+    // probe there missed the pill moving when a running timer arrived. The pill is server-rendered
+    // hidden and revealed only once that read has a final result (Direction D §15.1), so its becoming
+    // visible IS the confirmation signal. Two frames then make sure the frame carrying the last DOM
+    // change has been painted, and the flush collects whatever the observer has not delivered yet.
+    await expect(page.locator('[data-shell-timer]')).toBeVisible();
+
+    const probe = await page.evaluate(async () => {
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        (window as unknown as { __flushShift: () => void }).__flushShift();
+
+        return (window as unknown as { __probe: { firstFrame: string; shift: number } }).__probe;
+    });
 
     expect(probe.firstFrame).toBe('dark/collapsed');
     expect(probe.shift).toBe(0);

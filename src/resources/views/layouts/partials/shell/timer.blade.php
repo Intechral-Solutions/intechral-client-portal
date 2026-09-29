@@ -16,14 +16,19 @@
     not authorization — every timer endpoint keeps its own `can:time.log` middleware and its ownership
     check (§27).
 
-    The pill renders its IDLE state server-side and the script swaps in the running state once the
-    active set arrives. Nothing shifts when it does: the pill is the last item in the bar, so its width
-    is free to change without moving the breadcrumb. Server-rendering the running state instead would
-    mean a timer query on every Blade page render, and §18.2 is explicit that WP6 adds no backend work.
+    The root renders HIDDEN. Direction D §15.1: the pill shows the last confirmed state, or nothing on
+    first load, and the server knows nothing about this user's timers at render time. A visible idle
+    pill painted here would claim that nothing is running, then grow leftward into the running pill when
+    the active set arrived — the pill is the last item in the bar, but it is right-aligned, so growing
+    moves the pill itself and the shell reports a layout shift (measured 0.0010528120713305898,
+    1317,9,107,30 -> 1117,8,307,32). blade-timer.ts reveals the root once, after the first read has
+    reached a final result and the confirmed (or unavailable) state is drawn; later refreshes never hide
+    it again. Server-rendering the running state instead would mean a timer query on every Blade page
+    render, and §18.2 is explicit that WP6 adds no backend work.
 --}}
 @auth
 @can('time.log')
-<div class="relative shrink-0" data-shell-timer data-timer-running="false" data-timer-count="0">
+<div class="relative shrink-0" data-shell-timer data-timer-running="false" data-timer-count="0" hidden>
     {{-- Start/stop transitions only. The elapsed digits are deliberately outside this region: a clock
          in a live region announces every second (§13, Direction D §12.1). --}}
     <p class="sr-only" aria-live="polite" data-shell-timer-announce></p>

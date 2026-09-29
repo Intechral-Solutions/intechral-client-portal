@@ -36,7 +36,7 @@ function mountTimer() {
     document.body.innerHTML = `
         <div data-shell="operational" data-shell-renderer="blade">
             <header data-shell-utility>
-                <div class="relative" data-shell-timer data-timer-running="false" data-timer-count="0">
+                <div class="relative" data-shell-timer data-timer-running="false" data-timer-count="0" hidden>
                     <p class="sr-only" aria-live="polite" data-shell-timer-announce></p>
                     <div>
                         <button type="button" data-shell-timer-trigger aria-haspopup="dialog" aria-expanded="false" aria-label="Start timer">
@@ -112,6 +112,175 @@ afterEach(() => {
     vi.unstubAllGlobals();
     document.body.innerHTML = '';
     document.head.innerHTML = '';
+});
+
+/**
+ * Direction D §15.1 on the Blade renderer: the last confirmed state, or nothing on first load. The
+ * server renders the root hidden (it knows nothing about this user's timers), and the script reveals
+ * it exactly once — after the first read has a final result and that result is drawn.
+ */
+describe('first paint: the last confirmed state, or nothing', () => {
+    /**
+     * A `fetch` whose responses the test releases by hand. `respond` answers the NEWEST waiting
+     * request: the module listens for `timerStarted` on `window` and never removes the listener, so
+     * pills mounted by earlier tests in this file also react to it and queue reads of their own first;
+     * this test's pill registered last, so its read is always the last one queued.
+     */
+    function controlledFetch() {
+        const pending: Array<(response: Response) => void> = [];
+        const fetchMock = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        return {
+            fetchMock,
+            respond(body: unknown, status = 200) {
+                const release = pending.pop();
+
+                if (!release) throw new Error('No request is waiting for a response.');
+
+                release({
+                    ok: status >= 200 && status < 300,
+                    status,
+                    json: vi.fn().mockResolvedValue(body),
+                } as unknown as Response);
+
+                return settle();
+            },
+        };
+    }
+
+    /**
+     * A later refresh, by a route a user can really cause: the embedded ticket tracker announces a
+     * start, and the pill reconciles against the server (§18.4). It carries no timer of its own here,
+     * so the pill has nothing to adopt and can only wait for the read.
+     */
+    function refreshFromTracker() {
+        window.dispatchEvent(new CustomEvent('timerStarted', { detail: null }));
+    }
+
+    /** Records what the pill looked like at the moment it was revealed. */
+    function watchReveal() {
+        const seen: Array<{ running: string | undefined; idleShown: boolean; error: boolean }> = [];
+
+        new MutationObserver(() => {
+            if (pill().hidden) return;
+
+            seen.push({
+                running: pill().dataset.timerRunning,
+                idleShown: !document.querySelector<HTMLElement>('[data-timer-idle]')!.hidden,
+                error: trigger().classList.contains('border-danger'),
+            });
+        }).observe(pill(), { attributes: true, attributeFilter: ['hidden'] });
+
+        return seen;
+    }
+
+    it('stays hidden while the first read is unresolved', async () => {
+        controlledFetch();
+        mountTimer();
+        await settle();
+
+        expect(pill().hidden).toBe(true);
+    });
+
+    it('reveals the confirmed idle state after a first read with nothing running', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        const reveals = watchReveal();
+
+        await respond([]);
+
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('false');
+        expect(trigger().getAttribute('aria-label')).toBe('Start timer');
+        expect(trigger().classList.contains('border-danger')).toBe(false);
+        expect(reveals).toEqual([{ running: 'false', idleShown: true, error: false }]);
+    });
+
+    it('reveals the running pill directly, never through the idle presentation', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        const reveals = watchReveal();
+
+        await respond([timer()]);
+
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('true');
+        expect(text('[data-timer-label]')).toBe('Ticket: TKT-42');
+        // Ordering: at the instant it became visible the running state was already drawn.
+        expect(reveals).toEqual([{ running: 'true', idleShown: false, error: false }]);
+    });
+
+    it('reveals the unavailable state, with Retry, after a failed first read', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        const reveals = watchReveal();
+
+        await respond({}, 503);
+
+        expect(pill().hidden).toBe(false);
+        // Nothing was ever confirmed, so this is the error presentation and not a plain idle pill.
+        expect(reveals).toEqual([{ running: 'false', idleShown: true, error: true }]);
+
+        trigger().click();
+        expect(document.querySelector<HTMLElement>('[data-timer-retry]')!.hidden).toBe(false);
+        expect(document.querySelector<HTMLElement>('[data-timer-unavailable]')!.hidden).toBe(false);
+    });
+
+    it('does not hide a confirmed running pill while a later refresh is in flight', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        await respond([timer()]);
+
+        refreshFromTracker();
+        await settle();
+
+        // The second read is still unresolved: the last confirmed state stays exactly as drawn.
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('true');
+        expect(text('[data-timer-label]')).toBe('Ticket: TKT-42');
+
+        await respond([]);
+
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('false');
+    });
+
+    it('does not hide a confirmed idle pill while a later refresh is in flight', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        await respond([]);
+
+        refreshFromTracker();
+        await settle();
+
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('false');
+        expect(trigger().getAttribute('aria-label')).toBe('Start timer');
+
+        await respond([timer()]);
+
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('true');
+    });
+
+    it('keeps the last confirmed state, marked unavailable, when a later refresh fails', async () => {
+        const { respond } = controlledFetch();
+        mountTimer();
+        await respond([timer()]);
+
+        refreshFromTracker();
+        await settle();
+        await respond({}, 503);
+
+        // The existing semantics: the confirmed timer stays drawn, with the danger border and a Retry.
+        expect(pill().hidden).toBe(false);
+        expect(pill().dataset.timerRunning).toBe('true');
+        expect(text('[data-timer-label]')).toBe('Ticket: TKT-42');
+        expect(trigger().classList.contains('border-danger')).toBe(true);
+        expect(document.querySelector<HTMLElement>('[data-timer-retry]')!.hidden).toBe(false);
+    });
 });
 
 it('reads the active set from the canonical endpoint on init', async () => {

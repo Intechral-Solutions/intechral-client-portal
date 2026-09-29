@@ -387,7 +387,22 @@ it('mounts the timer pill inside the utility bar for an actor who may log time',
         ->and($page->query('//*[@data-shell-timer-trigger]')->length)->toBe(1)
         ->and($page->query('//*[@data-shell-timer-tray]')->length)->toBe(1);
 
-    // It renders its idle state, so nothing about a running timer is disclosed server-side.
+    // The root is server-rendered HIDDEN and unconfirmed (Direction D §15.1: the last confirmed state,
+    // or nothing on first load). The server knows nothing about this actor's timers at render time, so
+    // a visible "Start timer" here would claim that nothing is running and then shift the shell when a
+    // running timer arrived. blade-timer.ts reveals it after the first read, which the Vitest suite and
+    // time-migration.spec.ts cover; this only pins what the server owes it: the root exists, starts
+    // hidden, and carries no running state and no timer count.
+    $root = $page->query('//*[@data-shell-timer]')->item(0);
+    expect($root->hasAttribute('hidden'))->toBeTrue()
+        ->and($root->getAttribute('data-timer-running'))->toBe('false')
+        ->and($root->getAttribute('data-timer-count'))->toBe('0');
+
+    // The hooks the client initialisation reads are all present, so the reveal has something to draw.
+    foreach (['data-shell-timer-trigger', 'data-shell-timer-stop', 'data-shell-timer-tray', 'data-shell-timer-announce', 'data-timer-rows', 'data-timer-retry'] as $hook) {
+        expect($page->query("//*[@data-shell-timer]//*[@{$hook}]")->length)->toBe(1, "missing {$hook}");
+    }
+
     $trigger = $page->query('//*[@data-shell-timer-trigger]')->item(0);
     expect($trigger->getAttribute('aria-label'))->toBe('Start timer')
         ->and($trigger->getAttribute('aria-expanded'))->toBe('false')

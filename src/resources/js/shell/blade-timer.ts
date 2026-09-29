@@ -136,6 +136,13 @@ export function initBladeTimer(): void {
         }
 
         render();
+
+        // Direction D §15.1: the root is server-rendered hidden and stays so until the first read has
+        // a final result and that result is drawn — success or failure alike, so a failed first read
+        // still shows the danger border and a reachable Retry. This is the only place it is revealed,
+        // and it never hides again: a later refresh keeps the last confirmed DOM until its own
+        // response replaces it. Revealing before `render()` would paint the unconfirmed markup.
+        root!.hidden = false;
     }
 
     // ── Rendering ───────────────────────────────────────────────────────────
