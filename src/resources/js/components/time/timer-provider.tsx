@@ -16,9 +16,19 @@ import type { ActiveTimer, TimerStartPayload } from '@/types/time';
 
 type HydrationStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+/**
+ * Whether `timers` has ever been confirmed by a full read, which `status` cannot say: a later refresh
+ * puts `status` back to `loading` while `timers` still holds the last confirmed set. `pending` until
+ * the first read resolves; `failed` if reads have failed and none has ever succeeded; `confirmed`
+ * once one has, and it never goes back. Direction D §15.1: the pill shows the last confirmed state,
+ * or nothing on first load.
+ */
+type Confirmation = 'pending' | 'failed' | 'confirmed';
+
 type TimerState = {
     timers: ActiveTimer[];
     status: HydrationStatus;
+    confirmation: Confirmation;
     error: string | null;
     clockOffsetMs: number;
     starting: boolean;
@@ -47,6 +57,7 @@ type TimerContextValue = TimerState & {
 const initialState: TimerState = {
     timers: [],
     status: 'idle',
+    confirmation: 'pending',
     error: null,
     clockOffsetMs: 0,
     starting: false,
@@ -69,11 +80,17 @@ function reducer(state: TimerState, action: TimerAction): TimerState {
                 ...state,
                 timers: action.timers,
                 status: 'ready',
+                confirmation: 'confirmed',
                 error: null,
                 clockOffsetMs: action.clockOffsetMs,
             };
         case 'failed':
-            return { ...state, status: 'error', error: action.message };
+            return {
+                ...state,
+                status: 'error',
+                confirmation: state.confirmation === 'confirmed' ? 'confirmed' : 'failed',
+                error: action.message,
+            };
         case 'starting':
             return { ...state, starting: action.value, error: null };
         case 'started':
@@ -157,6 +174,8 @@ export function TimerProvider({ enabled, children }: PropsWithChildren<{ enabled
     const [state, dispatch] = useReducer(reducer, {
         ...initialState,
         status: enabled ? 'idle' : 'ready',
+        // A disabled provider never reads, so there is nothing to wait for.
+        confirmation: enabled ? 'pending' : 'confirmed',
     });
 
     // Only the newest refresh may publish a result (refreshSeq), and a read that began

@@ -106,3 +106,68 @@ export async function stopAllTimers(page: Page) {
 
     await expectRunningTimers(page, 0);
 }
+
+type ShellShift = { value: number; sources: string[] };
+
+/**
+ * Records layout shift attributed to shell chrome, from the first paint of every document the page
+ * loads (an init script, so it runs before any page script). An entry counts when any of its sources
+ * is inside the rail, drawer or utility bar, or is the canvas itself: page bodies reflow once when
+ * the swap fonts land (`font-display: swap`, EPIC-013 A5.7), which is not a shell shift. `sources`
+ * only describes what was counted, so a failure says what moved; it never changes the total.
+ */
+export async function installShellShiftProbe(page: Page) {
+    await page.addInitScript(() => {
+        type Source = { node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly };
+        type Entry = PerformanceEntry & { value: number; sources: Source[] };
+
+        const probe = { value: 0, sources: [] as string[] };
+        const rect = (r: DOMRectReadOnly) => [r.x, r.y, r.width, r.height].map(Math.round).join(',');
+        const describe = ({ node, previousRect, currentRect }: Source) => {
+            const element = node as Element | null;
+            const hook = element?.getAttributeNames?.().find((name) => name.startsWith('data-'));
+
+            return `${element?.tagName?.toLowerCase() ?? node?.nodeName}${hook ? `[${hook}]` : ''} ${rect(previousRect)} -> ${rect(currentRect)}`;
+        };
+        const record = (entries: PerformanceEntryList) => {
+            for (const entry of entries as Entry[]) {
+                const nodes = entry.sources.map((source) => source.node as Element | null);
+                const inShell = nodes.some((node) =>
+                    node?.closest?.('[data-shell-rail], [data-shell-drawer], [data-shell-utility]'),
+                );
+                const isCanvas = nodes.some((node) => node?.hasAttribute?.('data-shell-canvas'));
+
+                if (inShell || isCanvas) {
+                    probe.value += entry.value;
+                    probe.sources.push(...entry.sources.map(describe));
+                }
+            }
+        };
+        const observer = new PerformanceObserver((list) => record(list.getEntries()));
+        observer.observe({ type: 'layout-shift', buffered: true });
+
+        (window as unknown as { __shellShift: unknown }).__shellShift = {
+            probe,
+            // Entries the observer has queued but not yet delivered are still counted.
+            flush: () => record(observer.takeRecords()),
+        };
+    });
+}
+
+/**
+ * Reads the probe for the current document without discarding anything recorded since its first
+ * paint. Call it after the state under test has settled (e.g. the timer pill's first confirmation).
+ * Two animation frames make sure the frame carrying the last DOM change has been painted, so any shift
+ * it caused exists; `takeRecords()` then collects entries the observer has not delivered yet.
+ */
+export async function readShellShift(page: Page): Promise<ShellShift> {
+    return page.evaluate(async () => {
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        const state = (
+            window as unknown as { __shellShift: { probe: ShellShift; flush: () => void } }
+        ).__shellShift;
+        state.flush();
+
+        return { value: state.probe.value, sources: state.probe.sources };
+    });
+}
