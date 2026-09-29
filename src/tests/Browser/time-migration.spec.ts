@@ -324,6 +324,47 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await expectRunningTimers(page, 0);
     });
 
+    test('a full Blade page load paints no timer control until confirmed, and the shell never shifts', async ({
+        page,
+    }) => {
+        // The Blade twin of the test above, on `/tickets` (a Blade page the member reaches through the
+        // Helpdesk rail item). The partial used to server-render a visible "Start timer" and then grew
+        // it into the running pill after its first read: 0.0010528120713305898, 1317,9,107,30 ->
+        // 1117,8,307,32. The root now renders hidden and is revealed once that read has a final
+        // result, so its becoming visible is the confirmation signal. Still the member's timers, still
+        // this file's ownership: no operator timer, no mocked `/time/timers/active`.
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await signedIn(page);
+        await page.goto('/time');
+        await stopAllTimers(page);
+        await installShellShiftProbe(page);
+
+        // Confirmed idle, on a genuine full-document load of a Blade page.
+        await page.goto('/tickets');
+        await expect(timerPill(page)).toBeVisible();
+        await expectRunningTimers(page, 0);
+        await expect(timerTrigger(page)).toHaveAccessibleName('Start timer');
+        let shift = await readShellShift(page);
+        expect(shift.value, `shell shift sources: ${shift.sources.join('; ')}`).toBe(0);
+
+        // Confirmed running, with a label long enough to take the pill to its real width.
+        await page.goto('/time');
+        await avoidSlotBoundary(page);
+        await startTimer(page, 'Blade first paint regression with a long description');
+        await expectRunningTimers(page, 1);
+
+        await page.goto('/tickets');
+        await expect(timerPill(page)).toBeVisible();
+        await expectRunningTimers(page, 1);
+        await expect(timerPill(page)).toContainText('Blade first paint regression');
+        shift = await readShellShift(page);
+        expect(shift.value, `shell shift sources: ${shift.sources.join('; ')}`).toBe(0);
+
+        // Stop through the pill so the timer is finished before cleanup runs.
+        await timerStop(page).click();
+        await expectRunningTimers(page, 0);
+    });
+
     test('the pill is the one global timer affordance, on both renderers', async ({ page }) => {
         await signedIn(page);
         await page.goto('/time');
