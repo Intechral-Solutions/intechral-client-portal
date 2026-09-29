@@ -73,6 +73,8 @@ Use `./dev restart` (not just `./dev up`) afterwards: `up` only recreates contai
 
 **Adding a command.** Write `cmd_<name>` in `scripts/dev/commands.sh` (`db:status` maps to `cmd_db_status`) and add a `name|usage|description` line to `DEV_COMMANDS` (it drives both help and dispatch). Anything touching a database must call `resolve_or_die`, `print_target`, `enforce_contract` before acting. Container work goes through `app_exec`. Add a case to `scripts/dev/tests/run.sh` (`bash scripts/dev/tests/run.sh`; also run by `./dev check`).
 
+**CI.** GitHub Actions runs the same gates on every pull request to `main` and every push to `main`: `./dev check`'s five gates on the runner, and `./dev test:e2e` on the dev stack. What runs, why, and how to reproduce a failure: [docs/testing/ci.md](docs/testing/ci.md).
+
 ### npm scripts
 
 The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` and `test` delegate to the matching `./dev` command; the `fresh` alias (`migrate:fresh --seed` against the development database) was removed because it bypassed these guards.
