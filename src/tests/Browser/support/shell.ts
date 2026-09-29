@@ -172,8 +172,8 @@ type ShellShift = { value: number; sources: string[] };
 /**
  * Records layout shift attributed to shell chrome, from the first paint of every document the page
  * loads (an init script, so it runs before any page script). An entry counts when any of its sources
- * is inside the rail, drawer or utility bar, or is the canvas itself: page bodies reflow once when
- * the swap fonts land (`font-display: swap`, EPIC-013 A5.7), which is not a shell shift. `sources`
+ * is inside the rail, drawer or utility bar, or is the canvas itself (a Text-node source counts
+ * through its parent element): page bodies reflow once when the swap fonts land (`font-display: swap`, EPIC-013 A5.7), which is not a shell shift. `sources`
  * only describes what was counted, so a failure says what moved; it never changes the total.
  */
 export async function installShellShiftProbe(page: Page) {
@@ -189,15 +189,23 @@ export async function installShellShiftProbe(page: Page) {
 
             return `${element?.tagName?.toLowerCase() ?? node?.nodeName}${hook ? `[${hook}]` : ''} ${rect(previousRect)} -> ${rect(currentRect)}`;
         };
+        // A layout-shift source can be a Text node (a label re-centring inside its box reports the
+        // text run, not the element). Text has no `closest()`/`hasAttribute()`, so a source is
+        // normalised to the element that owns it before shell ownership is tested; testing the raw
+        // node silently dropped every text-node shift and could report a false 0.
+        const owner = (node: Node | null): Element | null =>
+            node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element | null);
+        const ownedByShell = (node: Node | null) => {
+            const element = owner(node);
+
+            return Boolean(
+                element?.closest?.('[data-shell-rail], [data-shell-drawer], [data-shell-utility]') ||
+                    element?.hasAttribute?.('data-shell-canvas'),
+            );
+        };
         const record = (entries: PerformanceEntryList) => {
             for (const entry of entries as Entry[]) {
-                const nodes = entry.sources.map((source) => source.node as Element | null);
-                const inShell = nodes.some((node) =>
-                    node?.closest?.('[data-shell-rail], [data-shell-drawer], [data-shell-utility]'),
-                );
-                const isCanvas = nodes.some((node) => node?.hasAttribute?.('data-shell-canvas'));
-
-                if (inShell || isCanvas) {
+                if (entry.sources.some((source) => ownedByShell(source.node))) {
                     probe.value += entry.value;
                     probe.sources.push(...entry.sources.map(describe));
                 }
@@ -208,6 +216,8 @@ export async function installShellShiftProbe(page: Page) {
 
         (window as unknown as { __shellShift: unknown }).__shellShift = {
             probe,
+            // Exposed so the probe's ownership rule can be exercised directly (shell-shift-probe.spec.ts).
+            ownedByShell,
             // Entries the observer has queued but not yet delivered are still counted.
             flush: () => record(observer.takeRecords()),
         };

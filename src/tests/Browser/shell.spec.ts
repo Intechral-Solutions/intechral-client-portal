@@ -254,12 +254,12 @@ test('an Inertia page paints with the remembered theme and panel state, without 
 }) => {
     // §25.3 flow 1 on the Inertia renderer; `blade-shell.spec.ts` asserts the Blade half, cold.
     //
-    // KNOWN LIMITATION — this is NOT a cold load, and is not yet allowed to be. `signedIn()` loads
-    // `/dashboard` first, so CSS and the preloaded Plex Sans 400/500 are cached when `/projects` is
-    // measured. A genuinely first document shifts the shell deterministically today: the active rail
-    // label (weight 600) first paints in the fallback bold and re-centres ~3.5px when Plex Sans 600
-    // arrives (shell shift ~9.607e-7). The true-cold Inertia shell-shift requirement remains blocked
-    // by that separately tracked Plex Sans 600 first-use issue; make this test cold when it is fixed.
+    // KNOWN LIMITATION — this is NOT a cold load. `signedIn()` loads `/dashboard` first, so CSS and
+    // the preloaded Plex Sans 400/500 are cached when `/projects` is measured; a zero here must not be
+    // read as a cold-load result. On a genuinely first document the active rail label (weight 600, not
+    // preloaded) paints in the fallback bold and re-centres by about 3.5px when Plex Sans 600 arrives
+    // (a shell shift of approximately 9.8e-7). True-cold Inertia shell-shift verification remains
+    // blocked by that known first-use issue (M2), deliberately deferred: docs/testing/ci.md.
     await page.setViewportSize(XL);
     await signedIn(page);
     await installShellShiftProbe(page);
