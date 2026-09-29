@@ -9,6 +9,7 @@ import {
     hasHorizontalOverflow,
     installShellShiftProbe,
     openAccountMenu,
+    railItemDrift,
     railLink,
     readShellShift,
     timerPill,
@@ -251,7 +252,14 @@ test('following a floating drawer link closes the drawer over the page it opened
 test('an Inertia page paints with the remembered theme and panel state, without shell shift', async ({
     page,
 }) => {
-    // §25.3 flow 1 on the Inertia renderer; `blade-shell.spec.ts` asserts the Blade half.
+    // §25.3 flow 1 on the Inertia renderer; `blade-shell.spec.ts` asserts the Blade half, cold.
+    //
+    // KNOWN LIMITATION — this is NOT a cold load, and is not yet allowed to be. `signedIn()` loads
+    // `/dashboard` first, so CSS and the preloaded Plex Sans 400/500 are cached when `/projects` is
+    // measured. A genuinely first document shifts the shell deterministically today: the active rail
+    // label (weight 600) first paints in the fallback bold and re-centres ~3.5px when Plex Sans 600
+    // arrives (shell shift ~9.607e-7). The true-cold Inertia shell-shift requirement remains blocked
+    // by that separately tracked Plex Sans 600 first-use issue; make this test cold when it is fixed.
     await page.setViewportSize(XL);
     await signedIn(page);
     await installShellShiftProbe(page);
@@ -320,6 +328,16 @@ test('an Inertia page paints with the remembered theme and panel state, without 
         const shift = await readShellShift(page);
         expect(shift.value, `shell shift sources: ${shift.sources.join('; ')}`).toBe(0);
     }
+});
+
+test('a partial React rail item is already in its final geometry', async ({ page }) => {
+    // The same label-independent geometry as the Blade rail (blade-shell.spec.ts). React renders an
+    // item in one commit, so it is not painted half-built, but the two renderers share one geometry.
+    await page.setViewportSize(XL);
+    await signedIn(page, '/projects');
+    await expect(page.locator('[data-shell-canvas]')).toBeVisible();
+
+    expect(await railItemDrift(page)).toEqual([]);
 });
 
 testWithProject(

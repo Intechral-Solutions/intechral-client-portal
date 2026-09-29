@@ -443,3 +443,35 @@ it('retires the pre-Direction-D timer strip entirely', function () {
     $page = bladeShellPage($actor, 'operator.tickets.index');
     expect($page->query('//*[@data-shell-timer]')->length)->toBe(1);
 });
+
+it('lays out every rail item like the React rail, so a half-parsed item is already in its final geometry', function () {
+    $page = bladeShellPage(bladeShellActor('operator'), 'operator.tickets.index');
+    $links = $page->query(BLADE_RAIL);
+
+    expect($links->length)->toBeGreaterThan(0);
+
+    // Fixed 18px icon + 10px label tracks and a full-width, centred-text label (rail.tsx,
+    // rail.test.tsx): the parser can pause inside an item, and a centred flex column moved the painted
+    // icon 7px when the label arrived — the hosted CI shell shift — while a shrink-wrapped label
+    // re-centred when its text arrived. With this geometry each part is at its final place either way.
+    foreach ($links as $link) {
+        $tokens = preg_split('/\s+/', trim($link->getAttribute('class')));
+
+        expect($tokens)->toContain('grid', 'h-[46px]', 'w-[52px]', 'grid-rows-[18px_10px]', 'content-center', 'justify-items-center', 'gap-1')
+            ->not->toContain('flex')
+            ->not->toContain('justify-center');
+
+        $children = [];
+        foreach ($link->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $children[] = $child->tagName;
+            }
+        }
+        expect($children)->toBe(['svg', 'span']);
+
+        $label = $link->getElementsByTagName('span')->item(0);
+        expect(preg_split('/\s+/', trim($label->getAttribute('class'))))
+            ->toContain('w-full', 'text-center', 'truncate')
+            ->not->toContain('max-w-full');
+    }
+});

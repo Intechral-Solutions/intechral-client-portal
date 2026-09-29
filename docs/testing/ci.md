@@ -138,9 +138,15 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   guards are vacuous (A13.13); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
   runners are smaller than the development machine, so a `userEvent` timeout in CI should be
   reproduced alone before being treated as a regression.
-- **The no-shift browser tests measure a warm-cache paint.** They pass only when fonts and CSS are
-  reusable from the HTTP cache, as nginx's headers allow (above). Whether a first, cold visit is
-  shift-free is not covered; recorded, not changed.
+- **Only the Blade no-shift test measures a cold paint.** `blade-shell.spec.ts` loads
+  `/operator/tickets` as the first document of a fresh context (session cookies only, empty HTTP cache)
+  and counts shell-owned layout shift only, as `shell.spec.ts` always has: page-body reflow when the
+  swap fonts land is not shell shift (EPIC-013 A13.9). The Inertia no-shift test in `shell.spec.ts`
+  still visits `/dashboard` first, so it measures a warm-cache paint. **The true-cold Inertia shell
+  shift requirement remains blocked by the separately tracked Plex Sans 600 first-use issue:** on a
+  genuinely first document the active rail label (weight 600, not preloaded) paints in the fallback
+  bold and re-centres ~3.5px when the face arrives (shell shift ~9.607e-7). It is not fixed; that test
+  is made cold when it is.
 - **Frontend failures cascade into Pest.** Pest's Blade and Inertia responses need the Vite manifest
   that `npm run check` builds last. If that chain fails before `vite build`, hundreds of Pest tests fail
   with `ViteManifestNotFoundException` (or "Not a valid Inertia response"), and the volume of failure

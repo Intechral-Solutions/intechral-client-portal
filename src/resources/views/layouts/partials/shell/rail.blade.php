@@ -40,13 +40,17 @@
         <nav aria-label="Workspaces"
              data-shell-workspaces
              class="flex w-full min-w-0 flex-col items-center gap-1 px-1.5">
+            {{-- Geometry that does not depend on the label having arrived (as rail.tsx). The parser can
+                 pause inside an item and Chromium may paint it half-built: explicit 18px/10px rows keep
+                 the icon at its final y without its label (a centred flex column moved it 7px), and a
+                 full-width label with centred text keeps the label box put before its text arrives. --}}
             @foreach ($navigation['workspaces'] as $workspace)
                 <a href="{{ $workspace['href'] }}"
                    @if ($workspace['isActive']) aria-current="page" @endif
                    data-shell-nav-row
-                   class="flex h-[46px] w-[52px] flex-col items-center justify-center gap-1 rounded-control text-[10px] leading-none transition-colors duration-motion-fast {{ $workspace['isActive'] ? 'bg-surface-selected font-semibold text-text ring-1 ring-rule' : 'text-text-muted hover:bg-surface-hover hover:text-text' }} {{ $shellFocusRing }}">
+                   class="grid h-[46px] w-[52px] grid-rows-[18px_10px] content-center justify-items-center gap-1 rounded-control text-[10px] leading-none transition-colors duration-motion-fast {{ $workspace['isActive'] ? 'bg-surface-selected font-semibold text-text ring-1 ring-rule' : 'text-text-muted hover:bg-surface-hover hover:text-text' }} {{ $shellFocusRing }}">
                     @include('layouts.partials.shell.icon', ['name' => $workspace['icon'], 'class' => 'h-[18px] w-[18px]'])
-                    <span class="max-w-full truncate px-0.5">{{ $workspace['label'] }}</span>
+                    <span class="w-full truncate px-0.5 text-center">{{ $workspace['label'] }}</span>
                 </a>
             @endforeach
         </nav>

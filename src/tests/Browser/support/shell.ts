@@ -107,6 +107,66 @@ export async function stopAllTimers(page: Page) {
     await expectRunningTimers(page, 0);
 }
 
+/**
+ * Replays, for every rail workspace item, the half-built states a first paint passes through when
+ * the HTML parser pauses inside the item (hosted CI caught one as shell shift 1.687885802469136e-6):
+ *
+ * - icon parsed, label not yet: the icon must already be at its final position;
+ * - label element parsed, its text not yet: the label box must already be at its final position.
+ *
+ * Each state is compared with the finished item, and again after restoring it. Returns a description
+ * of every movement; `[]` means the rail's geometry does not depend on how much of an item exists.
+ */
+export async function railItemDrift(page: Page): Promise<string[]> {
+    return page.evaluate(() => {
+        const drift: string[] = [];
+        const items = document.querySelectorAll('[data-shell-rail] [data-shell-workspaces] a');
+
+        if (items.length === 0) {
+            return ['no rail workspace items rendered'];
+        }
+
+        const box = (element: Element) => {
+            const r = element.getBoundingClientRect();
+
+            return `${r.x},${r.y},${r.width},${r.height}`;
+        };
+
+        for (const item of items) {
+            const icon = item.querySelector('svg');
+            const label = item.querySelector('span');
+
+            if (!icon || !label) {
+                drift.push(`${item.textContent?.trim()}: missing icon or label`);
+                continue;
+            }
+
+            const name = label.textContent?.trim();
+            const iconFinal = box(icon);
+            const labelFinal = box(label);
+
+            label.remove();
+            const iconWithoutLabel = box(icon);
+            item.append(label);
+
+            const text = [...label.childNodes];
+            label.replaceChildren();
+            const labelWithoutText = box(label);
+            label.append(...text);
+
+            if (iconWithoutLabel !== iconFinal || box(icon) !== iconFinal) {
+                drift.push(`${name} icon: ${iconFinal} -> ${iconWithoutLabel} (no label) -> ${box(icon)}`);
+            }
+
+            if (labelWithoutText !== labelFinal || box(label) !== labelFinal) {
+                drift.push(`${name} label: ${labelFinal} -> ${labelWithoutText} (no text) -> ${box(label)}`);
+            }
+        }
+
+        return drift;
+    });
+}
+
 type ShellShift = { value: number; sources: string[] };
 
 /**

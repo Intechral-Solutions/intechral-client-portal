@@ -5,8 +5,11 @@ import {
     accountTrigger,
     drawerLink,
     hasHorizontalOverflow,
+    installShellShiftProbe,
     openAccountMenu,
+    railItemDrift,
     railLink,
+    readShellShift,
 } from './support/shell';
 
 /**
@@ -139,61 +142,71 @@ test('React → Blade → React keeps theme, panel state, active state and histo
     await expect(currentWorkspace(page)).toHaveText('Projects');
 });
 
-test('a Blade page paints with the remembered theme and panel state, without layout shift', async ({
+test('a Blade page paints with the remembered theme and panel state, without shell shift, on a cold load', async ({
     page,
 }) => {
+    // §25.3 flow 1, cold: the Blade page is the FIRST document this fresh context loads. The context
+    // carries only the worker's session cookies (support/auth.ts), so its HTTP cache is empty and CSS,
+    // scripts and fonts all come from the network — no `/dashboard` visit warms them first.
     await page.setViewportSize(XL);
-    await signedIn(page);
+    await installShellShiftProbe(page);
 
     // Before any page script: remember dark + a collapsed Helpdesk panel, and record what the first
-    // animation frame sees and every layout shift the page reports.
+    // animation frame sees.
     await page.addInitScript(() => {
         localStorage.setItem('theme', 'dark');
         localStorage.setItem('shell.operational.panel', JSON.stringify({ helpdesk: 'collapsed' }));
 
-        const probe = { firstFrame: '', shift: 0 };
+        const probe = { firstFrame: '' };
         (window as unknown as { __probe: typeof probe }).__probe = probe;
 
         requestAnimationFrame(() => {
             const root = document.documentElement;
             probe.firstFrame = `${root.dataset.theme}/${root.dataset.drawer}`;
         });
-
-        const record = (entries: PerformanceEntryList) => {
-            for (const entry of entries as unknown as { value: number }[]) {
-                probe.shift += entry.value;
-            }
-        };
-        const observer = new PerformanceObserver((list) => record(list.getEntries()));
-        observer.observe({ type: 'layout-shift', buffered: true });
-
-        // Reading, not resetting: entries the observer has queued but not yet delivered are added to
-        // the running total, so nothing recorded since the first paint can be missed or discarded.
-        (window as unknown as { __flushShift: () => void }).__flushShift = () =>
-            record(observer.takeRecords());
     });
 
-    await page.goto('/operator/tickets');
+    await signedIn(page, '/operator/tickets');
     await expect(bladeShell(page)).toHaveCount(1);
 
-    // `load` does not wait for the timer pill's first read (`GET /time/timers/active`), so reading the
-    // probe there missed the pill moving when a running timer arrived. The pill is server-rendered
-    // hidden and revealed only once that read has a final result (Direction D §15.1), so its becoming
-    // visible IS the confirmation signal. Two frames then make sure the frame carrying the last DOM
-    // change has been painted, and the flush collects whatever the observer has not delivered yet.
+    // Proof the load was cold, so this cannot silently become a warm-cache test again: the stylesheet
+    // was transferred, not served from cache.
+    const stylesheetTransfers = await page.evaluate(() =>
+        performance
+            .getEntriesByType('resource')
+            .filter((entry) => /\/build\/assets\/app-[^/]+\.css$/.test(entry.name))
+            .map((entry) => (entry as PerformanceResourceTiming).transferSize),
+    );
+    expect(stylesheetTransfers).toHaveLength(1);
+    expect(stylesheetTransfers[0]).toBeGreaterThan(0);
+
+    // The timer pill is server-rendered hidden and revealed only once its first read has a final
+    // result (Direction D §15.1), so its becoming visible is the settle point for the measurement.
     await expect(page.locator('[data-shell-timer]')).toBeVisible();
 
-    const probe = await page.evaluate(async () => {
-        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-        (window as unknown as { __flushShift: () => void }).__flushShift();
+    // Shell-owned sources only (A13.9): the ticket table legitimately reflows when the swap faces land
+    // on a cold load, and that is page body, not shell. Everything in the rail, drawer, utility bar or
+    // the canvas origin still counts — including the 7px rail-icon jump hosted CI caught.
+    const shift = await readShellShift(page);
+    expect(shift.value, `shell shift sources: ${shift.sources.join('; ')}`).toBe(0);
 
-        return (window as unknown as { __probe: { firstFrame: string; shift: number } }).__probe;
-    });
-
+    const probe = await page.evaluate(
+        () => (window as unknown as { __probe: { firstFrame: string } }).__probe,
+    );
     expect(probe.firstFrame).toBe('dark/collapsed');
-    expect(probe.shift).toBe(0);
     await expect(page.getByRole('navigation', { name: 'Helpdesk views' })).toBeHidden();
     expect((await box(page, '[data-shell-canvas]'))?.x).toBeCloseTo(64, 0);
+});
+
+test('a half-parsed Blade rail item is already in its final geometry', async ({ page }) => {
+    // The parser can pause inside a rail item, and Chromium can paint it half-built. Hosted CI caught
+    // the icon-before-label state as shell shift 1.687885802469136e-6 (a centred flex column moved the
+    // icon up 7px when the label arrived); the label-before-its-text state re-centred the label box.
+    // railItemDrift puts each item into those same DOM states and measures them.
+    await page.setViewportSize(XL);
+    await signedIn(page, '/operator/tickets');
+
+    expect(await railItemDrift(page)).toEqual([]);
 });
 
 test('at L the Blade panel docks only when opened, and never floats', async ({ page }) => {

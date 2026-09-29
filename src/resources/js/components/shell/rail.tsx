@@ -87,8 +87,13 @@ export function RailItem({ workspace }: { workspace: Workspace }) {
             // Server-computed (§12.3 rule 3). Never derived from the URL here.
             aria-current={workspace.isActive ? 'page' : undefined}
             data-shell-nav-row
+            // Geometry that does not depend on the label having arrived. The HTML parser can pause
+            // inside an item and Chromium can paint it half-built (Blade; React shares the geometry):
+            // explicit 18px/10px rows keep the icon at its final y when the label is missing (a
+            // centred flex column moved it 7px), and a full-width label with centred text keeps the
+            // label box put while its text is missing (a shrink-wrapped label re-centred ~20px).
             className={cn(
-                'flex h-[46px] w-[52px] flex-col items-center justify-center gap-1 rounded-control text-[10px] leading-none transition-colors duration-motion-fast',
+                'grid h-[46px] w-[52px] grid-rows-[18px_10px] content-center justify-items-center gap-1 rounded-control text-[10px] leading-none transition-colors duration-motion-fast',
                 workspace.isActive
                     ? 'bg-surface-selected font-semibold text-text ring-1 ring-rule'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text',
@@ -96,7 +101,7 @@ export function RailItem({ workspace }: { workspace: Workspace }) {
             )}
         >
             <WorkspaceIcon icon={workspace.icon} className="h-[18px] w-[18px]" />
-            <span className="max-w-full truncate px-0.5">{workspace.label}</span>
+            <span className="w-full truncate px-0.5 text-center">{workspace.label}</span>
         </ShellLink>
     );
 }
