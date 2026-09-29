@@ -4,6 +4,9 @@
 # Stays Bash 3.2 compatible (macOS default): no associative arrays, no mapfile.
 # Anything that can act on a database goes through resolve_env + a *_contract_violations
 # check; the command name is never trusted to say which database is being touched.
+#
+# Some globals here are read only by commands.sh or tests/run.sh, which shellcheck cannot see when it
+# checks this file on its own; each such declaration carries its own SC2034 ("appears unused") disable.
 
 [[ -z ${DEV_LIB_LOADED:-} ]] || return 0
 DEV_LIB_LOADED=1
@@ -11,23 +14,30 @@ DEV_LIB_LOADED=1
 : "${DEV_ROOT:?DEV_ROOT must be set before sourcing lib.sh}"
 
 # ── Project contract (mirrors docker-compose.yml, src/.env, src/.env.testing) ──
+# shellcheck disable=SC2034
 readonly SVC_APP=app SVC_DB=db SVC_NGINX=nginx
 readonly DEV_ENV=local DEV_DB=portal DEV_DB_HOST=db
 readonly TEST_ENV=testing TEST_DB=intechral_client_portal_testing TEST_DB_HOST=db
+# shellcheck disable=SC2034
 readonly E2E_BASE_URL=http://nginx           # Playwright inside portal_app reaches the app via nginx
+# shellcheck disable=SC2034
 readonly E2E_OUTPUT_DIR=/tmp/dev-e2e-results # container-local: keeps test artifacts off the host mount
+# shellcheck disable=SC2034
 readonly E2E_BROWSERS_PATH=/opt/ms-playwright # baked into the image (ENV in .docker/php/Dockerfile)
 readonly REBUILD_HINT='docker compose build && ./dev restart'
+# shellcheck disable=SC2034
 readonly APP_DIR=/var/www/app
 readonly COUNT_SQL='SELECT (SELECT COUNT(*) FROM projects), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM time_entries)'
 
 # Generated/host-mounted paths that must stay owned by the host user (checked by doctor).
+# shellcheck disable=SC2034
 readonly GENERATED_DIRS="src/node_modules src/public/build src/test-results src/storage src/bootstrap/cache src/resources/js/actions src/resources/js/routes src/resources/js/wayfinder src/vendor"
 
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
 
 # ── Output ─────────────────────────────────────────────────────────────────────
+# shellcheck disable=SC2034
 if [[ -t 1 && -z ${NO_COLOR:-} ]]; then
     C_RED=$'\033[31m' C_GRN=$'\033[32m' C_YLW=$'\033[33m' C_BLD=$'\033[1m' C_RST=$'\033[0m'
 else
@@ -102,6 +112,7 @@ parse_resolved() {
     R_ENV='' R_CONNECTION='' R_DB='' R_HOST='' R_PORT='' R_APP_URL='' R_CONFIG_CACHED=''
     R_PENDING='' R_PENDING_COUNT='' R_PENDING_ERROR=''
     while IFS= read -r line; do
+        # shellcheck disable=SC2034
         case "$line" in
             env=*) R_ENV="${line#env=}" ;;
             connection=*) R_CONNECTION="${line#connection=}" ;;
@@ -219,6 +230,7 @@ backup_database() {
     fi
 
     mv "$partial" "$final"
+    # shellcheck disable=SC2034
     BACKUP_PATH="$final"
 }
 

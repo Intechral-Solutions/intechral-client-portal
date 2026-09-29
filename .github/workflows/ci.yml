@@ -1,0 +1,152 @@
+# Lightweight CI baseline: proves from a clean checkout that the gates `./dev check` defines, and
+# the Playwright browser suite, pass. Verification only: nothing is deployed, published or written
+# back. What runs, why, and how to reproduce each gate locally: docs/testing/ci.md.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same PR supersedes the older run. Runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The five `./dev check` gates, in its order, run directly on the runner: none of them serves
+  # the app, so building the dev image would only add time. Like `./dev check`, a failing gate
+  # does not stop the later ones, so one run reports every failure.
+  checks:
+    name: ./dev check gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # Depth 2: the git diff --check gate compares HEAD with its parent.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      # The compose service itself, not a re-declared one: same image, my.cnf, init-testing.sql
+      # (the testing database) and healthcheck as local. Nothing is built.
+      - name: Start MariaDB (compose db service)
+        run: docker compose up -d --wait db
+
+      # tests/bootstrap.php, phpunit.xml and .env.example address the database as host `db`, as
+      # the app container does. Resolve that name on the runner rather than change them.
+      - name: Resolve host "db" to the published MariaDB port
+        run: echo '127.0.0.1 db' | sudo tee -a /etc/hosts
+
+      # Versions and extensions follow .docker/php/Dockerfile (PHP 8.3, Node 22).
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, exif, gd, intl, mbstring, pcntl, pdo_mysql, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Locate Composer cache
+        id: composer-cache
+        working-directory: src
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('src/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - id: install
+        name: Install dependencies and create src/.env
+        working-directory: src
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          npm ci --no-audit --no-fund
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: CLI self-tests (host bash, stubbed docker)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bash scripts/dev/tests/run.sh
+
+      # Locally this checks uncommitted changes; a clean checkout has none, so CI checks what the
+      # change introduces instead. On a PR, HEAD is GitHub's merge commit and HEAD^1 is main.
+      - name: git diff --check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: git diff --check HEAD^1 HEAD
+
+      - name: Pint (style, no changes written)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: src
+        run: ./vendor/bin/pint --test
+
+      # Wayfinder generation, typecheck, lint, format check, Vitest, production build.
+      # laravel-vite-plugin refuses to start Vite's dev (HMR) server when CI is set, and Vitest
+      # loads vite.config.ts in serve mode; the plugin's own bypass lets Vitest start. It does not
+      # affect `vite build`, which the check never guards.
+      - name: 'Frontend: npm run check'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: src
+        env:
+          LARAVEL_BYPASS_ENV_CHECK: '1'
+        run: npm run check
+
+      # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
+      - name: 'PHP tests: Pest (testing DB)'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: src
+        run: ./vendor/bin/pest
+
+  # `./dev test:e2e` itself, on the dev stack from docker-compose.yml: nginx + php-fpm, MariaDB,
+  # Redis and the image's baked Chromium. The suite depends on how the stack serves assets (see
+  # docs/testing/ci.md), so it is not re-hosted on `php artisan serve`. Its own runner keeps the
+  # full Vitest and Playwright suites off one machine (EPIC-013 A13.18). Fortify throttling and
+  # the committed `workers: 3` are untouched.
+  browser:
+    name: Playwright browser suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Builds the dev image. queue and mailpit are not started: the suite does not need them.
+      - name: Start the dev stack (app, nginx, db, redis)
+        run: docker compose up -d --wait app nginx
+
+      # As ./dev does: in the app container, as the runner's UID:GID, so files stay runner-owned.
+      # APP_ENV=local from .env.example, so DevSeeder provides the personas and e2e-* fixtures.
+      - name: Install, configure, seed and build
+        run: |
+          docker compose exec -T -u "$(id -u):$(id -g)" -e HOME=/tmp app sh -euc '
+            composer install --no-interaction --no-progress --prefer-dist
+            npm ci --no-audit --no-fund
+            cp .env.example .env
+            php artisan key:generate --no-interaction
+            php artisan migrate --seed --no-interaction
+            npm run build
+          '
+
+      # php-fpm runs as the image's `portal` user (UID 1000), not the runner's; same as the
+      # chmod in `npm run setup`.
+      - name: Make storage writable for php-fpm
+        run: chmod -R a+rwX src/storage src/bootstrap/cache
+
+      - name: Playwright (./dev test:e2e)
+        run: ./dev test:e2e
+
+      - name: Application log (on failure)
+        if: failure()
+        run: tail -n 200 src/storage/logs/laravel.log 2>/dev/null || echo 'No laravel.log was written.'
