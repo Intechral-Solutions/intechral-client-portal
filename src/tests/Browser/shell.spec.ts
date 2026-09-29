@@ -1,4 +1,7 @@
+import type { Page } from '@playwright/test';
+
 import { expect, signedIn, test } from './support/auth';
+import { test as testWithProject } from './support/e2e-fixtures';
 import { signIn } from './support/sign-in';
 import {
     accountTrigger,
@@ -7,6 +10,23 @@ import {
     openAccountMenu,
     railLink,
 } from './support/shell';
+
+/**
+ * Creates a project through the normal application path and registers it with the cleanup
+ * fixture, exactly as board-migration.spec.ts and its siblings do. Only the one test below needs
+ * this, so it imports the cleanup-aware `test` (`testWithProject`) locally rather than switching
+ * the whole file off `./support/auth`'s `test`.
+ */
+async function createProject(page: Page, cleanup: { trackProject: (id: number) => void }, name: string) {
+    await page.goto('/projects/create');
+    await page.getByLabel('Project name').fill(name);
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    cleanup.trackProject(projectId);
+
+    return projectId;
+}
 
 /**
  * EPIC-013 WP4 — the Direction D operator shell in real Chromium (§25.3).
@@ -317,34 +337,46 @@ test('an Inertia page paints with the remembered theme and panel state, without 
     }
 });
 
-test('an Inertia visit is announced, and focus is repaired only when the visit destroyed it', async ({
-    page,
-}) => {
-    // §25.3 flow 5, the S2 policy (A1.8), in a real browser.
-    await page.setViewportSize(XL);
-    await signedIn(page);
+testWithProject(
+    'an Inertia visit is announced, and focus is repaired only when the visit destroyed it',
+    async ({ page, cleanup }) => {
+        // §25.3 flow 5, the S2 policy (A1.8), in a real browser.
+        await page.setViewportSize(XL);
+        await signedIn(page);
 
-    const announcer = page.locator('[data-shell-announcer]');
+        // Owns the project the in-page link below belongs to. A fresh, cold-seeded database (as
+        // CI's browser job starts from) can legitimately hold zero projects at any given instant,
+        // so this test no longer assumes one is ambiently present from another concurrently
+        // running spec (A9.7-adjacent; found and fixed as a fixture/isolation defect, not a focus
+        // bug — see docs/testing/ci.md).
+        const projectId = await createProject(page, cleanup, 'E2E WP8 shell-focus project');
 
-    // A rail link survives the visit, so focus stays on it.
-    await railLink(page, 'Projects').focus();
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/projects$/);
-    await expect(announcer).toHaveText('Projects');
-    await expect(railLink(page, 'Projects')).toBeFocused();
+        const announcer = page.locator('[data-shell-announcer]');
 
-    // An in-page link is inside the subtree the visit replaces, so focus is repaired to main.
-    await page.locator('main a[href*="/board"]').first().focus();
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/board$/);
-    await expect(page.locator('main#main-content')).toBeFocused();
-    await expect(announcer).toHaveText((await page.locator('main h1').textContent())?.trim() ?? '');
+        // A rail link survives the visit, so focus stays on it.
+        await railLink(page, 'Projects').focus();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(/\/projects$/);
+        await expect(announcer).toHaveText('Projects');
+        await expect(railLink(page, 'Projects')).toBeFocused();
 
-    // History traversal is announced too.
-    await page.goBack();
-    await expect(page).toHaveURL(/\/projects$/);
-    await expect(announcer).toHaveText('Projects');
-});
+        // An in-page link is inside the subtree the visit replaces, so focus is repaired to main.
+        // Scoped to this test's own project by id (not "the first board link on the page" and not
+        // by name, which is not guaranteed unique across concurrently running specs).
+        await page.locator(`main a[href="/projects/${projectId}/board"]`).focus();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/board$`));
+        await expect(page.locator('main#main-content')).toBeFocused();
+        await expect(announcer).toHaveText(
+            (await page.locator('main h1').textContent())?.trim() ?? '',
+        );
+
+        // History traversal is announced too.
+        await page.goBack();
+        await expect(page).toHaveURL(/\/projects$/);
+        await expect(announcer).toHaveText('Projects');
+    },
+);
 
 test('Escape dismisses a floating drawer and returns focus to the rail toggle', async ({
     page,
