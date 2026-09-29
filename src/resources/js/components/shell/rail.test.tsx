@@ -101,3 +101,39 @@ it('renders an unknown icon key with the neutral fallback instead of throwing', 
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
 });
+
+it('lays out every rail item so that a half-parsed item is already in its final geometry', () => {
+    render(<Rail workspaces={[home, projects, tasks]} showToggle={false} onToggle={vi.fn()} />);
+
+    // Fixed 18px icon + 10px label tracks, centred as a block in the 46px tile, and a full-width label
+    // with centred text. A centred flex column placed the icon by whatever children existed, so an
+    // icon painted before its label (the parser pausing mid-item) sat 7px lower and jumped when the
+    // label arrived; a shrink-wrapped label re-centred when its text arrived. Blade renders the same
+    // tokens (BladeShellTest); the browser invariant is in blade-shell.spec.ts and shell.spec.ts.
+    for (const link of screen.getAllByRole('link')) {
+        const tokens = link.className.split(/\s+/);
+
+        expect(tokens).toEqual(
+            expect.arrayContaining([
+                'grid',
+                'h-[46px]',
+                'w-[52px]',
+                'grid-rows-[18px_10px]',
+                'content-center',
+                'justify-items-center',
+                'gap-1',
+            ]),
+        );
+        expect(tokens).not.toContain('flex');
+        expect(tokens).not.toContain('justify-center');
+        expect([...link.children].map((child) => child.tagName.toLowerCase())).toEqual([
+            'svg',
+            'span',
+        ]);
+
+        const label = link.querySelector('span')!.className.split(/\s+/);
+
+        expect(label).toEqual(expect.arrayContaining(['w-full', 'text-center', 'truncate']));
+        expect(label).not.toContain('max-w-full');
+    }
+});
