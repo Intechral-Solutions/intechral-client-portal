@@ -20,7 +20,7 @@ import { ProjectMemberList } from '@/components/projects/project-member-list';
 import { SectionPanel } from '@/components/section-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { board, destroy, update } from '@/routes/projects';
 import { sync as syncCompanies } from '@/routes/projects/companies';
 import { sync as syncMembers } from '@/routes/projects/members';
@@ -291,6 +291,6 @@ export function EditProjectPage({
     );
 }
 
-EditProjectPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+EditProjectPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default EditProjectPage;

@@ -49,14 +49,16 @@ export default function TwoFactorChallengePage() {
                     <div className="grid grid-cols-2 gap-2" aria-label="Verification method">
                         <Button
                             type="button"
-                            variant={isCode ? 'default' : 'outline'}
+                            variant={isCode ? 'primary' : 'secondary'}
+                            aria-pressed={isCode}
                             onClick={() => chooseMode('code')}
                         >
                             Authenticator
                         </Button>
                         <Button
                             type="button"
-                            variant={!isCode ? 'default' : 'outline'}
+                            variant={!isCode ? 'primary' : 'secondary'}
+                            aria-pressed={!isCode}
                             onClick={() => chooseMode('recovery_code')}
                         >
                             Recovery code

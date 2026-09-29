@@ -43,8 +43,27 @@ it.each([
 });
 
 it('merges class names onto the track', () => {
-    render(<Progress value={10} label="Slim" className="h-1" />);
+    render(<Progress value={10} label="Slim" className="mt-2 h-3" />);
 
+    expect(bar()).toHaveClass('mt-2', 'h-3');
+    expect(bar()).not.toHaveClass('h-1.5');
+});
+
+it('draws a thin bar from the progress tokens: 6px summary by default, 4px inline', () => {
+    const { rerender } = render(<Progress value={10} label="Summary" />);
+
+    expect(bar()).toHaveClass('h-1.5', 'rounded-full', 'bg-progress-track');
+    expect(fill()).toHaveClass('bg-progress-fill');
+    // Never brand cyan (live) and never the legacy indigo: a quantity is not "live".
+    expect(fill().className).not.toMatch(/bg-(live|accent|primary)/);
+
+    rerender(<Progress value={10} label="Inline" size="sm" />);
     expect(bar()).toHaveClass('h-1');
-    expect(bar()).not.toHaveClass('h-2');
+});
+
+it('is a progressbar, not a meter: it measures completion', () => {
+    render(<Progress value={2} max={4} label="Done" />);
+
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(bar()).toHaveAttribute('aria-valuenow', '2');
 });

@@ -15,7 +15,11 @@ test('login page is accessible to guests', function () {
         ->component('auth/login')
         ->where('auth.user', null)
         ->where('auth.permissions', [])
-        ->where('navigation', []));
+        // EPIC-013 §12.2: the canonical shape is stable for every actor, so a guest gets an empty
+        // workspace list rather than an empty array and no consumer branches on the shape.
+        ->where('navigation', ['currentWorkspace' => null, 'workspaces' => []])
+        ->missing('navigationLegacy')
+        ->where('shell.presentation', 'operational'));
 });
 
 test('authenticated users are redirected from login', function () {

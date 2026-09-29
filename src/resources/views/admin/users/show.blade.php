@@ -123,11 +123,11 @@
                     @method('PUT')
                     <div class="space-y-2 mb-4">
                         @foreach ($allRoles as $role)
-                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface"
+                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
                                style="border-color: var(--border-base);">
                             <input type="checkbox" name="roles[]" value="{{ $role->name }}"
                                    {{ $user->hasRole($role->name) ? 'checked' : '' }}
-                                   class="h-4 w-4 rounded accent-accent">
+                                   class="h-4 w-4 rounded accent-legacy-accent">
                             <span style="color: var(--text-primary);">{{ $role->name }}</span>
                         </label>
                         @endforeach

@@ -111,7 +111,6 @@ export function MilestoneCard({ milestone, projectId, canManage, onEdit }: Miles
                     value={milestone.completion}
                     label={`${milestone.name} completion`}
                     valueText={`${milestone.doneCount} of ${milestone.taskCount} tasks done`}
-                    className="h-1.5"
                 />
             </div>
         </article>

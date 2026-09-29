@@ -49,7 +49,7 @@ export default function LoginPage() {
                         <div className="flex items-center justify-between gap-4">
                             <Label htmlFor="password">Password</Label>
                             <Link
-                                className="text-sm text-primary hover:underline"
+                                className="legacy-text-primary text-sm hover:underline"
                                 href={forgotPassword.url()}
                             >
                                 Forgot password?
@@ -74,7 +74,7 @@ export default function LoginPage() {
                             type="checkbox"
                             checked={form.data.remember}
                             onChange={(event) => form.setData('remember', event.target.checked)}
-                            className="h-4 w-4 accent-primary"
+                            className="h-4 w-4 accent-accent"
                         />
                         Remember me
                     </label>

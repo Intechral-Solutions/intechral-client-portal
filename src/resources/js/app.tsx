@@ -16,6 +16,8 @@ void createInertiaApp({
         createRoot(el).render(<App {...props} />);
     },
     progress: {
-        color: '#4f46e5',
+        // Direction D accent (light `--ds-accent`). A hard-coded legacy indigo lived here before
+        // WP4; a JS literal cannot read a custom property, so the value is duplicated deliberately.
+        color: '#0B6A73',
     },
 });

@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
-import { RunningTimerBar } from '@/components/time/running-timer-bar';
+import { TimerPill } from '@/components/time/timer-pill';
 import { TimerProvider, useTimers } from '@/components/time/timer-provider';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -108,18 +108,20 @@ it('hydrates and renders multiple timers using one derived ticking clock', async
 
     render(
         <TimerProvider enabled>
-            <RunningTimerBar />
+            <TimerPill />
         </TimerProvider>,
     );
 
     await act(async () => Promise.resolve());
-    expect(screen.getByRole('region', { name: 'Active timers' })).toBeInTheDocument();
-    expect(screen.getByText('00:00:10')).toBeInTheDocument();
-    expect(screen.getByText('00:00:05')).toBeInTheDocument();
+
+    // WP6: the pill shows the most recently started timer (id 2, 5s old) and counts the other,
+    // rather than the retired strip's row-per-timer. One derived clock still drives it.
+    expect(screen.getByText('0:00:05')).toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.queryByText('0:00:10')).not.toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(2000));
-    expect(screen.getByText('00:00:12')).toBeInTheDocument();
-    expect(screen.getByText('00:00:07')).toBeInTheDocument();
+    expect(screen.getByText('0:00:07')).toBeInTheDocument();
 });
 
 it('reconciles a started timer from the canonical server response', async () => {
@@ -162,14 +164,17 @@ it('keeps the application usable and offers retry after hydration failure', asyn
 
     render(
         <TimerProvider enabled>
-            <RunningTimerBar />
+            <TimerPill />
             <p>Application content</p>
         </TimerProvider>,
     );
 
+    // The page stays usable and the pill stays mounted; the failure and its retry are in the tray.
+    expect(screen.getByText('Application content')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Start timer/ }));
     expect(await screen.findByText('Unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.getByText('Application content')).toBeInTheDocument();
 });
 
 it('reconciles description and stop mutations from canonical responses', async () => {
@@ -439,7 +444,7 @@ describe('server clock offset', () => {
 
         render(
             <TimerProvider enabled>
-                <RunningTimerBar />
+                <TimerPill />
             </TimerProvider>,
         );
         await act(async () => Promise.resolve());
@@ -447,7 +452,7 @@ describe('server clock offset', () => {
         // Browser time is 12:00:02 at receipt; the corrected server clock is server_now + 1s
         // of half-latency, i.e. 10s + 1s after the timer started. One tick later it is 12s.
         act(() => vi.advanceTimersByTime(1000));
-        expect(screen.getByText('00:00:12')).toBeInTheDocument();
+        expect(screen.getByText('0:00:12')).toBeInTheDocument();
     });
 
     it('clamps a timer that starts after the corrected server clock to zero', async () => {
@@ -470,12 +475,12 @@ describe('server clock offset', () => {
 
         render(
             <TimerProvider enabled>
-                <RunningTimerBar />
+                <TimerPill />
             </TimerProvider>,
         );
         await act(async () => Promise.resolve());
 
-        expect(screen.getByText('00:00:00')).toBeInTheDocument();
+        expect(screen.getByText('0:00:00')).toBeInTheDocument();
         expect(screen.queryByText(/^-/)).not.toBeInTheDocument();
     });
 });

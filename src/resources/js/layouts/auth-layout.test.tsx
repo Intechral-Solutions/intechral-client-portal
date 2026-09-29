@@ -7,7 +7,8 @@ vi.mock('@inertiajs/react', () => ({
         props: {
             app: { name: 'Test Portal' },
             auth: { user: null, permissions: [] },
-            navigation: [],
+            shell: { presentation: 'operational' },
+            navigation: { currentWorkspace: null, workspaces: [] },
             flash: {
                 success: null,
                 error: null,

@@ -47,11 +47,11 @@
                 </p>
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($permissions as $permission)
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface"
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
                            style="border-color: var(--border-base);">
                         <input type="checkbox" name="permissions[]" value="{{ $permission }}"
                                {{ in_array($permission, old('permissions', [])) ? 'checked' : '' }}
-                               class="h-4 w-4 rounded accent-accent">
+                               class="h-4 w-4 rounded accent-legacy-accent">
                         <span style="color: var(--text-primary);">{{ Str::after($permission, '.') }}</span>
                     </label>
                     @endforeach
@@ -68,7 +68,7 @@
                 Create Role
             </button>
             <a href="{{ route('roles.index') }}"
-               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:bg-surface"
+               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                style="color: var(--text-secondary);">
                 Cancel
             </a>

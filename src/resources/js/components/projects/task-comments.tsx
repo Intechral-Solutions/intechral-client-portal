@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import type { FormEvent } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { formatTimestamp } from '@/lib/dates';
@@ -49,12 +50,11 @@ export function TaskComments({ projectId, taskId, comments, canComment }: TaskCo
                 <ul className="space-y-4">
                     {comments.map((comment) => (
                         <li key={comment.id} className="flex gap-3">
-                            <span
-                                className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground"
-                                aria-hidden="true"
-                            >
-                                {(comment.author?.name ?? '?').charAt(0).toUpperCase()}
-                            </span>
+                            <Avatar
+                                className="mt-0.5"
+                                name={comment.author?.name ?? 'Unknown'}
+                                decorative
+                            />
                             <div className="min-w-0">
                                 <p className="text-xs font-medium text-foreground">
                                     {comment.author?.name ?? 'Unknown'}{' '}

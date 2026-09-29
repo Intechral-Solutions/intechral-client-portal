@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { signedIn } from './support/auth';
+import { timerPill } from './support/shell';
 
 /**
  * EPIC-011E WP5 critical flows: the project board as a React/Inertia page, keyboard-accessible
@@ -38,15 +40,16 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP5 board nav project');
 
     // Start a timer for this project so its elapsed clock is the SPA-navigation signal: a full
     // document reload would remount the app and the clock would restart from what the server
-    // last rendered, not keep ticking client-side. The running timer bar also renders its own
-    // "Project: <name>" link, so every click on the project's own name below is `exact: true`
-    // to avoid matching that one instead (a Playwright accessible-name match is substring by
-    // default). D4 blocks deleting a project with a running (or any) time entry against it, so
+    // last rendered, not keep ticking client-side. Since WP6 the signal is the timer PILL's clock
+    // rather than the retired strip's; the pill also carries a "Project: <name>" label, so every
+    // click on the project's own name below stays `exact: true` to avoid matching it (a Playwright
+    // accessible-name match is substring by default). D4 blocks deleting a project with a running
+    // (or any) time entry against it, so
     // the timer is stopped before the test ends and the fixture teardown can remove the project.
     const entryId = await page.evaluate(async (id) => {
         const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
@@ -65,11 +68,11 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
 
     await page.goto('/projects');
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
-    const clock = page.getByRole('region', { name: 'Active timers' }).locator('span.font-mono');
+    const clock = timerPill(page).locator('[data-timer-elapsed="wide"]');
     const firstReading = await clock.textContent();
     await expect(clock).not.toHaveText(firstReading ?? '', { timeout: 3000 });
 
@@ -77,7 +80,7 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     // is an Inertia visit each way; the timer keeps ticking uninterrupted throughout.
     await page.getByRole('link', { name: 'Milestones' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
@@ -101,7 +104,7 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 keyboard move project');
 
     await quickAdd(page, 'Backlog', 'E2E keyboard move task');
@@ -117,12 +120,15 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
     await expect(toDoColumn.getByRole('link', { name: 'E2E keyboard move task' })).toBeVisible();
 
     // Focus followed the card to its new location, and the live region announced the result.
-    // (`[aria-live="polite"]` alone also matches the persistent RunningTimerBar's "Active
-    // timers" region; `.sr-only` is what distinguishes the board's own live region from it.)
+    // (`[aria-live="polite"]` alone also matches the shell's own announcer and, since WP6, the timer
+    // pill's start/stop announcer. Both carry a `data-shell-*` hook, so excluding them by attribute
+    // is what leaves the board's own live region.)
     await expect(moveButton).toBeFocused();
-    await expect(page.locator('[aria-live="polite"].sr-only')).toHaveText(
-        'Moved "E2E keyboard move task" to To Do, position 1 of 1.',
-    );
+    await expect(
+        page.locator(
+            '[aria-live="polite"].sr-only:not([data-shell-announcer]):not([data-shell-timer-announce])',
+        ),
+    ).toHaveText('Moved "E2E keyboard move task" to To Do, position 1 of 1.');
 
     // Persists after a reload: the move was a real server round trip, not a client-only effect.
     await page.reload();
@@ -130,34 +136,28 @@ test('keyboard-only: moves a task across columns through the Move menu, with foc
 });
 
 test('move up and down within a column through the Move menu', async ({ page, cleanup }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 reorder project');
 
     await quickAdd(page, 'Backlog', 'E2E first task');
     await quickAdd(page, 'Backlog', 'E2E second task');
 
     const backlogColumn = page.locator('[data-column-id]').filter({ hasText: 'Backlog' });
-    await expect(backlogColumn.getByRole('link')).toHaveText([
-        'E2E first task',
-        'E2E second task',
-    ]);
+    await expect(backlogColumn.getByRole('link')).toHaveText(['E2E first task', 'E2E second task']);
 
     await page.getByRole('button', { name: 'Move "E2E second task"' }).focus();
     await page.keyboard.press('Enter');
     await page.getByRole('menuitem', { name: 'Move up' }).click();
 
-    await expect(backlogColumn.getByRole('link')).toHaveText([
-        'E2E second task',
-        'E2E first task',
-    ]);
+    await expect(backlogColumn.getByRole('link')).toHaveText(['E2E second task', 'E2E first task']);
 });
 
 test('a plain project member gets a read-only board and can still open, comment on, and toggle a checklist item for a task', async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP5 read-only board');
 
     await quickAdd(page, 'Backlog', 'E2E D1 task');
@@ -171,10 +171,9 @@ test('a plain project member gets a read-only board and can still open, comment 
     await page.getByRole('button', { name: 'Update members' }).click();
     await expect(page.getByRole('status')).toContainText('Members updated.');
 
-    const memberContext = await browser.newContext();
+    const memberContext = await contextFor('member');
     const memberPage = await memberContext.newPage();
     try {
-        await signIn(memberPage, 'user@intechral.test');
         await memberPage.goto(`/projects/${projectId}/board`);
 
         await expect(memberPage.getByRole('link', { name: 'E2E D1 task' })).toBeVisible();
@@ -201,7 +200,7 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
     cleanup,
 }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await createProject(page, cleanup, 'E2E WP5 mobile project');
 
     await quickAdd(page, 'Backlog', 'E2E mobile task');
@@ -215,4 +214,60 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
 
     const toDoColumn = page.locator('[data-column-id]').filter({ hasText: 'To Do' });
     await expect(toDoColumn.getByRole('link', { name: 'E2E mobile task' })).toBeVisible();
+});
+
+/**
+ * EPIC-013 WP7 — the board on a `canvas` page frame (§19.3, §25.3 flow 11).
+ *
+ * `shell.spec.ts` already proves the *canvas region* reclaims the viewport when the drawer is
+ * collapsed. This proves the other half, which is the half WP7 added: that the page inside it
+ * actually takes that width, minus the page gutters and nothing else. It lives in this file because
+ * the board's project fixtures and their cleanup already do.
+ */
+test('the board reclaims the wide canvas on its page frame, under an entity header', async ({
+    page,
+    cleanup,
+}) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signedIn(page);
+    await createProject(page, cleanup, 'E2E WP7 canvas project');
+
+    const frame = page.locator('[data-page-frame]');
+    await expect(frame).toHaveAttribute('data-page-frame', 'canvas');
+
+    // Collapsed drawer at XL: the canvas is the viewport minus the 64px rail, and the canvas frame
+    // is the whole of it. Canvas is the one width that sets no max-width, which is what makes the
+    // wider shell a real win for the board rather than a wider margin.
+    await page.getByRole('button', { name: 'Collapse workspace views' }).click();
+    await expect(page.getByRole('navigation', { name: 'Projects views' })).toBeHidden();
+
+    const frameBox = (await frame.boundingBox())!;
+    expect(frameBox.width).toBeCloseTo(1440 - 64, 0);
+
+    const padding = await frame.evaluate((node) => getComputedStyle(node).paddingLeft);
+    expect(padding).toBe('40px');
+    expect(
+        await frame.evaluate((node) => getComputedStyle(node).maxWidth),
+    ).toBe('none');
+
+    // The entity header (Direction D §6): the record's name is the page's one h1, its state is a
+    // glyph-and-label status rather than colour alone, and the strata rule closes the block. §17
+    // allows the motif on a project workspace, which is what this page is.
+    await expect(
+        page.getByRole('heading', { level: 1, name: 'E2E WP7 canvas project' }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.locator('[data-strata]')).toHaveCount(1);
+
+    // The hand-built "Projects /" trail this header replaced is gone: the utility bar has owned the
+    // breadcrumb since WP4, and two of them would be two sources of truth.
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(1);
+
+    // The actions survive the move into the header, as links, still Inertia.
+    await expect(page.getByRole('link', { name: 'Milestones' })).toBeVisible();
+
+    const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(overflow).toBe(false);
 });

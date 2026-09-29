@@ -16,7 +16,7 @@ import {
 } from '@/components/projects/project-details-fields';
 import { SectionPanel } from '@/components/section-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { index, store } from '@/routes/projects';
 import type { SharedPageProps } from '@/types';
 import type { CompanyOption, MemberCandidate } from '@/types/projects';
@@ -159,6 +159,6 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
     );
 }
 
-CreateProjectPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+CreateProjectPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default CreateProjectPage;

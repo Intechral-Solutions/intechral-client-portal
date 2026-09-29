@@ -33,13 +33,13 @@ export function ConfirmationDialog({
             <Dialog.Trigger asChild>{children}</Dialog.Trigger>
             <DialogShell title={title} description={description}>
                 {error ? (
-                    <p role="alert" className="mt-4 text-sm text-[var(--text-danger)]">
+                    <p role="alert" className="mt-4 text-sm text-danger">
                         {error}
                     </p>
                 ) : null}
                 <div className="mt-6 flex justify-end gap-2">
                     <Dialog.Close asChild>
-                        <Button type="button" variant="outline" disabled={processing}>
+                        <Button type="button" variant="secondary" disabled={processing}>
                             Cancel
                         </Button>
                     </Dialog.Close>

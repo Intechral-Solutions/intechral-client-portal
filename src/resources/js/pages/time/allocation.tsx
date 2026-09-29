@@ -10,7 +10,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { allocation, index as timeIndex } from '@/routes/time';
 import { allocation as updateAllocation } from '@/routes/time/blocks';
 import type { AllocationEntry, AllocationSlotResponse } from '@/types/time';
@@ -216,7 +216,7 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
                     </Link>
                     <Link
                         href={allocation.url()}
-                        className="border-b-2 border-primary px-3 py-2 text-sm font-medium text-primary"
+                        className="border-b-2 border-ink px-3 py-2 text-sm font-medium text-text"
                     >
                         Allocation
                     </Link>
@@ -247,11 +247,7 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
                     </Button>
                 </form>
 
-                {error ? (
-                    <Alert role="alert" className="text-destructive">
-                        {error}
-                    </Alert>
-                ) : null}
+                {error ? <Alert variant="danger">{error}</Alert> : null}
                 {status ? (
                     <p className="text-sm text-muted-foreground" role="status">
                         {status}
@@ -290,6 +286,6 @@ export function AllocationPage({ date, entries: pageEntries }: Props) {
     );
 }
 
-AllocationPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+AllocationPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default AllocationPage;

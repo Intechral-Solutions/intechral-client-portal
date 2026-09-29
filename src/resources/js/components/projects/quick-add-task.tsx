@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { store as storeTask } from '@/routes/projects/tasks';
 
 type QuickAddTaskProps = {
@@ -65,7 +66,7 @@ export function QuickAddTask({ projectId, columnId, open, onClose }: QuickAddTas
                 <label htmlFor={`quick-add-${columnId}`} className="sr-only">
                     New task title
                 </label>
-                <input
+                <Input
                     ref={inputRef}
                     id={`quick-add-${columnId}`}
                     type="text"
@@ -73,7 +74,6 @@ export function QuickAddTask({ projectId, columnId, open, onClose }: QuickAddTas
                     onChange={(event) => form.setData('title', event.target.value)}
                     placeholder="Task title…"
                     required
-                    className="block w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 {form.errors.title ? (
                     <p role="alert" className="mt-1 text-xs text-[var(--text-danger)]">

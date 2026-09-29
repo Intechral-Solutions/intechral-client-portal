@@ -53,3 +53,14 @@ it('keeps the page indicator centred when there is a single page', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
 });
+
+it('marks the directions for the browser and draws them as secondary buttons', () => {
+    render(<Pagination paginator={middle} />);
+
+    expect(screen.getByRole('link', { name: 'Previous' })).toHaveAttribute('rel', 'prev');
+    expect(screen.getByRole('link', { name: 'Next' })).toHaveAttribute('rel', 'next');
+    expect(screen.getByRole('link', { name: 'Next' })).toHaveClass(
+        'border-control-edge',
+        'bg-surface',
+    );
+});

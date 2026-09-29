@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { ProjectCard } from '@/components/projects/project-card';
 import { buttonVariants } from '@/components/ui/button';
-import { AppLayout } from '@/layouts/app-layout';
+import { AppShell } from '@/components/shell/app-shell';
 import { create } from '@/routes/projects';
 import type { Paginated } from '@/types/pagination';
 import type { ProjectCardData } from '@/types/projects';
@@ -49,7 +49,7 @@ export function ProjectsIndexPage({ projects, abilities }: ProjectsIndexProps) {
                         {abilities.create ? (
                             <Link
                                 href={create.url()}
-                                className="text-sm font-medium text-primary hover:underline"
+                                className="legacy-text-primary text-sm font-medium hover:underline"
                             >
                                 Create your first project
                             </Link>
@@ -70,6 +70,6 @@ export function ProjectsIndexPage({ projects, abilities }: ProjectsIndexProps) {
     );
 }
 
-ProjectsIndexPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ProjectsIndexPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ProjectsIndexPage;

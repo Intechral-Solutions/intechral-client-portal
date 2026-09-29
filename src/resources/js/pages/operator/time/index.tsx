@@ -11,7 +11,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { AppLayout } from '@/layouts/app-layout';
+import { Progress } from '@/components/ui/progress';
+import { AppShell } from '@/components/shell/app-shell';
 import { exportMethod, index } from '@/routes/operator/time';
 import type { Paginated } from '@/types/pagination';
 
@@ -123,7 +124,6 @@ export function ReportPage({
                             id="report-user"
                             value={userId}
                             onChange={(event) => setUserId(event.target.value)}
-                            className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
                         >
                             <option value="">All users</option>
                             {users.map((user) => (
@@ -139,7 +139,6 @@ export function ReportPage({
                             id="report-project"
                             value={projectId}
                             onChange={(event) => setProjectId(event.target.value)}
-                            className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
                         >
                             <option value="">All projects</option>
                             {projects.map((project) => (
@@ -173,7 +172,6 @@ export function ReportPage({
                             id="report-billable"
                             value={billable}
                             onChange={(event) => setBillable(event.target.value)}
-                            className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
                         >
                             <option value="">All entries</option>
                             <option value="1">Billable only</option>
@@ -292,12 +290,12 @@ function SummaryList({
                                         billable)
                                     </dd>
                                 </div>
-                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                                    <div
-                                        className="h-full bg-primary"
-                                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                                    />
-                                </div>
+                                <Progress
+                                    className="mt-2"
+                                    value={percentage}
+                                    label={`${row.name} share of tracked time`}
+                                    valueText={`${percentage}% of tracked time`}
+                                />
                             </div>
                         );
                     })}
@@ -309,6 +307,6 @@ function SummaryList({
     );
 }
 
-ReportPage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ReportPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ReportPage;

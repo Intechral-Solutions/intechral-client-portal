@@ -1,29 +1,21 @@
+import type { Navigation, ShellProps } from './navigation';
+
+/** Initials are derived server-side so both renderers agree; `url` is null (no photo storage). */
+export type AuthAvatar = {
+    initials: string;
+    url: string | null;
+};
+
 export type AuthUser = {
     id: number;
     name: string;
     email: string;
+    avatar: AuthAvatar;
 };
 
 export type AuthProps = {
     user: AuthUser | null;
     permissions: string[];
-};
-
-export type NavigationItem = {
-    key: string;
-    label: string;
-    href: string;
-    method: 'get' | 'post';
-    visit: 'inertia' | 'document';
-    activePatterns: string[];
-    isActive: boolean;
-    children: NavigationItem[];
-};
-
-export type NavigationGroup = {
-    key: string;
-    label: string | null;
-    items: NavigationItem[];
 };
 
 export type FlashProps = {
@@ -38,6 +30,13 @@ export type SharedPageProps = {
         name: string;
     };
     auth: AuthProps;
-    navigation: NavigationGroup[];
+    shell: ShellProps;
+    /**
+     * The canonical navigation contract, and the shell's only navigation input.
+     *
+     * The same payload reaches the Blade shell through `ShellComposer`. WP3's temporary flattened
+     * compatibility shape is gone from both renderers (WP4 on React, WP5 on Blade).
+     */
+    navigation: Navigation;
     flash: FlashProps;
 };

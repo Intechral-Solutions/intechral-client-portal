@@ -113,7 +113,7 @@ LATER items are listed in their recommended order but are separable; see [Depend
 
 **Class:** UX foundation.
 
-**Vehicle:** [EPIC-013: Direction D Application Shell and Design System Foundation](../epics/EPIC-013-direction-d-shell-design-system.md) (**Planned** 2026-09-25) delivers this item together with [Design system](#design-system) below, against the approved [Direction D design contract](../design/direction-d-design-system.md).
+**Vehicle:** [EPIC-013: Direction D Application Shell and Design System Foundation](../epics/EPIC-013-direction-d-shell-design-system.md) (**Verified** 2026-09-28; planned 2026-09-25) delivers this item together with [Design system](#design-system) below, against the approved [Direction D design contract](../design/direction-d-design-system.md).
 
 - Full-viewport shell; workspace-based navigation (Home, Projects, Tasks, Helpdesk, Time, Directory, Finance, System) driven by the server `NavigationBuilder`
 - Workspace layout primitives: wide canvas, reading width, split/side regions

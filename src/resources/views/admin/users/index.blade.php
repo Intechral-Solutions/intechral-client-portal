@@ -39,13 +39,13 @@
                    class="block w-full max-w-sm rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
                    style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
             <button type="submit"
-                    class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                    class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                     style="border-color: var(--border-base); color: var(--text-secondary);">
                 Search
             </button>
             @if (request('search'))
             <a href="{{ route('users.index') }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                style="border-color: var(--border-base); color: var(--text-secondary);">
                 Clear
             </a>
@@ -66,7 +66,7 @@
             </thead>
             <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 @forelse ($users as $user)
-                <tr class="transition-colors hover:bg-surface">
+                <tr class="transition-colors hover:legacy-bg-surface">
                     <td class="px-6 py-4">
                         <span class="font-medium" style="color: var(--text-primary);">{{ $user->name }}</span>
                     </td>
@@ -136,7 +136,7 @@
                 </button>
                 <button type="button"
                         onclick="document.getElementById('invite-modal').setAttribute('hidden', '')"
-                        class="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:bg-surface"
+                        class="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
                         style="color: var(--text-secondary);">
                     Cancel
                 </button>

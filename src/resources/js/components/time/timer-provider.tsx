@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { PropsWithChildren } from 'react';
 
+import { clockOffsetFrom } from '@/lib/timer-state';
 import { description, start, stop } from '@/routes/time/timer';
 import { active } from '@/routes/time/timers';
 import type { ActiveTimer, TimerStartPayload } from '@/types/time';
@@ -143,14 +144,15 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     return (await response.json()) as T;
 }
 
-function offsetFrom(timer: ActiveTimer | undefined, requestStartedAt: number, receivedAt: number) {
-    if (!timer) return 0;
-    const serverNow = Date.parse(timer.server_now);
-    if (!Number.isFinite(serverNow)) return 0;
-
-    return serverNow - (requestStartedAt + receivedAt) / 2;
-}
-
+/**
+ * The client-side holder of the active timer set, and the only one. Its reconciliation is the
+ * hardened EPIC-011D model and EPIC-013 WP6 left it alone: the two sequence refs, the re-read on
+ * every failure path and the `401/419` reload all behave exactly as before.
+ *
+ * WP6's one change here is a deletion — the private `offsetFrom` helper now lives in
+ * `lib/timer-state.ts` as `clockOffsetFrom`, unchanged in behaviour, because the Blade renderer has to
+ * estimate the server clock by the same rule and a second copy of it would be a second rule.
+ */
 export function TimerProvider({ enabled, children }: PropsWithChildren<{ enabled: boolean }>) {
     const [state, dispatch] = useReducer(reducer, {
         ...initialState,
@@ -182,7 +184,7 @@ export function TimerProvider({ enabled, children }: PropsWithChildren<{ enabled
                 dispatch({
                     type: 'hydrated',
                     timers,
-                    clockOffsetMs: offsetFrom(timers[0], requestStartedAt, receivedAt),
+                    clockOffsetMs: clockOffsetFrom(timers[0], requestStartedAt, receivedAt),
                 });
 
                 return;
@@ -218,7 +220,7 @@ export function TimerProvider({ enabled, children }: PropsWithChildren<{ enabled
                 dispatch({
                     type: 'started',
                     timer,
-                    clockOffsetMs: offsetFrom(timer, requestStartedAt, receivedAt),
+                    clockOffsetMs: clockOffsetFrom(timer, requestStartedAt, receivedAt),
                 });
 
                 return timer;

@@ -20,7 +20,12 @@ it('renders an authenticated production inertia page with minimal shared props',
             ->where('auth.user.name', $user->name)
             ->where('auth.user.email', $user->email)
             ->has('auth.permissions')
-            ->has('navigation')
+            // EPIC-013 §12.5: the canonical workspace contract, the presentation discriminator and
+            // the server-derived avatar. Their own coverage is in ShellContractTest.
+            ->has('navigation.workspaces')
+            ->has('navigation.currentWorkspace')
+            ->where('shell.presentation', 'operational')
+            ->has('auth.user.avatar')
             ->has('flash')
             ->missing('auth.user.password')
             ->missing('auth.user.remember_token')

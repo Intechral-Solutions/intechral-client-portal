@@ -7,15 +7,168 @@
 @source '../**/*.ts';
 @source '../**/*.tsx';
 
+/* ── Direction D fonts (EPIC-013 WP1d, gate G1 / Amendment 1 A1.4) ──
+   Self-hosted WOFF2, fingerprinted and emitted by Vite; no third-party
+   font host. Latin subsets for every face; IBM Plex Sans also declares
+   latin-ext, which the browser fetches only when a page renders a glyph
+   in that range. Plex Sans 400 and 500 (latin) are preloaded from both
+   root views (layouts/partials/font-preloads.blade.php); everything else
+   loads on first use. Files and licences: resources/fonts/ (SIL OFL 1.1).
+   ── */
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-500-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-600-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Newsreader';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/newsreader-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Newsreader';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/newsreader-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ============================================================
    Design Tokens — Light Theme (default)
    Switch to dark by adding data-theme="dark" to <html>
    ============================================================ */
 @theme {
-    /* Typography */
-    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    /* Typography — Direction D §3.1 (EPIC-013 WP1d). Three roles, one utility
+       each: font-sans (UI, the page default), font-mono (IDs, time, money,
+       counts) and font-display (Newsreader: entity names and customer voice
+       only, §3.3 — never page titles, section headings, tables or buttons).
+       Fallbacks are the contract's; the emoji families only extend glyph
+       coverage. */
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif, 'Apple Color Emoji',
         'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --font-display: 'Newsreader', Georgia, serif;
+
+    /* Radius — Direction D §4.2 (EPIC-013 WP2). `rounded-control` is the 5px of
+       buttons, inputs, chips and menu rows; `-control-lg` is the 7px of large
+       buttons; `rounded-overlay` is the 8px of menus, popovers and dialogs;
+       `rounded-tag` is the 2-3px of tags. */
+    --radius-control: 5px;
+    --radius-control-lg: 7px;
+    --radius-overlay: 8px;
+    --radius-tag: 3px;
+
+    /* Overlay animations (EPIC-013 WP2). Durations and easing come from the
+       WP1c motion tokens; `--ds-shift` collapses to 0 under
+       prefers-reduced-motion (see :root below), leaving an opacity fade. */
+    --animate-overlay-in: ds-fade-in var(--ds-anim-sheet) var(--ds-motion-easing) both;
+    --animate-overlay-out: ds-fade-out var(--ds-anim-sheet-exit) var(--ds-motion-easing-exit) both;
+    --animate-dialog-in: ds-dialog-in var(--ds-anim-sheet) var(--ds-motion-easing) both;
+    --animate-dialog-out: ds-dialog-out var(--ds-anim-sheet-exit) var(--ds-motion-easing-exit) both;
+    --animate-menu-in: ds-menu-in var(--ds-anim-base) var(--ds-motion-easing) both;
+    --animate-menu-out: ds-fade-out var(--ds-anim-base-exit) var(--ds-motion-easing-exit) both;
+    /* The running-timer dot (EPIC-013 WP6, Direction D §12.1/§16). Deliberately slow and shallow
+       — it signals "live", it does not compete for attention — and it is only ever a supporting
+       cue: the pill also carries a ticking clock and a textual accessible name, so the animation
+       is never the sole indicator of a running timer. `none` under reduced motion (see below). */
+    --animate-live-pulse: ds-live-pulse 2.4s var(--ds-motion-easing) infinite;
+
+    @keyframes ds-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes ds-fade-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    @keyframes ds-dialog-in {
+        from { opacity: 0; transform: translateY(var(--ds-shift)); }
+        to { opacity: 1; transform: none; }
+    }
+    @keyframes ds-dialog-out {
+        from { opacity: 1; transform: none; }
+        to { opacity: 0; transform: translateY(var(--ds-shift)); }
+    }
+    @keyframes ds-menu-in {
+        from { opacity: 0; transform: translateY(calc(var(--ds-shift) * -0.5)); }
+        to { opacity: 1; transform: none; }
+    }
+    @keyframes ds-live-pulse {
+        50% { opacity: 0.45; }
+    }
 
     /* Brand palette */
     --color-brand-50:  #eef2ff;
@@ -31,6 +184,92 @@
     --color-brand-950: #1e1b4b;
 }
 
+/* ── Direction D semantic tokens → Tailwind (EPIC-013 WP1c) ──────
+   Canonical names from docs/design/direction-d-design-system.md §2.2,
+   §2.2 Shadows and §16. Values live only in the theme blocks below as
+   --ds-* custom properties; the --ds- namespace exists because several
+   canonical names (--accent, --danger, --success, --warning,
+   --text-secondary, --text-muted …) are already live legacy raw
+   variables with different values. Components use the utilities
+   (bg-surface, text-muted, border-rule …), never the hex values. ── */
+@theme inline {
+    /* Surfaces */
+    --color-canvas: var(--ds-canvas);
+    --color-rail: var(--ds-rail);
+    --color-drawer: var(--ds-drawer);
+    --color-surface: var(--ds-surface);
+    --color-surface-sunken: var(--ds-surface-sunken);
+    --color-surface-hover: var(--ds-surface-hover);
+    --color-surface-selected: var(--ds-surface-selected);
+
+    /* Rules */
+    --color-rule: var(--ds-rule);
+    --color-rule-control: var(--ds-rule-control);
+    --color-control-edge: var(--ds-control-edge);
+    --color-rule-strong: var(--ds-rule-strong);
+
+    /* Text. `text-secondary`, `text-muted` and `text-faint` are the
+       canonical text utilities (§2.1); the --color-text-* forms exist for
+       the few non-text uses (strata line, marker, control outline). */
+    --color-text: var(--ds-text);
+    --color-text-secondary: var(--ds-text-secondary);
+    --color-text-muted: var(--ds-text-muted);
+    --color-text-faint: var(--ds-text-faint);
+    --text-color-secondary: var(--ds-text-secondary);
+    --text-color-muted: var(--ds-text-muted);
+    --text-color-faint: var(--ds-text-faint);
+
+    /* Accent and live */
+    --color-accent: var(--ds-accent);
+    --color-accent-hover: var(--ds-accent-hover);
+    --color-accent-soft: var(--ds-accent-soft);
+    --color-accent-line: var(--ds-accent-line);
+    --color-live: var(--ds-live);
+    --color-live-soft: var(--ds-live-soft);
+    --color-live-text: var(--ds-live-text);
+
+    /* Ink (primary action) */
+    --color-ink: var(--ds-ink);
+    --color-on-ink: var(--ds-on-ink);
+
+    /* State */
+    --color-danger: var(--ds-danger);
+    --color-danger-soft: var(--ds-danger-soft);
+    --color-warning: var(--ds-warning);
+    --color-warning-glyph: var(--ds-warning-glyph);
+    --color-warning-soft: var(--ds-warning-soft);
+    --color-success: var(--ds-success);
+    --color-success-glyph: var(--ds-success-glyph);
+
+    /* Progress */
+    --color-progress-fill: var(--ds-progress-fill);
+    --color-progress-track: var(--ds-progress-track);
+    --color-stage-future: var(--ds-stage-future);
+
+    /* Focus and scrim */
+    --color-focus: var(--ds-focus);
+    --color-scrim: var(--ds-scrim);
+
+    /* Elevation */
+    --shadow-card: var(--ds-shadow-card);
+    --shadow-overlay: var(--ds-shadow-overlay);
+
+    /* Motion */
+    --transition-duration-motion-fast: var(--ds-motion-fast);
+    --transition-duration-motion-base: var(--ds-motion-base);
+    --transition-duration-motion-panel: var(--ds-motion-panel);
+    --transition-duration-motion-sheet: var(--ds-motion-sheet);
+    --ease-motion: var(--ds-motion-easing);
+    --ease-motion-exit: var(--ds-motion-easing-exit);
+}
+
+/* ── Compatibility aliases (shadcn + legacy status) ─────────────
+   Kept for existing consumers (Direction D §2.4). `accent`, `success`
+   and `warning` now name Direction D tokens above; the legacy accent
+   meaning lives on as `legacy-accent` (identical value), the same
+   isolation WP1a applied to the hand-written utilities. WP2 retired
+   `legacy-success`/`legacy-warning` with the Alert restyle: their only
+   consumer was FlashRegion. ── */
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -42,37 +281,113 @@
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
-    --color-success: var(--success);
-    --color-warning: var(--warning);
     --color-info: var(--info);
+    --color-legacy-accent: var(--accent);
+}
+
+/* ── Theme-invariant Direction D tokens (EPIC-013 WP1c) ─────── */
+:root {
+    /* Motion (§16). Exits run at 70% of the enter duration. */
+    --ds-motion-fast:  120ms;
+    --ds-motion-base:  160ms;
+    --ds-motion-panel: 200ms;
+    --ds-motion-sheet: 240ms;
+    --ds-motion-easing:      cubic-bezier(0.2, 0, 0, 1);
+    --ds-motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /* Overlay animation durations (EPIC-013 WP2): enter = the motion token,
+       exit = 70% of it (§16). Reduced motion removes the translation and
+       caps fades at motion-fast (§16). */
+    --ds-shift: 8px;
+    --ds-anim-base: var(--ds-motion-base);
+    --ds-anim-base-exit: calc(var(--ds-motion-base) * 0.7);
+    --ds-anim-sheet: var(--ds-motion-sheet);
+    --ds-anim-sheet-exit: calc(var(--ds-motion-sheet) * 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        /* The dot stays visible and fully opaque; only the animation stops. */
+        --animate-live-pulse: none;
+        --ds-shift: 0px;
+        --ds-anim-base: var(--ds-motion-fast);
+        --ds-anim-base-exit: var(--ds-motion-fast);
+        --ds-anim-sheet: var(--ds-motion-fast);
+        --ds-anim-sheet-exit: var(--ds-motion-fast);
+    }
 }
 
 /* ── Light theme (default) ────────────────────────────────── */
 :root,
 [data-theme="light"] {
+    /* Direction D semantic tokens (EPIC-013 WP1c) — canonical light values,
+       direction-d-design-system.md §2.2. Exposed through @theme inline above. */
+    --ds-canvas:           #F6F5F1;
+    --ds-rail:             #EBE8E1;
+    --ds-drawer:           #F1EFEA;
+    --ds-surface:          #FFFFFF;
+    --ds-surface-sunken:   #EFEDE7;
+    --ds-surface-hover:    #E8E5DD;
+    --ds-surface-selected: #FFFFFF;
+    --ds-rule:             #E3E0D8;
+    --ds-rule-control:     #D2CEC3;
+    --ds-control-edge:     #8B877C; /* resting boundary of interactive controls; >=3:1 (WCAG 1.4.11) */
+    --ds-rule-strong:      #1A1B1E;
+    --ds-text:             #1A1B1E;
+    --ds-text-secondary:   #3F4248;
+    --ds-text-muted:       #5C5F66;
+    --ds-text-faint:       #8A8D93; /* placeholders/disabled/decorative only (§2.3.7) */
+    --ds-accent:           #0B6A73;
+    --ds-accent-hover:     #084E55;
+    --ds-accent-soft:      #E3EEEE;
+    --ds-accent-line:      #0B6A73;
+    --ds-live:             #0B8792; /* glyphs/dots/bars only; text uses --ds-live-text (§2.3.3) */
+    --ds-live-soft:        #E4F2F2;
+    --ds-live-text:        #0B6A73;
+    --ds-ink:              #1A1B1E;
+    --ds-on-ink:           #FFFFFF;
+    --ds-danger:           #B42318;
+    --ds-danger-soft:      #FBEAE7;
+    --ds-warning:          #8A5A0B;
+    --ds-warning-glyph:    #B7791F;
+    --ds-warning-soft:     #FAF0DC;
+    --ds-success:          #2B7A4B;
+    --ds-success-glyph:    #2E8B57;
+    --ds-progress-fill:    #1A1B1E;
+    --ds-progress-track:   #E4E1D9;
+    --ds-stage-future:     #C9C5BA;
+    --ds-focus:            #0B6A73;
+    --ds-scrim:            rgba(26, 27, 30, 0.18);
+    --ds-shadow-card:      0 1px 2px rgba(26, 27, 30, 0.05), 0 0 0 1px #E3E0D8;
+    --ds-shadow-overlay:   0 14px 36px rgba(26, 27, 30, 0.16), 0 0 0 1px #E3E0D8;
+
+    /* shadcn compatibility aliases. `destructive` and `ring` point at Direction D
+       (WP1c, measured safe). `primary` points at ink (EPIC-013 WP2, Amendment 6:
+       every consumer that meant "accent" was made explicit first, so `primary`
+       now only ever means "the primary action"). Every other alias keeps its
+       legacy value. */
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
     --card-foreground: var(--text-primary);
-    --primary:       var(--accent);
-    --primary-foreground: var(--accent-text);
+    --primary:       var(--ds-ink);
+    --primary-foreground: var(--ds-on-ink);
     --secondary:     theme(colors.gray.100);
     --secondary-foreground: theme(colors.gray.900);
     --muted:         var(--bg-surface);
     --muted-foreground: var(--text-secondary);
     --accent-foreground: var(--text-primary);
-    --destructive:   var(--danger);
+    --destructive:   var(--ds-danger);
     --destructive-foreground: theme(colors.white);
     --border:        var(--border-base);
     --input:         var(--border-base);
-    --ring:          var(--accent);
+    --ring:          var(--ds-focus);
 
     /* Backgrounds */
     --bg-base:       theme(colors.white);
@@ -117,6 +432,16 @@
     --warning:       theme(colors.amber.500);
     --info:          theme(colors.blue.600);
 
+    /* Compatibility orphans (EPIC-013 WP1b) — six variables already referenced by
+       live Blade/React markup with no prior definition. Explicit now; unchanged
+       from Direction D's own values later, this register is retired, not replaced. */
+    --surface-base:     var(--bg-base);
+    --surface-muted:    var(--bg-surface);
+    --surface-elevated: var(--bg-surface);
+    --border-muted:     var(--border-subtle);
+    --surface-accent:   var(--surface-info);
+    --accent-success:   var(--success);
+
     /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -126,22 +451,64 @@
 /* ── Dark theme ───────────────────────────────────────────── */
 [data-theme="dark"] {
     color-scheme: dark;
+
+    /* Direction D semantic tokens (EPIC-013 WP1c) — canonical dark values */
+    --ds-canvas:           #0D1416;
+    --ds-rail:             #091012;
+    --ds-drawer:           #10191C;
+    --ds-surface:          #142023;
+    --ds-surface-sunken:   #0F181A;
+    --ds-surface-hover:    #162427;
+    --ds-surface-selected: #18292D;
+    --ds-rule:             #1E2D31;
+    --ds-rule-control:     #2A3D42;
+    --ds-control-edge:     #617679; /* resting boundary of interactive controls; >=3:1 (WCAG 1.4.11) */
+    --ds-rule-strong:      #C8D7D9;
+    --ds-text:             #E6EEEF;
+    --ds-text-secondary:   #C3D1D3;
+    --ds-text-muted:       #98AEB2;
+    --ds-text-faint:       #6D8388;
+    --ds-accent:           #7ADDE4;
+    --ds-accent-hover:     #B2F4F7;
+    --ds-accent-soft:      #12292C;
+    --ds-accent-line:      #19E7F2;
+    --ds-live:             #19E7F2;
+    --ds-live-soft:        #0E2629;
+    --ds-live-text:        #19E7F2;
+    --ds-ink:              #E6EEEF;
+    --ds-on-ink:           #0D1416;
+    --ds-danger:           #FF8A7A;
+    --ds-danger-soft:      #2A1715;
+    --ds-warning:          #F2B45A;
+    --ds-warning-glyph:    #F2B45A;
+    --ds-warning-soft:     #2A2013;
+    --ds-success:          #6FD39A;
+    --ds-success-glyph:    #4CCB86;
+    --ds-progress-fill:    #C8D7D9;
+    --ds-progress-track:   #1E2D31;
+    --ds-stage-future:     #34494E;
+    --ds-focus:            #19E7F2;
+    --ds-scrim:            rgba(0, 0, 0, 0.45);
+    --ds-shadow-card:      0 0 0 1px #213136;
+    --ds-shadow-overlay:   0 14px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px #2A3D42;
+
+    /* shadcn compatibility aliases — see the light block */
     --background:    var(--bg-base);
     --foreground:    var(--text-primary);
     --card:          var(--bg-elevated);
     --card-foreground: var(--text-primary);
-    --primary:       var(--accent);
-    --primary-foreground: var(--accent-text);
+    --primary:       var(--ds-ink);
+    --primary-foreground: var(--ds-on-ink);
     --secondary:     theme(colors.gray.800);
     --secondary-foreground: theme(colors.gray.50);
     --muted:         var(--bg-surface);
     --muted-foreground: var(--text-secondary);
     --accent-foreground: var(--text-primary);
-    --destructive:   var(--danger);
+    --destructive:   var(--ds-danger);
     --destructive-foreground: theme(colors.gray.950);
     --border:        var(--border-base);
     --input:         var(--border-base);
-    --ring:          var(--accent);
+    --ring:          var(--ds-focus);
 
     /* Backgrounds */
     --bg-base:       theme(colors.gray.950);
@@ -186,6 +553,14 @@
     --warning:       theme(colors.amber.400);
     --info:          theme(colors.blue.400);
 
+    /* Compatibility orphans (EPIC-013 WP1b) — see the light block for rationale */
+    --surface-base:     var(--bg-base);
+    --surface-muted:    var(--bg-surface);
+    --surface-elevated: var(--bg-surface);
+    --border-muted:     var(--border-subtle);
+    --surface-accent:   var(--surface-info);
+    --accent-success:   var(--success);
+
     /* Shadows */
     --shadow-sm:     0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-md:     0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
@@ -205,23 +580,413 @@ body {
     line-height: 1.6;
 }
 
-/* ── Semantic utility layer ───────────────────────────────── */
+/* ── Legacy utility layer (EPIC-013 WP1a) ─────────────────────
+   Prefixed so Direction D can register `surface`, `text-primary`,
+   etc. as semantic utilities later without a name collision.
+   Values unchanged from the pre-WP1a names. ────────────────── */
 @layer utilities {
-    .bg-base       { background-color: var(--bg-base); }
-    .bg-surface    { background-color: var(--bg-surface); }
-    .bg-elevated   { background-color: var(--bg-elevated); }
-    .border-subtle { border-color: var(--border-subtle); }
-    .border-base   { border-color: var(--border-base); }
-    .text-primary  { color: var(--text-primary); }
-    .text-secondary{ color: var(--text-secondary); }
-    .text-muted    { color: var(--text-muted); }
-    .text-inverse  { color: var(--text-inverse); }
-    .btn-accent {
+    .legacy-bg-base       { background-color: var(--bg-base); }
+    .legacy-bg-surface    { background-color: var(--bg-surface); }
+    .legacy-bg-elevated   { background-color: var(--bg-elevated); }
+    .legacy-border-subtle { border-color: var(--border-subtle); }
+    .legacy-border-base   { border-color: var(--border-base); }
+    .legacy-text-primary  { color: var(--text-primary); }
+    .legacy-text-secondary{ color: var(--text-secondary); }
+    .legacy-text-muted    { color: var(--text-muted); }
+    .legacy-text-inverse  { color: var(--text-inverse); }
+    .legacy-btn-accent {
         background-color: var(--accent);
         color: var(--accent-text);
         &:hover { background-color: var(--accent-hover); }
     }
-    .shadow-theme-sm { box-shadow: var(--shadow-sm); }
-    .shadow-theme-md { box-shadow: var(--shadow-md); }
-    .shadow-theme-lg { box-shadow: var(--shadow-lg); }
+    .legacy-shadow-theme-sm { box-shadow: var(--shadow-sm); }
+    .legacy-shadow-theme-md { box-shadow: var(--shadow-md); }
+    .legacy-shadow-theme-lg { box-shadow: var(--shadow-lg); }
+}
+
+/* ── Direction D operator shell (EPIC-013 WP4) ────────────────
+   Geometry from direction-d-design-system.md §5.1/§6 and the width classes
+   from §5.2, implemented entirely in CSS so no JavaScript decides layout
+   (EPIC-013 §16). Two attributes drive it:
+
+     html[data-drawer="open"|"collapsed"]   the remembered/default panel state
+     [data-shell="operational"][data-panel] whether this workspace has a
+                                            contextual panel at all
+
+   The panel preference is honoured only at XL, and at L only when pinned, so
+   M/S ignore it here rather than through a resize listener.
+
+   These rules are deliberately UNLAYERED. Shell parts also carry Tailwind
+   utilities (`flex`, `h-9`, ...), and an unlayered rule beats every layered one
+   regardless of specificity. Inside `@layer components` the width classes were
+   silently inert: `display: none` lost to `.flex` from the utilities layer, so
+   the rail list, the sheet trigger and the pin all stayed visible at every
+   width. Chromium caught that; the layer is the fix.
+   ── */
+[data-shell='operational'] {
+    --shell-rail: 64px;
+    --shell-rail-s: 56px;
+    --shell-drawer: 248px;
+    --shell-utility: 48px;
+
+    display: grid;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-areas: 'rail canvas';
+    grid-template-columns: var(--shell-rail) minmax(0, 1fr);
+    background-color: var(--ds-canvas);
+    color: var(--ds-text);
+}
+
+[data-shell='operational'] [data-shell-rail] {
+    grid-area: rail;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 0;
+    background-color: var(--ds-rail);
+    border-right: 1px solid var(--ds-rule);
+}
+
+[data-shell='operational'] [data-shell-drawer] {
+    grid-area: drawer;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    width: var(--shell-drawer);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--ds-drawer);
+    border-right: 1px solid var(--ds-rule);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+[data-shell='operational'] [data-shell-canvas] {
+    grid-area: canvas;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+[data-shell='operational'] [data-shell-utility] {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--shell-utility);
+    padding: 0 16px;
+    background-color: var(--ds-canvas);
+    border-bottom: 1px solid var(--ds-rule);
+}
+
+/* ── Timer pill (EPIC-013 WP6, Direction D §12.1) ─────────────
+   The pill renders BOTH its wide and its narrow elapsed form and CSS shows one,
+   so which form appears is decided by the same width classes that own every
+   other piece of shell geometry — no resize listener, no JS breakpoint query,
+   and no chance of React and Blade disagreeing about it.
+
+   Unlayered with the rest of the shell (A8.12 #2): the pill's parts also carry
+   Tailwind utilities, and a layered `display: none` would lose to `.flex`. ── */
+[data-shell='operational'] [data-shell-timer] [data-timer-elapsed='narrow'] {
+    display: none;
+}
+
+/* Blade's pill toggles its parts with the `hidden` ATTRIBUTE, and several of
+   them also carry a Tailwind display utility (`flex`, `inline-flex`) that would
+   otherwise win and show a part the script had just hidden. The UA stylesheet's
+   [hidden] rule is not enough against a utility class, so this unlayered rule
+   restores the attribute's authority for the pill's subtree — the same
+   layered-vs-unlayered trap A8.12 #2 records for the width classes. */
+[data-shell='operational'] [data-shell-timer] [hidden] {
+    display: none;
+}
+
+/* ── Page frame (EPIC-013 WP7, §19, Direction D §9) ───────────
+   Page GEOMETRY, which is a different job from the shell geometry above: the
+   shell decides where the canvas is, the frame decides how content sits inside
+   it. It lives here rather than in Tailwind utilities for the same reason every
+   other piece of geometry does — the width classes are the one place widths are
+   decided, and XL (1360px) is not a Tailwind screen, so expressing it in
+   utilities would mean either a second breakpoint vocabulary or a JS query.
+
+   `<main>` stays unpadded (§19.2). Page padding belongs to the frame, which is
+   what lets a canvas page deliberately reclaim it. The ten unmigrated pages keep
+   their own `mx-auto max-w-*` containers and are unaffected: nothing here
+   applies without `data-page-frame`.
+
+   Unlayered, like the shell rules above, because the frame's element also carries
+   Tailwind utilities and a layered rule would lose to them (A8.12 #2). ── */
+[data-page-frame] {
+    /* 40 / 32 / 24 / 16 by width class (§19.2). */
+    --page-gutter: 16px;
+
+    width: 100%;
+    min-width: 0;
+    padding-inline: var(--page-gutter);
+    padding-block: 24px;
+}
+
+@media (min-width: 768px) {
+    [data-page-frame] {
+        --page-gutter: 24px;
+
+        padding-block: 32px;
+    }
+}
+
+@media (min-width: 1024px) {
+    [data-page-frame] {
+        --page-gutter: 32px;
+    }
+}
+
+@media (min-width: 1360px) {
+    [data-page-frame] {
+        --page-gutter: 40px;
+    }
+}
+
+/* Canvas deliberately sets no max-width: full width minus the page padding is
+   the whole point (tables, boards, queues). Asserted by test. */
+
+/* Reading: a centred column whose max-width is the variant's measure. The
+   gutters are added back so the *text* column is 640/700/720/760, not the box. */
+[data-page-frame='reading'] {
+    --page-measure: 720px;
+
+    max-width: calc(var(--page-measure) + var(--page-gutter) * 2);
+    margin-inline: auto;
+}
+
+[data-page-frame='reading'][data-page-measure='forms'] {
+    --page-measure: 640px;
+}
+
+[data-page-frame='reading'][data-page-measure='conversation'] {
+    --page-measure: 700px;
+}
+
+[data-page-frame='reading'][data-page-measure='account'] {
+    --page-measure: 720px;
+}
+
+[data-page-frame='reading'][data-page-measure='knowledge'] {
+    --page-measure: 760px;
+}
+
+/* Grid: `1fr + 340–360px` (§9). The split waits for XL because at L the docked
+   drawer has already taken 248px, and splitting the remainder would leave a main
+   column narrower than the aside. Below XL the aside stacks under the content it
+   supports, which is also its reading order. */
+[data-page-frame='grid'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+
+/* The header spans the content region, as §6 draws it, so its rule runs the full
+   width rather than stopping where the supporting column begins. */
+[data-page-frame='grid'] [data-page-header] {
+    grid-column: 1 / -1;
+}
+
+@media (min-width: 1360px) {
+    [data-page-frame='grid'][data-page-split] {
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 40px;
+    }
+}
+
+/* Overlay is the DEFAULT: it floats over the canvas with no scrim (§5.4), so
+   content stays visible behind it. The width classes below un-overlay it where
+   it is allowed to dock, which is what keeps docked-vs-overlay a pure CSS
+   decision with no resize listener and no JavaScript width query. */
+[data-shell='operational'] [data-shell-drawer] {
+    position: fixed;
+    top: 0;
+    left: var(--shell-rail);
+    z-index: 40;
+    box-shadow: var(--ds-shadow-overlay);
+}
+
+/* ── XL >= 1360: the panel docks whenever the workspace has one and the
+   remembered/default state is open. ── */
+@media (min-width: 1360px) {
+    html[data-drawer='open'] [data-shell='operational'][data-panel='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true']
+        > [data-shell-drawer] {
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+}
+
+/* ── L 1024-1359: "open" docks only when pinned at L; otherwise it stays an
+   overlay (Direction D §5.3 rule 2). ── */
+@media (min-width: 1024px) and (max-width: 1359.98px) {
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true'][data-pinned='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-panel='true'][data-pinned='true']
+        > [data-shell-drawer] {
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+}
+
+/* ── M 768-1023: overlay only, so the pin affordance is hidden and the
+   remembered preference cannot dock anything. ── */
+@media (max-width: 1023.98px) {
+    [data-shell='operational'] [data-shell-pin] {
+        display: none;
+    }
+}
+
+/* ── S < 768: the rail becomes a 56px top bar and its workspace list folds into
+   the nav sheet. ── */
+@media (max-width: 767.98px) {
+    [data-shell='operational'] {
+        grid-template-areas: 'rail' 'canvas';
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: var(--shell-rail-s) minmax(0, 1fr);
+    }
+
+    [data-shell='operational'] [data-shell-rail] {
+        flex-direction: row;
+        justify-content: space-between;
+        height: var(--shell-rail-s);
+        padding: 0 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--ds-rule);
+        z-index: 30;
+    }
+
+    /* Removed from the accessibility tree, not merely hidden, so the nav sheet
+       is the single set of workspace links at this width. */
+    [data-shell='operational'] [data-shell-workspaces],
+    [data-shell='operational'] [data-shell-drawer],
+    [data-shell='operational'] [data-shell-toggle] {
+        display: none;
+    }
+
+    /* Touch targets stay reachable at S (§16). */
+    [data-shell-sheet] [data-shell-nav-row] {
+        min-height: 44px;
+    }
+
+    /* The narrow pill is dot + H:MM + +N: the seconds and the context label go,
+       which is what keeps the bar from overflowing at 390px. The tray still
+       carries both, so nothing is unreachable — only undrawn. */
+    [data-shell='operational'] [data-shell-timer] [data-timer-elapsed='wide'],
+    [data-shell='operational'] [data-shell-timer] [data-timer-label] {
+        display: none;
+    }
+
+    [data-shell='operational'] [data-shell-timer] [data-timer-elapsed='narrow'] {
+        display: inline;
+    }
+
+    /* The pill's own controls stay tappable at S (§16, WCAG 2.5.8). */
+    [data-shell='operational'] [data-shell-timer] [data-shell-timer-trigger],
+    [data-shell='operational'] [data-shell-timer] [data-shell-timer-stop] {
+        min-height: 44px;
+    }
+}
+
+@media (min-width: 768px) {
+    [data-shell='operational'] [data-shell-sheet-trigger] {
+        display: none;
+    }
+}
+
+/* ── Blade renderer (EPIC-013 WP5, §14.2) ─────────────────────
+   The Blade shell renders the same data-shell hooks as React, so every rule
+   above lays it out unchanged: one geometry, one set of width classes. These
+   rules are only the simplification §14.2 permits, scoped by
+   [data-shell-renderer='blade'] so React is untouched:
+
+     - the panel is DOCKED OR HIDDEN, never an overlay, and has no pin;
+     - it docks at XL when html[data-drawer] is open (as React), and at L when
+       open too — the shared bootstrap starts L collapsed unless pinned, so an
+       open panel at L is one the user asked for, and it docks instead of
+       floating;
+     - at M its content is reached through the nav sheet, as at S.
+
+   Unlayered for the same reason as the block above (A8.12 #2). ── */
+[data-shell='operational'][data-shell-renderer='blade'] [data-shell-drawer],
+[data-shell='operational'][data-shell-renderer='blade'] [data-shell-toggle] {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    html[data-drawer='open'] [data-shell='operational'][data-shell-renderer='blade'][data-panel='true'] {
+        grid-template-areas: 'rail drawer canvas';
+        grid-template-columns: var(--shell-rail) var(--shell-drawer) minmax(0, 1fr);
+    }
+
+    html[data-drawer='open']
+        [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        > [data-shell-drawer] {
+        display: flex;
+        position: sticky;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+    }
+
+    html[data-drawer='collapsed']
+        [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        [data-shell-toggle] {
+        display: flex;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+    [data-shell='operational'][data-shell-renderer='blade'][data-panel='true']
+        [data-shell-sheet-trigger] {
+        display: flex;
+    }
+}
+
+/* The account menu lives inside the rail (Blade has no portal), and the rail
+   is sticky, which makes it a stacking context: the menu's own z-index cannot
+   lift it above the docked panel or the utility bar that follow the rail in
+   the DOM. While the menu is open the whole rail is lifted instead. Chromium
+   caught this as the docked panel intercepting clicks on the menu. */
+[data-shell='operational'][data-shell-renderer='blade']
+    [data-shell-rail]:has([data-shell-account][aria-expanded='true']) {
+    z-index: 45;
+}
+
+/* ── Brand mark theming (EPIC-013 WP4, §10.3 / A1.5) ──────────
+   The canonical SVGs hard-code the brand cyan in their gradient stops, which
+   is correct on dark. CSS beats SVG presentation attributes, so light flattens
+   the fade to solid ink without touching path data or the source files. ── */
+[data-theme='light'] .brand-mark stop {
+    stop-color: var(--ds-ink);
+    stop-opacity: 1;
 }

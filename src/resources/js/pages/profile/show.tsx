@@ -22,7 +22,8 @@ import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AppLayout } from '@/layouts/app-layout';
+import { Status } from '@/components/ui/status';
+import { AppShell } from '@/components/shell/app-shell';
 import { formatTimestamp } from '@/lib/dates';
 import { confirmation as passwordConfirmation } from '@/routes/password';
 import { confirm as confirmProfilePassword } from '@/routes/profile/password';
@@ -363,7 +364,7 @@ function TwoFactorSection({ state }: { state: TwoFactorState }) {
         return (
             <div className="max-w-xl">
                 <div className="flex items-center gap-2">
-                    <Badge variant="neutral">Disabled</Badge>
+                    <Status tone="neutral">Disabled</Status>
                     <span className="text-sm text-muted-foreground">
                         Sign-in requires only your current authentication method.
                     </span>
@@ -387,8 +388,8 @@ function TwoFactorSection({ state }: { state: TwoFactorState }) {
     if (!state.confirmed) {
         return (
             <div className="max-w-xl space-y-5">
-                <Alert className="border-[var(--border-warning)] bg-[var(--surface-warning)]">
-                    <p className="font-medium text-[var(--text-warning)]">Setup is not complete</p>
+                <Alert variant="warning">
+                    <p className="font-medium">Setup is not complete</p>
                     <p className="mt-1 text-muted-foreground">
                         Connect an authenticator app, then enter its six-digit code to finish.
                     </p>
@@ -469,14 +470,14 @@ function TwoFactorSection({ state }: { state: TwoFactorState }) {
     return (
         <div className="max-w-xl space-y-5">
             <div className="flex items-center gap-2">
-                <Badge variant="success">Enabled</Badge>
+                <Status tone="success">Enabled</Status>
                 <span className="text-sm text-muted-foreground">
                     Your account requires an authenticator code at sign-in.
                 </span>
             </div>
 
             {recoveryCodes ? (
-                <Alert className="border-[var(--border-warning)] bg-[var(--surface-warning)]">
+                <Alert variant="warning">
                     <p className="font-medium">Recovery codes</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                         Store these somewhere secure. Each code can be used once.
@@ -753,6 +754,6 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
     );
 }
 
-ProfilePage.layout = (page: ReactElement) => <AppLayout>{page}</AppLayout>;
+ProfilePage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
 
 export default ProfilePage;

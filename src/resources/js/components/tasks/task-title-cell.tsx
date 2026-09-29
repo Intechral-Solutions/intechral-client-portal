@@ -15,7 +15,7 @@ export function TaskTitleCell({ task }: { task: TaskRow }) {
 
     if (task.url) {
         return (
-            <Link href={task.url} className={`${className} text-primary hover:underline`}>
+            <Link href={task.url} className={`${className} legacy-text-primary hover:underline`}>
                 {task.title}
             </Link>
         );

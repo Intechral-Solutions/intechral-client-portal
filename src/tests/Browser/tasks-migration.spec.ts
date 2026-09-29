@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/e2e-fixtures';
-import { signIn } from './support/sign-in';
+
+import { signedIn } from './support/auth';
+import { timerPill } from './support/shell';
 
 /**
  * EPIC-011E WP8 critical flows: the unified `/tasks` list as a React/Inertia page, replacing the
@@ -66,7 +68,7 @@ test('the tasks list loads and navigates over Inertia, both to a task page and b
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP8 nav project');
     await quickAdd(page, 'Backlog', 'E2E WP8 nav task');
     await assignToBoardCreator(page, projectId, 'E2E WP8 nav task');
@@ -97,17 +99,17 @@ test('the tasks list loads and navigates over Inertia, both to a task page and b
     // The Inertia-ness this test is actually about is proven below, from this point onward.
     await page.goto('/tasks');
     await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     // The title link is the migrated React task page (WP7): an Inertia visit, never a document
-    // load, so the timer bar survives it.
+    // load, so the timer pill survives it.
     await page.getByRole('link', { name: 'E2E WP8 nav task' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL('/tasks');
-    await expect(page.getByRole('region', { name: 'Active timers' })).toBeVisible();
+    await expect(timerPill(page)).toBeVisible();
 
     await page.evaluate(async (id) => {
         const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
@@ -126,7 +128,7 @@ test('a project task is linked and a standalone task is not, and the standalone 
     page,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP8 mixed-kind project');
     await quickAdd(page, 'Backlog', 'E2E WP8 project task');
     await assignToBoardCreator(page, projectId, 'E2E WP8 project task');
@@ -162,12 +164,12 @@ test('a project task is linked and a standalone task is not, and the standalone 
     await expect(standaloneRow.getByRole('button')).toHaveCount(0);
 });
 
-test('a task assigned to one person never appears on another person\'s task list', async ({
+test("a task assigned to one person never appears on another person's task list", async ({
     page,
-    browser,
+    contextFor,
     cleanup,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP8 visibility project');
     await quickAdd(page, 'Backlog', 'E2E WP8 not-yours task');
     await assignToBoardCreator(page, projectId, 'E2E WP8 not-yours task');
@@ -178,10 +180,9 @@ test('a task assigned to one person never appears on another person\'s task list
     // A second browser context, not a re-sign-in on the same page: every other multi-actor flow
     // in this suite (e.g. task-detail-migration.spec.ts's checklist test) does the same, so one
     // session's own state never leaks into the other's.
-    const otherContext = await browser.newContext();
+    const otherContext = await contextFor('member');
     try {
         const otherPage = await otherContext.newPage();
-        await signIn(otherPage, 'user@intechral.test');
         await otherPage.goto('/tasks');
         await expect(otherPage.getByText('E2E WP8 not-yours task')).toHaveCount(0);
     } finally {
@@ -192,7 +193,7 @@ test('a task assigned to one person never appears on another person\'s task list
 test('the standalone create form reports a validation error inline without losing the draft', async ({
     page,
 }) => {
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await page.goto('/tasks');
 
     await page.getByRole('button', { name: '+ New task' }).click();
@@ -202,7 +203,9 @@ test('the standalone create form reports a validation error inline without losin
     await page.evaluate(() => {
         // Bypass the native required-field block to exercise the server's own validation path,
         // exactly as a request forged past the client would.
-        document.querySelectorAll('input[required]').forEach((el) => el.removeAttribute('required'));
+        document
+            .querySelectorAll('input[required]')
+            .forEach((el) => el.removeAttribute('required'));
     });
     await page.getByRole('button', { name: 'Create task' }).click();
 
@@ -214,7 +217,7 @@ test('the tasks list is usable at a phone viewport with no document-level horizo
     page,
 }) => {
     await page.setViewportSize({ width: 375, height: 700 });
-    await signIn(page, 'operator@intechral.test');
+    await signedIn(page);
     await page.goto('/tasks');
 
     await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();

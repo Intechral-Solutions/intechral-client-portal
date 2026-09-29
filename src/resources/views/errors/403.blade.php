@@ -11,7 +11,7 @@
 
     <div class="flex gap-3">
         <a href="{{ url()->previous('/') }}"
-           class="rounded-lg border px-5 py-2 text-sm font-medium transition-colors hover:bg-surface"
+           class="rounded-lg border px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
            style="border-color: var(--border-base); color: var(--text-secondary);">
             Go back
         </a>
