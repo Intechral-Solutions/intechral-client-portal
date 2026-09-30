@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -59,6 +60,32 @@ class ProjectIntegrityAudit
             'tasks_blocked_from_delete_by_time' => DB::table('tasks')
                 ->whereExists(fn ($sub) => $sub->from('time_entries')->whereColumn('time_entries.task_id', 'tasks.id'))
                 ->count(),
+
+            // EPIC-014 INV-8: explicit Complete needs exactly one designated Done column per
+            // project. Every project the application creates gets one; any other count is a
+            // board Complete/Reopen would refuse. A project with no columns at all counts as none.
+            'projects_with_no_done_column' => DB::table('projects')
+                ->whereNotExists(fn ($sub) => $this->doneColumns($sub))
+                ->count(),
+
+            'projects_with_multiple_done_columns' => DB::table('projects')
+                ->whereExists(fn ($sub) => $this->doneColumns($sub)->havingRaw('COUNT(*) > 1')->groupBy('project_columns.project_id'))
+                ->count(),
+
+            // EPIC-014 INV-13: a task is a board task or a ticket task, never both. No write path
+            // produces this; Tasks-workspace queries exclude such a row rather than classify it.
+            'tasks_linked_to_project_and_ticket' => DB::table('tasks')
+                ->whereNotNull('project_id')
+                ->whereNotNull('ticket_id')
+                ->count(),
         ];
+    }
+
+    /** Correlated subquery: the current project's designated Done columns. */
+    private function doneColumns(Builder $query): Builder
+    {
+        return $query->from('project_columns')
+            ->whereColumn('project_columns.project_id', 'projects.id')
+            ->where('project_columns.is_done_column', true);
     }
 }

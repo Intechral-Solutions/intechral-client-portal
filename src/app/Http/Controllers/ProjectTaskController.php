@@ -10,8 +10,8 @@ use App\Models\Task;
 use App\Models\TaskChecklistItem;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Rules\ProjectTaskAssignee;
 use App\Services\ProjectService;
-use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -241,21 +241,8 @@ class ProjectTaskController extends Controller
         return [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'assignee_id' => [
-                'nullable',
-                'integer',
-                function (string $attribute, mixed $value, Closure $fail) use ($project, $task) {
-                    // Saving a task unchanged is not a new assignment: someone who has since
-                    // left the project keeps the task rather than being silently unassigned (I8).
-                    if ($task !== null && (int) $value === $task->assignee_id) {
-                        return;
-                    }
-
-                    if (! $project->members()->where('users.id', $value)->exists()) {
-                        $fail('The selected assignee is invalid.');
-                    }
-                },
-            ],
+            // A current member, or the unchanged departed assignee (I8): ProjectTaskAssignee.
+            'assignee_id' => ['nullable', 'integer', new ProjectTaskAssignee($project, $task)],
             'milestone_id' => ['nullable', Rule::exists('project_milestones', 'id')->where('project_id', $project->id)],
             'priority' => 'required|in:low,medium,high,critical',
             'due_date' => 'nullable|date',

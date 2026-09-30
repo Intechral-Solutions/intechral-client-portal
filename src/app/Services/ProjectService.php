@@ -2,13 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\DoneColumnConfigurationException;
 use App\Models\Project;
 use App\Models\ProjectColumn;
 use App\Models\Task;
-use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -24,14 +23,13 @@ class ProjectService
         ['name' => 'Done',        'position' => 4, 'is_done_column' => true],
     ];
 
-    /** MariaDB/MySQL error 1451: a parent row is referenced by a RESTRICT foreign key. */
-    private const FOREIGN_KEY_DELETE_VIOLATION = 1451;
-
     /** How often a transaction is retried when the database picks it as a deadlock victim. */
     private const LOCK_ATTEMPTS = 3;
 
     /** How often a move/delete starts over because the task changed column while it waited. */
     private const RESTART_ATTEMPTS = 5;
+
+    public function __construct(private RecordedTimeGuard $recordedTime) {}
 
     public function create(User $creator, array $data): Project
     {
@@ -170,7 +168,8 @@ class ProjectService
     /**
      * Delete a task and close the gap it leaves. Refused while any time entry references it
      * (D4); the foreign key is the backstop when a timer starts between the check and the
-     * DELETE, and that violation is reported with the same message.
+     * DELETE, and that violation is reported with the same message. Both rules live in
+     * `RecordedTimeGuard`, which runs here under the column and task locks.
      *
      * @throws ValidationException on the "delete" key
      */
@@ -189,15 +188,7 @@ class ProjectService
                     return false;
                 }
 
-                if (TimeEntry::where('task_id', $task->id)->exists()) {
-                    throw $this->recordedTime('task');
-                }
-
-                try {
-                    $current->delete();
-                } catch (QueryException $e) {
-                    throw $this->isRestrictViolation($e) ? $this->recordedTime('task') : $e;
-                }
+                $this->recordedTime->deleteTask($current);
 
                 if ($columnId !== null) {
                     $positions = $this->columnPositions($columnId);
@@ -211,27 +202,35 @@ class ProjectService
 
     /**
      * Delete a project. Refused while any time entry references the project or one of its
-     * tasks (D4), for billed, invoiced, stopped and running entries alike.
+     * tasks (D4), for billed, invoiced, stopped and running entries alike (`RecordedTimeGuard`).
      *
      * @throws ValidationException on the "delete" key
      */
     public function deleteProject(Project $project): void
     {
-        DB::transaction(function () use ($project) {
-            $hasTime = TimeEntry::where('project_id', $project->id)
-                ->orWhereIn('task_id', Task::where('project_id', $project->id)->select('id'))
-                ->exists();
+        DB::transaction(fn () => $this->recordedTime->deleteProject($project), self::LOCK_ATTEMPTS);
+    }
 
-            if ($hasTime) {
-                throw $this->recordedTime('project');
-            }
+    /**
+     * The project's single designated Done column (EPIC-014 Q2, INV-8): the destination of an
+     * explicit Complete. Exactly one `is_done_column` is required; zero or several is a board
+     * configuration error, reported rather than resolved by guessing (never the last column,
+     * never a name match, never `tasks.status`). Read-only.
+     *
+     * @throws DoneColumnConfigurationException
+     */
+    public function doneColumn(Project $project): ProjectColumn
+    {
+        $columns = ProjectColumn::query()
+            ->where('project_id', $project->id)
+            ->where('is_done_column', true)
+            ->get();
 
-            try {
-                $project->delete();
-            } catch (QueryException $e) {
-                throw $this->isRestrictViolation($e) ? $this->recordedTime('project') : $e;
-            }
-        }, self::LOCK_ATTEMPTS);
+        if ($columns->count() !== 1) {
+            throw new DoneColumnConfigurationException($project->id, $columns->count());
+        }
+
+        return $columns->first();
     }
 
     // ── Internals ────────────────────────────────────────────────────────────
@@ -341,17 +340,5 @@ class ProjectService
                 ]);
             }
         }
-    }
-
-    private function recordedTime(string $what): ValidationException
-    {
-        return ValidationException::withMessages([
-            'delete' => "This {$what} has recorded time and cannot be deleted.",
-        ]);
-    }
-
-    private function isRestrictViolation(QueryException $e): bool
-    {
-        return (int) ($e->errorInfo[1] ?? 0) === self::FOREIGN_KEY_DELETE_VIOLATION;
     }
 }
