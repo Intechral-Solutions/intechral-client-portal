@@ -279,7 +279,7 @@ Each invariant is **preserved**. The epic adds none that weakens an existing gua
 | INV-10 | **Project time attribution cannot be silently changed**: time on a task is attributed through `task.project_id`, so INV-9 protects every report and invoice | INV-9 | follows from INV-9 |
 | INV-11 | **Hard delete is prohibited once any time entry references the task** (billed, invoiced, stopped or running), for every kind | `ProjectService::deleteTask` guard today; lifted into a shared guard (WP1) | `ProjectDeletionGuardTest` |
 | INV-12 | **Database RESTRICT on `time_entries.task_id` stays authoritative**; an FK violation from a race maps to the same validation message | migration `2026_09_21_120000`; `isRestrictViolation` | `ProjectDeletionGuardTest` |
-| INV-13 | `project_id` and `ticket_id` are not both set. Not enforced today (F9). The epic adds an audit check and refuses to create such rows, but does not add a DB constraint | new audit check (WP1) | new |
+| INV-13 | `project_id` and `ticket_id` are not both set. Not enforced today (F9). The epic adds an audit check and refuses to create such rows, but does not add a DB constraint. Tasks-workspace queries exclude such a row (`ticket_id IS NULL`, §9.1.1) rather than classify it | new audit check (WP1) | new |
 | INV-14 | **Billed time stays immutable**: no task operation mutates a time entry | `TimeEntry::isLockedForBilling` + `TimeEntryService` | EPIC-010C suite, `ProjectDeletionGuardTest` |
 | INV-15 | **Complete never stops, alters or reassigns any timer**, the actor's own included (stopping one's own is Timer UX scope) | `TaskService` touches no `time_entries` row | new pin (§16.2) |
 | INV-16 | **Filters, search and sort only narrow** the authorized visible set; no request parameter widens it | `TaskQuery` composition order (§9.1) | `ProjectVisibilityTest` (org tab); new pins |
@@ -315,7 +315,7 @@ Registered for `App\Models\Task`. For board tasks the policy **delegates to `Pro
 | `viewAll` (class-level) | `tasks.view_all` | same | same |
 
 Rules:
-- A board task whose assignee has left the project is **not** viewable by that former assignee. This keeps today's matrix row `assignee → DENY` on project task routes. The row still appears in their My Tasks, unlinked and with no actions, exactly as today (EPIC-011E §5).
+- A board task whose assignee has left the project is **not** viewable by that former assignee, and the stale assignment does **not** make it visible: the stored assignee is preserved (INV-7) but grants no visibility. This keeps today's matrix row `assignee → DENY` on project task routes, and it **extends that denial to the Tasks lists**: the row is in neither My Tasks nor All Tasks for them (§9.1). This narrows today's `/tasks`, which lists such a row unlinked (EPIC-011E §5).
 - `viewAll` gates the **surface** only. The rows inside it come from `view` (Q3), restricted to the kinds the workspace surfaces: board and standalone (§9.1). `TaskPolicy` understanding a ticket-kind task internally is authorization support, never product exposure (Q6).
 - Comment and checklist abilities stay on `ProjectPolicy` in `ProjectTaskController` and are **unchanged**.
 - `ProjectTaskController`'s existing structural routes keep `ProjectPolicy::manage`. Those controllers are not refactored to call `TaskPolicy` unless a WP needs it; if one does, the result must be identical, proven by `ProjectAuthorizationMatrixTest`.
@@ -338,7 +338,7 @@ The board assignee-validation closure in `taskRules()` is **extracted and shared
 | `operator` (all permissions, incl. `projects.admin`) | yes | yes: every board task (all projects are visible to `projects.admin`) and only **own** standalone tasks; never ticket tasks (Q6) | yes | yes | own only |
 | `user`, project manager (`projects.manage` + manager role) | yes | no | own projects: yes | own projects: yes | own only |
 | `user`, plain member | yes | no | only as member-assignee | no | own only |
-| `user`, former member still assigned | row listed, unlinked | no | no | no | own only |
+| `user`, former member still assigned | row **not** listed (stale assignment grants no visibility) | no | no | no | own only |
 | no role | yes | no | no board visibility | no | own only |
 
 "Own" standalone means creator or current assignee.
@@ -371,46 +371,54 @@ The board assignee-validation closure in `taskRules()` is **extracted and shared
 
 One query layer (working name `App\Queries\TaskQuery`) builds every Tasks-workspace list, in a fixed order:
 
-1. **Visibility set** for the chosen view (§9.2 or §9.3). This is the maximum; nothing later may OR into it.
-2. **Filters**, each an `AND`-ed `where`/`whereHas`.
-3. **Search**, `AND`-ed.
-4. **Sort**, then **pagination** (30 per page, `withQueryString`, as today).
+1. **Maximum authorized surfaced set** (§9.1.1). Nothing later may OR into it.
+2. **View semantics** (My Tasks §9.2, or All Tasks §9.3), always `AND`-ed onto the set from step 1.
+3. **Filters**, each an `AND`-ed `where`/`whereHas`.
+4. **Search**, `AND`-ed.
+5. **Sort**, then **pagination** (30 per page, `withQueryString`, as today).
 
-**Surfaced kinds (Q6).** Step 1 always begins with the *surfaced-kinds predicate*, `project_id IS NOT NULL OR ticket_id IS NULL` (board and standalone). `TaskQuery` therefore returns **no ticket-kind task in any Tasks-workspace result**: not in My Tasks, not in All Tasks, not under any filter, and not because the actor holds `tasks.view_all`. This is a deliberate narrowing of today's `/tasks`, which can list ticket rows (assigned to the viewer, or reached through the org view). Ticket-task product UX remains Future, and the queries, filter options and DTOs model only the two surfaced kinds. EPIC-014 adds **no** `Ticket::scopeVisibleTo`; if a later package finds an independent concrete need for a canonical Ticket visibility scope, it is proposed and characterized then.
+The whole of steps 1–2 is one parenthesised `where(fn …)` group, so a later filter can never escape it through operator precedence. A test pins that every filter combination returns a subset of the unfiltered view (§16.2). **My Tasks and All Tasks obey the same non-widening principle:** each is a subset of the step-1 set, and a predicate about assignment is never sufficient on its own to admit a row.
 
-The view's visibility set is wrapped in a single parenthesised `where(fn …)` group, so a filter can never escape it through operator precedence. A test pins that every filter combination returns a subset of the unfiltered view (§16.2).
+#### 9.1.1 The maximum authorized surfaced set (Q3, Q4, Q6)
+
+```
+ticket_id IS NULL                                              -- surfaced kinds only (Q6)
+AND (
+      (project_id IS NOT NULL
+         AND project_id IN Project::visibleTo(actor))          -- board task the actor may view (ProjectPolicy::view)
+   OR (project_id IS NULL
+         AND (created_by = me OR assignee_id = me))            -- standalone task: creator or current assignee (Q4)
+)
+```
+
+- **Surfaced-kinds predicate: `ticket_id IS NULL`.** For a valid row this admits exactly board/project tasks (`project_id` set, `ticket_id` null) and standalone tasks (both null). It excludes ticket-kind tasks (`ticket_id` set) and **malformed rows with both `project_id` and `ticket_id` set**. `TaskQuery` is not a classifier: it assigns no product kind to a dual-linked row. Such a row is excluded from every Tasks-workspace query and is detected by the integrity audit (INV-13, WP1). No database constraint is added in WP0.
+- `TaskQuery` therefore returns **no ticket-kind task in any Tasks-workspace result**: not in My Tasks, not in All Tasks, not under any filter, and not because the actor holds `tasks.view_all`. This is a deliberate narrowing of today's `/tasks`, which can list ticket rows (assigned to the viewer, or reached through the org view). Ticket-task product UX remains Future, and the queries, filter options and DTOs model only the two surfaced kinds. EPIC-014 adds **no** `Ticket::scopeVisibleTo`; if a later package finds an independent concrete need for a canonical Ticket visibility scope, it is proposed and characterized then.
+- **Board visibility comes only from `Project::visibleTo`** (equal to `ProjectPolicy::view`, pinned by `ProjectVisibilityTest`). Assignment never bypasses it: `assignee_id = actor` on a board task admits nothing unless the actor can also view its project. A departed member who is still the stored assignee (INV-7) is therefore not shown the task once `ProjectPolicy` no longer permits view.
+- **Standalone visibility** is the approved creator-or-current-assignee rule and nothing wider.
+- A row the actor can see but whose project page they may not open cannot occur for board tasks: visibility and openability are the same rule (INV-17).
 
 ### 9.2 My Tasks (Q4)
 
+Step 2 for My Tasks:
+
 ```
-surfaced kinds (project_id IS NOT NULL OR ticket_id IS NULL)
-AND (
-      assignee_id = me                       -- board or standalone tasks assigned to me
-   OR (project_id IS NULL AND ticket_id IS NULL AND created_by = me AND assignee_id IS NULL)
-)
+assignee_id = me                                               -- assigned to me
+OR (project_id IS NULL AND created_by = me AND assignee_id IS NULL)   -- unassigned standalone I created
 ```
 
-- Board/project tasks currently assigned to me; standalone tasks currently assigned to me; unassigned standalone tasks I created (Q4). **No ticket tasks.**
+evaluated **inside** the step-1 set (§9.1.1). It is not evaluated on its own.
+
+- Board/project tasks currently assigned to me **and visible to me**; standalone tasks currently assigned to me; unassigned standalone tasks I created (Q4). **No ticket tasks.**
 - No company or organization widening. Being the creator of a project task grants nothing.
-- Rows the viewer cannot open (a former member still assigned) are listed **unlinked and without actions** (INV-17), as today.
+- A board task whose assignee has left the project is not listed (§7.2).
 
 ### 9.3 All Tasks (Q3)
 
-Available only with `tasks.view_all`. The set is the union of the surfaced-kind rows the actor can `view` (§7.2):
+Available only with `tasks.view_all`. Step 2 for All Tasks adds no predicate: the view **is** the step-1 set (§9.1.1), so All ⊇ Mine holds by construction.
 
-```
-surfaced kinds (project_id IS NOT NULL OR ticket_id IS NULL)
-AND (
-      project_id IN Project::visibleTo(actor)                       -- board tasks the actor may view
-   OR (project_id IS NULL AND ticket_id IS NULL
-       AND (created_by = me OR assignee_id = me))                   -- the actor's own standalone tasks
-   OR assignee_id = me                                              -- keeps All ⊇ Mine
-)
-```
-
-- `Project::visibleTo` already exists and equals `ProjectPolicy::view` (pinned by `ProjectVisibilityTest`).
+- Board tasks the actor may view (for an operator holding `projects.admin`, every board task), and the actor's own standalone tasks.
 - **Ticket tasks are excluded** (Q6). No ticket authorization query is part of this epic, so no `Ticket::scopeVisibleTo` is planned.
-- Other users' standalone tasks never appear.
+- Other users' standalone tasks never appear. `tasks.view_all` gates the surface, never a row (Q3).
 
 ### 9.4 View state
 
@@ -670,6 +678,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 | INV-15: Complete leaves every time entry, running ones included, byte-identical | Pest | WP2 |
 | Ticket task: absent from My Tasks and All Tasks for every actor (including a `tasks.view_all` holder and the ticket's owner) and from every filter combination; every mutation route denied; `tasks.show` 404; `TaskService` refuses it without changing anything; `TaskPolicy` `view` delegation and mutation denials pinned | Pest | WP1/WP2/WP3 |
 | All Tasks: gated by `tasks.view_all`; clamps without it; excludes others' standalone; equals the union of `view`-able rows | Pest | WP3 |
+| Malformed dual-linked row (`project_id` + `ticket_id`) is absent from every Tasks-workspace result and flagged by the audit; **assignment never bypasses visibility**: a departed-member assignee sees neither My Tasks nor All Tasks rows for that project; a stranger assigned a standalone task sees only what §9.1.1 admits | Pest | WP1 (audit) / WP3 |
 | **Filters never widen**: property-style, every filter/search/sort combination ⊆ unfiltered view, for several actors | Pest | WP3 |
 | Search escaping; sort determinism; filter clamping; `view=org` clamps to mine | Pest | WP3 |
 | Query budget constant across filters, search, All Tasks and option lists | Pest | WP3 |
@@ -689,6 +698,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 | `ProjectIntegrityTest` "accepts a standalone assignee only when it is the actor or none" / "keeps standalone validation unchanged" | Kept on create, and extended to update/assign per §7.3 |
 | `ProjectVisibilityTest` org-tab cases ("limits the org tab…", "gives an admin the org tab…", "shows no org rows to a user without tasks.view_org…") | Rewritten to the organization **filter** (narrows only, grants nothing) and to All Tasks visibility |
 | `TaskListInertiaTest` ticket-row cases ("derives a ticket row's status from its raw status field…", the ticket arm of "reports context.kind…") and `ProjectVisibilityTest` "renders no ticket link that TicketPolicy would deny" | Rewritten to the Q6 rule: a ticket-kind task is absent from My Tasks and All Tasks (WP3). Ticket-kind status semantics stay pinned at the model/presenter level (`ProjectPinnedBehaviorTest`), which the workspace does not exercise. Nothing is deleted without its replacement assertion |
+| `ProjectVisibilityTest` "renders no link to a project or task page the viewer cannot open" (the former-member-assignee row) | The row is absent from My Tasks and All Tasks for a former member; visibility never comes from assignment (§9.1.1) |
 | `ProjectVisibilityTest` "keeps standalone tasks unlinked and the mine tab scoped to the assignee" | Standalone rows link to `tasks.show` when viewable; My Tasks follows the Q4 rule |
 | `NavigationBuilderTest` "tasks org view" | Replaced by `tasks.all` (`view=all`) active-state cases |
 | `ProjectAuthorizationMatrixTest` `tasks.index`/`tasks.store` rows | Extended with every new `tasks.*` route |
@@ -753,7 +763,7 @@ The discovery structure is kept with one boundary change: **bulk Complete/Reopen
 
 - **Objective:** implement §9 in full, the `tasks.view_all` permission and the §9.8 navigation contract.
 - **In scope:**
-  - `TaskQuery` (with the surfaced-kinds predicate, §9.1);
+  - `TaskQuery` (with the `ticket_id IS NULL` surfaced-kinds predicate and the maximum authorized set, §9.1.1);
   - `TaskController::index` props (`filters`, `filterOptions`, `sort`, `canViewAll`; remove `canViewOrg`);
   - `PermissionCatalogue` + seeder impact; `NavigationBuilder` (`tasks.all`, retire `tasks.org`);
   - `EXPLAIN`-justified indexes only (a migration only if justified);
@@ -863,7 +873,7 @@ EPIC-014 is **Verified** when all of these hold. S1–S5 (WP6) are **not** crite
 ### 19.3 Tasks list "mine" semantics and ticket rows (EPIC-011E WP8)
 
 - **Original:** "mine" = `assignee_id = me`, and the list could show ticket-kind rows (assigned to the viewer, or reached through the org view) with a context link.
-- **New:** Q4's two-arm rule over the surfaced kinds (§9.2). Ticket-kind tasks leave the workspace list under Q6 (§9.1) until ticket-task UX is designed; no ticket data is changed.
+- **New:** Q4's two-arm rule applied inside the maximum authorized surfaced set (§9.1.1, §9.2); assignment alone never admits a board task. Ticket-kind tasks leave the workspace list under Q6 (§9.1) until ticket-task UX is designed; no ticket data is changed.
 - **When:** WP3.
 
 ### 19.4 Discovery-report correction (not a prior decision)
@@ -890,7 +900,7 @@ The discovery report's "missing indexes on `assignee_id`/`created_by`" was wrong
 |---|---|---|---|---|---|
 | R1 | A second source of task-authorization truth diverges from `ProjectPolicy` | Medium | High | Board abilities delegate; `ProjectAuthorizationMatrixTest` unchanged; `TaskPolicy` matrix shares its actors | Revert the WP; no data change |
 | R2 | Complete via `moveTask` regresses board ordering or concurrency | Low | High | No new ordering code; concurrency worker re-run in WP1/WP2 | Revert WP2's routes; the board is untouched |
-| R3 | A filter or All Tasks leaks rows | Medium | High | Fixed composition order and surfaced-kinds predicate (§9.1); property test | Revert WP3; the list falls back to the prior query |
+| R3 | A filter or All Tasks leaks rows | Medium | High | Fixed composition order; maximum authorized set first, `ticket_id IS NULL` predicate (§9.1.1); property test | Revert WP3; the list falls back to the prior query |
 | R4 | Standalone delete bypasses the time guard | Low | High | One shared guard; static test; RESTRICT backstop | Revert WP2 |
 | R5 | Shared `DataTable`/`FilterBar` over-generalized, slowing WP4 | Medium | Medium | Build only what Tasks uses; presentation-only contract | Keep them in `components/tasks/` and promote later |
 | R6 | Standalone reassignment affects time-entry edits (§12.2) | Low | Medium | WP1 characterization first; owner decision if a real regression shows | Keep the pre-existing assignment rule |
