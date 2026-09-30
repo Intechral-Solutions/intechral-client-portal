@@ -90,6 +90,10 @@ class ProjectTaskController extends Controller
                 'comment' => true,
                 'toggleChecklist' => true,
                 'logTime' => $user->can('time.log'),
+                // EPIC-014 Q1 (WP2 backend; the controls land in WP5): manage, or the current
+                // assignee while still a member. TaskPolicy decides; this grants no move.
+                'complete' => $user->can('complete', $task),
+                'reopen' => $user->can('reopen', $task),
             ],
             'timeSummary' => TaskTimeSummaryPresenter::summary($task, $user),
         ]);

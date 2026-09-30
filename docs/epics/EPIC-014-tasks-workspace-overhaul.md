@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** Planned (WP0 planning, 2026-09-29; no implementation has started)
+**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 implemented, in review)
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented
 
 ---
 
@@ -38,6 +38,7 @@
 23. [Branch and PR strategy](#23-branch-and-pr-strategy)
 
 - [Amendment 1: WP1 Results (2026-09-29)](#amendment-1-wp1-results-2026-09-29)
+- [Amendment 2: WP2 Results (2026-09-30)](#amendment-2-wp2-results-2026-09-30)
 
 ---
 
@@ -993,3 +994,96 @@ The §12.2 characterization showed the risk is real (`TaskCurrentBehaviorCharact
 | Preserved suites before any change | `tests/Feature/Projects` + `TimeTrackingTest`: 505 passed (1956 assertions) |
 | After WP1 | `tests/Feature/Tasks`, `tests/Feature/Projects`, `tests/Feature/Time`, `tests/Unit/Architecture`: 624 passed (2662 assertions), including `ProjectMoveConcurrencyTest`, `ProjectDeletionGuardTest` and `ProjectAuthorizationMatrixTest` unmodified |
 | Modified existing test | `ProjectIntegrityAuditTest` only: the three new counts added to its expected arrays, fixtures for them, and one new case (a bare project row counts as having no Done column) |
+
+---
+
+## Amendment 2: WP2 Results (2026-09-30)
+
+WP2 implemented on `feature/epic-014-tasks-overhaul`, brought forward to `main` @ `d8ed710` (WP1 merged, PR #9). Backend only: no React, navigation, query, permission, migration or dependency change. Status moves from **Planned** to **In Progress** (the [lifecycle](./README.md#epic-lifecycle)'s "implementation has begun"); this document, the epic index and the roadmap line say so. It is not Implemented until the remaining packages land.
+
+### A2.1 What landed
+
+| Piece | Where | Notes |
+|---|---|---|
+| Routes | `routes/web.php` | `tasks.update`, `tasks.destroy`, `tasks.complete`, `tasks.reopen`, `tasks.assignee.update`, `tasks.bulk` exactly as §13.1. `tasks.show` is deferred to WP5 (A2.3.1) |
+| Controller | `TaskController` | Thin: TaskPolicy → validate → `TaskService` → redirect with a flash. 403 before any kind 404, so nobody unauthorized learns a task's kind. `store` now calls `TaskService::createStandalone`, with unchanged validation |
+| Complete / Reopen | `TaskService::complete`/`reopen`, `ProjectService::appendToColumn`/`firstOpenColumn` | Board tasks go to the tail of the single Done column, or of the first open column by position (ties by id), through the one board move. The "already done" / "already open" no-op is decided **under** ProjectService's column and task locks. `status` is never written for a board task. Standalone tasks use `status`. Ticket-kind and dual-linked rows are refused |
+| Configuration errors | `TaskController` | `DoneColumnConfigurationException` → a validation error on the `complete`/`reopen` key with the §8 message (a no-open-column variant for Reopen). Never a 500, never a guess |
+| Standalone edit / delete | `TaskService::updateStandalone`/`delete` | Creator or current assignee. Fields per §10; `project_id`/`ticket_id`/column/creator are never taken (INV-9). Delete goes through `RecordedTimeGuard` under the task-row lock and redirects to `tasks.index` |
+| Assignment | `TaskService::assign`, `StandaloneTaskAssignee`, `ProjectTaskAssignee` | Standalone: the actor, null, or the unchanged value. Board: the shared `ProjectTaskAssignee` (current member, or the unchanged departed assignee), `manage` only; Q1's member-assignee gets no `assign` |
+| Bulk | `TaskController::bulk`, `flash.bulk` | §15.2: per-id authorization and execution, own transactions, dedupe, cap 30, per-id buckets |
+| Board detail abilities | `ProjectTaskController::show` | `abilities.complete`/`reopen` from TaskPolicy (the WP5 controls consume them). The TS type is left to WP5 |
+| Owner decision (c) | `TimeEntryController::update` | A2.2. `AccessibleTimeContext` and `TimeEntryService` are unchanged |
+
+### A2.2 Owner decision (c), implemented
+
+Current eligibility (`AccessibleTimeContext`) governs **new or changed** task attribution. An existing, unbilled entry keeps its **unchanged** task through unrelated edits (date, hours, description, billable), even after its owner lost eligibility.
+
+Request semantics of `PUT /time/{entry}`, whose context is exactly one of `project_id`/`task_id`/`ticket_id`, or none:
+
+| Request | Effect |
+|---|---|
+| none of the three keys sent | context unchanged; nothing written. The service already read an absent key as "keep"; the controller used to turn absence into null, dropping the task. It no longer does |
+| the triple sent equals the stored one | context unchanged; nothing written, so an edit never rewrites (or, racing another edit, reverts) the attribution |
+| a different triple sent | it replaces the context, a key left out being null, as before. A **changed or added** task needs current eligibility |
+| `task_id: null` sent explicitly | clears the task, as before |
+
+The time page always sends all three keys (explicit nulls for the unused two), so its behaviour is unchanged except that keeping an ineligible-but-unchanged task now succeeds.
+
+Still requiring current eligibility: a new manual entry, a new timer, a switch to another task, and adding a task to an entry without one. P5 is unchanged: the creator of an unassigned standalone task is not eligible until they take it (option (b) is not implemented). Billed/invoiced entries stay locked (the service refuses them whatever the context). Timer stop is unchanged.
+
+The carve-out is **task-only**, as decided: an unchanged *project* or *ticket* context the actor can no longer view is still re-validated and refused (pinned; A2.4).
+
+Tests: `Time/TimeEntryTaskAttributionTest` covers cases A–H, billed/invoiced, new entry, new timer, P5, timer stop and the project-context boundary. The three WP1 §12.2 characterizations flipped in place and are labelled **FLIPPED IN WP2**.
+
+### A2.3 Clarifications and deviations
+
+1. **`tasks.show` ships in WP5, not WP2.** §17 allows either and asks this amendment to record which. A standalone detail needs a React page, and WP2 changes no React; a bare placeholder page would be misleading. The board-redirect and ticket-404 rules (P6) ship with the page. The D3 pin rewrite lists the §13.1 set without `tasks.show` and says why.
+2. **`TaskRow.abilities` moves to WP3.** Computing them in batch (never a policy query per row, §13.3) belongs with `TaskQuery` and the extended query budget. WP2 adds the abilities where one task is shown: board detail. The standalone detail props ship with the page (WP5).
+3. **Bulk details §15.2 leaves open.**
+   - An id that does not exist, or that the actor may not act on (ticket-kind and malformed rows included), is `notPermitted`. That way the endpoint enumerates nothing.
+   - A `ConflictHttpException` (the task kept moving past ProjectService's restart limit) lands in a fourth bucket, `failed`, rather than being misfiled. So does a `QueryException` that outlives the operation's own retries (A2.5); it is `report()`ed, never shown.
+   - More than 30 **distinct** ids is a validation error on `ids`, never a silent truncation. The raw array is bounded at 100.
+   - The result travels as the shared `flash.bulk` prop `{action, succeeded, notPermitted, configurationError, failed}`, echoing only submitted ids, with a `success`/`error` summary message.
+4. **Standalone Reopen of a task that is not done is a no-op.** It does not demote `in_progress` to `todo`, mirroring the board rule ("If the task is not done: no-op success"). Complete of a done standalone task is likewise a no-op.
+5. **An unchanged standalone assignee is kept.** §7.3 allows the actor or null. Re-saving a task someone else holds (legacy or factory data) is not a hand-over, the I8 precedent, so the creator can edit it without releasing it. No cross-person assignment exists. "Unchanged" is decided on the **locked** row by `TaskService` (A2.5); the request rule's snapshot check is only fast feedback.
+6. **Standalone edit is a full PUT of the create fields.** `assignee_id` is optional: absent leaves the assignee alone, null releases it. A changed assignee is additionally authorized as `assign` (identical to `update` for standalone today, kept explicit).
+7. **A column-less board task always rejoins the Done column on Complete (P4)**, even when its legacy `status` already says done.
+8. **Idempotence is decided under the locks.** `ProjectService::moveTask`'s body moved, unchanged, into one private `relocate()`, which both `moveTask` and the new `appendToColumn` run. `appendToColumn` takes an `$unless` test evaluated on the locked row; true means nothing is written. No second ordering algorithm exists. `TaskCompletionTest` injects a concurrent move between the unlocked read and the locks, and a decision taken before the locks fails it. The racing-Complete concurrency tests prove different things (A2.5): they show no card lost, duplicated or reordered, not where the decision is taken.
+9. **Kind is decided from the stored row.** `TaskService` re-reads the row before dispatch (the WP1 audit's recommendation), never trusting the caller's model. A standalone mutation re-checks the kind on the row it locks. A board mutation takes **no** task-row lock of its own before ProjectService's column locks, which would invert INV-4's order. A board task's kind cannot change (INV-9), and ProjectService re-reads the row under its locks. `assign` locks only the task row, which touches no column and so cannot deadlock against a move.
+10. **Concurrency** runs in a new sibling worker (`tests/Support/task_completion_worker.php`) and `TaskCompletionConcurrencyTest`. `ProjectMoveConcurrencyTest` and its worker are unchanged, as §16.1 requires.
+11. **§16.3 rewrites done in WP2:**
+    - the D3 route pin is rewritten to the §13.1 surface, each route answering through its TaskPolicy ability;
+    - the `ProjectIntegrityTest` standalone pins are kept on create and extended to update/assign;
+    - `ProjectAuthorizationMatrixTest` gains every new `tasks.*` route (board tasks on the standalone-only routes: 403, then 404 for authorized actors).
+
+    The browser pin in `tasks-migration.spec.ts` ("the standalone row offers no mutation controls") still holds, since WP2 adds no UI. It is rewritten with the list UI (WP4) and the fixture cleanup (WP7). **A9.7 stays open for WP7.**
+
+### A2.4 Still deferred (unchanged by WP2)
+
+1. **Time domain: a stale board assignee keeps new-time eligibility** (A1.3.1 item 1). `AccessibleTimeContext` is unchanged, and the OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP test still passes as written. Decision (c) is separate from it: (c) preserves an *existing* unchanged attribution and grants no new time.
+2. **`ProjectService::create` is not atomic** (A1.3.1 item 2). Unchanged.
+3. **(c) does not cover project or ticket contexts.** An entry whose unchanged project (or ticket) context the actor can no longer view is still refused on edit, as before WP2. The locked decision is about task attribution; extending it would be a new time-domain decision. Pinned in `TimeEntryTaskAttributionTest`.
+
+### A2.5 Audit remediations (independent review, 2026-09-30)
+
+The independent WP2 review found no blocker and three Low findings, fixed before the WP2 commit. Nothing else in WP2 changed.
+
+1. **F1: bulk keeps its summary on a database failure.** `TaskController::bulk` also catches `QueryException`, the only thing that can escape a domain operation after its own `LOCK_ATTEMPTS`: the id lands in `failed`, is `report()`ed (the repository's existing channel; no exception text reaches the user), earlier commits stand and later ids still run. There is still no outer transaction, and `Throwable` is deliberately not caught, so programmer errors surface (pinned). Tests in `TaskBulkTest` simulate the failure after the service boundary; they do not rely on a real deadlock.
+2. **F3: the standalone "unchanged assignee" is re-checked under the row lock.** `StandaloneTaskAssignee` judged "unchanged" against the route-bound snapshot, so a stale form could restore an assignee who had since released the task. `TaskService::updateStandalone` and `assign` now take the acting user and, on the locked row, accept only null, the actor or the locked row's assignee (`ValidationException` on `assignee_id`, the rule's message). The rule stays as fast feedback; no second authority exists, and board assignment is untouched. `StandaloneLifecycleTest` releases the task between route binding and the locked write for both routes, and pins the service check directly. Self, release and a true unchanged value still pass.
+3. **F2: the Complete concurrency evidence is stronger and no longer overclaimed.** The earlier "6 racing Completes" case (a task moving from To Do) cannot tell a locked no-op from a repeated append to the tail, and passes even when the no-op test is removed. A new case starts the target at the **head** of Done, races repeated Completes of it against the real Completes of six other tasks, and requires the head, then the two tasks behind it, to keep their places, with Done dense. With the no-op test replaced by "always move" (mutation-checked) the new case fails and the old one does not. *Where* the decision is taken is proven by the deterministic injection in `TaskCompletionTest`; the concurrency cases prove no loss, duplicate or reorder.
+
+Deliberately unchanged, as the review accepted: board assignee membership is validated outside the lock (inherited from `projects.tasks.update`), `TaskPolicy` is evaluated on the route-bound model, legacy time entries carrying both project and task context, and Done/open column resolution before the locks (safe while no column-management route exists; revisit when one lands).
+
+### A2.6 Evidence
+
+| Gate | Result |
+|---|---|
+| Test-first | `TimeEntryTaskAttributionTest` was red on exactly the (c) cases (B, C, and billed-with-unchanged-task) before `TimeEntryController` changed. The Complete/Reopen, lifecycle and bulk suites were red (81 failing) before the service/controller code existed |
+| New suites | `TaskCompletionTest`, `StandaloneLifecycleTest`, `TaskBulkTest`, `TaskCompletionConcurrencyTest` (+ worker), `TaskDetailAbilitiesTest`, `Time/TimeEntryTaskAttributionTest` |
+| Rewritten pins | D3 route pin (`ProjectPinnedBehaviorTest`), `ProjectAuthorizationMatrixTest` (+6 routes × 8 actors), `ProjectIntegrityTest` standalone assignee, the three WP1 §12.2 characterizations (FLIPPED IN WP2), `TaskDeletionAuthorityTest` inventory (+ the `TaskController` delete call through `TaskService`) |
+| Concurrency (§16.4) | `TaskCompletionConcurrencyTest` 3 passed (incl. the Done-head race, A2.5) and `ProjectMoveConcurrencyTest` 3 passed, unmodified (6 tests, 74 assertions) |
+| Audit remediations (A2.5) | Each new test was run red against the unfixed code (bulk without the `QueryException` catch; TaskService without the locked-assignee check; the Done-head race with the no-op test replaced by "always move") and green with the fix |
+| Focused | `tests/Feature/Tasks`, `tests/Feature/Projects`, `tests/Feature/Time`, `tests/Unit/Architecture`: 797 passed (3239 assertions) |
+| `./dev check` | green: CLI self-tests 196 assertions; Vitest 796 tests / 76 files; Pest 1352 passed (7040 assertions); build, Pint, `git diff --check` pass |
+| Playwright (focused) | `time-migration.spec.ts` + `tasks-migration.spec.ts` (the flows reaching `time.update` and `tasks.store`): 18 passed, 2 workers. The known A9.7 residue (+1 standalone task) is reported; closure stays with WP7. The full browser suite is left to PR CI (WP2 adds no UI) |

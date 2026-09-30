@@ -137,3 +137,14 @@ it('refuses to delete a row linked to both a project and a ticket and changes no
     expect(Task::find($dual->id))->not->toBeNull()
         ->and(columnPositions($this->todo))->toBe($positions);
 });
+
+it('re-reads the kind from the stored row before deleting, never trusting a stale caller model (WP2)', function () {
+    // The WP1 audit's recommendation: the caller's model can be out of date, so the service
+    // decides the kind from the row itself (and, for a standalone delete, again under its lock).
+    $task = Task::factory()->standalone()->create();
+    $stale = Task::find($task->id);
+    Task::whereKey($task->id)->update(['ticket_id' => Ticket::factory()->create()->id]);
+
+    expect(fn () => $this->service->delete($stale))->toThrow(UnsupportedTaskOperationException::class);
+    expect(Task::find($task->id))->not->toBeNull();
+});

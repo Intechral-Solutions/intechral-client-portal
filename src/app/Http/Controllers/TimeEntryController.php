@@ -13,12 +13,16 @@ use App\Services\TimeEntryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class TimeEntryController extends Controller
 {
+    /** An entry's context: exactly one of these, or none. */
+    private const CONTEXT_KEYS = ['project_id', 'task_id', 'ticket_id'];
+
     public function __construct(private TimeEntryService $service) {}
 
     public function index(Request $request): Response
@@ -99,16 +103,14 @@ class TimeEntryController extends Controller
             // whole-minute duration a timer produced, so edits only require that the
             // value still converts to at least one stored minute (0.01h = 0.6min -> 1).
             'hours' => 'required|numeric|min:0.01|max:24',
-            ...$this->contextRules($request->user()),
+            ...$this->contextRules($request->user(), $this->keepsTask($request, $entry)),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
 
         $this->service->update($entry, [
-            ...$data,
-            'project_id' => $request->input('project_id'),
-            'task_id' => $request->input('task_id'),
-            'ticket_id' => $request->input('ticket_id'),
+            ...Arr::except($data, self::CONTEXT_KEYS),
+            ...$this->submittedContext($request, $entry),
             'description' => $request->input('description'),
             'billable' => $request->boolean('billable', true),
         ]);
@@ -392,7 +394,47 @@ class TimeEntryController extends Controller
         ];
     }
 
-    private function contextRules(User $user): array
+    /**
+     * The context an update writes (EPIC-014 owner decision (c)). The context is one of
+     * project/task/ticket, so it is replaced as a whole or not at all:
+     *   - none of the three keys sent: nothing is written, the stored context stays (absence is
+     *     not a request to clear; TimeEntryService already reads an absent key as "keep");
+     *   - the triple sent equals the stored one: nothing is written either, so an edit of
+     *     unrelated fields never rewrites (or, racing another edit, reverts) the attribution;
+     *   - otherwise the submitted triple replaces it, a key left out being null. An explicit
+     *     `task_id: null` therefore still clears the task.
+     *
+     * @return array<string, int|string|null>
+     */
+    private function submittedContext(Request $request, TimeEntry $entry): array
+    {
+        if (! $request->hasAny(self::CONTEXT_KEYS)) {
+            return [];
+        }
+
+        $submitted = [];
+        foreach (self::CONTEXT_KEYS as $key) {
+            $value = $request->input($key);
+            $submitted[$key] = $value === null ? null : (int) $value;
+        }
+
+        return $submitted === $entry->only(self::CONTEXT_KEYS) ? [] : $submitted;
+    }
+
+    /**
+     * Owner decision (c): an entry that already references a task keeps that UNCHANGED task
+     * without the actor's current eligibility. Eligibility still governs every new or changed
+     * attribution (a new entry, a timer, a switch to another task, adding a task), and project
+     * or ticket contexts are unaffected. Billing locks are enforced by the service regardless.
+     */
+    private function keepsTask(Request $request, TimeEntry $entry): bool
+    {
+        $taskId = $request->input('task_id');
+
+        return $entry->task_id !== null && is_numeric($taskId) && (int) $taskId === $entry->task_id;
+    }
+
+    private function contextRules(User $user, bool $keepsTask = false): array
     {
         return [
             'project_id' => [
@@ -401,12 +443,12 @@ class TimeEntryController extends Controller
                 'prohibits:task_id,ticket_id',
                 new AccessibleTimeContext($user, 'project'),
             ],
-            'task_id' => [
+            'task_id' => array_values(array_filter([
                 'nullable',
                 'integer',
                 'prohibits:project_id,ticket_id',
-                new AccessibleTimeContext($user, 'task'),
-            ],
+                $keepsTask ? null : new AccessibleTimeContext($user, 'task'),
+            ])),
             'ticket_id' => [
                 'nullable',
                 'integer',
