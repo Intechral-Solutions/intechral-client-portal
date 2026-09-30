@@ -60,6 +60,9 @@ class HandleInertiaRequests extends Middleware
                     default => $request->session()->get('status'),
                 },
                 'warning' => fn () => $request->session()->get('warning'),
+                // EPIC-014 §15.2: the per-task outcome of POST /tasks/bulk, echoing only the
+                // submitted ids ({action, succeeded, notPermitted, configurationError, failed}).
+                'bulk' => fn () => $request->session()->get('bulk'),
             ],
         ];
     }

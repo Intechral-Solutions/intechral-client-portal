@@ -80,7 +80,7 @@ it('PINNED: members, managers and admins may comment and toggle checklist items;
     }
 });
 
-// ── Status contract (§15) and standalone tasks (D3) ──────────────────────────
+// ── Status contract (§15) and standalone tasks (D3, superseded by EPIC-014 Q4) ─
 
 it('PINNED: done/effectiveStatus per task kind and null-column edge', function () {
     $inOpen = makeTask($this->todo);
@@ -120,11 +120,40 @@ it('PINNED: a board move never touches tasks.status', function () {
         ->and($task->fresh()->isDone())->toBeTrue();
 });
 
-it('PINNED (D3): standalone tasks have no route beyond tasks.index and tasks.store', function () {
-    $names = collect(Route::getRoutes()->getRoutes())
+// Formerly "PINNED (D3): standalone tasks have no route beyond tasks.index and tasks.store"
+// (EPIC-011E D3: create/list only). EPIC-014 Q4 supersedes D3 (EPIC-014 §19.1), and WP2 rewrites
+// the pin rather than deleting it: the /tasks surface is now exactly EPIC-014 §13.1's set, and
+// every mutation route answers through its TaskPolicy ability. `tasks.show` is §13.1's too, but
+// its page lands in WP5 (EPIC-014 Amendment 2), so it is deliberately absent here until then.
+it('PINNED (Q4, supersedes D3): the /tasks route surface is exactly EPIC-014 §13.1, each route with its TaskPolicy ability', function () {
+    $routes = collect(Route::getRoutes()->getRoutes())
         ->filter(fn ($route) => str_starts_with($route->uri(), 'tasks'))
-        ->map(fn ($route) => $route->getName())
-        ->sort()->values()->all();
+        ->mapWithKeys(fn ($route) => [$route->getName() => implode('|', array_diff($route->methods(), ['HEAD'])).' '.$route->uri()])
+        ->sortKeys()->all();
 
-    expect($names)->toBe(['tasks.index', 'tasks.store']);
+    expect($routes)->toBe([
+        'tasks.assignee.update' => 'PUT tasks/{task}/assignee',
+        'tasks.bulk' => 'POST tasks/bulk',
+        'tasks.complete' => 'PUT tasks/{task}/complete',
+        'tasks.destroy' => 'DELETE tasks/{task}',
+        'tasks.index' => 'GET tasks',
+        'tasks.reopen' => 'PUT tasks/{task}/reopen',
+        'tasks.store' => 'POST tasks',
+        'tasks.update' => 'PUT tasks/{task}',
+    ]);
+
+    // Each single-task mutation consults its TaskPolicy ability: the ability, denied, is a 403.
+    $stranger = makeUser();
+    $standalone = Task::factory()->standalone()->create();
+    $abilities = [
+        'tasks.update' => fn () => $this->actingAs($stranger)->put(route('tasks.update', $standalone), ['title' => 'x', 'priority' => 'low', 'status' => 'todo']),
+        'tasks.destroy' => fn () => $this->actingAs($stranger)->delete(route('tasks.destroy', $standalone)),
+        'tasks.complete' => fn () => $this->actingAs($stranger)->put(route('tasks.complete', $standalone)),
+        'tasks.reopen' => fn () => $this->actingAs($stranger)->put(route('tasks.reopen', $standalone)),
+        'tasks.assignee.update' => fn () => $this->actingAs($stranger)->put(route('tasks.assignee.update', $standalone), ['assignee_id' => null]),
+    ];
+    foreach ($abilities as $route => $call) {
+        $call()->assertForbidden();
+    }
+    expect($standalone->fresh())->not->toBeNull();
 });

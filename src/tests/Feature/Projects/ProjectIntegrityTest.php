@@ -373,6 +373,26 @@ it('keeps standalone validation unchanged', function () {
         ->assertSessionHasErrors(['title', 'priority', 'status']);
 });
 
+// EPIC-014 §16.3: the two standalone pins above stay on create, and WP2 extends the same rule to
+// the new update and assign routes (§7.3): the actor or none, never another person.
+it('accepts a standalone assignee on update and assign only when it is the actor, none, or unchanged', function () {
+    $user = makeUser();
+    $other = makeUser();
+    $task = Task::factory()->standalone()->create(['created_by' => $user->id, 'assignee_id' => null, 'status' => 'todo']);
+    $edit = fn (array $extra) => ['title' => 'T', 'priority' => 'low', 'status' => 'todo', ...$extra];
+
+    $this->actingAs($user)->put(route('tasks.update', $task), $edit(['assignee_id' => $other->id]))->assertSessionHasErrors('assignee_id');
+    $this->actingAs($user)->put(route('tasks.assignee.update', $task), ['assignee_id' => $other->id])->assertSessionHasErrors('assignee_id');
+    expect($task->fresh()->assignee_id)->toBeNull();
+
+    $this->actingAs($user)->put(route('tasks.assignee.update', $task), ['assignee_id' => $user->id])->assertSessionHasNoErrors();
+    $this->actingAs($user)->put(route('tasks.update', $task), $edit(['assignee_id' => '']))->assertSessionHasNoErrors();
+    expect($task->fresh()->assignee_id)->toBeNull();
+
+    $this->actingAs($user)->put(route('tasks.update', $task), $edit(['title' => '', 'priority' => 'urgent', 'status' => 'blocked']))
+        ->assertSessionHasErrors(['title', 'priority', 'status']);
+});
+
 // ── Checklist authoring (D5) ─────────────────────────────────────────────────
 
 it('adds checklist items at the tail, trimmed, for managers', function () {

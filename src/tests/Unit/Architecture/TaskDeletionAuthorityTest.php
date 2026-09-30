@@ -19,6 +19,9 @@
 const REVIEWED_DELETE_CALLS = [
     // The authority itself: the one place a Task or Project model is deleted.
     'Services/RecordedTimeGuard.php' => ['$model->delete();'],
+    // EPIC-014 WP2: the standalone delete route, through TaskService, which runs the guard
+    // under the task-row lock (board tasks delegate to ProjectService::deleteTask).
+    'Http/Controllers/TaskController.php' => ['$this->service->delete($task);'],
     // Time entries (their own allocation-aware delete), not tasks.
     'Services/TimeEntryService.php' => ['$current->delete();', '$current->delete();'],
     'Http/Controllers/TimeEntryController.php' => ['$this->service->delete($entry);'],

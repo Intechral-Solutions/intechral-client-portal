@@ -20,11 +20,12 @@ require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
  *                 is not a statement that the behaviour is desired.
  *   OBSERVED    — a fact a later package depends on, pinned so a decision can be made about it.
  *
- * The §12.2 time-entry tests carry a fourth flavour, KNOWN DEFECT / TRANSITION: the owner chose
+ * The §12.2 time-entry tests carried a fourth flavour, KNOWN DEFECT / TRANSITION: the owner chose
  * option (c) (an unchanged task attribution on an existing unbilled entry stays valid on unrelated
- * edits, even after the actor loses eligibility), which WP2 implements. They pin today's rejection
- * so that change lands visibly; new task-attributed time, new timers and a change to a different
- * task keep requiring current eligibility.
+ * edits, even after the actor loses eligibility). WP2 implemented it and flipped those assertions
+ * in place; they are now labelled FLIPPED IN WP2 and keep the history of what changed. New
+ * task-attributed time, new timers and a change to a different task still require current
+ * eligibility (the full matrix is Time/TimeEntryTaskAttributionTest).
  *
  * The TaskPolicy/TaskService/audit seams have their own suites; nothing here uses them.
  */
@@ -155,8 +156,9 @@ it('PRESERVED (INV-12): the database refuses to delete a standalone or ticket ta
     TimeEntry::factory()->create(['user_id' => $worker->id, 'task_id' => $standalone->id]);
     TimeEntry::factory()->create(['user_id' => $worker->id, 'task_id' => $ticket->id]);
 
-    // There is no application delete path for either kind today (EPIC-011E D3); the RESTRICT
-    // key is the only thing between a raw delete and the history.
+    // At 7fa5584 no application delete path existed for either kind (EPIC-011E D3). WP2 adds one
+    // for standalone tasks, through RecordedTimeGuard; a raw delete still meets the RESTRICT key,
+    // the final protection for both kinds.
     // Error 1451 is MariaDB/MySQL's "parent row referenced by a RESTRICT foreign key": pinning the
     // code keeps this from passing when a delete fails for some unrelated database reason.
     foreach ([$standalone, $ticket] as $task) {
@@ -171,7 +173,7 @@ it('PRESERVED (INV-12): the database refuses to delete a standalone or ticket ta
     expect(Task::whereKey([$standalone->id, $ticket->id])->count())->toBe(2);
 });
 
-it('PRESERVED: an unreferenced standalone task is deletable at the model level (no application route exists)', function () {
+it('PRESERVED: an unreferenced standalone task is deletable at the model level (WP2 adds DELETE /tasks/{task} over the shared guard)', function () {
     $standalone = Task::factory()->standalone()->create();
 
     $standalone->delete();
@@ -181,7 +183,7 @@ it('PRESERVED: an unreferenced standalone task is deletable at the model level (
 
 // ── §12.2: releasing a task and existing unbilled time ───────────────────────
 
-it('KNOWN DEFECT / TRANSITION (§12.2, owner decision (c); WP2 intentionally changes this): once the actor loses eligibility for a standalone task, an unrelated edit of their unbilled entry that keeps the task is rejected', function () {
+it('FLIPPED IN WP2 (§12.2, owner decision (c)): once the actor loses eligibility for a standalone task, an unrelated edit of their unbilled entry that keeps the task is accepted and the attribution survives', function () {
     $worker = makeUser();   // the `user` role holds time.log
     $task = Task::factory()->standalone()->create(['created_by' => $worker->id, 'assignee_id' => $worker->id]);
     $entry = TimeEntry::factory()->create([
@@ -195,22 +197,20 @@ it('KNOWN DEFECT / TRANSITION (§12.2, owner decision (c); WP2 intentionally cha
     ])->assertSessionHasNoErrors();
     expect($entry->fresh()->duration_minutes)->toBe(90);
 
-    // Release it (no route does this today; EPIC-014 WP2 adds one). The creator is no longer the
-    // assignee, and AccessibleTimeContext admits only an assignee or a project/ticket viewer.
+    // Release it. The creator is no longer the assignee, and AccessibleTimeContext admits only an
+    // assignee or a project/ticket viewer, so they are no longer eligible for NEW time on it.
     $task->update(['assignee_id' => null]);
 
-    // TRANSITION: today this edit, keeping the unchanged task, is rejected on task_id. Option (c)
-    // makes it valid in WP2 (the attribution is preserved, not re-granted); this assertion is then
-    // expected to flip. Creating new time, starting a timer or moving the entry to another task
-    // stays gated on current eligibility.
+    // Before WP2 this edit was rejected on task_id (KNOWN DEFECT / TRANSITION at 7fa5584). Under
+    // owner decision (c) the unchanged attribution is preserved, not re-granted: the edit passes.
     $this->actingAs($worker)->put(route('time.update', $entry), [
         'date' => today()->toDateString(), 'hours' => 2, 'task_id' => $task->id, 'description' => 'Edit after release',
-    ])->assertSessionHasErrors('task_id');
+    ])->assertSessionHasNoErrors();
     expect($entry->fresh()->only(['task_id', 'duration_minutes', 'description']))
-        ->toBe(['task_id' => $task->id, 'duration_minutes' => 90, 'description' => 'Still mine']);
+        ->toBe(['task_id' => $task->id, 'duration_minutes' => 120, 'description' => 'Edit after release']);
 });
 
-it('OBSERVED (§12.2; flagged for WP2): omitting task_id from an entry update currently clears its task attribution', function () {
+it('FLIPPED IN WP2 (§12.2): omitting every context key from an entry update no longer clears its task attribution', function () {
     $worker = makeUser();
     $task = Task::factory()->standalone()->create(['created_by' => $worker->id, 'assignee_id' => $worker->id]);
     $entry = TimeEntry::factory()->create([
@@ -218,18 +218,18 @@ it('OBSERVED (§12.2; flagged for WP2): omitting task_id from an entry update cu
         'date' => today()->toDateString(), 'description' => 'Before',
     ]);
 
-    // The update path writes the context from the request, so leaving the field out drops it.
-    // This is current mechanics, NOT a desired invariant: omission is not necessarily an explicit
-    // user request to clear attribution, and WP2's option (c) work must decide how an absent
-    // task_id and an explicit clear are told apart.
+    // At 7fa5584 (OBSERVED, flagged for WP2) the controller wrote the context from the request, so
+    // leaving it out dropped the task. Omission was never a request to clear, and TimeEntryService
+    // already read an absent key as "keep"; WP2 aligns the controller with it. An explicit
+    // `task_id: null` still clears (TimeEntryTaskAttributionTest D).
     $this->actingAs($worker)->put(route('time.update', $entry), [
-        'date' => today()->toDateString(), 'hours' => 2, 'description' => 'Context dropped',
+        'date' => today()->toDateString(), 'hours' => 2, 'description' => 'Context not sent',
     ])->assertSessionHasNoErrors();
 
-    expect($entry->fresh()->only(['task_id', 'duration_minutes']))->toBe(['task_id' => null, 'duration_minutes' => 120]);
+    expect($entry->fresh()->only(['task_id', 'duration_minutes']))->toBe(['task_id' => $task->id, 'duration_minutes' => 120]);
 });
 
-it('OBSERVED (§12.2): an existing entry on a board task stays editable after its assignee leaves the project, because the stale assignment still grants task eligibility; only unassigning removes it', function () {
+it('OBSERVED (§12.2): an existing entry on a board task stays editable after its assignee leaves the project, because the stale assignment still grants task eligibility; FLIPPED IN WP2: it stays editable after unassigning too', function () {
     $worker = projectActor('member', $this->project);
     $task = makeTask($this->open, ['assignee_id' => $worker->id]);
     $entry = TimeEntry::factory()->create(['user_id' => $worker->id, 'task_id' => $task->id, 'date' => today()->toDateString()]);
@@ -237,16 +237,18 @@ it('OBSERVED (§12.2): an existing entry on a board task stays editable after it
     $this->project->members()->detach($worker->id);
 
     // Still the stored assignee (I8 keeps it), and AccessibleTimeContext admits the assignee, so
-    // a departed member is still eligible: the edit succeeds today.
+    // a departed member is still eligible: the edit succeeds (unchanged by WP2).
     $this->actingAs($worker)->put(route('time.update', $entry), [
         'date' => today()->toDateString(), 'hours' => 1, 'task_id' => $task->id,
     ])->assertSessionHasNoErrors();
 
-    // TRANSITION (owner decision (c); WP2): once unassigned, keeping the task is rejected today.
+    // Before WP2, unassigning made this edit fail on task_id. Under owner decision (c) the
+    // unchanged attribution survives the unrelated edit.
     $task->update(['assignee_id' => null]);
     $this->actingAs($worker)->put(route('time.update', $entry), [
         'date' => today()->toDateString(), 'hours' => 1, 'task_id' => $task->id,
-    ])->assertSessionHasErrors('task_id');
+    ])->assertSessionHasNoErrors();
+    expect($entry->fresh()->task_id)->toBe($task->id);
 });
 
 it('OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP: a board assignee who left the project can still start NEW time on the task they are still stored against', function () {

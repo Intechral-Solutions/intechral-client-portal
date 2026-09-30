@@ -120,49 +120,25 @@ class ProjectService
      */
     public function moveTask(Task $task, int $targetColumnId, int $position): void
     {
-        $this->untilStable(function () use ($task, $targetColumnId, $position) {
-            $sourceId = $this->currentColumnId($task);
+        $this->relocate($task, $targetColumnId, $position);
+    }
 
-            return DB::transaction(function () use ($task, $sourceId, $targetColumnId, $position) {
-                $locked = $this->lockColumns(array_filter([$sourceId, $targetColumnId]));
-                $target = $locked[$targetColumnId] ?? throw (new ModelNotFoundException)->setModel(ProjectColumn::class, [$targetColumnId]);
-
-                if ($target->project_id !== $task->project_id) {
-                    throw ValidationException::withMessages(['column_id' => 'The selected column is invalid.']);
-                }
-
-                $current = Task::whereKey($task->id)->lockForUpdate()->first()
-                    ?? throw (new ModelNotFoundException)->setModel(Task::class, [$task->id]);
-
-                if ($current->column_id !== $sourceId) {
-                    return false; // moved by someone else while this one waited: start over
-                }
-
-                // Everything below runs after the locks, so these reads see the latest committed
-                // state (the snapshot only starts with the first plain read, which is this one).
-                $targetPositions = $this->columnPositions($targetColumnId);
-
-                if ($sourceId === $targetColumnId) {
-                    $ids = array_values(array_diff(array_keys($targetPositions), [$task->id]));
-                    array_splice($ids, max(0, min($position, count($ids))), 0, [$task->id]);
-                    $this->writeOrder($targetColumnId, $ids, $targetPositions, $task->id, $sourceId);
-                } else {
-                    if ($sourceId !== null) {
-                        $sourcePositions = $this->columnPositions($sourceId);
-                        unset($sourcePositions[$task->id]);
-                        $this->writeOrder($sourceId, array_keys($sourcePositions), $sourcePositions);
-                    }
-
-                    $ids = array_keys($targetPositions);
-                    array_splice($ids, max(0, min($position, count($ids))), 0, [$task->id]);
-                    $this->writeOrder($targetColumnId, $ids, $targetPositions, $task->id, $sourceId);
-                }
-
-                return true;
-            }, self::LOCK_ATTEMPTS);
-        });
-
-        $task->refresh();
+    /**
+     * Append a task to the tail of a column (EPIC-014 P3: Complete/Reopen), through exactly the
+     * locking, restart and dense-order protocol of `moveTask`. `$unless` receives the task row as
+     * read under the column and task locks; when it returns true the task is already where the
+     * caller wants it, and nothing is written (no move, no reorder). That keeps an idempotent
+     * Complete/Reopen decided under the same locks as the move itself.
+     *
+     * @param  (callable(Task): bool)|null  $unless
+     * @return bool whether the task moved
+     *
+     * @throws ModelNotFoundException when the task or the target column no longer exists
+     * @throws ValidationException when the column belongs to another project
+     */
+    public function appendToColumn(Task $task, int $targetColumnId, ?callable $unless = null): bool
+    {
+        return $this->relocate($task, $targetColumnId, PHP_INT_MAX, $unless);
     }
 
     /**
@@ -233,7 +209,95 @@ class ProjectService
         return $columns->first();
     }
 
+    /**
+     * The Reopen destination (EPIC-014 Q2): the project's first non-Done column by position,
+     * ties broken by id. A board with no open column cannot reopen anything and is reported the
+     * same way as a Done-column misconfiguration, never resolved by guessing. Read-only.
+     *
+     * @throws DoneColumnConfigurationException
+     */
+    public function firstOpenColumn(Project $project): ProjectColumn
+    {
+        return ProjectColumn::query()
+            ->where('project_id', $project->id)
+            ->where('is_done_column', false)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->first()
+            ?? throw DoneColumnConfigurationException::forMissingOpenColumn(
+                $project->id,
+                ProjectColumn::where('project_id', $project->id)->where('is_done_column', true)->count(),
+            );
+    }
+
     // ── Internals ────────────────────────────────────────────────────────────
+
+    /**
+     * The one board move: `moveTask` and `appendToColumn` both run it. See `moveTask` for the
+     * locking protocol. `$unless`, when given, is asked under the locks whether to leave the task
+     * where it is.
+     *
+     * @param  (callable(Task): bool)|null  $unless
+     * @return bool whether the task moved
+     */
+    private function relocate(Task $task, int $targetColumnId, int $position, ?callable $unless = null): bool
+    {
+        $moved = false;
+
+        $this->untilStable(function () use ($task, $targetColumnId, $position, $unless, &$moved) {
+            $sourceId = $this->currentColumnId($task);
+
+            return DB::transaction(function () use ($task, $sourceId, $targetColumnId, $position, $unless, &$moved) {
+                $locked = $this->lockColumns(array_filter([$sourceId, $targetColumnId]));
+                $target = $locked[$targetColumnId] ?? throw (new ModelNotFoundException)->setModel(ProjectColumn::class, [$targetColumnId]);
+
+                if ($target->project_id !== $task->project_id) {
+                    throw ValidationException::withMessages(['column_id' => 'The selected column is invalid.']);
+                }
+
+                $current = Task::whereKey($task->id)->lockForUpdate()->first()
+                    ?? throw (new ModelNotFoundException)->setModel(Task::class, [$task->id]);
+
+                if ($current->column_id !== $sourceId) {
+                    return false; // moved by someone else while this one waited: start over
+                }
+
+                if ($unless !== null && $unless($current)) {
+                    $moved = false;
+
+                    return true; // already where the caller wants it: nothing to write
+                }
+
+                // Everything below runs after the locks, so these reads see the latest committed
+                // state (the snapshot only starts with the first plain read, which is this one).
+                $targetPositions = $this->columnPositions($targetColumnId);
+
+                if ($sourceId === $targetColumnId) {
+                    $ids = array_values(array_diff(array_keys($targetPositions), [$task->id]));
+                    array_splice($ids, max(0, min($position, count($ids))), 0, [$task->id]);
+                    $this->writeOrder($targetColumnId, $ids, $targetPositions, $task->id, $sourceId);
+                } else {
+                    if ($sourceId !== null) {
+                        $sourcePositions = $this->columnPositions($sourceId);
+                        unset($sourcePositions[$task->id]);
+                        $this->writeOrder($sourceId, array_keys($sourcePositions), $sourcePositions);
+                    }
+
+                    $ids = array_keys($targetPositions);
+                    array_splice($ids, max(0, min($position, count($ids))), 0, [$task->id]);
+                    $this->writeOrder($targetColumnId, $ids, $targetPositions, $task->id, $sourceId);
+                }
+
+                $moved = true;
+
+                return true;
+            }, self::LOCK_ATTEMPTS);
+        });
+
+        $task->refresh();
+
+        return $moved;
+    }
 
     /**
      * Run an attempt until it reports success. An attempt returns false when it noticed, under

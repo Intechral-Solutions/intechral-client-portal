@@ -282,6 +282,16 @@ Route::middleware(['auth', 'can:cms.view'])->prefix('pages')->name('cms.')->grou
 Route::middleware('auth')->prefix('tasks')->name('tasks.')->group(function () {
     Route::get('/', [TaskController::class, 'index'])->name('index');
     Route::post('/', [TaskController::class, 'store'])->name('store');
+
+    // EPIC-014 §13.1 (WP2). Each route authorizes through TaskPolicy in the controller; bulk
+    // authorizes each task on its own. Literal before wildcard. tasks.show (§13.1) lands with its
+    // page in WP5 (EPIC-014 Amendment 2).
+    Route::post('/bulk', [TaskController::class, 'bulk'])->name('bulk');
+    Route::put('/{task}', [TaskController::class, 'update'])->name('update');
+    Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
+    Route::put('/{task}/complete', [TaskController::class, 'complete'])->name('complete');
+    Route::put('/{task}/reopen', [TaskController::class, 'reopen'])->name('reopen');
+    Route::put('/{task}/assignee', [TaskController::class, 'assignee'])->name('assignee.update');
 });
 
 // Dashboard

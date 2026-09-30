@@ -18,6 +18,7 @@ require_once __DIR__.'/ProjectTestHelpers.php';
 const ALLOW = 'allow';
 const DENY = 403;
 const LOGIN = 'login';
+const MISSING = 404;
 
 /** ProjectPolicy::view routes: member, either manager kind, admin; not outsiders or assignees. */
 const MATRIX_VIEW = [
@@ -47,6 +48,16 @@ const MATRIX_MEMBERS = [
 const MATRIX_AUTH = [
     'guest' => LOGIN, 'outsider' => ALLOW, 'member' => ALLOW, 'manager_role' => ALLOW,
     'project_manager' => ALLOW, 'admin' => ALLOW, 'admin_only' => ALLOW, 'assignee' => ALLOW,
+];
+
+/**
+ * EPIC-014 §13.1: tasks.update / tasks.destroy are standalone-only. On a board task TaskPolicy
+ * answers first (403 for anyone without manage), then an authorized actor gets 404: board edits
+ * and deletes stay on projects.tasks.*, and nobody unauthorized learns the task's kind.
+ */
+const MATRIX_BOARD_KIND_MISMATCH = [
+    'guest' => LOGIN, 'outsider' => DENY, 'member' => DENY, 'manager_role' => DENY,
+    'project_manager' => MISSING, 'admin' => MISSING, 'admin_only' => MISSING, 'assignee' => DENY,
 ];
 
 /** Create needs projects.manage (route middleware and policy), not a project membership. */
@@ -83,6 +94,15 @@ function projectMatrixExpectations(): array
         'projects.tasks.checklist.toggle' => MATRIX_VIEW,
         'tasks.index' => MATRIX_AUTH,
         'tasks.store' => MATRIX_AUTH,
+        // EPIC-014 WP2 (§13.1, Q1): the generic task routes, exercised on the board task. The
+        // matrix's `assignee` is a non-member, so Q1's member-assignee arm does not apply to it
+        // (TaskCompletionTest covers the member-assignee). Bulk authorizes per row, not per route.
+        'tasks.complete' => MATRIX_MANAGE_POLICY,
+        'tasks.reopen' => MATRIX_MANAGE_POLICY,
+        'tasks.assignee.update' => MATRIX_MANAGE_POLICY,
+        'tasks.update' => MATRIX_BOARD_KIND_MISMATCH,
+        'tasks.destroy' => MATRIX_BOARD_KIND_MISMATCH,
+        'tasks.bulk' => MATRIX_AUTH,
     ];
 }
 
@@ -133,6 +153,12 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
         'projects.tasks.checklist.toggle' => $test->putJson(route('projects.tasks.checklist.toggle', [$p, $ctx->task, $ctx->item->id])),
         'tasks.index' => $test->get(route('tasks.index')),
         'tasks.store' => $test->post(route('tasks.store'), ['title' => 'Mine', 'priority' => 'low', 'status' => 'todo']),
+        'tasks.complete' => $test->put(route('tasks.complete', $ctx->task)),
+        'tasks.reopen' => $test->put(route('tasks.reopen', $ctx->task)),
+        'tasks.assignee.update' => $test->put(route('tasks.assignee.update', $ctx->task), ['assignee_id' => null]),
+        'tasks.update' => $test->put(route('tasks.update', $ctx->task), ['title' => 'Renamed', 'priority' => 'high', 'status' => 'todo']),
+        'tasks.destroy' => $test->delete(route('tasks.destroy', $ctx->task)),
+        'tasks.bulk' => $test->post(route('tasks.bulk'), ['action' => 'complete', 'ids' => [$ctx->task->id]]),
     };
 }
 
@@ -165,6 +191,12 @@ it('enforces the actor-by-route matrix', function (string $route, string $actor,
 
     if ($expected === DENY) {
         $response->assertForbidden();
+
+        return;
+    }
+
+    if ($expected === MISSING) {
+        $response->assertNotFound();
 
         return;
     }
