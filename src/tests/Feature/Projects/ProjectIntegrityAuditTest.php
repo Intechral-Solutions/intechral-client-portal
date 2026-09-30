@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Project;
 use App\Models\Task;
+use App\Models\Ticket;
 use App\Models\TimeEntry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +44,9 @@ it('reports zero on a clean database', function () {
         'time_entries_with_missing_project_or_task' => 0,
         'projects_blocked_from_delete_by_time' => 0,
         'tasks_blocked_from_delete_by_time' => 0,
+        'projects_with_no_done_column' => 0,
+        'projects_with_multiple_done_columns' => 0,
+        'tasks_linked_to_project_and_ticket' => 0,
     ]);
 });
 
@@ -78,6 +83,17 @@ it('counts every legacy integrity problem without modifying any data', function 
         'duration_minutes' => 30, 'billable' => true, 'billed' => false, 'created_at' => now(), 'updated_at' => now(),
     ]);
     Schema::enableForeignKeyConstraints();
+    // EPIC-014 INV-8: a board without exactly one Done column (one with none, one with two)
+    $noDone = makeProject(null, 'No done column');
+    $noDone->columns()->update(['is_done_column' => false]);
+    $twoDone = makeProject(null, 'Two done columns');
+    $twoDone->columns()->where('position', 3)->update(['is_done_column' => true]);
+    // EPIC-014 INV-13: a task linked to both a project and a ticket (two), and a valid ticket task
+    // that must not count
+    $ticket = Ticket::factory()->create();
+    makeTask($project->columns[0], ['ticket_id' => $ticket->id]);
+    makeTask($project->columns[0], ['ticket_id' => $ticket->id]);
+    Task::factory()->standalone()->create(['ticket_id' => $ticket->id]);
 
     $before = auditedTablesFingerprint();
     $counts = auditCounts();
@@ -91,7 +107,22 @@ it('counts every legacy integrity problem without modifying any data', function 
             // $project (via its timed task) and $other (direct time)
             'projects_blocked_from_delete_by_time' => 2,
             'tasks_blocked_from_delete_by_time' => 1,
+            'projects_with_no_done_column' => 1,
+            'projects_with_multiple_done_columns' => 1,
+            'tasks_linked_to_project_and_ticket' => 2,
         ]);
+});
+
+it('counts a bare project row with no columns at all as having no Done column', function () {
+    // Only the application's own create path seeds the board; a row inserted any other way (a
+    // factory, a partial create) has none, and the audit says so rather than assuming a board.
+    makeProject();
+    Project::factory()->create();
+
+    expect(auditCounts())->toMatchArray([
+        'projects_with_no_done_column' => 1,
+        'projects_with_multiple_done_columns' => 0,
+    ]);
 });
 
 it('prints a readable table without the json flag', function () {

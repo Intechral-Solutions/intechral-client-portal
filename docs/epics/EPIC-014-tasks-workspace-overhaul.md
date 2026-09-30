@@ -7,6 +7,7 @@
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups
 
 ---
 
@@ -35,6 +36,8 @@
 21. [Risks and rollback](#21-risks-and-rollback)
 22. [Plan-level choices open to review](#22-plan-level-choices-open-to-review)
 23. [Branch and PR strategy](#23-branch-and-pr-strategy)
+
+- [Amendment 1: WP1 Results (2026-09-29)](#amendment-1-wp1-results-2026-09-29)
 
 ---
 
@@ -930,3 +933,63 @@ None blocks WP1. Each is the plan's default, derived from the locked decisions, 
   - After each package merges, the epic branch is **synced to current `main`** (merge, not rebase of published history) before the next package starts. **No force pushes.**
 - **CI:** the PR gate (`pull_request` → `main`) is the merge gate for every package. `./dev check` (and `./dev test:e2e` for UI/route packages) runs locally before opening each PR.
 - **Record:** each package's results are recorded as an amendment to this document in the same PR.
+
+---
+
+## Amendment 1: WP1 Results (2026-09-29)
+
+WP1 implemented on `feature/epic-014-tasks-overhaul` from `main` @ `7fa5584`. Foundation only: no route, permission, query, navigation, prop or React change. Status stays **Planned** until the package merges.
+
+### A1.1 What landed
+
+| Seam | Where | Notes |
+|---|---|---|
+| Characterization | `tests/Feature/Tasks/TaskCurrentBehaviorCharacterizationTest.php` | Written and green against the unchanged code first. Each test is labelled **PRESERVED** (an §6 invariant), **KNOWN DEFECT** (changed on purpose by a named later WP) or **OBSERVED** (a fact a decision depends on) |
+| `TaskPolicy` | `app/Policies/TaskPolicy.php`, registered in `AppServiceProvider` | `view`, `update`, `complete`, `reopen`, `delete`, `assign`, `move`, per §7.2. Board abilities go through the Gate to `ProjectPolicy`; Q1's member-assignee arm (checked at call time) grants only `complete`/`reopen`. No route consumes it yet. No existing code performs a Task-model gate check, so registration changes nothing observable |
+| Shared recorded-time guard | `app/Services/RecordedTimeGuard.php` | `deleteTask`, `deleteProject`. Extracted from `ProjectService` unchanged: same `TimeEntry` checks, same 1451 → `delete`-key mapping, other `QueryException`s rethrown. It opens no transaction and takes no lock; `ProjectService::deleteTask` still calls it under its column and task locks |
+| `TaskService` | `app/Services/TaskService.php` | WP1 ships one operation, `delete`: board → `ProjectService::deleteTask`; standalone → the guard under a task-row lock in its own transaction; ticket-kind or dual-linked → `UnsupportedTaskOperationException` before any lock or write. No route calls it |
+| Done-column resolver | `ProjectService::doneColumn(Project): ProjectColumn` | Exactly one `is_done_column`, or `DoneColumnConfigurationException` (`projectId`, `doneColumnCount`). Read-only; by flag, never by name or position; never `tasks.status`. The Reopen destination resolver is left to WP2 with Complete/Reopen |
+| Assignee rule | `app/Rules/ProjectTaskAssignee.php` | `taskRules()`'s closure moved verbatim into a `ValidationRule`; `ProjectTaskController` uses it. A3 and I8 are unchanged (`ProjectIntegrityTest`) |
+| Audit | `ProjectIntegrityAudit` | New counts: `projects_with_no_done_column`, `projects_with_multiple_done_columns`, `tasks_linked_to_project_and_ticket`. Still SELECT-only |
+| Static guard | `tests/Unit/Architecture/TaskDeletionAuthorityTest.php` | A token-based inventory of every `delete`/`destroy`/`forceDelete`/`truncate` call in app files that mention tasks or projects; each must be a reviewed call, and the only Task/Project model delete is inside `RecordedTimeGuard`. It was mutation-checked by temporarily replacing the guard call in `TaskService` with a bare `$current->delete()`, which failed the test |
+
+### A1.2 Clarifications and deviations
+
+1. **Dual-linked rows are refused by the policy and the service as well as by the query.** §9.1.1 excluded them from queries; WP1 makes `TaskPolicy` deny every ability on them (operator included) and `TaskService` refuse them, rather than treating them as whatever `Task::kind()` prefers (it prefers *board*). Existing `projects.tasks.*` routes still authorize through `ProjectPolicy`, so their behaviour is unchanged.
+2. **INV-13 needs no create-path change.** Characterization shows neither create path can produce a dual-linked row today: `ProjectService::createTask` whitelists its columns and `tasks.store` validates only its own fields. WP2's service-owned create keeps that property.
+3. **`viewAny`/`viewAll` are not in WP1.** `viewAll` is inseparable from `tasks.view_all`, which §17 places in WP3; `viewAny` ("any authenticated user") has no consumer before WP3's query. Both land with WP3.
+4. **`TaskService` carries only `delete` in WP1.** That gives the shared guard both of its consumers now, so the extraction is proven against a standalone path rather than only the board. The standalone delete has no route until WP2.
+5. **The Done-column rule is safe for current data.** Every application-created project gets exactly one Done column. The development database was read (no writes): 19 projects, all with exactly one Done column; 0 dual-linked tasks; 0 ticket tasks; 50 standalone tasks, none unassigned. A project row created any other way (a factory, or a `ProjectService::create` that failed between the project insert and its columns, which is not wrapped in a transaction) has none, and the audit counts it rather than assuming a board.
+
+### A1.3 Owner decision: existing time attribution survives unrelated edits (standalone release)
+
+The §12.2 characterization showed the risk is real (`TaskCurrentBehaviorCharacterizationTest`, the KNOWN DEFECT / TRANSITION and OBSERVED time tests):
+
+- `time.update` re-validates the entry's context on every edit, and the time page always re-sends it. `AccessibleTimeContext` admits a standalone task only for its **assignee**, not for its creator.
+- So once a standalone task is **released** (assignee → null, which WP2 adds under §7.3), the releaser's existing **unbilled** entries on it cannot be edited while keeping the task: the edit fails on `task_id`. Omitting the context is accepted, and `TimeEntryController::update` then **clears** `task_id` (the update writes the context from the request), dropping the attribution.
+- Billed/invoiced entries are unaffected (INV-14: locked regardless). Stopping a running timer on a released task still works (`timerStop` does not re-validate).
+
+**Decision (owner, locked): option (c) is selected.**
+
+- **Selected: (c)** an existing **unbilled** time entry keeps its existing task attribution when unrelated fields are edited (notes, duration, other mutable fields), even if the actor is no longer currently eligible for that task. Only an edit that leaves `task_id` **unchanged** is covered.
+- **Current eligibility is still required** for new task-attributed time, for starting a new timer on a task, and for changing an existing entry from one task to another. Explicitly clearing the task stays allowed where current product rules allow it. Preserved historical attribution never broadens eligibility.
+- **Rejected: (a)** accepting the current rejection permanently.
+- **Rejected: (b)** making the standalone creator automatically eligible for new time in `AccessibleTimeContext`.
+- **P5 is unchanged:** an unassigned standalone creator must assign the task to themselves before logging **new** time.
+- Billed entries stay under the existing billing lock; stopping a running timer stays under the existing timer semantics.
+
+**Not implemented in WP1.** WP1 changes no time behavior; the two characterization tests that pin today's rejection are labelled KNOWN DEFECT / TRANSITION and are expected to flip when this lands. It becomes **WP2 work**, delivered with standalone release/reassignment (§7.3). WP2 must also decide how an *absent* `task_id` differs from an explicit clear: omission currently clears attribution (pinned as OBSERVED), and is not necessarily a request to do so.
+
+### A1.3.1 Deferred follow-ups (non-blocking; not assigned to a WP)
+
+1. **Time domain: a stale board assignee keeps new-time eligibility.** A board assignee who leaves the project stays the stored assignee (INV-7), and `AccessibleTimeContext` admits the stored assignee for **new** time even though `TaskPolicy` (and `ProjectPolicy`) no longer let them view the task. They can still start a timer or log time on it. This is pinned as OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP (`TaskCurrentBehaviorCharacterizationTest`), not endorsed and not an EPIC-014 invariant. The likely direction is that stale assignment alone should not grant new-time eligibility once project visibility is lost, but that is **not** a locked decision. `AccessibleTimeContext` is unchanged.
+2. **`ProjectService::create` is not atomic.** A failure between the project insert and its default-column inserts can leave a project with no columns. The integrity audit surfaces it (`projects_with_no_done_column`); it is an existing issue, not introduced by WP1, and is left unfixed. The committed plan does not require it, so it is not assigned to WP2.
+
+### A1.4 Evidence
+
+| Gate | Result |
+|---|---|
+| New suites (Tasks + architecture) | TaskCurrentBehaviorCharacterization 14, TaskPolicyMatrix 25 (240 assertions), TaskService 11, DoneColumnResolver 6, TaskDeletionAuthority 8 (two scan tests plus regression rows for a raw table delete in an unrelated file) |
+| Preserved suites before any change | `tests/Feature/Projects` + `TimeTrackingTest`: 505 passed (1956 assertions) |
+| After WP1 | `tests/Feature/Tasks`, `tests/Feature/Projects`, `tests/Feature/Time`, `tests/Unit/Architecture`: 624 passed (2662 assertions), including `ProjectMoveConcurrencyTest`, `ProjectDeletionGuardTest` and `ProjectAuthorizationMatrixTest` unmodified |
+| Modified existing test | `ProjectIntegrityAuditTest` only: the three new counts added to its expected arrays, fixtures for them, and one new case (a bare project row counts as having no Done column) |
