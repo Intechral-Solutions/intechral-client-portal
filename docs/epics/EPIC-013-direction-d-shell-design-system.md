@@ -582,6 +582,8 @@ Populated entirely from `routes/web.php`, `NavigationBuilder.php` and the contro
 | **System** | `users.index`, `roles.index`, `operator.cms.index` | Yes | any of `users.view`, `roles.view`, `cms.edit` | **Views:** Users (`users.view`), Roles (`roles.view`), Pages (`cms.edit`) | **document** | Settings, Integrations, audit/system controls, invitation management as a section |
 | **Pages** *(transitional, see §11.3)* | `cms.index` | Yes | `cms.view` **and not** `cms.edit` | None — single surface | **document** | Knowledge; public publishing |
 
+> **Forward note (2026-09-29).** The Tasks row above is superseded for future work by [EPIC-014 §9.8](./EPIC-014-tasks-workspace-overhaul.md#98-navigation-contract-update-planned-implemented-in-wp3): the views become *My tasks* and *All tasks* (`tasks.view_all`), and *Organisation tasks* (`tasks.org`) is retired in favour of an organization filter. This table remains the accurate record of what EPIC-013 built.
+
 ### 11.2 What this changes, and what it deliberately does not
 
 **Relabels that are safe now** (pure presentation over unchanged routes):
@@ -1506,6 +1508,8 @@ Two notes this epic hands forward: the Playwright suite grows by roughly twelve 
 | Standalone-task E2E fixture leak, one row per full run (A9.7); operator-persona timer isolation (A11.15) | Test infrastructure |
 | Lockfile caret inconsistency (A11.2) | Next dependency change |
 | `pageshow`/bfcache resync for the Blade shell (A10.16; not reproduced in Chromium, A13.8) | Final hardening |
+
+> **Forward note (2026-09-29).** The Tasks overhaul rows above (D2/D9 patterns, `DataTable`/`FilterBar`/`Chip`/`BulkBar`, shortcuts, peek inspector), A13.5, A13.12 and A9.7 are now owned by [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md); its [§5](./EPIC-014-tasks-workspace-overhaul.md#5-scope) classifies each as required or separable and its [§20](./EPIC-014-tasks-workspace-overhaul.md#20-deferred-and-inherited-items) records where each closes.
 
 ### 31.1 Shell presentation parity / unification (Future)
 
