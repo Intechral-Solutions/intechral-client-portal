@@ -142,3 +142,12 @@ it('asks to open when its own trigger is used', async () => {
 
     expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(true);
 });
+
+it('opens on its first field rather than the Close button (Direction D §14.2)', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByRole('button', { name: 'Add milestone' }));
+
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+});

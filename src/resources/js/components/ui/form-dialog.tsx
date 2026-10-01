@@ -32,6 +32,7 @@ export function FormDialog({
     children,
 }: FormDialogProps) {
     const opener = useRef<HTMLElement | null>(null);
+    const form = useRef<HTMLFormElement>(null);
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -39,9 +40,19 @@ export function FormDialog({
             <DialogShell
                 title={title}
                 description={description}
-                onOpenAutoFocus={() => {
+                onOpenAutoFocus={(event) => {
                     opener.current =
                         document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+                    // Direction D §14.2: a dialog opens on its first field. Radix would otherwise
+                    // pick the first tabbable, which is the Close button that precedes the form.
+                    const field = form.current?.querySelector<HTMLElement>(
+                        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])',
+                    );
+                    if (field) {
+                        event.preventDefault();
+                        field.focus();
+                    }
                 }}
                 onCloseAutoFocus={(event) => {
                     // Radix returns focus only to its own Trigger. A dialog opened through
@@ -54,6 +65,7 @@ export function FormDialog({
                 }}
             >
                 <form
+                    ref={form}
                     className="mt-4 space-y-4"
                     onSubmit={(event) => {
                         event.preventDefault();

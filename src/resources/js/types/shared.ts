@@ -1,4 +1,5 @@
 import type { Navigation, ShellProps } from './navigation';
+import type { TaskBulkResult } from './tasks';
 
 /** Initials are derived server-side so both renderers agree; `url` is null (no photo storage). */
 export type AuthAvatar = {
@@ -23,6 +24,8 @@ export type FlashProps = {
     error: string | null;
     status: string | null;
     warning: string | null;
+    /** The per-task outcome of a bulk Complete/Reopen (EPIC-014 §15.2), present for one response. */
+    bulk?: TaskBulkResult | null;
 };
 
 export type SharedPageProps = {

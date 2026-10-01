@@ -1,25 +1,55 @@
 import { Link } from '@inertiajs/react';
 
+import { focusRing } from '@/components/ui/control-metrics';
+import { Status } from '@/components/ui/status';
+import { Tag } from '@/components/ui/tag';
+import { cn } from '@/lib/utils';
 import type { TaskRow } from '@/types/tasks';
 
+/** The mono source tag's text. A row's own kind (`board`), not the filter's `project` (EPIC-014 A3.7). */
+const sourceTag: Record<TaskRow['kind'], string> = { board: 'Board', standalone: 'Standalone' };
+
 /**
- * A row's title, kind-aware (EPIC-011E §11, WP8). Only a project-board task has a detail page
- * from this list so far (`url` is `null` for standalone rows until EPIC-014 WP5), so this is the
- * one cell whose markup genuinely differs by kind; every other cell is identical across both. Its
- * own destination is always the migrated React task page, so it is always an Inertia `Link` when
- * present — never a document navigation guessed from the URL shape.
+ * A row's title, source tag and, while the viewer's own timer runs on it, the running state
+ * (EPIC-014 §14.1, §15.3). Only a project-board task has a detail page from this list so far (`url`
+ * is `null` for standalone rows until EPIC-014 WP5), so the title is a link for exactly those and
+ * plain text for the rest — never a dead anchor. A present `url` is always the migrated React task
+ * page, so it is always an Inertia `Link`, never a document navigation guessed from the URL shape.
+ *
+ * At S (D9) the title band is one visual line: the title truncates visually (`text-overflow`, the DOM
+ * text is the full title, so assistive technology reads all of it) while the tag and the running
+ * state keep their size. From M up the title wraps as before.
+ *
+ * Done-ness is the row's job (muted text); this cell inherits the colour and adds no strike-through.
  */
-export function TaskTitleCell({ task }: { task: TaskRow }) {
-    const done = task.status.done;
-    const className = done ? 'font-medium line-through opacity-60' : 'font-medium';
-
-    if (task.url) {
-        return (
-            <Link href={task.url} className={`${className} legacy-text-primary hover:underline`}>
-                {task.title}
-            </Link>
-        );
-    }
-
-    return <span className={`${className} text-foreground`}>{task.title}</span>;
+export function TaskTitleCell({ task, running = false }: { task: TaskRow; running?: boolean }) {
+    return (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 max-md:flex-nowrap">
+            {task.url ? (
+                <Link
+                    href={task.url}
+                    title={task.title}
+                    className={cn(
+                        'font-medium break-words text-inherit hover:underline max-md:min-w-0 max-md:truncate',
+                        focusRing,
+                    )}
+                >
+                    {task.title}
+                </Link>
+            ) : (
+                <span
+                    title={task.title}
+                    className="font-medium break-words max-md:min-w-0 max-md:truncate"
+                >
+                    {task.title}
+                </span>
+            )}
+            <Tag className="shrink-0">{sourceTag[task.kind]}</Tag>
+            {running ? (
+                <Status tone="live" className="shrink-0 whitespace-nowrap">
+                    Timer running
+                </Status>
+            ) : null}
+        </div>
+    );
 }
