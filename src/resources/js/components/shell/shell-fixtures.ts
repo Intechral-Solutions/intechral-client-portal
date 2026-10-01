@@ -129,9 +129,9 @@ export const tasks: Workspace = {
                     count: null,
                 },
                 {
-                    key: 'tasks.org',
-                    label: 'My organization',
-                    href: '/tasks?view=org',
+                    key: 'tasks.all',
+                    label: 'All tasks',
+                    href: '/tasks?view=all',
                     visit: 'inertia',
                     isActive: false,
                     count: null,

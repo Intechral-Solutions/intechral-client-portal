@@ -205,7 +205,7 @@ describe('following a link inside the drawer', () => {
 
         await actor.click(screen.getByRole('button', { name: 'Show workspace views' }));
         setPanelFloating(true);
-        await actor.click(screen.getByRole('link', { name: 'My organization' }));
+        await actor.click(screen.getByRole('link', { name: 'All tasks' }));
 
         expect(screen.queryByRole('navigation', { name: 'Tasks views' })).toBeNull();
     });
@@ -227,7 +227,7 @@ describe('following a link inside the drawer', () => {
         await actor.click(screen.getByRole('button', { name: 'Show workspace views' }));
         setPanelFloating(true);
         await actor.keyboard('{Control>}');
-        await actor.click(screen.getByRole('link', { name: 'My organization' }));
+        await actor.click(screen.getByRole('link', { name: 'All tasks' }));
         await actor.keyboard('{/Control}');
 
         expect(screen.getByRole('navigation', { name: 'Tasks views' })).toBeInTheDocument();
@@ -272,7 +272,7 @@ it('moves the current view into a switcher while the drawer is collapsed', async
     await actor.click(switcher);
 
     // A real menu, so Radix's arrow keys are correct here and L11 is not contradicted.
-    for (const name of ['My tasks', 'My organization']) {
+    for (const name of ['My tasks', 'All tasks']) {
         expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
     }
 });
@@ -343,7 +343,7 @@ it.each([
         'Reports',
     ],
     [
-        'the tasks organization view',
+        'the tasks all view',
         {
             ...tasks,
             isActive: true,
@@ -353,12 +353,12 @@ it.each([
                     ...tasks.context[0]!,
                     items: tasks.context[0]!.items.map((item) => ({
                         ...item,
-                        isActive: item.key === 'tasks.org',
+                        isActive: item.key === 'tasks.all',
                     })),
                 },
             ],
         },
-        'My organization',
+        'All tasks',
     ],
 ])('renders only the canonical active item on the %s route', (_label, workspace, expected) => {
     mount(navigation([workspace as Workspace], (workspace as Workspace).key));

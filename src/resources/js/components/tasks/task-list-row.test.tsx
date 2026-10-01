@@ -11,6 +11,7 @@ afterEach(resetInertiaMock);
 const base: TaskRow = {
     id: 1,
     title: 'Ship it',
+    kind: 'board',
     priority: 'high',
     status: { label: 'In Progress', done: false, source: 'column' },
     dueDate: null,
@@ -18,6 +19,7 @@ const base: TaskRow = {
     assignee: null,
     context: { kind: 'project', label: 'Alpha', url: '/projects/1/board' },
     url: '/projects/1/tasks/1',
+    abilities: { complete: true, reopen: true, assign: false },
 };
 
 function renderRow(task: TaskRow) {
@@ -41,24 +43,23 @@ it('renders a project-board task as an Inertia link to its own task page', () =>
     );
 });
 
-it('renders a ticket task with a context link but no title link (its own task has none)', () => {
-    renderRow({
-        ...base,
-        title: 'Diagnose outage',
-        status: { label: 'Done', done: true, source: 'status' },
-        context: { kind: 'ticket', label: 'TKT-1001', url: '/tickets/9' },
-        url: null,
-    });
+it('renders a title without a link when the row has no destination, keeping its context link', () => {
+    // Ticket-kind rows used to be the case here; they left the Tasks workspace in EPIC-014 WP3.
+    renderRow({ ...base, title: 'Diagnose outage', url: null });
 
     expect(screen.queryByRole('link', { name: 'Diagnose outage' })).not.toBeInTheDocument();
     expect(screen.getByText('Diagnose outage')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'TKT-1001' })).toHaveAttribute('href', '/tickets/9');
+    expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+        'href',
+        '/projects/1/board',
+    );
 });
 
-it('renders a standalone task with no links at all (D3)', () => {
+it('renders a standalone task with no links at all (no detail page until EPIC-014 WP5)', () => {
     renderRow({
         ...base,
         title: 'Loose end',
+        kind: 'standalone',
         context: { kind: 'standalone', label: 'Standalone', url: null },
         url: null,
     });

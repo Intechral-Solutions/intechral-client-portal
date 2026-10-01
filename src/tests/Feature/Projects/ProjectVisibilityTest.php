@@ -13,7 +13,8 @@ require_once __DIR__.'/ProjectTestHelpers.php';
 
 /*
  * EPIC-011E D2 (§16): a company link is metadata and grants no project access. The projects
- * index, the /tasks org tab and every rendered link must agree with ProjectPolicy::view.
+ * index, the /tasks list (org tab until EPIC-014 WP3; now the organization filter) and every rendered
+ * link must agree with ProjectPolicy::view.
  */
 
 beforeEach(function () {
@@ -92,7 +93,7 @@ it('adds only manageMembers to ProjectPolicy and leaves view, manage and create 
         ->and((new ProjectPolicy)->manage($outsider, $this->unrelated))->toBeFalse();
 });
 
-// ── /tasks (org tab and links, EPIC-011E WP8: now an Inertia page) ───────────
+// ── /tasks (organization filter and links; EPIC-011E WP8, EPIC-014 WP3) ──────
 
 function boardTask(Project $project, array $attributes = []): Task
 {
@@ -112,19 +113,29 @@ function taskIndexRowByTitle($response, string $title): ?array
     return collect(taskIndexRows($response))->firstWhere('title', $title);
 }
 
-it('limits the org tab to company-linked projects the viewer can actually open', function () {
+// The org tab is retired (EPIC-014 Q5): organization is a filter that narrows and never grants,
+// and `view=org` clamps to My Tasks. The cases below were rewritten in WP3 (§16.3), each keeping
+// the D2 guarantee it used to pin.
+
+it('narrows by organization only within projects the viewer can actually open', function () {
+    $this->orgUser->givePermissionTo('tasks.view_all');
     boardTask($this->linkedNotMember);
     $visible = boardTask($this->linkedMember);
     boardTask($this->memberOnly, ['title' => 'Member only, not linked']);
     boardTask($this->unrelated);
 
-    $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'org']))->assertOk();
+    $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'all', 'organization' => $this->company->id]))->assertOk();
     $titles = collect(taskIndexRows($response))->pluck('title')->all();
 
     expect($titles)->toBe([$visible->title]);
+
+    // Without the filter, All Tasks is every visible project's rows: still never the linked
+    // non-member project, however the company link reads.
+    $all = collect(taskIndexRows($this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'all']))))->pluck('title')->sort()->values()->all();
+    expect($all)->toBe(['Member only, not linked', 'Task in Linked And Member']);
 });
 
-it('gives an admin the org tab of every company-linked project', function () {
+it('gives an admin the organization filter over every company-linked project', function () {
     $admin = makeUser('operator');
     $admin->organizations()->attach($this->org, ['role' => 'member']);
     boardTask($this->linkedNotMember);
@@ -132,67 +143,74 @@ it('gives an admin the org tab of every company-linked project', function () {
     boardTask($this->unrelated);
 
     $titles = collect(taskIndexRows(
-        $this->actingAs($admin)->get(route('tasks.index', ['view' => 'org']))
+        $this->actingAs($admin)->get(route('tasks.index', ['view' => 'all', 'organization' => $this->company->id]))
     ))->pluck('title')->sort()->values()->all();
 
     expect($titles)->toBe(['Task in Linked And Member', 'Task in Linked Not Member']);
 });
 
-it('renders no link to a project or task page the viewer cannot open', function () {
+it('lists no row for a project the viewer cannot open, even one still assigned to them', function () {
+    // Until WP3 the former member's row was listed unlinked. A stored assignment now grants no
+    // visibility at all (§9.1.1, §7.2), in either view.
+    $this->orgUser->givePermissionTo('tasks.view_all');
     boardTask($this->unrelated, ['title' => 'Assigned before leaving', 'assignee_id' => $this->orgUser->id]);
     boardTask($this->memberOnly, ['title' => 'Assigned and member', 'assignee_id' => $this->orgUser->id]);
 
-    $response = $this->actingAs($this->orgUser)->get(route('tasks.index'))->assertOk();
+    foreach (['mine', 'all'] as $view) {
+        $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => $view]))->assertOk();
 
-    $legacyRow = taskIndexRowByTitle($response, 'Assigned before leaving');
-    expect($legacyRow)->not->toBeNull();
-    expect($legacyRow['url'])->toBeNull();
-    expect($legacyRow['context']['url'])->toBeNull();
+        expect(taskIndexRowByTitle($response, 'Assigned before leaving'))->toBeNull();
 
-    $okRow = taskIndexRowByTitle($response, 'Assigned and member');
-    expect($okRow['url'])->toBe(route('projects.tasks.show', [$this->memberOnly, $okRow['id']]));
-    expect($okRow['context']['url'])->toBe(route('projects.board', $this->memberOnly));
+        $okRow = taskIndexRowByTitle($response, 'Assigned and member');
+        expect($okRow['url'])->toBe(route('projects.tasks.show', [$this->memberOnly, $okRow['id']]));
+        expect($okRow['context']['url'])->toBe(route('projects.board', $this->memberOnly));
+    }
 });
 
-it('renders no ticket link that TicketPolicy would deny', function () {
+it('lists no ticket-kind task, whether or not TicketPolicy would open the ticket (Q6)', function () {
+    // Until WP3 both rows were listed through the org tab, only the openable ticket linked.
+    $this->orgUser->givePermissionTo('tasks.view_all');
     $foreignTicket = Ticket::factory()->create(['user_id' => $this->owner->id, 'company_id' => $this->company->id, 'ticket_number' => 'TKT-7001']);
     $ownTicket = Ticket::factory()->create(['user_id' => $this->orgUser->id, 'company_id' => $this->company->id, 'ticket_number' => 'TKT-7002']);
-    Task::factory()->standalone()->create(['ticket_id' => $foreignTicket->id, 'title' => 'On foreign ticket']);
-    Task::factory()->standalone()->create(['ticket_id' => $ownTicket->id, 'title' => 'On own ticket']);
+    Task::factory()->standalone()->create(['ticket_id' => $foreignTicket->id, 'title' => 'On foreign ticket', 'assignee_id' => $this->orgUser->id]);
+    Task::factory()->standalone()->create(['ticket_id' => $ownTicket->id, 'title' => 'On own ticket', 'assignee_id' => $this->orgUser->id, 'created_by' => $this->orgUser->id]);
 
-    $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => 'org']))->assertOk();
+    foreach (['mine', 'org', 'all'] as $view) {
+        $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => $view, 'completion' => 'any']))->assertOk();
 
-    // Both rows stay listed (current list behavior; flagged for EPIC-011F, C8) ...
-    $foreignRow = taskIndexRowByTitle($response, 'On foreign ticket');
-    $ownRow = taskIndexRowByTitle($response, 'On own ticket');
-    expect($foreignRow['context'])->toBe(['kind' => 'ticket', 'label' => 'TKT-7001', 'url' => null]);
-    // ... but only the ticket the viewer may open is a link.
-    expect($ownRow['context'])->toBe(['kind' => 'ticket', 'label' => 'TKT-7002', 'url' => route('tickets.show', $ownTicket)]);
-    // A ticket-derived row never gets the project-task detail URL (kind-aware, not a fake one).
-    expect($foreignRow['url'])->toBeNull();
-    expect($ownRow['url'])->toBeNull();
+        expect(taskIndexRows($response))->toBe([], $view);
+        expect(json_encode($response->viewData('page')['props']['tasks']))->not->toContain('TKT-700');
+    }
 });
 
-it('keeps standalone tasks unlinked and the mine tab scoped to the assignee', function () {
+it('keeps standalone tasks unlinked and My Tasks to what is mine under Q4', function () {
     Task::factory()->standalone()->create(['title' => 'Standalone mine', 'assignee_id' => $this->orgUser->id]);
+    Task::factory()->standalone()->create(['title' => 'Standalone created, unassigned', 'created_by' => $this->orgUser->id, 'assignee_id' => null]);
+    Task::factory()->standalone()->create(['title' => 'Standalone created, handed on', 'created_by' => $this->orgUser->id, 'assignee_id' => $this->owner->id]);
     Task::factory()->standalone()->create(['title' => 'Standalone theirs', 'assignee_id' => $this->owner->id]);
 
-    $response = $this->actingAs($this->orgUser)->get(route('tasks.index'))->assertOk();
-    $rows = taskIndexRows($response);
+    $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['completion' => 'any']))->assertOk();
+    $rows = collect(taskIndexRows($response))->keyBy('title');
 
-    expect(collect($rows)->pluck('title')->all())->toBe(['Standalone mine']);
-    expect($rows[0]['context'])->toBe(['kind' => 'standalone', 'label' => 'Standalone', 'url' => null]);
-    expect($rows[0]['url'])->toBeNull();
+    expect($rows->keys()->sort()->values()->all())->toBe(['Standalone created, unassigned', 'Standalone mine']);
+    // No standalone destination until the WP5 detail page ships tasks.show (A2.3.1).
+    expect($rows['Standalone mine']['context'])->toBe(['kind' => 'standalone', 'label' => 'Standalone', 'url' => null]);
+    expect($rows['Standalone mine']['url'])->toBeNull();
 });
 
-it('shows no org rows to a user without tasks.view_org, and hides the org tab', function () {
-    $user = User::factory()->create(); // no role: no tasks.view_org
+it('clamps the retired org view to My Tasks for everyone, and a company link grants no row', function () {
+    $user = User::factory()->create(); // no role at all
     $this->org->members()->attach($user, ['role' => 'member']);
     $this->linkedMember->members()->attach($user, ['role' => 'member']);
     boardTask($this->linkedMember);
 
-    $response = $this->actingAs($user)->get(route('tasks.index', ['view' => 'org']))->assertOk();
+    foreach ([$user, $this->orgUser] as $viewer) {
+        $response = $this->actingAs($viewer)->get(route('tasks.index', ['view' => 'org']))->assertOk();
+        $props = $response->viewData('page')['props'];
 
-    expect(taskIndexRows($response))->toHaveCount(0);
-    expect($response->viewData('page')['props']['canViewOrg'])->toBeFalse();
+        expect(taskIndexRows($response))->toHaveCount(0)
+            ->and($props['view'])->toBe('mine')
+            ->and($props['canViewAll'])->toBeFalse()
+            ->and($props)->not->toHaveKey('canViewOrg');
+    }
 });

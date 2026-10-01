@@ -5,6 +5,14 @@ namespace App\Policies;
 use App\Models\Project;
 use App\Models\User;
 
+/**
+ * Maintenance note (EPIC-014 WP3): `view` and `manage` are restated as a batch, in memory, by
+ * `App\Queries\TaskRowAbilities` (one membership query per Tasks page, by design), and `view` is
+ * composed in SQL as `Project::visibleTo`. A change to these rules must keep green the parity
+ * tests that pin both: `Tasks/TaskListPageTest` ("computes row abilities identical to TaskPolicy"
+ * and "agrees with TaskPolicy on every task") and `Tasks/TaskQueryTest` ("equals the TaskPolicy
+ * view-able surfaced rows"), extending their fixtures to any new rule.
+ */
 class ProjectPolicy
 {
     public function create(User $user): bool

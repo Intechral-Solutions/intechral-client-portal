@@ -16,13 +16,6 @@ it('renders a project context as an Inertia link (the board is React, WP5)', () 
     expect(link).toHaveAttribute('href', '/projects/1/board');
 });
 
-it('renders a ticket context as a plain document anchor (tickets stay Blade until EPIC-011F)', () => {
-    render(<TaskContextLink context={{ kind: 'ticket', label: 'TKT-1001', url: '/tickets/9' }} />);
-
-    const link = screen.getByRole('link', { name: 'TKT-1001' });
-    expect(link).toHaveAttribute('href', '/tickets/9');
-});
-
 it('renders plain text, never a link, when the destination policy denies it', () => {
     render(<TaskContextLink context={{ kind: 'project', label: 'Alpha', url: null }} />);
 

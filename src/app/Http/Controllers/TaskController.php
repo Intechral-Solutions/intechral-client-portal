@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Exceptions\DoneColumnConfigurationException;
 use App\Exceptions\UnsupportedTaskOperationException;
 use App\Http\Presenters\TaskListPresenter;
-use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\TaskListState;
+use App\Queries\TaskQuery;
+use App\Queries\TaskRowAbilities;
 use App\Rules\ProjectTaskAssignee;
 use App\Rules\StandaloneTaskAssignee;
 use App\Services\TaskService;
@@ -35,66 +37,42 @@ class TaskController extends Controller
 
     public function __construct(private TaskService $service) {}
 
+    /**
+     * My Tasks / All Tasks (§9). The server resolves the view (an unauthorized or unknown `view`
+     * is My Tasks, never a 403), normalizes the URL state against options drawn from the
+     * authorized set, and TaskQuery builds the page from the maximum authorized set outward.
+     */
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Task::class);
+
         /** @var User $user */
-        $user = auth()->user();
-        // A closed two-value enum, clamped rather than rejected: this is a navigational tab
-        // link, not a form submission, so an unrecognized value falls back to "mine" (the
-        // narrower, always-safe view) instead of a validation redirect a stray/edited URL would
-        // otherwise bounce through.
-        $view = $request->query('view') === 'org' ? 'org' : 'mine';
-        $companyIds = $user->can('tasks.view_org') ? $user->orgCompanyIds() : [];
-        // The org tab only ever widens the query with company-linked rows (below); with no
-        // company to link through it can show nothing beyond "mine", so it stays hidden rather
-        // than rendering an org tab that behaves exactly like the one already shown.
-        $canViewOrg = ! empty($companyIds);
+        $user = $request->user();
+        $view = TaskQuery::resolveView($user, $request->query('view'));
+        $query = new TaskQuery($user, $view);
 
-        $query = Task::with([
-            'assignee:id,name',
-            'project:id,name',
-            // `user_id` is loaded (never rendered) because TicketPolicy::view needs it to decide
-            // openableTickets below; trimming it would silently deny every ticket owner's link.
-            'ticket:id,ticket_number,user_id',
-            'column:id,project_id,name,is_done_column',
-        ])
-            ->where(function ($q) use ($user, $companyIds, $view) {
-                // "mine" tab — always includes tasks assigned directly to the user
-                $q->where('assignee_id', $user->id);
+        $options = $query->filterOptions($request->query('project'));
+        $state = TaskListState::fromInput($request->query(), $view, $options);
 
-                // "org" tab / view_org — also show tasks in the org's projects/tickets. A
-                // company link is metadata (D2), so a project only counts when the viewer can
-                // actually open it.
-                if ($view === 'org' && ! empty($companyIds)) {
-                    $q->orWhereHas('project', fn ($p) => $p->visibleTo($user)
-                        ->whereHas('companies', fn ($c) => $c->whereIn('crm_companies.id', $companyIds)))
-                        ->orWhereHas('ticket', fn ($t) => $t->whereIn('company_id', $companyIds));
-                }
-            })
-            ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('due_date')
-            ->orderByDesc('created_at');
-
-        $tasks = $query->paginate(30)->withQueryString();
-
-        // Which destinations the viewer may open, so no row renders a link that would 403.
-        // Projects are answered with one query for the whole page (the same rule as
-        // ProjectPolicy::view, D2); tickets ask TicketPolicy, which needs no query per row.
-        $projectIds = $tasks->getCollection()->pluck('project_id')->filter()->unique()->all();
-        $openableProjects = $projectIds === []
-            ? []
-            : array_flip(Project::visibleTo($user)->whereIn('id', $projectIds)->pluck('id')->all());
-        $openableTickets = $tasks->getCollection()
-            ->pluck('ticket')->filter()
-            ->filter(fn ($ticket) => Gate::forUser($user)->allows('view', $ticket))
-            ->pluck('id')->flip()->all();
-
-        $tasks->through(fn (Task $task) => TaskListPresenter::row($task, $openableProjects, $openableTickets));
+        // Links carry the normalized state, not the raw query: a malformed value never rides along.
+        $tasks = $query->paginate($state)->appends($state->query() + ($view === TaskQuery::VIEW_ALL ? ['view' => $view] : []));
+        $abilities = TaskRowAbilities::for($user, $tasks->getCollection());
+        $tasks->through(fn (Task $task) => TaskListPresenter::row($task, $abilities));
 
         return Inertia::render('tasks/index', [
             'tasks' => $tasks,
             'view' => $view,
-            'canViewOrg' => $canViewOrg,
+            'filters' => $state->filters(),
+            'filterOptions' => [
+                'completion' => self::labelled(['open' => 'Open', 'done' => 'Done', 'any' => 'Any']),
+                'priorities' => self::labelled(array_combine(Task::PRIORITIES, array_map('ucfirst', Task::PRIORITIES))),
+                'due' => self::labelled(['overdue' => 'Overdue', 'today' => 'Due today', 'next7' => 'Next 7 days', 'none' => 'No due date']),
+                'kinds' => self::labelled(['project' => 'Project', 'standalone' => 'Standalone']),
+                'sorts' => self::labelled(['due' => 'Due date', 'priority' => 'Priority', 'title' => 'Title', 'updated' => 'Last updated', 'created' => 'Created']),
+                ...$options,
+            ],
+            'sort' => $state->sort(),
+            'canViewAll' => $user->can('viewAll', Task::class),
             // The server is the source of truth for task vocabulary (§15); the standalone
             // create form receives labelled options rather than hard-coding labels in React.
             'createOptions' => [
@@ -266,6 +244,17 @@ class TaskController extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * Server-named vocabulary (INV-19), in the order the filter controls offer it.
+     *
+     * @param  array<string, string>  $labels  value => label
+     * @return array<int, array{value: string, label: string}>
+     */
+    private static function labelled(array $labels): array
+    {
+        return array_map(fn (string $value, string $label) => ['value' => $value, 'label' => $label], array_keys($labels), $labels);
     }
 
     /**

@@ -43,9 +43,7 @@ it('marks the active contextual item as the current page, and only that one', ()
     renderDrawer(tasks);
 
     expect(screen.getByRole('link', { name: 'My tasks' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'My organization' })).not.toHaveAttribute(
-        'aria-current',
-    );
+    expect(screen.getByRole('link', { name: 'All tasks' })).not.toHaveAttribute('aria-current');
 });
 
 it('renders an action as an action, never as selected navigation', () => {

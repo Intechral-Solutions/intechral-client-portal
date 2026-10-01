@@ -240,9 +240,9 @@ test('following a floating drawer link closes the drawer over the page it opened
     await expect(page).toHaveURL(/\/tasks$/);
 
     await page.getByRole('button', { name: 'Show workspace views' }).click();
-    await drawerLink(page, 'Tasks', 'My organization').click();
+    await drawerLink(page, 'Tasks', 'All tasks').click();
 
-    await expect(page).toHaveURL(/\/tasks\?view=org$/);
+    await expect(page).toHaveURL(/\/tasks\?view=all$/);
     await expect(page.getByRole('navigation', { name: 'Tasks views' })).toHaveCount(0);
     // Nothing floats over the canvas, and the toggle is back for the next deliberate open.
     expect((await page.locator('[data-shell-canvas]').boundingBox())?.x).toBeCloseTo(64, 0);

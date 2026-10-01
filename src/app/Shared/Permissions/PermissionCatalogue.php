@@ -59,7 +59,17 @@ final class PermissionCatalogue
     const PROJECTS_VIEW_ORG = 'projects.view_org';
 
     // ── Tasks ──────────────────────────────────────────────
+    /**
+     * Inert since EPIC-014 WP3: the "My organization" view it gated is retired (Q5). Kept in the
+     * catalogue and the user defaults as recorded permission debt (EPIC-014 §22 P1).
+     */
     const TASKS_VIEW_ORG = 'tasks.view_org';
+
+    /**
+     * Offers the All Tasks view (EPIC-014 Q3). A surface capability only: the rows inside it are
+     * still exactly the ones the actor may view, never other users' standalone tasks.
+     */
+    const TASKS_VIEW_ALL = 'tasks.view_all';
 
     // ── Billing ────────────────────────────────────────────
     const BILLING_VIEW = 'billing.view';
@@ -127,7 +137,7 @@ final class PermissionCatalogue
             // Projects
             self::PROJECTS_VIEW, self::PROJECTS_CREATE, self::PROJECTS_MANAGE, self::PROJECTS_ADMIN, self::PROJECTS_VIEW_ORG,
             // Tasks
-            self::TASKS_VIEW_ORG,
+            self::TASKS_VIEW_ORG, self::TASKS_VIEW_ALL,
             // Billing
             self::BILLING_VIEW, self::BILLING_CREATE, self::BILLING_MANAGE, self::BILLING_ADMIN, self::BILLING_VIEW_ORG,
             // Time

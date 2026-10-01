@@ -20,6 +20,9 @@ require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
  *                 is not a statement that the behaviour is desired.
  *   OBSERVED    — a fact a later package depends on, pinned so a decision can be made about it.
  *
+ * WP3 flipped the two list KNOWN DEFECTs (F1 and the dual-linked row) in place; they are labelled
+ * FLIPPED IN WP3 and say what the list did before.
+ *
  * The §12.2 time-entry tests carried a fourth flavour, KNOWN DEFECT / TRANSITION: the owner chose
  * option (c) (an unchanged task attribution on an existing unbilled entry stays valid on unrelated
  * edits, even after the actor loses eligibility). WP2 implemented it and flipped those assertions
@@ -77,15 +80,22 @@ it('OBSERVED (F9, INV-13): a dual-linked row is classified as a board task and f
         ->and($dual->isDone())->toBeTrue();
 });
 
-it('KNOWN DEFECT (INV-13; WP3 excludes it): a dual-linked row assigned to the viewer is listed on /tasks as a project row', function () {
+it('FLIPPED IN WP3 (INV-13, §9.1.1): a dual-linked row assigned to the viewer is no longer listed on /tasks, and is left untouched', function () {
     $user = projectActor('member', $this->project);
+    $user->givePermissionTo('tasks.view_all');
     $ticket = Ticket::factory()->create();
-    makeTask($this->open, ['ticket_id' => $ticket->id, 'assignee_id' => $user->id, 'title' => 'Dual linked']);
+    $dual = makeTask($this->open, ['ticket_id' => $ticket->id, 'assignee_id' => $user->id, 'title' => 'Dual linked']);
 
-    $this->actingAs($user)->get(route('tasks.index'))->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('tasks.data.0.title', 'Dual linked')
-            ->where('tasks.data.0.context.kind', 'project'));
+    // Until WP3 (at 55d2139) this row was listed as a project row (`context.kind` "project"),
+    // because the list classified it through Task::kind(). The workspace query now admits only
+    // `ticket_id IS NULL`, so it appears in neither view, for anyone.
+    foreach (['mine', 'all'] as $view) {
+        $this->actingAs($user)->get(route('tasks.index', ['view' => $view, 'completion' => 'any']))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('tasks.total', 0));
+    }
+
+    expect($dual->fresh()->only(['project_id', 'ticket_id', 'assignee_id']))
+        ->toBe(['project_id' => $this->project->id, 'ticket_id' => $ticket->id, 'assignee_id' => $user->id]);
 });
 
 // ── INV-13: no application path creates a dual-linked row ───────────────────
@@ -129,8 +139,9 @@ it('PRESERVED (INV-9): a task update ignores project_id and ticket_id', function
 
 // ── F1: the unassigned standalone orphan ─────────────────────────────────────
 
-it('KNOWN DEFECT F1 (WP3 fixes it; Q4): an unassigned standalone task is listed to nobody, its creator included', function () {
+it('FLIPPED IN WP3 (F1, Q4): an unassigned standalone task is listed in its creator\'s My Tasks, and to nobody else', function () {
     $creator = makeUser();
+    $other = makeUser('operator');
 
     $this->actingAs($creator)->post(route('tasks.store'), [
         'title' => 'Orphaned', 'priority' => 'low', 'status' => 'todo', 'assignee_id' => null,
@@ -140,9 +151,20 @@ it('KNOWN DEFECT F1 (WP3 fixes it; Q4): an unassigned standalone task is listed 
     expect($task->only(['created_by', 'assignee_id', 'project_id', 'ticket_id']))
         ->toBe(['created_by' => $creator->id, 'assignee_id' => null, 'project_id' => null, 'ticket_id' => null]);
 
-    // Neither view reaches it, so the creator can never see, finish or log time on it again.
+    // Until WP3 (at 55d2139) neither view reached it ("mine" was `assignee_id = me` only), so the
+    // creator could never see, finish or log time on it again. The retired `view=org` now clamps
+    // to mine, so it lists the task too.
     foreach (['mine', 'org'] as $view) {
         $this->actingAs($creator)->get(route('tasks.index', ['view' => $view]))->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('view', 'mine')
+                ->where('tasks.total', 1)
+                ->where('tasks.data.0.id', $task->id));
+    }
+
+    // An operator holding tasks.view_all still never sees another user's personal task (Q3).
+    foreach (['mine', 'all'] as $view) {
+        $this->actingAs($other)->get(route('tasks.index', ['view' => $view]))->assertOk()
             ->assertInertia(fn ($page) => $page->where('tasks.total', 0));
     }
 });

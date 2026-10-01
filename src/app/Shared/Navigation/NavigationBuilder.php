@@ -2,6 +2,7 @@
 
 namespace App\Shared\Navigation;
 
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
 use LogicException;
@@ -142,15 +143,18 @@ final class NavigationBuilder
     }
 
     /**
-     * The two live views are one route differentiated by a query parameter, so they are matched on
-     * that parameter as well as the route name. `TaskController` clamps anything that is not `org`
-     * to `mine`, and "My tasks" mirrors that clamp by declaring no query constraint.
+     * My tasks and All tasks (EPIC-014 §9.8) are one route differentiated by a query parameter,
+     * so they are matched on that parameter as well as the route name. `TaskQuery::resolveView`
+     * clamps anything that is not an authorized `all` to `mine`, and "My tasks" mirrors that clamp
+     * by declaring no query constraint: an actor without `tasks.view_all` asking for `view=all`
+     * sees My tasks active, because My tasks is what the server served.
      *
-     * The controller additionally hides its org tab when the actor's organization has no company
-     * link — data, not capability. That suppression deliberately stays in the controller: this
-     * builder runs on every authenticated request and must not issue an organization query, and the
-     * destination is authorized and safe (the org view can only widen the list with rows the actor
-     * may already open).
+     * "My organization" (`tasks.org`) is retired (Q5): organization is a filter inside the list.
+     * Its permission, `tasks.view_org`, stays in the catalogue unused (§22 P1). Gating here is
+     * permission-only, so building navigation still issues no query.
+     *
+     * The standalone detail route (`tasks.show`) joins both items' active routes when it ships
+     * with its page in EPIC-014 WP5.
      *
      * @return array<string, mixed>
      */
@@ -160,14 +164,14 @@ final class NavigationBuilder
             $this->item('tasks.mine', 'My tasks', route('tasks.index'), 'inertia', ['tasks.index']),
         ];
 
-        if ($user->can('tasks.view_org')) {
+        if ($user->can('viewAll', Task::class)) {
             $views[] = $this->item(
-                'tasks.org',
-                'My organization',
-                route('tasks.index', ['view' => 'org']),
+                'tasks.all',
+                'All tasks',
+                route('tasks.index', ['view' => 'all']),
                 'inertia',
                 ['tasks.index'],
-                ['view' => 'org'],
+                ['view' => 'all'],
             );
         }
 

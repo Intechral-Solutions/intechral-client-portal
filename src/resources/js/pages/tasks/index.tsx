@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { ListChecks } from 'lucide-react';
 import type { ReactElement } from 'react';
 
@@ -7,62 +7,45 @@ import { Pagination } from '@/components/pagination';
 import { CreateTaskForm } from '@/components/tasks/create-task-form';
 import { TaskListRow } from '@/components/tasks/task-list-row';
 import { AppShell } from '@/components/shell/app-shell';
-import { cn } from '@/lib/utils';
-import { index } from '@/routes/tasks';
 import type { Paginated } from '@/types/pagination';
-import type { TaskCreateOptions, TaskRow } from '@/types/tasks';
+import type {
+    TaskCreateOptions,
+    TaskFilterOptions,
+    TaskListFilters,
+    TaskListSort,
+    TaskRow,
+    TaskView,
+} from '@/types/tasks';
 
+/**
+ * The Tasks list (EPIC-014 WP3 contract). The view, filters and sort are server-resolved URL
+ * state; `filters`, `filterOptions`, `sort` and each row's `abilities` are received but not yet
+ * rendered — the Direction D list that consumes them is WP4. My tasks / All tasks are shell
+ * drawer views, so the page carries no view tabs of its own.
+ */
 export type TasksIndexProps = {
     tasks: Paginated<TaskRow>;
-    view: 'mine' | 'org';
-    /** The org tab only ever widens the list through a company link (D2); hidden when that can
-     * never surface a row, exactly like the Blade page it replaces. */
-    canViewOrg: boolean;
+    view: TaskView;
+    filters: TaskListFilters;
+    filterOptions: TaskFilterOptions;
+    sort: TaskListSort;
+    canViewAll: boolean;
     createOptions: TaskCreateOptions;
 };
 
-function ViewTab({ href, active, children }: { href: string; active: boolean; children: string }) {
-    return (
-        <Link
-            href={href}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-                '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors',
-                active
-                    ? 'border-ink text-text'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-        >
-            {children}
-        </Link>
-    );
-}
+const viewDescriptions: Record<TaskView, string> = {
+    mine: 'Tasks assigned to you, and unassigned tasks you created.',
+    all: 'Every task you can see: tasks in your projects, and your own tasks.',
+};
 
-export function TasksIndexPage({ tasks, view, canViewOrg, createOptions }: TasksIndexProps) {
+export function TasksIndexPage({ tasks, view, createOptions }: TasksIndexProps) {
     return (
         <>
             <Head title="Tasks" />
             <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-                <PageHeader
-                    title="Tasks"
-                    description="Tasks assigned to you or your organization."
-                />
+                <PageHeader title="Tasks" description={viewDescriptions[view]} />
 
                 <CreateTaskForm options={createOptions} />
-
-                <div className="flex gap-1 border-b border-border">
-                    <ViewTab href={index.url({ query: { view: 'mine' } })} active={view === 'mine'}>
-                        Assigned to Me
-                    </ViewTab>
-                    {canViewOrg ? (
-                        <ViewTab
-                            href={index.url({ query: { view: 'org' } })}
-                            active={view === 'org'}
-                        >
-                            My Organization
-                        </ViewTab>
-                    ) : null}
-                </div>
 
                 {tasks.data.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-4 py-14 text-center">
