@@ -1,5 +1,13 @@
 import type { Navigation, Workspace } from '@/types';
 
+/** The signed-in user the shell tests render, shaped as the shared `auth.user` prop. */
+export const shellUser = {
+    id: 1,
+    name: 'Dana Webb',
+    email: 'dana@example.test',
+    avatar: { initials: 'DW', url: null },
+};
+
 /**
  * Payloads shaped exactly as `NavigationBuilder` serializes them, so the shell tests exercise the
  * real contract rather than a convenient invention. Keys, order, icon keys, visit modes and the

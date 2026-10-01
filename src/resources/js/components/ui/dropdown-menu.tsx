@@ -16,6 +16,8 @@ export const DropdownMenuGroup = Menu.Group;
 /** Radio rows inside a menu (`group` > `menuitemradio`), so they join the menu's arrow-key focus. */
 export const DropdownMenuRadioGroup = Menu.RadioGroup;
 export const DropdownMenuRadioItem = Menu.RadioItem;
+/** Renders its children only while its radio item is checked: the visible half of the checked state. */
+export const DropdownMenuItemIndicator = Menu.ItemIndicator;
 
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof Menu.Content>,

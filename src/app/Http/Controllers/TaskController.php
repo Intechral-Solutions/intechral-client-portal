@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\DoneColumnConfigurationException;
 use App\Exceptions\UnsupportedTaskOperationException;
+use App\Http\Presenters\StandaloneTaskPresenter;
 use App\Http\Presenters\TaskListPresenter;
+use App\Http\Presenters\TaskTimeSummaryPresenter;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\TaskAssigneeOptions;
 use App\Queries\TaskListState;
 use App\Queries\TaskQuery;
 use App\Queries\TaskRowAbilities;
+use App\Rules\AccessibleTimeContext;
 use App\Rules\ProjectTaskAssignee;
 use App\Rules\StandaloneTaskAssignee;
 use App\Services\TaskService;
@@ -57,6 +61,8 @@ class TaskController extends Controller
         // Links carry the normalized state, not the raw query: a malformed value never rides along.
         $tasks = $query->paginate($state)->appends($state->query() + ($view === TaskQuery::VIEW_ALL ? ['view' => $view] : []));
         $abilities = TaskRowAbilities::for($user, $tasks->getCollection());
+        // Before `through`, which replaces the page's models with row arrays.
+        $assigneeOptions = TaskAssigneeOptions::forPage($user, $tasks->getCollection(), $abilities);
         $tasks->through(fn (Task $task) => TaskListPresenter::row($task, $abilities));
 
         return Inertia::render('tasks/index', [
@@ -75,18 +81,57 @@ class TaskController extends Controller
             'canViewAll' => $user->can('viewAll', Task::class),
             // The server is the source of truth for task vocabulary (§15); the standalone
             // create form receives labelled options rather than hard-coding labels in React.
-            'createOptions' => [
-                'priorities' => collect(Task::PRIORITIES)
-                    ->map(fn (string $value) => ['value' => $value, 'label' => ucfirst($value)])
-                    ->values(),
-                'statuses' => collect(Task::STATUSES)
-                    ->map(fn (string $value) => ['value' => $value, 'label' => match ($value) {
-                        'in_progress' => 'In Progress',
-                        'done' => 'Done',
-                        default => 'To Do',
-                    }])
-                    ->values(),
-            ],
+            'createOptions' => self::formOptions(),
+            // R6 (WP5): who a row may be assigned to, from the rows' own abilities and one query
+            // for the whole page. Self for a standalone row; current members for a managed board
+            // project; nothing for a project whose rows the actor may not assign.
+            'assigneeOptions' => $assigneeOptions,
+        ]);
+    }
+
+    /**
+     * The standalone task detail (§10, WP5). Authorization comes first, as on every other `tasks.*`
+     * route (A2): `TaskPolicy::view` answers 403, so an unauthorized actor is given no kind oracle by
+     * comparing this route with the others. Only then does the kind matter: a board task has one
+     * canonical page (P6), so it redirects there; a standalone task renders here; a ticket-kind task is
+     * not surfaced by EPIC-014 (Q6) and is 404 for the ticket's authorized viewer. A malformed
+     * project-and-ticket row (INV-13) is denied by the policy, never treated as a board task.
+     */
+    public function show(Request $request, Task $task): Response|RedirectResponse
+    {
+        $this->authorize('view', $task);
+        abort_if($task->ticket_id !== null, 404);
+
+        if ($task->kind() === Task::KIND_BOARD) {
+            return redirect()->route('projects.tasks.show', [$task->project_id, $task->id]);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $task->load('assignee:id,name');
+
+        $abilities = [
+            'update' => $user->can('update', $task),
+            'complete' => $user->can('complete', $task),
+            'reopen' => $user->can('reopen', $task),
+            'delete' => $user->can('delete', $task),
+            'assign' => $user->can('assign', $task),
+            // Starting a timer needs the personal-time permission AND current eligibility for this
+            // task (AccessibleTimeContext): the creator of an unassigned task is not eligible until
+            // they take it (P5). The panel offers Start only when the server says so.
+            'logTime' => $user->can('time.log') && AccessibleTimeContext::allows($user, 'task', $task->id),
+        ];
+
+        return Inertia::render('tasks/show', [
+            'task' => StandaloneTaskPresenter::detail($task),
+            'abilities' => $abilities,
+            // Priorities and statuses are server-named (INV-19). The assignee set is the actor and
+            // nobody (§7.3, Q4): no other user is ever named to populate a control.
+            'options' => $abilities['update'] ? [
+                ...self::formOptions(),
+                'assignees' => ['self' => ['id' => $user->id, 'name' => $user->name]],
+            ] : null,
+            'timeSummary' => TaskTimeSummaryPresenter::summary($task, $user),
         ]);
     }
 
@@ -244,6 +289,30 @@ class TaskController extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * The standalone form's labelled vocabulary (INV-19): the create dialog and the detail page's
+     * edit form share it, so the two forms cannot name a priority or status differently.
+     *
+     * @return array{priorities: list<array{value: string, label: string}>, statuses: list<array{value: string, label: string}>}
+     */
+    private static function formOptions(): array
+    {
+        return [
+            'priorities' => collect(Task::PRIORITIES)
+                ->map(fn (string $value) => ['value' => $value, 'label' => ucfirst($value)])
+                ->values()
+                ->all(),
+            'statuses' => collect(Task::STATUSES)
+                ->map(fn (string $value) => ['value' => $value, 'label' => match ($value) {
+                    'in_progress' => 'In Progress',
+                    'done' => 'Done',
+                    default => 'To Do',
+                }])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

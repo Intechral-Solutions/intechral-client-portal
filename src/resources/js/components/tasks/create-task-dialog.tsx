@@ -3,14 +3,18 @@ import { useRef } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
 import { FormDialog } from '@/components/ui/form-dialog';
-import { Input } from '@/components/ui/input';
+import {
+    DescriptionField,
+    DueDateField,
+    PriorityField,
+    TitleField,
+} from '@/components/tasks/task-fields';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { Textarea } from '@/components/ui/textarea';
 import { store } from '@/routes/tasks';
 import type { SharedPageProps } from '@/types';
 import type { TaskPriority } from '@/types/projects';
-import type { TaskCreateOptions } from '@/types/tasks';
+import type { TaskFormOptions } from '@/types/tasks';
 
 type CreateTaskFormData = {
     title: string;
@@ -48,7 +52,7 @@ export function CreateTaskDialog({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    options: TaskCreateOptions;
+    options: TaskFormOptions;
 }) {
     const { auth } = usePage<SharedPageProps>().props;
     const form = useForm<CreateTaskFormData>(EMPTY);
@@ -95,20 +99,13 @@ export function CreateTaskDialog({
             processing={form.processing}
         >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="new-task-title">
-                        Title <span aria-hidden="true">*</span>
-                    </Label>
-                    <Input
+                <div className="sm:col-span-2">
+                    <TitleField
                         id="new-task-title"
                         value={form.data.title}
-                        onChange={(event) => form.setData('title', event.target.value)}
-                        required
-                        maxLength={255}
-                        aria-invalid={Boolean(errors.title)}
-                        aria-describedby={errors.title ? 'new-task-title-error' : undefined}
+                        onChange={(value) => form.setData('title', value)}
+                        error={errors.title}
                     />
-                    <FormFieldError id="new-task-title-error" message={errors.title} />
                 </div>
 
                 <div className="space-y-2">
@@ -130,23 +127,13 @@ export function CreateTaskDialog({
                     <FormFieldError id="new-task-assignee-error" message={errors.assignee_id} />
                 </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="new-task-priority">Priority</Label>
-                    <NativeSelect
-                        id="new-task-priority"
-                        className="w-full"
-                        value={form.data.priority}
-                        onChange={(event) =>
-                            form.setData('priority', event.target.value as TaskPriority)
-                        }
-                    >
-                        {options.priorities.map((priority) => (
-                            <option key={priority.value} value={priority.value}>
-                                {priority.label}
-                            </option>
-                        ))}
-                    </NativeSelect>
-                </div>
+                <PriorityField
+                    id="new-task-priority"
+                    value={form.data.priority}
+                    onChange={(value) => form.setData('priority', value)}
+                    options={options.priorities}
+                    error={errors.priority}
+                />
 
                 <div className="space-y-2">
                     <Label htmlFor="new-task-status">Status</Label>
@@ -169,30 +156,21 @@ export function CreateTaskDialog({
                     </NativeSelect>
                 </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="new-task-due-date">Due date</Label>
-                    <Input
-                        id="new-task-due-date"
-                        type="date"
-                        value={form.data.due_date}
-                        onChange={(event) => form.setData('due_date', event.target.value)}
-                    />
-                    <FormFieldError id="new-task-due-date-error" message={errors.due_date} />
-                </div>
+                <DueDateField
+                    id="new-task-due-date"
+                    value={form.data.due_date}
+                    onChange={(value) => form.setData('due_date', value)}
+                    error={errors.due_date}
+                />
 
-                <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="new-task-description">Description</Label>
-                    <Textarea
+                <div className="sm:col-span-2">
+                    <DescriptionField
                         id="new-task-description"
                         rows={2}
                         value={form.data.description}
-                        onChange={(event) => form.setData('description', event.target.value)}
-                        aria-invalid={Boolean(errors.description)}
-                        aria-describedby={
-                            errors.description ? 'new-task-description-error' : undefined
-                        }
+                        onChange={(value) => form.setData('description', value)}
+                        error={errors.description}
                     />
-                    <FormFieldError id="new-task-description-error" message={errors.description} />
                 </div>
             </div>
         </FormDialog>

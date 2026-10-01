@@ -1,15 +1,17 @@
 import { Clock } from 'lucide-react';
 import type { Ref } from 'react';
 
+import { assigneeChoices } from '@/components/tasks/task-assignee-choices';
+import { TaskAssigneeMenu } from '@/components/tasks/task-assignee-menu';
 import { TaskCompleteControl } from '@/components/tasks/task-complete-control';
 import { TaskContextLink } from '@/components/tasks/task-context-link';
+import { TaskPriorityMark } from '@/components/tasks/task-priority';
 import { TaskTitleCell } from '@/components/tasks/task-title-cell';
 import { DataTable, type DataTableColumn, type DataTableHandle } from '@/components/ui/data-table';
-import { Priority } from '@/components/ui/priority';
 import { Status } from '@/components/ui/status';
 import { formatDate } from '@/lib/dates';
 import type { TaskPriority } from '@/types/projects';
-import type { TaskRow } from '@/types/tasks';
+import type { TaskAssigneeOptions, TaskRow } from '@/types/tasks';
 
 /**
  * EPIC-014 WP4 — the Tasks list's `DataTable` (§14.1): Complete ring · Task (title + source tag) ·
@@ -18,11 +20,11 @@ import type { TaskRow } from '@/types/tasks';
  * visibility all come from the server.
  *
  * At S (D9) the selection, ring and one-line title share the first band and the status, priority,
- * context and due date the second (a strict two bands at 390px); the assignee stays for assistive
- * technology only (`detail`).
+ * context, assignee and due date the second (a strict two bands at 390px). A row the server lets the
+ * viewer assign (`abilities.assign`) draws the assignee as a compact control, the mark alone at S, so the
+ * band does not grow (EPIC-014 R6); any other row keeps the assignee for assistive technology only
+ * (`detail`), as before.
  */
-const bars: Record<TaskPriority, 1 | 2 | 3> = { low: 1, medium: 2, high: 3, critical: 3 };
-
 function DueCell({ task }: { task: TaskRow }) {
     if (!task.dueDate) {
         return (
@@ -63,6 +65,9 @@ export function TaskTable({
     pendingIds,
     onToggle,
     onOpen,
+    assigneeOptions,
+    assigningIds,
+    onAssign,
     selection,
     ref,
 }: {
@@ -73,6 +78,11 @@ export function TaskTable({
     pendingIds: ReadonlySet<number>;
     onToggle: (task: TaskRow) => void;
     onOpen: (task: TaskRow) => void;
+    /** The server's candidate pool for single-row assignment (R6). */
+    assigneeOptions: TaskAssigneeOptions;
+    assigningIds: ReadonlySet<number>;
+    /** A change of assignee for one row: a user id, or `null` to release it. */
+    onAssign: (task: TaskRow, userId: number | null) => void;
     selection?: { selected: ReadonlySet<number>; onChange: (next: Set<number>) => void };
     ref?: Ref<DataTableHandle<number>>;
 }) {
@@ -119,12 +129,10 @@ export function TaskTable({
             header: 'Priority',
             className: 'max-md:shrink-0 max-md:px-0',
             cell: (task) => (
-                <Priority
-                    bars={bars[task.priority]}
-                    tone={task.priority === 'critical' ? 'danger' : 'neutral'}
-                >
-                    {priorityLabels[task.priority] ?? task.priority}
-                </Priority>
+                <TaskPriorityMark
+                    priority={task.priority}
+                    label={priorityLabels[task.priority] ?? task.priority}
+                />
             ),
         },
         {
@@ -145,12 +153,25 @@ export function TaskTable({
         {
             id: 'assignee',
             header: 'Assignee',
-            area: 'detail',
-            cell: (task) => (
-                <span data-cell="assignee" className="whitespace-nowrap text-text-secondary">
-                    {task.assignee?.name ?? '—'}
-                </span>
-            ),
+            // A control the server allows is a visible second-band item at S; plain text is not.
+            area: (task) => (task.abilities.assign ? 'meta' : 'detail'),
+            className: 'max-md:shrink-0 max-md:px-0',
+            cell: (task) =>
+                task.abilities.assign ? (
+                    <TaskAssigneeMenu
+                        taskTitle={task.title}
+                        assignee={task.assignee}
+                        choices={assigneeChoices(task, assigneeOptions)}
+                        pending={assigningIds.has(task.id)}
+                        onAssign={(userId) => onAssign(task, userId)}
+                        compactAtSmall
+                        className="max-w-48"
+                    />
+                ) : (
+                    <span data-cell="assignee" className="whitespace-nowrap text-text-secondary">
+                        {task.assignee?.name ?? '—'}
+                    </span>
+                ),
         },
         {
             id: 'due',

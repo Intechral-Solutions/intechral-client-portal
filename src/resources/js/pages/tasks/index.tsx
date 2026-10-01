@@ -24,12 +24,14 @@ import type { DataTableHandle } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { focusIsLost } from '@/lib/focus';
 import { bulk as bulkRoute, complete, index, reopen } from '@/routes/tasks';
+import { update as assigneeUpdate } from '@/routes/tasks/assignee';
 import { cn } from '@/lib/utils';
 import { focusRing } from '@/components/ui/control-metrics';
 import type { SharedPageProps } from '@/types';
 import type { Paginated } from '@/types/pagination';
 import type { TaskPriority } from '@/types/projects';
 import type {
+    TaskAssigneeOptions,
     TaskBulkResult,
     TaskCreateOptions,
     TaskFilterOptions,
@@ -61,6 +63,8 @@ export type TasksIndexProps = {
     sort: TaskListSort;
     canViewAll: boolean;
     createOptions: TaskCreateOptions;
+    /** Who a row may be assigned to (EPIC-014 R6): the server's candidate pool, never derived here. */
+    assigneeOptions: TaskAssigneeOptions;
 };
 
 const viewTitles: Record<TaskView, string> = { mine: 'My tasks', all: 'All tasks' };
@@ -114,6 +118,7 @@ export function TasksIndexPage({
     filterOptions,
     sort,
     createOptions,
+    assigneeOptions,
 }: TasksIndexProps) {
     const { flash } = usePage<SharedPageProps>().props;
     const timers = useOptionalTimers();
@@ -122,17 +127,25 @@ export function TasksIndexPage({
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
     const [pending, setPending] = useState<ReadonlySet<number>>(new Set());
+    const [assigning, setAssigning] = useState<ReadonlySet<number>>(new Set());
     const [bulkBusy, setBulkBusy] = useState(false);
     const [actionError, setActionError] = useState<{ title: string; message: string } | null>(null);
     const inFlight = useRef(new Set<number>());
+    const assignInFlight = useRef(new Set<number>());
     const bulkInFlight = useRef(false);
     // Where focus goes once the list the server returns has rendered (Direction D §14.2): the row
     // that takes the acted-on row's place, or `'empty'` when it was the only one. `wasDone` is the
     // row's state when the request left; if the response shows it unchanged, the action did not take
-    // effect (a refusal), the focus has no reason to move and the entry is dropped.
-    const focusAfter = useRef<{ task: number; wasDone: boolean; target: number | 'empty' } | null>(
-        null,
-    );
+    // effect (a refusal), the focus has no reason to move and the entry is dropped. An assignment
+    // (`onlyIfLost`) never completes a row, so it moves focus only when the row has left the list AND
+    // focus was lost with it: a row still listed keeps its own control, and a user who has moved on
+    // keeps their place.
+    const focusAfter = useRef<{
+        task: number;
+        wasDone: boolean;
+        target: number | 'empty';
+        onlyIfLost?: boolean;
+    } | null>(null);
     const emptyRegion = useRef<HTMLDivElement>(null);
     // The row that last held table focus while a selection existed, and the selection size before.
     const lastRow = useRef<number | null>(null);
@@ -162,6 +175,7 @@ export function TasksIndexPage({
         }
 
         focusAfter.current = null;
+        if (pendingFocus.onlyIfLost && !focusIsLost()) return;
         if (pendingFocus.target !== 'empty') {
             tableRef.current?.focusRow(pendingFocus.target);
         } else if (tasks.data.length === 0) {
@@ -263,6 +277,49 @@ export function TasksIndexPage({
                 onFinish: () => {
                     inFlight.current.delete(task.id);
                     setPending(new Set(inFlight.current));
+                },
+            },
+        );
+    }
+
+    /** R6: one row's assignee, through the narrow endpoint. The server authorizes and validates it again. */
+    function assign(task: TaskRow, userId: number | null) {
+        if (assignInFlight.current.has(task.id)) return;
+
+        assignInFlight.current.add(task.id);
+        setAssigning(new Set(assignInFlight.current));
+        setActionError(null);
+
+        // In My Tasks a reassignment can take the row out of the list: remember where focus should go.
+        const position = tasks.data.findIndex((candidate) => candidate.id === task.id);
+        const neighbour = (tasks.data[position + 1] ?? tasks.data[position - 1])?.id;
+        focusAfter.current = {
+            task: task.id,
+            wasDone: task.status.done,
+            target: neighbour ?? 'empty',
+            onlyIfLost: true,
+        };
+
+        router.put(
+            assigneeUpdate.url(task.id),
+            { assignee_id: userId },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setActionError(null),
+                onError: (errors) => {
+                    focusAfter.current = null;
+                    setActionError({
+                        title: task.title,
+                        message:
+                            errors.assignee_id ??
+                            Object.values(errors)[0] ??
+                            'The assignee could not be changed.',
+                    });
+                },
+                onFinish: () => {
+                    assignInFlight.current.delete(task.id);
+                    setAssigning(new Set(assignInFlight.current));
                 },
             },
         );
@@ -380,6 +437,9 @@ export function TasksIndexPage({
                         pendingIds={pending}
                         onToggle={toggle}
                         onOpen={(task) => task.url && router.visit(task.url)}
+                        assigneeOptions={assigneeOptions}
+                        assigningIds={assigning}
+                        onAssign={assign}
                         selection={{ selected, onChange: setSelected }}
                     />
                 )}

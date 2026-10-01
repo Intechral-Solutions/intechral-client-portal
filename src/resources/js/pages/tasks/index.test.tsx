@@ -2,9 +2,16 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { TasksIndexPage, type TasksIndexProps } from '@/pages/tasks/index';
+import { chooseRadio, openMenu } from '@/test/menu';
 import { inertiaSpies, resetInertiaMock, setPageProps } from '@/test/inertia';
 import type { Paginated } from '@/types/pagination';
-import type { TaskBulkResult, TaskFilterOptions, TaskListFilters, TaskRow } from '@/types/tasks';
+import type {
+    TaskAssigneeOptions,
+    TaskBulkResult,
+    TaskFilterOptions,
+    TaskListFilters,
+    TaskRow,
+} from '@/types/tasks';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
 
@@ -85,6 +92,7 @@ const projectRow: TaskRow = {
     id: 1,
     title: 'Ship it',
     kind: 'board',
+    projectId: 1,
     priority: 'high',
     status: { label: 'To Do', done: false, source: 'column' },
     dueDate: null,
@@ -99,14 +107,28 @@ const standaloneRow: TaskRow = {
     id: 3,
     title: 'Loose end',
     kind: 'standalone',
+    projectId: null,
     priority: 'low',
     status: { label: 'To Do', done: false, source: 'status' },
     dueDate: null,
     overdue: false,
     assignee: { id: 5, name: 'Mia Member' },
     context: { kind: 'standalone', label: 'Standalone', url: null },
-    url: null,
+    url: '/tasks/3',
     abilities: { complete: true, reopen: true, assign: true },
+};
+
+const assigneeOptions: TaskAssigneeOptions = {
+    self: { id: 5, name: 'Mia Member' },
+    projects: [
+        {
+            projectId: 1,
+            members: [
+                { id: 5, name: 'Mia Member' },
+                { id: 6, name: 'Noor Newhire' },
+            ],
+        },
+    ],
 };
 
 const third: TaskRow = { ...projectRow, id: 4, title: 'Third thing', url: '/projects/1/tasks/4' };
@@ -132,6 +154,7 @@ function defaultProps(overrides: Partial<TasksIndexProps> = {}): TasksIndexProps
         sort: { by: 'due', dir: 'asc' },
         canViewAll: false,
         createOptions,
+        assigneeOptions,
         ...overrides,
     };
 }
@@ -186,8 +209,9 @@ describe('page architecture (EPIC-014 §14.1)', () => {
             'href',
             '/projects/1/board',
         );
-        expect(screen.getByText('Loose end')).toBeVisible();
-        expect(screen.queryByRole('link', { name: 'Loose end' })).not.toBeInTheDocument();
+        // WP5: a standalone task has its own page, `tasks.show`; its context is a label, not a link.
+        expect(screen.getByRole('link', { name: 'Loose end' })).toHaveAttribute('href', '/tasks/3');
+        expect(screen.queryByRole('link', { name: 'Standalone' })).not.toBeInTheDocument();
     });
 });
 
@@ -829,5 +853,133 @@ describe('create dialog and pagination', () => {
             'href',
             '/tasks?due=overdue&page=2',
         );
+    });
+});
+
+describe('single-row assignment (EPIC-014 R6, WP5)', () => {
+    const managed: TaskRow = {
+        ...projectRow,
+        abilities: { complete: true, reopen: true, assign: true },
+    };
+
+    it('assigns a standalone row to the viewer or releases it, through the narrow endpoint', async () => {
+        const user = userEvent.setup();
+        render(
+            <TasksIndexPage
+                {...defaultProps({ tasks: paginate([{ ...standaloneRow, assignee: null }]) })}
+            />,
+        );
+
+        await openMenu(
+            user,
+            screen.getByRole('button', { name: /Change assignee of “Loose end”/ }),
+        );
+        await chooseRadio(user, 'Me');
+
+        expect(inertiaSpies.router.put).toHaveBeenCalledWith(
+            '/tasks/3/assignee',
+            { assignee_id: 5 },
+            expect.objectContaining({ preserveScroll: true, preserveState: true }),
+        );
+    });
+
+    it('assigns a managed board row to a listed project member', async () => {
+        const user = userEvent.setup();
+        render(<TasksIndexPage {...defaultProps({ tasks: paginate([managed]) })} />);
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+
+        expect(inertiaSpies.router.put.mock.calls[0]).toEqual([
+            '/tasks/1/assignee',
+            { assignee_id: 6 },
+            expect.any(Object),
+        ]);
+    });
+
+    it('offers no control on a row the server did not allow to be assigned', () => {
+        render(<TasksIndexPage {...defaultProps({ tasks: paginate([projectRow]) })} />);
+
+        expect(screen.queryByRole('button', { name: /Change assignee/ })).not.toBeInTheDocument();
+        expect(within(row('Ship it')).getByText('Mia Member')).toBeInTheDocument();
+    });
+
+    it('is single-flight per row and marks the control busy until the request finishes', async () => {
+        const user = userEvent.setup();
+        render(<TasksIndexPage {...defaultProps({ tasks: paginate([managed]) })} />);
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+
+        const trigger = screen.getByRole('button', { name: /Change assignee of “Ship it”/ });
+        expect(trigger).toHaveAttribute('aria-busy', 'true');
+        expect(inertiaSpies.router.put).toHaveBeenCalledTimes(1);
+
+        const options = inertiaSpies.router.put.mock.calls[0]![2] as { onFinish: () => void };
+        act(() => options.onFinish());
+        expect(trigger).not.toHaveAttribute('aria-busy');
+    });
+
+    it('shows a refusal in a live alert naming the task, and clears it when dismissed', async () => {
+        const user = userEvent.setup();
+        render(<TasksIndexPage {...defaultProps({ tasks: paginate([managed]) })} />);
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+        const options = inertiaSpies.router.put.mock.calls[0]![2] as {
+            onError: (errors: Record<string, string>) => void;
+        };
+        act(() => options.onError({ assignee_id: 'The selected assignee is invalid.' }));
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Could not change “Ship it”');
+        expect(screen.getByRole('alert')).toHaveTextContent('The selected assignee is invalid.');
+
+        await user.click(screen.getByRole('button', { name: 'Dismiss message' }));
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('repairs focus onto the next row when the reassigned row leaves the view', async () => {
+        const user = userEvent.setup();
+        const { rerender } = render(
+            <TasksIndexPage {...defaultProps({ tasks: paginate([managed, third]) })} />,
+        );
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+        const options = inertiaSpies.router.put.mock.calls[0]![2] as { onFinish: () => void };
+
+        // The server moved the task out of My Tasks: the row (and the focused trigger) is gone.
+        (document.activeElement as HTMLElement | null)?.blur();
+        rerender(<TasksIndexPage {...defaultProps({ tasks: paginate([third]) })} />);
+        act(() => options.onFinish());
+
+        expect(row('Third thing')).toHaveFocus();
+    });
+
+    it('leaves focus alone when the row is still listed after the assignment', async () => {
+        const user = userEvent.setup();
+        const { rerender } = render(
+            <TasksIndexPage {...defaultProps({ tasks: paginate([managed, third]) })} />,
+        );
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+        rerender(
+            <TasksIndexPage
+                {...defaultProps({
+                    tasks: paginate([
+                        { ...managed, assignee: { id: 6, name: 'Noor Newhire' } },
+                        third,
+                    ]),
+                })}
+            />,
+        );
+
+        expect(row('Third thing')).not.toHaveFocus();
+        expect(
+            screen.getByRole('button', {
+                name: 'Assignee: Noor Newhire. Change assignee of “Ship it”',
+            }),
+        ).toBeInTheDocument();
     });
 });

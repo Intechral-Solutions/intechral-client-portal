@@ -24,7 +24,11 @@ import { cn } from '@/lib/utils';
  * and stays for assistive technology, except its select-all checkbox, which is hidden outright there:
  * a control nobody can see must not be a Tab stop (WCAG 2.4.7), and rows stay selectable one by one.
  * Nothing scrolls the document sideways; at M and up the table
- * scrolls inside its own wrapper rather than being clipped by it.
+ * scrolls inside its own wrapper rather than being clipped by it. The wrapper is also positioned, so
+ * the visually hidden (`sr-only`, absolutely positioned) text inside a cell is clipped by it too: with
+ * no positioned ancestor, such text in a far-right cell of a table wider than the viewport sits outside
+ * the wrapper's clip and widens the *document* (found at 768px once the assignee control widened the
+ * table, EPIC-014 WP5).
  *
  * Keyboard (EPIC-014 §15.1, Direction D §14.3), only while focus is inside the table and not in a
  * text field, and never with Ctrl/Meta/Alt held (WCAG 2.1.4; browser and AT shortcuts stay theirs):
@@ -34,6 +38,8 @@ import { cn } from '@/lib/utils';
  */
 type Key = string | number;
 
+export type DataTableArea = 'lead' | 'title' | 'meta' | 'detail';
+
 export type DataTableColumn<T> = {
     id: string;
     /** Header text. Always present for assistive technology, even when `hideHeader` hides it. */
@@ -42,9 +48,10 @@ export type DataTableColumn<T> = {
     cell: (row: T) => ReactNode;
     /**
      * Where the cell goes in the small-width reflow. `lead`/`title` share the first line, `meta` the
-     * second; `detail` is visually hidden there. Default `meta`.
+     * second; `detail` is visually hidden there. Default `meta`. A function chooses per row, for a
+     * cell that is a visible control on some rows and plain, assistive-technology-only text on others.
      */
-    area?: 'lead' | 'title' | 'meta' | 'detail';
+    area?: DataTableArea | ((row: T) => DataTableArea);
     className?: string;
 };
 
@@ -63,7 +70,7 @@ export type DataTableHandle<K extends Key = Key> = {
     focusedRowKey(): K | null;
 };
 
-const areaClass: Record<NonNullable<DataTableColumn<unknown>['area']>, string> = {
+const areaClass: Record<DataTableArea, string> = {
     lead: 'max-md:order-1',
     title: 'max-md:order-2 max-md:min-w-0 max-md:flex-1',
     meta: 'max-md:order-4',
@@ -187,7 +194,7 @@ export function DataTable<T, K extends Key = Key>({
     }
 
     return (
-        <div className="md:overflow-x-auto">
+        <div className="relative md:overflow-x-auto">
             <table
                 role="table"
                 aria-label={label}
@@ -266,7 +273,11 @@ export function DataTable<T, K extends Key = Key>({
                                         role="cell"
                                         className={cn(
                                             'px-3 py-2 align-middle max-md:px-1.5 max-md:py-0',
-                                            areaClass[column.area ?? 'meta'],
+                                            areaClass[
+                                                (typeof column.area === 'function'
+                                                    ? column.area(row)
+                                                    : column.area) ?? 'meta'
+                                            ],
                                             column.className,
                                         )}
                                     >

@@ -8,6 +8,7 @@ const task: TaskRow = {
     id: 1,
     title: 'Ship it',
     kind: 'board',
+    projectId: 1,
     priority: 'high',
     status: { label: 'To Do', done: false, source: 'column' },
     dueDate: null,

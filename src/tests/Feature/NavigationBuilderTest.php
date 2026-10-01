@@ -495,6 +495,19 @@ it('marks exactly one workspace and at most one contextual item active', functio
 // Tasks views (EPIC-014 WP3, §9.8)
 // ─────────────────────────────────────────────────────────────────────────────
 
+it('keeps the Tasks workspace and My tasks active on the standalone task detail (WP5, §9.8)', function () {
+    $operator = actor('operator');
+
+    // The page carries no `view` of its own, so it lands on My tasks, the view that mirrors the clamp.
+    $navigation = navigationFor($operator, 'tasks.show', ['task' => 1]);
+    expect($navigation['currentWorkspace'])->toBe('tasks')
+        ->and(navigationActiveKeysDeep($navigation))->toBe(['tasks', 'tasks.mine']);
+
+    // A request that did name the All view keeps that item active, as on the list.
+    $all = navigationFor($operator, 'tasks.show', ['task' => 1], ['view' => 'all']);
+    expect(navigationActiveKeysDeep($all))->toBe(['tasks', 'tasks.all']);
+});
+
 it('offers My tasks to everyone and All tasks only with tasks.view_all, and never My organization', function () {
     $operator = actor('operator');
     $user = actor('user');   // holds tasks.view_org, which no longer offers anything

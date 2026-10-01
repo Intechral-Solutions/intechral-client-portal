@@ -153,15 +153,15 @@ final class NavigationBuilder
      * Its permission, `tasks.view_org`, stays in the catalogue unused (§22 P1). Gating here is
      * permission-only, so building navigation still issues no query.
      *
-     * The standalone detail route (`tasks.show`) joins both items' active routes when it ships
-     * with its page in EPIC-014 WP5.
+     * The standalone detail route (`tasks.show`, EPIC-014 WP5) is an active route of both items, so
+     * the page keeps the Tasks workspace active. It carries no `view`, so it lands on My tasks.
      *
      * @return array<string, mixed>
      */
     private function tasks(User $user): array
     {
         $views = [
-            $this->item('tasks.mine', 'My tasks', route('tasks.index'), 'inertia', ['tasks.index']),
+            $this->item('tasks.mine', 'My tasks', route('tasks.index'), 'inertia', ['tasks.index', 'tasks.show']),
         ];
 
         if ($user->can('viewAll', Task::class)) {
@@ -170,7 +170,7 @@ final class NavigationBuilder
                 'All tasks',
                 route('tasks.index', ['view' => 'all']),
                 'inertia',
-                ['tasks.index'],
+                ['tasks.index', 'tasks.show'],
                 ['view' => 'all'],
             );
         }
