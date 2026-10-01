@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { TasksIndexPage, type TasksIndexProps } from '@/pages/tasks/index';
 import { resetInertiaMock, setPageProps } from '@/test/inertia';
 import type { Paginated } from '@/types/pagination';
-import type { TaskRow } from '@/types/tasks';
+import type { TaskFilterOptions, TaskRow } from '@/types/tasks';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
 
@@ -37,9 +37,24 @@ function paginate(
     };
 }
 
+const abilities = { complete: true, reopen: true, assign: false };
+
+const filterOptions: TaskFilterOptions = {
+    completion: [{ value: 'open', label: 'Open' }],
+    priorities: [{ value: 'high', label: 'High' }],
+    due: [{ value: 'overdue', label: 'Overdue' }],
+    kinds: [{ value: 'project', label: 'Project' }],
+    sorts: [{ value: 'due', label: 'Due date' }],
+    projects: [],
+    milestones: [],
+    assignees: [],
+    organizations: [],
+};
+
 const projectRow: TaskRow = {
     id: 1,
     title: 'Ship it',
+    kind: 'board',
     priority: 'high',
     status: { label: 'To Do', done: false, source: 'column' },
     dueDate: null,
@@ -47,23 +62,13 @@ const projectRow: TaskRow = {
     assignee: { id: 5, name: 'Mia Member' },
     context: { kind: 'project', label: 'Alpha', url: '/projects/1/board' },
     url: '/projects/1/tasks/1',
-};
-
-const ticketRow: TaskRow = {
-    id: 2,
-    title: 'Diagnose outage',
-    priority: 'critical',
-    status: { label: 'Done', done: true, source: 'status' },
-    dueDate: null,
-    overdue: false,
-    assignee: null,
-    context: { kind: 'ticket', label: 'TKT-1001', url: '/tickets/9' },
-    url: null,
+    abilities,
 };
 
 const standaloneRow: TaskRow = {
     id: 3,
     title: 'Loose end',
+    kind: 'standalone',
     priority: 'low',
     status: { label: 'To Do', done: false, source: 'status' },
     dueDate: null,
@@ -71,55 +76,66 @@ const standaloneRow: TaskRow = {
     assignee: { id: 5, name: 'Mia Member' },
     context: { kind: 'standalone', label: 'Standalone', url: null },
     url: null,
+    abilities: { complete: true, reopen: true, assign: true },
 };
 
 function defaultProps(overrides: Partial<TasksIndexProps> = {}): TasksIndexProps {
     return {
-        tasks: paginate([projectRow, ticketRow, standaloneRow]),
+        tasks: paginate([projectRow, standaloneRow]),
         view: 'mine',
-        canViewOrg: true,
+        filters: {
+            completion: 'open',
+            priority: [],
+            due: null,
+            kind: null,
+            project: null,
+            milestone: null,
+            assignee: null,
+            organization: null,
+            q: '',
+        },
+        filterOptions,
+        sort: { by: 'due', dir: 'asc' },
+        canViewAll: false,
         createOptions,
         ...overrides,
     };
 }
 
-it('renders every task kind, each with its own correct link behavior', () => {
+it('renders both surfaced kinds, each with its own correct link behavior', () => {
     render(<TasksIndexPage {...defaultProps()} />);
 
     expect(screen.getByRole('link', { name: 'Ship it' })).toHaveAttribute(
         'href',
         '/projects/1/tasks/1',
     );
-    expect(screen.getByText('Diagnose outage')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Diagnose outage' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'TKT-1001' })).toHaveAttribute('href', '/tickets/9');
+    expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+        'href',
+        '/projects/1/board',
+    );
     expect(screen.getByText('Loose end')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Loose end' })).not.toBeInTheDocument();
     expect(screen.getByText('Standalone')).toBeInTheDocument();
 });
 
-it('shows both view tabs when the org tab is available, "Assigned to Me" marked current', () => {
-    render(<TasksIndexPage {...defaultProps({ view: 'mine' })} />);
+it('carries no view tabs of its own: My tasks and All tasks are shell drawer views (EPIC-014 §9.8)', () => {
+    render(<TasksIndexPage {...defaultProps({ canViewAll: true })} />);
 
-    const mine = screen.getByRole('link', { name: 'Assigned to Me' });
-    const org = screen.getByRole('link', { name: 'My Organization' });
-    expect(mine).toHaveAttribute('aria-current', 'page');
-    expect(org).not.toHaveAttribute('aria-current');
-    expect(org).toHaveAttribute('href', expect.stringContaining('view=org'));
+    for (const name of ['Assigned to Me', 'My Organization', 'My tasks', 'All tasks']) {
+        expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
 });
 
-it('hides the org tab entirely when canViewOrg is false', () => {
-    render(<TasksIndexPage {...defaultProps({ canViewOrg: false })} />);
+it('describes the view the server resolved', () => {
+    const { rerender } = render(<TasksIndexPage {...defaultProps()} />);
+    expect(
+        screen.getByText('Tasks assigned to you, and unassigned tasks you created.'),
+    ).toBeInTheDocument();
 
-    expect(screen.queryByRole('link', { name: 'My Organization' })).not.toBeInTheDocument();
-});
-
-it('marks the org tab current when viewing it', () => {
-    render(<TasksIndexPage {...defaultProps({ view: 'org' })} />);
-
-    expect(screen.getByRole('link', { name: 'My Organization' })).toHaveAttribute(
-        'aria-current',
-        'page',
-    );
+    rerender(<TasksIndexPage {...defaultProps({ view: 'all', canViewAll: true })} />);
+    expect(
+        screen.getByText('Every task you can see: tasks in your projects, and your own tasks.'),
+    ).toBeInTheDocument();
 });
 
 it('shows an empty state and no table when there are no tasks', () => {

@@ -39,6 +39,8 @@ time.view_own
 time.view_all
 time.manage
 
+tasks.view_all
+
 cms.view
 cms.edit
 cms.publish
@@ -58,6 +60,8 @@ settings.manage
 ```
 
 **Known gap — `time.view_own`:** this permission exists in the catalogue and is granted by default to the `user` role (see below), but nothing in the live application currently checks it as an enforcement boundary. Implemented Time behavior is gated by `time.log` (may log/see one's own entries) and `time.view_all` (may see every user's entries); there is no code path where holding or lacking `time.view_own` changes what a request can do. EPIC-011E (Projects and Kanban Migration) reviewed this while auditing Time-adjacent contracts and deliberately did not reinterpret or wire it — that was out of its scope. Future permission-model work should either give `time.view_own` a real enforcement meaning or retire it from the catalogue; until then, treat `time.log` as the operative "see your own time" gate.
+
+**Tasks — `tasks.view_all` and the inert `tasks.view_org` (EPIC-014 WP3):** `tasks.view_all` offers the **All Tasks** view (`TaskPolicy::viewAll`; the `tasks.all` navigation item; `/tasks?view=all`). It is a surface capability, never an object grant: the rows inside All Tasks are exactly the ones `TaskPolicy::view` allows (board tasks of projects the actor may view, and the actor's own standalone tasks), so holding it never reveals another user's standalone task, a project the actor cannot view, or a ticket-kind task. It is granted to `operator` through the usual all-permissions sync and is **not** in the `user` defaults; any role may be given it. `tasks.view_org` lost its only consumer when the "My organization" view was retired (EPIC-014 Q5): it stays in the catalogue and the `user` defaults, unused, as recorded permission debt (EPIC-014 §22 P1), the same treatment `projects.view_org` received in EPIC-011E. Existing development databases need `PermissionSeeder` and `RoleSeeder` re-run to pick up `tasks.view_all`.
 
 ## Built-in Roles
 
@@ -163,7 +167,7 @@ org.manage_roles
 org.admin
 ```
 
-The built-in `user` role receives the `*.view_org` permissions. The `org.*` permissions exist in the catalogue, but organization-admin self-service routes are not yet implemented; current member management is under `crm.manage`.
+The built-in `user` role receives the `*.view_org` permissions. `tasks.view_org` is inert since EPIC-014 WP3 (see the Tasks note above). The `org.*` permissions exist in the catalogue, but organization-admin self-service routes are not yet implemented; current member management is under `crm.manage`.
 
 ### Organization Tables
 

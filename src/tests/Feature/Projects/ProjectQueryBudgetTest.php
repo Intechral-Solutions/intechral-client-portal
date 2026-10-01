@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\CrmCompany;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskChecklistItem;
 use App\Models\Ticket;
@@ -142,6 +144,63 @@ it('does not run per-row queries on the tasks list', function () {
 
     expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "tasks queries: 9 rows={$small}, 30 rows={$large}");
 });
+
+/*
+ * EPIC-014 WP3 (§9.7): the Tasks workspace query, its filter options and the batched row
+ * abilities cost a constant number of queries per request shape. Each case grows rows, projects,
+ * assignees and companies together, so a per-row, per-project or per-option query would show.
+ */
+
+/** Grow a Tasks-workspace world around $member: one project, one company, one assignee per step. */
+function growTasksWorld(User $member, User $owner, int $n): void
+{
+    static $step = 0;
+
+    for ($i = 0; $i < $n; $i++, $step++) {
+        $project = makeProject($owner, "Budget {$step}");
+        $project->members()->attach($member->id, ['role' => $step % 2 ? 'member' : 'manager']);
+        $other = makeUser();
+        $project->members()->attach($other->id, ['role' => 'member']);
+        $project->milestones()->create(['name' => "MS {$step}", 'due_date' => today()]);
+        $project->companies()->attach(CrmCompany::factory()->create(['created_by' => $owner->id])->id);
+        makeTask($project->columns[$step % 5], ['assignee_id' => $member->id, 'priority' => 'high', 'title' => "Budget task {$step}", 'due_date' => today()->subDay()]);
+        makeTask($project->columns[1], ['assignee_id' => $other->id, 'priority' => 'high', 'title' => "Budget other {$step}", 'position' => 1]);
+        Task::factory()->standalone()->create(['created_by' => $member->id, 'assignee_id' => null, 'title' => "Budget loose {$step}", 'priority' => 'high']);
+        Task::factory()->standalone()->create([
+            'assignee_id' => $member->id, 'title' => "Budget ticket {$step}", 'ticket_id' => Ticket::factory()->create(['user_id' => $member->id])->id,
+        ]);
+    }
+}
+
+it('keeps My Tasks, All Tasks, filtered, searched and option-heavy requests constant as rows grow (WP3)', function (string $who, array $query) {
+    $owner = makeUser('operator');
+    $member = makeUser('user');
+    $member->givePermissionTo(['projects.manage', 'tasks.view_all']);
+    $actor = $who === 'operator' ? $owner : $member;
+    if (isset($query['project'])) {
+        $query['project'] = makeProject($owner, 'Selected')->id;
+        Project::find($query['project'])->members()->attach($member->id, ['role' => 'manager']);
+    }
+    $request = fn () => $this->actingAs($actor)->get(route('tasks.index', $query))->assertOk();
+
+    growTasksWorld($member, $owner, 3);
+    if (isset($query['project'])) {
+        makeTask(Project::find($query['project'])->columns[1], ['assignee_id' => $member->id, 'title' => 'Budget selected']);
+    }
+    $small = warmQueries($request);
+    growTasksWorld($member, $owner, 12);
+    $large = warmQueries($request);
+
+    expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "{$who} ".json_encode($query).": small={$small}, large={$large}");
+})->with([
+    'member, My Tasks' => ['member', []],
+    'member, All Tasks' => ['member', ['view' => 'all']],
+    'operator, All Tasks' => ['operator', ['view' => 'all', 'completion' => 'any']],
+    'member, All Tasks, completion/priority/due/kind/search/sort' => ['member', [
+        'view' => 'all', 'completion' => 'any', 'priority' => ['high'], 'due' => 'overdue', 'kind' => 'project', 'q' => 'Budget', 'sort' => 'priority',
+    ]],
+    'member, one project selected (milestones offered)' => ['member', ['view' => 'all', 'project' => true]],
+]);
 
 it('keeps milestone completion counts equal to the per-milestone method', function () {
     $admin = makeUser('operator');

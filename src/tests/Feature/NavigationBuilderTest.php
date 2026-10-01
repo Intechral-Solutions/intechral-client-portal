@@ -467,7 +467,9 @@ it('marks exactly one workspace and at most one contextual item active', functio
     // "All projects" survives.
     'projects create' => ['projects.create', [], 'projects', 'projects.all'],
     'tasks default' => ['tasks.index', [], 'tasks', 'tasks.mine'],
-    'tasks org view' => ['tasks.index', ['view' => 'org'], 'tasks', 'tasks.org'],
+    // EPIC-014 WP3 (§9.8): All tasks is its own view; the retired org view clamps to mine.
+    'tasks all view' => ['tasks.index', ['view' => 'all'], 'tasks', 'tasks.all'],
+    'tasks retired org view' => ['tasks.index', ['view' => 'org'], 'tasks', 'tasks.mine'],
     // An unrecognized value clamps to "mine" in TaskController; navigation agrees.
     'tasks unknown view' => ['tasks.index', ['view' => 'nonsense'], 'tasks', 'tasks.mine'],
     'customer tickets' => ['tickets.index', [], 'helpdesk', 'helpdesk.requests'],
@@ -488,6 +490,42 @@ it('marks exactly one workspace and at most one contextual item active', functio
     // A route inside no workspace: nothing is active and nothing is guessed.
     'profile' => ['profile.show', [], null, null],
 ]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tasks views (EPIC-014 WP3, §9.8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('offers My tasks to everyone and All tasks only with tasks.view_all, and never My organization', function () {
+    $operator = actor('operator');
+    $user = actor('user');   // holds tasks.view_org, which no longer offers anything
+    $granted = actor('user', ['tasks.view_all']);
+
+    $tasksFor = fn (User $actor) => workspaces(navigationFor($actor, 'tasks.index'))['tasks'];
+
+    expect(array_keys(contextItems($tasksFor($operator))))->toBe(['tasks.mine', 'tasks.all'])
+        ->and(array_keys(contextItems($tasksFor($user))))->toBe(['tasks.mine'])
+        ->and(array_keys(contextItems($tasksFor($granted))))->toBe(['tasks.mine', 'tasks.all'])
+        ->and($user->can('tasks.view_org'))->toBeTrue();
+
+    $all = contextItems($tasksFor($operator))['tasks.all'];
+    expect($all['label'])->toBe('All tasks')
+        ->and($all['href'])->toBe(route('tasks.index', ['view' => 'all']))
+        ->and($all['visit'])->toBe('inertia')
+        ->and(contextItems($tasksFor($operator))['tasks.mine']['href'])->toBe(route('tasks.index'));
+
+    expect(navigationValuesDeep(navigationFor($operator, 'tasks.index'), 'key'))->not->toContain('tasks.org')
+        ->and(navigationValuesDeep(navigationFor($operator, 'tasks.index'), 'href'))->not->toContain(route('tasks.index', ['view' => 'org']));
+
+    $granted->revokePermissionTo('tasks.view_all');
+    expect(array_keys(contextItems($tasksFor($granted->fresh()))))->toBe(['tasks.mine']);
+});
+
+it('marks My tasks active when an actor without tasks.view_all asks for view=all', function () {
+    $user = actor('user');
+
+    expect(navigationActiveKeysDeep(navigationFor($user, 'tasks.index', [], ['view' => 'all'])))
+        ->toBe(['tasks', 'tasks.mine']);
+});
 
 it('keeps an item active on the nested routes that belong to it', function () {
     $operator = actor('operator');

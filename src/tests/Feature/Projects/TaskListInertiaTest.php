@@ -7,7 +7,10 @@ use Inertia\Testing\AssertableInertia as Assert;
 require_once __DIR__.'/ProjectTestHelpers.php';
 
 /*
- * EPIC-011E WP8: the unified `/tasks` list as an Inertia/React page. TaskListPresenter's DTO
+ * EPIC-011E WP8: the unified `/tasks` list as an Inertia/React page. EPIC-014 WP3 moved the query
+ * to TaskQuery and removed ticket-kind rows (Q6); the ticket cases below were rewritten to that
+ * rule, and the WP3 contract itself is pinned in Tasks/TaskListPageTest.php.
+ * TaskListPresenter's DTO
  * (§5), the kind-aware status contract (§15), and D3's unchanged standalone surface are pinned
  * here. D2 visibility and link-permission behavior (org tab scoping, no dead links) are pinned in
  * ProjectVisibilityTest.php, which already exercised this route against the query/authorization
@@ -48,8 +51,9 @@ it('renders the unified list as the tasks/index component with a minimal DTO', f
 
     $props = taskListProps($response);
     $row = $props['tasks']['data'][0];
+    // EPIC-014 WP3 (§13.3) added `kind` and the batch-computed `abilities`; every earlier field stays.
     expect(array_keys($row))->toBe([
-        'id', 'title', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url',
+        'id', 'title', 'kind', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
     ]);
     expect($row['id'])->toBe($task->id);
     expect(array_keys($row['context']))->toBe(['kind', 'label', 'url']);
@@ -62,7 +66,7 @@ it('never exposes an email, raw model attribute, or unrelated id on the tasks pa
     Task::factory()->standalone()->create(['assignee_id' => $this->admin->id, 'ticket_id' => $ticket->id]);
 
     $props = taskListProps($this->actingAs($this->admin)->get(route('tasks.index')));
-    $json = json_encode(array_intersect_key($props, array_flip(['tasks', 'view', 'canViewOrg', 'createOptions'])));
+    $json = json_encode(array_intersect_key($props, array_flip(['tasks', 'view', 'filters', 'filterOptions', 'sort', 'canViewAll', 'createOptions'])));
 
     foreach (['email', 'Secret notes', 'created_at', 'updated_at', 'created_by', 'project_id', 'column_id', 'password', 'assignee_id'] as $forbidden) {
         expect($json)->not->toContain($forbidden);
@@ -75,7 +79,8 @@ it('derives a project-board row\'s status from its column, never its raw status 
     $doneRaw = makeTask($this->todo, ['title' => 'Board task', 'status' => 'done', 'assignee_id' => $this->admin->id]);
     $inDoneColumn = makeTask($this->done, ['title' => 'In done column', 'status' => 'todo', 'assignee_id' => $this->admin->id]);
 
-    $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index')))['tasks']['data'])->keyBy('title');
+    // `completion=any`: since EPIC-014 WP3 the list defaults to open rows only (P2).
+    $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index', ['completion' => 'any'])))['tasks']['data'])->keyBy('title');
 
     expect($rows['Board task']['status'])->toBe(['label' => 'To Do', 'done' => false, 'source' => 'column']);
     expect($rows['In done column']['status'])->toBe(['label' => 'Done', 'done' => true, 'source' => 'column']);
@@ -85,25 +90,28 @@ it('derives a standalone row\'s status from its raw status field', function () {
     Task::factory()->standalone()->create(['title' => 'Loose in progress', 'status' => 'in_progress', 'assignee_id' => $this->admin->id]);
     Task::factory()->standalone()->create(['title' => 'Loose done', 'status' => 'done', 'assignee_id' => $this->admin->id]);
 
-    $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index')))['tasks']['data'])->keyBy('title');
+    $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index', ['completion' => 'any'])))['tasks']['data'])->keyBy('title');
 
     expect($rows['Loose in progress']['status'])->toBe(['label' => 'In Progress', 'done' => false, 'source' => 'status']);
     expect($rows['Loose done']['status'])->toBe(['label' => 'Done', 'done' => true, 'source' => 'status']);
 });
 
-it('derives a ticket row\'s status from its raw status field, never board completion semantics', function () {
+it('lists no ticket-kind task, whatever its status, even to its assignee and ticket owner (EPIC-014 Q6)', function () {
+    // Rewritten in EPIC-014 WP3 (§16.3). Until then this pinned a ticket row's status as coming
+    // from its raw status field. Ticket-kind tasks have left the Tasks workspace (§9.1); their
+    // status semantics stay pinned at the model/presenter level (ProjectPinnedBehaviorTest).
     $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TKT-9002']);
-    Task::factory()->standalone()->create(['title' => 'Ticket work', 'ticket_id' => $ticket->id, 'status' => 'done', 'assignee_id' => $this->admin->id]);
+    Task::factory()->standalone()->create(['title' => 'Ticket work', 'ticket_id' => $ticket->id, 'status' => 'done', 'assignee_id' => $this->admin->id, 'created_by' => $this->admin->id]);
 
-    $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index')))['tasks']['data'])->keyBy('title');
-
-    expect($rows['Ticket work']['status'])->toBe(['label' => 'Done', 'done' => true, 'source' => 'status']);
-    expect($rows['Ticket work']['context']['kind'])->toBe('ticket');
+    foreach (['mine', 'all'] as $view) {
+        $titles = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index', ['view' => $view, 'completion' => 'any'])))['tasks']['data'])->pluck('title');
+        expect($titles)->not->toContain('Ticket work');
+    }
 });
 
 // ── context.kind mapping ──────────────────────────────────────────────────────
 
-it('reports context.kind matching each row\'s actual task kind', function () {
+it('reports kind and context.kind for the two surfaced kinds, and no ticket row at all', function () {
     $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TKT-9003']);
     makeTask($this->todo, ['title' => 'Board row', 'assignee_id' => $this->admin->id]);
     Task::factory()->standalone()->create(['title' => 'Standalone row', 'assignee_id' => $this->admin->id]);
@@ -111,9 +119,11 @@ it('reports context.kind matching each row\'s actual task kind', function () {
 
     $rows = collect(taskListProps($this->actingAs($this->admin)->get(route('tasks.index')))['tasks']['data'])->keyBy('title');
 
-    expect($rows['Board row']['context']['kind'])->toBe('project');
-    expect($rows['Standalone row']['context']['kind'])->toBe('standalone');
-    expect($rows['Ticket row']['context']['kind'])->toBe('ticket');
+    expect($rows['Board row']['kind'])->toBe('board')
+        ->and($rows['Board row']['context']['kind'])->toBe('project')
+        ->and($rows['Standalone row']['kind'])->toBe('standalone')
+        ->and($rows['Standalone row']['context']['kind'])->toBe('standalone')
+        ->and($rows->has('Ticket row'))->toBeFalse();
 });
 
 // ── Vocabulary (§15: server is the source of truth) ──────────────────────────

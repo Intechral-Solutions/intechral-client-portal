@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 implemented, in review)
+**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 implemented, in review)
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index
 
 ---
 
@@ -39,6 +39,7 @@
 
 - [Amendment 1: WP1 Results (2026-09-29)](#amendment-1-wp1-results-2026-09-29)
 - [Amendment 2: WP2 Results (2026-09-30)](#amendment-2-wp2-results-2026-09-30)
+- [Amendment 3: WP3 Results (2026-09-30)](#amendment-3-wp3-results-2026-09-30)
 
 ---
 
@@ -1086,4 +1087,179 @@ Deliberately unchanged, as the review accepted: board assignee membership is val
 | Audit remediations (A2.5) | Each new test was run red against the unfixed code (bulk without the `QueryException` catch; TaskService without the locked-assignee check; the Done-head race with the no-op test replaced by "always move") and green with the fix |
 | Focused | `tests/Feature/Tasks`, `tests/Feature/Projects`, `tests/Feature/Time`, `tests/Unit/Architecture`: 797 passed (3239 assertions) |
 | `./dev check` | green: CLI self-tests 196 assertions; Vitest 796 tests / 76 files; Pest 1352 passed (7040 assertions); build, Pint, `git diff --check` pass |
+| Audit remediation | Independent Opus audit found no security or architectural defect; owner decision B (A3.3, A3.7) and the low findings were applied. Tests added: project filter kept with zero rows for a visible-empty, a nonexistent and an inaccessible project (no metadata); organization and assignee ids outside the offered labels kept, zero rows, no name; malformed ids (zero, negative, decimal, overflow, array) still dropped; milestones offered for a visible zero-row project and a foreign milestone still ignored; pagination links built from the normalized state. Mutation: restoring "drop an unoffered project id" turns five of the new cases red, then restored |
 | Playwright (focused) | `time-migration.spec.ts` + `tasks-migration.spec.ts` (the flows reaching `time.update` and `tasks.store`): 18 passed, 2 workers. The known A9.7 residue (+1 standalone task) is reported; closure stays with WP7. The full browser suite is left to PR CI (WP2 adds no UI) |
+
+---
+
+## Amendment 3: WP3 Results (2026-09-30)
+
+WP3 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `55d2139` (WP2 merged, PR #10). This package covers the query, the permission, navigation and the list's server contract. It changes no mutation, lifecycle, time, billing or timer behaviour, and adds no migration or dependency. The list keeps its old layout; the Direction D list is WP4. Status stays **In Progress**.
+
+### A3.1 What landed
+
+| Piece | Where | Notes |
+|---|---|---|
+| Workspace query | `app/Queries/TaskQuery.php` | §9.1 in fixed order. `authorizedFor` is step 1, `inView` adds step 2, `results` adds steps 3–5, and `paginate` returns 30 rows per page. Steps 1–2 form one parenthesised `where` group. Authorization is SQL throughout; no rows are fetched and then hidden in PHP |
+| URL state | `app/Queries/TaskListState.php` | The normalized value object. It is the only form in which request input reaches `TaskQuery`. Its constructor still enforces the vocabulary, so no unchecked string can reach a column or an `ORDER BY` |
+| Row abilities | `app/Queries/TaskRowAbilities.php` | `complete`/`reopen`/`assign` for one page from **one** `project_members` lookup (§13.3). It restates `TaskPolicy`; it has no authority of its own |
+| Permission | `PermissionCatalogue::TASKS_VIEW_ALL` | Added to `all()` but not to `userDefaults()`. `operator` gets it through `RoleSeeder`'s existing sync to `Permission::all()`, so no seeder changed. `tasks.view_org` stays in the catalogue and the `user` defaults, inert (P1) |
+| Policy | `TaskPolicy::viewAny` (true), `TaskPolicy::viewAll` (`tasks.view_all`) | Deferred here by A1.2(3). `TaskController::index` authorizes `viewAny`. `viewAll` is the single capability check, used by the controller, `TaskQuery::resolveView` and `NavigationBuilder` |
+| Controller | `TaskController::index` | New props: `view`, `filters`, `filterOptions`, `sort`, `canViewAll` and `createOptions`; `canViewOrg` removed. The old per-page `openableProjects`/`openableTickets` lookups are gone |
+| Presenter | `TaskListPresenter::row` | Adds `kind` (`board`/`standalone`) and `abilities`. The ticket arm is removed, because no ticket-kind row reaches it |
+| Navigation | `NavigationBuilder::tasks` | `tasks.mine` + `tasks.all` (§9.8); `tasks.org` retired |
+| Transitional page | `pages/tasks/index.tsx`, `types/tasks.ts` | Takes the new props. The in-page view tabs are removed and the description follows the view. TS types model only the two surfaced kinds (A3.4) |
+
+### A3.2 Query semantics, as built
+
+- **Step 1, the maximum authorized surfaced set:** exactly §9.1.1:
+  - `ticket_id IS NULL`;
+  - AND either a board row with `project_id IN Project::visibleTo(actor)`, or a standalone row with `created_by = me OR assignee_id = me`.
+  - A test compares it row for row with `TaskPolicy::view` restricted to `ticket_id IS NULL`, for six actor shapes: operator, project manager, member, departed assignee, stranger, and a member holding `tasks.view_all`.
+- **My Tasks:** `assignee_id = me OR (project_id IS NULL AND assignee_id IS NULL AND created_by = me)`, inside step 1.
+  - A board task assigned to me whose project I cannot view is excluded.
+  - So are a board task I merely created, and a standalone task I created and handed on.
+- **All Tasks:** step 1 unchanged. All ⊇ Mine is pinned for every actor, and so is the exclusion of another user's standalone task for an operator.
+- **View resolution:** `TaskQuery::resolveView` returns `all` only when `view=all` and `viewAll`. Everything else, missing, `mine`, `org`, garbage, an array, or `all` without the permission, is `mine`: HTTP 200, no redirect, no 403. `/tasks?view=org` is served as My Tasks under the same URL (no redirect, so no loop).
+  - `new TaskQuery($actor, 'all')` does **not** check the capability. It returns only rows the actor may view, so the capability (`resolveView`) and the row rule are tested separately.
+  - An unknown view name throws.
+
+### A3.3 Filter, search and sort contract
+
+Every parameter is optional. An unknown or malformed value is **dropped**: that filter is simply off, never a validation redirect.
+
+**Id filters (owner decision B, WP3 audit).** A well-formed id (a positive integer; no decimal, sign, zero, array or overflow) for `project`, `organization` or an All Tasks `assignee` is **kept and applied as an AND predicate whether or not it appears in `filterOptions`**. The authorized set is established first, so an id can only narrow it: an invisible, a nonexistent and a visible-but-empty id all return zero rows, and nothing distinguishes them. The filter never disappears into the whole view. `filterOptions` remain the only source of display labels: the server does not fetch a record merely to name an id the viewer was not offered, so WP4 may render a generic clearable chip for an unlabeled selection. `milestone` is the exception: it is kept only when it is one of the offered milestones of the selected, visible project, so it can never apply apart from, or be probed through, its project.
+
+| Param | Values | Query | Options (source) |
+|---|---|---|---|
+| `completion` | `open` (default), `done`, `any` | `scopeOpen`/`scopeDone`: the column for board tasks, `status` otherwise (INV-1) | vocabulary |
+| `priority` | a subset of `Task::PRIORITIES`; `priority[]=` or one string. Echoed deduplicated, in vocabulary order | `whereIn` | vocabulary |
+| `due` | `overdue`, `today`, `next7`, `none` | `overdue` = `scopeOverdue` (open only). `today` = due today. `next7` = due today through today + 6. `none` = no due date. The date presets other than `overdue` ignore completion; the completion filter handles that | vocabulary |
+| `kind` | `project`, `standalone` (never `ticket`) | `project_id` not null / null | vocabulary |
+| `project` | any well-formed project id | `project_id =` | projects in `Project::visibleTo` with at least one row in the current view (steps 1–2, no filters); labels only |
+| `milestone` | an offered milestone id of the selected project | `milestone_id =`, applied only together with the project, in both the state and the query | milestones of the selected project **while that project is visible to the actor** (rows in the view are not required); `[]` otherwise, so an unseen project's milestones are never probed |
+| `assignee` | any well-formed user id, or `none`; **All Tasks only** (off in My Tasks) | `assignee_id =` / `IS NULL` | distinct assignees of rows in the All view, `{id, name}`; `[]` in My Tasks; labels only |
+| `organization` | any well-formed CRM company id | `whereHas('project.companies')`. A standalone task never matches. `CrmCompany`'s tenant scope still applies inside the subquery, so a company the actor's CRM scope hides matches nothing | companies linked to projects in `Project::visibleTo`, **also** within `CrmCompany`'s own tenant scope (`OrganizationScope`); labels only |
+| `q` | a string, trimmed, at most 100 characters | `title LIKE` bound with `%`, `_` and `\` escaped (P7: title only) | — |
+| `sort` / `dir` | `due`, `priority`, `title`, `updated`, `created` / `asc`, `desc` | allowlisted `ORDER BY`; direction clamped | vocabulary |
+
+- **Sort.** A missing `dir` takes the sort's natural direction: `due` asc, `priority` desc (critical first), `title` asc, `updated`/`created` desc.
+  - `due` keeps undated rows last in both directions, then orders newest first.
+  - `priority` sorts by rank through a `CASE`, never alphabetically.
+  - An `id` tiebreak is always appended. A 45-row, two-page walk under every sort and direction pins no duplicates and no gaps.
+- **Pagination:** 30 per page. Page links are built from the **normalized** state (`TaskListState::query()`, defaults omitted, plus `view=all` when served), not the raw query string, so an active filter, including a preserved unoffered id, survives paging and a malformed or unknown parameter does not ride along. Totals count only authorized rows.
+- **Search** matches titles only. A search whose text matches only unauthorized rows returns nothing.
+
+### A3.4 TaskRow DTO
+
+The fields, in order:
+
+- `id`, `title`, **`kind`**, `priority`, `status`, `dueDate`, `overdue`, `assignee {id, name}`;
+- `context {kind: project|standalone, label, url}`;
+- `url`;
+- **`abilities {complete, reopen, assign}`**.
+
+Notes:
+- Standalone rows have `url: null`: `tasks.show` ships with its page in WP5 (A2.3.1).
+- The TS `TaskKind` drops `ticket`, and `taskLinkModes` drops its ticket entry.
+- `abilities` come from `TaskRowAbilities`. It is parity-tested against `TaskPolicy` in two ways:
+  - on every listed row, for six actor shapes and both views;
+  - on **every task in the database, listed or not** (departed assignee, ticket-kind, dual-linked), for four actors.
+- The second test was added after a mutation run: dropping the membership check from the Q1 arm survived the listed-row test. On listed rows it is equivalent, because a non-member only ever sees a board row through `projects.admin`, which already grants manage. The every-task test fails on that mutation.
+
+### A3.5 Query budget and indexes
+
+**Query budget.** `ProjectQueryBudgetTest` gains a five-shape case: My Tasks, All Tasks, operator All, every filter at once, and one project selected (milestones offered). Each world grows from 3 to 15 steps; every step adds a project, a member, a milestone, a company, two board tasks, a standalone task and a ticket-kind task.
+
+| Shape | Queries at 3 steps → 15 steps |
+|---|---|
+| member, My Tasks | 10 → 10 |
+| member, All Tasks | 11 → 11 (+ assignee options) |
+| operator, All Tasks | 11 → 11 |
+| member, All Tasks, every filter | 11 → 11 |
+| member, All Tasks, one project selected | 12 → 12 (+ milestone options) |
+
+Abilities cost one query per page. The existing "does not run per-row queries on the tasks list" case is unchanged and green.
+
+**EXPLAIN (§9.7).** Run on MariaDB against a throwaway fixture in the testing database: 35,000 tasks (30,000 board across 100 projects, 5,000 standalone), 300 users, and a member of 10 projects. The harness was deleted afterwards and the testing database confirmed empty.
+
+| Shape | Plan on `tasks` | Time |
+|---|---|---|
+| My Tasks | `index_merge` union(`assignee_id` FK, intersect(`created_by` FK, `(project_id, assignee_id)`)): about 53 rows examined | 2.9 ms |
+| All Tasks (member) | range on `ticket_id` (every surfaced row), filesort | 49 ms |
+| All Tasks (operator, 24,000 visible) | the same | 65 ms |
+| All Tasks + one project | ref on `(project_id, assignee_id)` | 2.2 ms |
+| project options | FirstMatch through `(project_id, assignee_id)` | 1.9 ms |
+| assignee options (All) | full scan of `tasks`, materialized | 19.8 ms |
+
+**Conclusion: no index is added, so no migration.**
+- My Tasks, the most frequent shape, is already served by the existing FK indexes via `index_merge`. §9.7's candidate composite `(created_by, assignee_id)` would remove no scan.
+- All Tasks scans because its visibility is an OR of a project-membership subquery and a creator/assignee arm, and because `due` ordering uses a `CASE` expression. The plan is a range over every surfaced row (`ticket_id IS NULL`) followed by a filesort, so the work grows with the surfaced task table and **not** only with the actor's visible set. No single B-tree removes either the OR or the `CASE`. About 49–65 ms at ~35,000 tasks was accepted for this product stage, and no index was shown to help.
+- **Future lever, not done now:** a `UNION` of the two visibility arms (board through `Project::visibleTo`, standalone through `created_by`/`assignee_id`), each arm index-served, if All Tasks ever becomes material at production scale.
+- `status` stays unindexed (low cardinality; it is not in any plan's access path).
+- Revisit only if production-scale evidence shows All Tasks or the assignee options degrading.
+
+### A3.6 Navigation (§9.8)
+
+- `tasks.mine` "My tasks" → `tasks.index`, with no query constraint (it mirrors the clamp).
+- `tasks.all` "All tasks" → `tasks.index?view=all`, gated on `TaskPolicy::viewAll`, matched on `view=all`.
+- `tasks.org` is gone. `?view=org` activates My tasks. An actor without the permission asking for `view=all` sees My tasks active, because that is what the server served.
+- Panel default is still Collapsed. Building navigation still issues no query.
+- **Deviation:** `tasks.show` is not added to either item's active routes, because the route does not exist until WP5 (A2.3.1). WP5 adds it.
+- The Vitest shell fixtures (`shell-fixtures.ts`, `drawer.test.tsx`, `app-shell.test.tsx`) and `tests/Browser/shell.spec.ts` now use `tasks.all` / "All tasks".
+
+### A3.7 Clarifications and deviations
+
+1. **The in-page tabs are removed, not switched** (§17 WP3 allows either). §14.1 says they are deleted when WP3's views land, because the shell owns navigation.
+   - The page keeps its title, "Tasks", so existing browser flows still find it, and its description now follows the view.
+   - `filters`, `filterOptions`, `sort` and `abilities` are received but not rendered; WP4 consumes them.
+2. **Filter ids are validated against the offered options**, not only against visibility. This follows the §9.5 option definitions, and it means a WP4 filter chip can always find its label.
+   - **Superseded by owner decision B (audit remediation, see A3.3):** the first build dropped an unoffered id, so a visible project with no rows in the view showed the *whole* view. Well-formed ids are now preserved and applied, and only labels come from the options.
+3. **The organization options also honour `CrmCompany`'s tenant scope.** That scope reads the authenticated user, which is the actor on every request path. It narrows §9.5's "companies linked to projects the actor can view" to companies the actor's CRM scope already shows, so the list never names a company that CRM would hide from them. An organization id outside those labels is still applied and matches nothing; the company is not fetched or named.
+   - **Constraint: `TaskQuery` is request-context code.** Its actor must be the authenticated user, because `OrganizationScope` reads `Auth::user()` rather than the query's actor. Run for anyone else (queue, console, acting-as) the organization options and filter would follow the wrong tenant scope. That use is unsupported in WP3; CRM scope is not redesigned and no cross-domain bridge is added. (The S4 Home reuse in A3.9 therefore runs inside a request.)
+4. **The date presets are fixed as in A3.3.** `next7` is seven calendar days including today, in the application timezone. `today` and `next7` ignore completion because the completion filter owns that.
+5. **The running-timer row state (R9, §15.3) adds no server field.** §15.3 assigns it to the client `TimerProvider` ("no new server query"), so it is WP4 rendering. No timer data is read in WP3.
+6. **`TaskRowAbilities` is a projection.** Every route still authorizes through `TaskPolicy`; the parity tests (A3.4) guard against drift.
+7. **Transitional gap (WP3 → WP4).** The list now defaults to `completion=open`, but the filter UI ships in WP4. Until then completed tasks are reachable only through an explicit query (`?completion=done` or `?completion=any`). This is a short-lived integration gap, not a WP3 defect, and no temporary UI bridges it. WP3 and WP4 should merge close together.
+8. **Kind vocabularies differ (WP4 note).** The `kind` filter and `context.kind` use `project`/`standalone`; a row's `kind` uses `board`/`standalone`. Do not compare `row.kind` with `filters.kind` directly. The contracts are not renamed in WP3.
+9. **Maintenance coupling.** `TaskRowAbilities` is a batched restatement of `TaskPolicy`/`ProjectPolicy`. A maintenance note on `ProjectPolicy` names the parity tests (`TaskListPageTest`, `TaskQueryTest`) that must stay green, and extended, when project authorization changes. The constant query budget is intentional; abilities are not returned to per-row Gate calls.
+10. **Development databases need `tasks.view_all`** (§7.1). Before the focused browser run, the development database had `PermissionSeeder` and `RoleSeeder` re-run. It was first confirmed read-only that its `user` role already matched the catalogue defaults, so the only change was `operator` gaining `tasks.view_all` (41 → 42 permissions). CI seeds from scratch.
+
+### A3.8 §16.3 rewrites done in WP3
+
+Each rewrite is in place, labelled, and keeps its history in a comment.
+- **`TaskCurrentBehaviorCharacterizationTest`:** F1 and the dual-linked row are **FLIPPED IN WP3**.
+  - F1: an unassigned standalone task is in its creator's My Tasks (also via the clamped `view=org`), and in nobody else's view, the operator's All Tasks included.
+  - The dual-linked row is in neither view and is left untouched.
+- **`TaskListInertiaTest`:**
+  - the DTO key list gains `kind` and `abilities`;
+  - the two ticket-row cases now assert absence under Q6;
+  - the status cases request `completion=any`, because the default is now open.
+- **`ProjectVisibilityTest`:**
+  - the three org-tab cases become organization-filter cases (narrows only; admin over every company-linked project; `view=org` clamps for everyone);
+  - the former-member row is absent from both views;
+  - the ticket-link case asserts ticket rows are absent from mine, org and all;
+  - the standalone case asserts Q4's My Tasks.
+- **`NavigationBuilderTest`:** "tasks org view" is replaced by "tasks all view" and "tasks retired org view", plus gating and grant/revoke cases for `tasks.all`.
+- **Vitest:** the ticket-row cases in `task-list-row.test.tsx` and `task-context-link.test.tsx` are rewritten or removed with the type, and the page test's tab cases are replaced by "no view tabs of its own" and a view-description case.
+- **Not yet:** `tasks-migration.spec.ts` "…the standalone row offers no mutation controls (D3)" still holds and is rewritten with the WP4 list UI and the WP7 fixture cleanup. **A9.7 stays open for WP7.**
+
+### A3.9 Still deferred (unchanged by WP3)
+
+- A1.3.1 items 1–2 and A2.4 item 3 are unchanged.
+- `AccessibleTimeContext`, `TaskService`, `TimeEntryController` and the billing locks are untouched.
+- `tasks.view_org` is still debt (P1).
+- The S4 Home "My work" feed can reuse `TaskQuery` (`new TaskQuery($user, 'mine')`).
+
+### A3.10 Evidence
+
+| Gate | Result |
+|---|---|
+| Test-first | `TaskQueryTest` (22) and `TaskListPageTest` (18) were written first and were red, along with every rewritten pin, the navigation cases and the new budget cases, before any production code existed (`tasks.view_all` did not exist) |
+| Mutation checks | Each was run red against a deliberately broken build, then restored: (1) board visibility widened by assignment, 14 tests red; (2) the `ticket_id IS NULL` predicate removed, and (3) LIKE escaping removed, 13 tests red between them; (4) the Q1 membership check dropped from `TaskRowAbilities`, caught only by the every-task parity test (A3.4) |
+| New suites | `Tasks/TaskQueryTest` 22, `Tasks/TaskListPageTest` 19 (incl. the every-task parity case); `ProjectQueryBudgetTest` +5 dataset cases; `NavigationBuilderTest` +2 cases, +2 dataset rows |
+| Rewritten pins | A3.8 |
+| Focused Pest | `tests/Feature/Tasks`, `tests/Feature/Projects`, `tests/Feature/Time`, `tests/Unit/Architecture`, `NavigationBuilderTest`, `ShellContractTest`: 916 passed (5144 assertions) after the audit remediation (911 / 5082 before it) |
+| Focused Vitest | `pages/tasks`, `components/tasks`, `components/shell`: 10 files, 82 tests |
+| `./dev check` | green after the audit remediation: CLI self-tests 196 assertions; Vitest 794 tests / 76 files; build; Pint; `git diff --check`; Pest 1406 passed (7918 assertions) (1401 / 7856 before it) |
+| Playwright (focused) | `tasks-migration.spec.ts` + `shell.spec.ts` + `inertia-coexistence.spec.ts`: 27 passed, 3 workers (run before the audit remediation, which changes backend filter state only and no rendered control; the focused specs do not exercise the changed query behaviour, so they were not rerun and the full browser suite is left to PR CI). The known A9.7 residue (+1 standalone task) is reported; closure stays with WP7. The full browser suite is left to PR CI |

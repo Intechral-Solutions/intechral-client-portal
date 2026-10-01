@@ -25,6 +25,21 @@ use Illuminate\Support\Facades\Gate;
  */
 class TaskPolicy
 {
+    /** The Tasks workspace itself, which is My Tasks: every authenticated user has one (§7.2). */
+    public function viewAny(User $user): bool
+    {
+        return true;
+    }
+
+    /**
+     * The All Tasks surface (Q3). It gates the view, never a row: which rows it holds is
+     * `view`, as the workspace query (App\Queries\TaskQuery) applies it in SQL.
+     */
+    public function viewAll(User $user): bool
+    {
+        return $user->can('tasks.view_all');
+    }
+
     public function view(User $user, Task $task): bool
     {
         return match ($this->kindOf($task)) {
