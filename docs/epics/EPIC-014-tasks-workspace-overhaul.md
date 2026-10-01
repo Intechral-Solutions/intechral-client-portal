@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 implemented, in review)
+**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 implemented, in review)
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S
 
 ---
 
@@ -40,6 +40,7 @@
 - [Amendment 1: WP1 Results (2026-09-29)](#amendment-1-wp1-results-2026-09-29)
 - [Amendment 2: WP2 Results (2026-09-30)](#amendment-2-wp2-results-2026-09-30)
 - [Amendment 3: WP3 Results (2026-09-30)](#amendment-3-wp3-results-2026-09-30)
+- [Amendment 4: WP4 Results (2026-10-01)](#amendment-4-wp4-results-2026-10-01)
 
 ---
 
@@ -589,7 +590,7 @@ PageFrame width="canvas"
 - **Status and priority** follow [Direction D §10.2/§10.3](../design/direction-d-design-system.md#102-tasks):
   - an Open task shows a hollow ring, which *is* the Complete control;
   - Done shows a ring with a check (`success-glyph`) and muted row text;
-  - Overdue shows a clock glyph plus the due date in `danger` at weight 500; "Today" is plain;
+  - Overdue shows a clock glyph plus the due date in `danger` at weight 500; the date is always the canonical formatted date (no relative "Today": the browser's calendar can disagree with the application's, [Amendment 4](#amendment-4-wp4-results-2026-10-01) D3);
   - a Running row uses `live-soft`;
   - the source tag is mono (`BOARD`/`STANDALONE`; `TICKET` is a Direction D kind this epic does not surface, Q6);
   - a board status shows the column name;
@@ -647,7 +648,7 @@ The board page and its cards (Projects-owned; §5.3), the Home dashboard (S4), a
 ### 15.3 Contextual time (required minimum, R9)
 
 - **Every task detail surface EPIC-014 delivers, board/project task detail and standalone task detail:** `TaskTimePanel` with the shared `TimerControl`, exactly as EPIC-011D/013 built it. Start is offered only when the server-provided eligibility (`time.log` + `AccessibleTimeContext`) allows it.
-- **Tasks list:** a row whose task has the **viewer's** running timer shows the Direction D running state (`live-soft` row, time in `live-text`). This comes from the existing `TimerProvider` client state: no new server query and no second timer state.
+- **Tasks list:** a row whose task has the **viewer's** running timer shows the Direction D running state (`live-soft` row and a "Timer running" label). This comes from the existing `TimerProvider` client state: no new server query and no second timer state. **The ticking elapsed time on a row (`live-text`) is not a WP4 requirement** (Amendment 4, D2): it is part of optional WP6, and until then the global timer pill is the one ticking clock.
 - Row-level start/stop (S1) is separable. Timer UX NEXT items are out (§5.3).
 
 ## 16. Test strategy
@@ -1263,3 +1264,105 @@ Each rewrite is in place, labelled, and keeps its history in a comment.
 | Focused Vitest | `pages/tasks`, `components/tasks`, `components/shell`: 10 files, 82 tests |
 | `./dev check` | green after the audit remediation: CLI self-tests 196 assertions; Vitest 794 tests / 76 files; build; Pint; `git diff --check`; Pest 1406 passed (7918 assertions) (1401 / 7856 before it) |
 | Playwright (focused) | `tasks-migration.spec.ts` + `shell.spec.ts` + `inertia-coexistence.spec.ts`: 27 passed, 3 workers (run before the audit remediation, which changes backend filter state only and no rendered control; the focused specs do not exercise the changed query behaviour, so they were not rerun and the full browser suite is left to PR CI). The known A9.7 residue (+1 standalone task) is reported; closure stays with WP7. The full browser suite is left to PR CI |
+
+---
+
+## Amendment 4: WP4 Results (2026-10-01)
+
+WP4 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `3612a56` (WP3 merged, PR #11; its push-to-`main` CI was green, Playwright 98 / 98 on 3 workers). It is UI only: no query, authorization, service, route, migration or dependency change, and no server change at all. Status stays **In Progress**.
+
+### A4.1 Package boundary, as recovered from the final EPIC
+
+| Item | Where the final EPIC puts it | WP4 |
+|---|---|---|
+| Canvas `PageFrame`, `PageHeader`, `FilterBar`/`FilterChip`, `DataTable`, `EmptyState`, create `FormDialog`, in-page tab removal | §14.1, §17 WP4 | **Done** |
+| Complete ring, bulk Complete/Reopen UI and `BulkBar` | §14.1, §15.2, §17 WP4 (R10 minimum) | **Done** |
+| Row shortcuts `J`/`K`/`Enter`/`E`/`X` and focus to the next row | §15.1 (R10 minimum) | **Done** (`Esc` clears the selection too: Direction D §14.3) |
+| Viewer's running-timer state on a row | §15.3 (R9), from `TimerProvider` | **Done** (state only, owner decision D2, A4.5) |
+| D9 rows at S, A13.5 | §14.1, §20 | **Done**, strict two bands at 390px after review remediation (A4.6, A4.10) |
+| `T` / row `TimerControl` (S1), bulk assign (S2), peek inspector (S3), Home "My work" (S4), `?` sheet (S5) | §5.2, WP6 | **Not built** |
+| Task detail, standalone detail, shared task form, A13.12 | WP5 | **Not built** |
+| **Single-row assignment from the list (R6, §18.7; exit criterion 7)** | **WP5** (owner decision D1, A4.10) | **Not built; criterion 7 stays OPEN** |
+
+The prompt and the EPIC agreed; nothing was pulled forward from WP6 or WP5.
+
+### A4.2 What landed
+
+| Piece | Where | Notes |
+|---|---|---|
+| `DataTable` | `components/ui/data-table.tsx` | Presentation only: columns, rows, optional selection column, row keys. No domain types, no sorting or filtering. A real `<table>` with explicit ARIA roles on every part, so the S reflow cannot strip its semantics. Flat and rule-bounded (no card, no shadow). Exposes a handle (`focusRow`, `focusFirstRow`, `focusedRowKey`) |
+| `FilterBar`, `FilterField`, `FilterSearch`, `FilterToggleGroup` | `components/ui/filter-bar.tsx` | A named `group`, not a landmark. Owns no filter state and builds no URL. Search is an explicit submit (Enter or the Search button), never per keystroke |
+| `Chip`, `FilterChip`, `Tag`, `Priority`, `BulkBar` | `components/ui/` | `FilterChip`'s one control is named "Remove filter: …". `Priority` is the three-bar mark with the label as the signal. `BulkBar` is a named toolbar with a polite count |
+| Tasks composition | `components/tasks/task-filter-bar.tsx`, `task-table.tsx`, `task-complete-control.tsx`, `task-title-cell.tsx`, `task-list-query.ts`, `create-task-dialog.tsx` | The page `pages/tasks/index.tsx` composes them |
+| Retired | `task-list-row.tsx`, `create-task-form.tsx` | Superseded by the table and the dialog, with their tests rewritten rather than dropped |
+| Small shared changes | `FormDialog`, `TimerProvider`, types | `FormDialog` now opens on its first field (Direction D §14.2; Radix chose the Close button). `useOptionalTimers()` lets a passive reader outside a provider render. `types/tasks.ts`/`shared.ts` gain `TaskBulkResult` and `flash.bulk` |
+
+### A4.3 Filter state: the server stays the only authority
+
+- A control change builds a **request** from the canonical echo plus one change (`taskListQuery`), omitting defaults and never a page, so any change restarts at page one. The visit is `router.get('/tasks', query, { preserveState: true, preserveScroll: true })` and pushes history, so back/forward restores each query state. The page re-renders from what the server returned.
+- Selects apply on change; the search applies on submit. Changing the sort field sends no direction (the server picks the natural one); the direction is its own control. Changing the project drops the milestone. The browser fetches no options and derives no authorization: the assignee control exists only in All Tasks, the milestone only with a selected project and offered milestones, and no ticket option exists because the server never offers one.
+- **Owner decision B (A3.3), in the UI.** A well-formed id the server applied but did not label shows as a type-only chip and select entry ("Project filter", "Organization filter", "Assignee filter", "Milestone filter"), is cleared like any other, and never shows an id or a name. The browser looks nothing up. The empty result reads as the filtered-empty state.
+- Chips appear only for non-default state (completion other than Open, each priority, due, kind, project, milestone, assignee, organization). A search has its own field and no chip; Clear filters is offered for it too and resets filters and search while keeping the view and the sort.
+- `completion` is sent as `open`/`done`/`any`; the server's own labels ("Open", "Done", "Any") are shown. The kind filter's `project`/`standalone` and a row's `board`/`standalone` stay separate vocabularies, as A3.7(8) asks: the row's source tag is mapped from the row's own kind.
+
+### A4.4 Rows, Complete ring, bulk and keyboard
+
+- Columns: selection · Complete ring · Task (title + source tag) · Status · Priority · Context · Assignee · Due. A board title links to its page and a standalone title is plain text (`url` is still `null` until WP5). Done rows are muted. An overdue date is a clock glyph, a screen-reader cue and `danger` at weight 500. The date is always the canonical formatted date inside a `<time>`; there is no relative "Today" (A4.10).
+- The ring is a real button named "Complete <title>"/"Reopen <title>" only when `abilities.complete`/`abilities.reopen` allows; otherwise it is a decorative mark and nothing is offered that could only 403. It calls the WP2 endpoints, invents no state, and while a request is in flight is `aria-disabled` (not `disabled`) so a keyboard user keeps their place; a second press is ignored. A configuration error returns on the `complete`/`reopen` key and is shown in a dismissible `role="alert"` above the table. Timers are never touched.
+- Bulk: a checkbox column (page select-all with an indeterminate state) and `X`; the `BulkBar` offers Complete and Reopen and posts `{action, ids}` to `POST /tasks/bulk` once. A selection for a row that left the page is dropped. A partial result adds a count summary (not permitted, blocked by board setup, failed) beside the shell's own flash.
+- Shortcuts act only while focus is inside the table and not in a text field, never with Ctrl/Meta/Alt: `J`/`K` move the row focus, `X` selects, `E` completes or reopens when the row's ability allows, `Enter` opens only when the row itself has focus (so a link keeps its own Enter), `Esc` clears the selection. After a keyboard Complete, focus goes to the next row (the previous one at the end), only when the row had focus.
+
+### A4.5 Running timer row state
+
+Taken from the existing client `TimerProvider` (`timer.context.type === 'Task'`): no new server field, fetch or interval. The row takes `live-soft` and shows a `live` "Timer running" status; there is no start/stop control (S1). **Owner decision D2 (accepted):** the row carries state only (live styling and "Timer running"). The ticking elapsed value on a row would need a second interval per row, so it belongs to optional WP6; the pill and tray stay the authoritative clock. §15.3 is amended to say so.
+
+### A4.6 Responsive D9 and A13.5
+
+At S (`max-md`, 768px, the shell's own breakpoint) each row is a wrapping line: selection, ring and title first, a forced break, then status, priority, due and context. The assignee stays for assistive technology only. The header row is visually hidden but present. The whole-page `overflow-hidden` wrapper is gone; at M and up the table scrolls inside its own wrapper. **Strict two bands at 390px (owner decisions D4 and N1).** The first band is the selection, the ring and a **one-line** title; the second is status, priority, context and due date. The title is truncated *visually* (`text-overflow` at S only; desktop still wraps) while the DOM text stays the full title, so assistive technology reads all of it, and a native `title` tooltip repeats it. The source tag and "Timer running" do not shrink or wrap. On the second band the context is the flexible item that truncates, the status label is capped and truncated (board column names are user-defined), priority and due date do not shrink, and the due date drops the visual "Due" (kept for assistive technology) inside a `<time datetime>`. The independent review measured the pre-remediation layout at 390px: the ordinary Medium row with a due date, the long-status/context row, the running row, the Standalone tag and long titles all broke to three or more lines, so the earlier statement that only the longest due dates could wrap was wrong and is withdrawn. At M and up the header row is visible and the table scrolls inside its own wrapper. The header's select-all checkbox is `display: none` at S (the header row is invisible there and a control nobody can see must not be a Tab stop); rows stay selectable one by one. **Measured in Playwright** (light and dark, 390 / 767 / 768 / 1400): no document horizontal overflow; display `flex` at 390/767 and `table-row` at 768/1400; at 390 an ordinary dated row, an overdue Critical row with a long title, a long project name and a running timer, and a Standalone row with a long title and a due date each have exactly two bands (the first-band cells share one centre and are one line tall, the second-band cells share another and are one line tall, the row is at most 96px, nothing leaves the viewport), the long title really is truncated, and every control left in the table is visible. Mutation-checked: restoring the wrapping classes turns the ordinary-row assertion red. **A13.5 is closed.**
+
+### A4.7 Empty states and create
+
+- Truly empty: no row and no narrowing, with view-specific copy ("No open tasks", then what will appear there) and the create action. Filtered empty: "No tasks match these filters." with Clear filters. A non-default completion or an active search counts as narrowing, so "no done tasks" is never "no tasks yet". The empty state sits in a focusable region (`tabindex=-1`) so focus has somewhere to go when the last row leaves (A4.10).
+- Create is a `FormDialog` opened from the header (and the truly-empty state) onto the existing `tasks.store`: the same fields and the same Me/Unassigned set, no second endpoint, no ticket creation. It opens on the title field, keeps its draft and errors on a failed create, discards both on any close, and returns focus to whatever opened it. An unassigned standalone task stays discoverable in My Tasks (WP3).
+
+### A4.8 Findings and deviations
+
+1. **The WP3 → WP4 completed-task gap (A3.7(7)) is closed**: the completion filter is on the page.
+2. **Browser-derived "Today" was removed (owner decision D3).** The DTO has no `dueToday` and none was added; the due cell renders the canonical formatted date, and `overdue`, the due filter and the sort stay the server's.
+3. **Assignment from the list (R6, §18.7) is REQUIRED and is assigned to WP5 (owner decision D1).** It was missing from WP4's, WP5's and WP6's package text. WP5 already owns assignment, detail and edit and establishes the assignment option source and the shared form, so it builds the single-row list affordance on `abilities.assign` (already delivered, unused here). **Exit criterion 7 therefore stays OPEN until WP5.** WP6 is optional and cannot carry a required criterion, and WP7 is hardening and closeout, not a feature package.
+4. §14.1's "Complete ring · … · [selection column]" is rendered with the selection column first.
+5. A9.7 is unchanged: the browser spec's standalone row is Completed at the end of its test so it leaves the open list, and the row stays until WP7.
+
+### A4.9 Evidence
+
+| Gate | Result |
+|---|---|
+| Test-first | The shared components' tests were written first and were red (modules absent) before any code; so were the Tasks components and the page, which was rewritten test-first over the WP3 page test |
+| Vitest | New and rewritten suites for `DataTable`, `FilterBar`, `Chip`/`FilterChip`/`Tag`/`Priority`, `BulkBar`, the Complete ring, the filter bar, the table, the query builder, the create dialog and the page, plus a `FormDialog` first-field case. Full suite after remediation: 932 tests / 84 files |
+| Pest | Unchanged server: focused (`tests/Feature/Tasks`, `Projects`, `Time`, `Unit/Architecture`, `NavigationBuilderTest`, `ShellContractTest`) 916 passed (5144 assertions); no PHP file changed |
+| `./dev check` | green after the review remediation (A4.10): CLI self-tests 196 assertions; Vitest 932 tests / 84 files; build; Pint; `git diff --check`; Pest 1406 passed (7918 assertions) |
+| Playwright (focused) | `tasks-migration.spec.ts` (11 after remediation) + `shell.spec.ts` + `inertia-coexistence.spec.ts`: 46 passed, 0 failed, 0 skipped, 3 workers (31 before remediation). The new flows cover Complete/Reopen from the list, URL-backed filters/search/sort with history, an unlabeled id, the member's forged `view=all`, keyboard + bulk, and the measured S/M/desktop geometry in both themes. The known A9.7 residue (+1 standalone task, left Completed) is reported; closure stays with WP7. The full browser suite is left to PR CI |
+| Visual inspection | Desktop 1400 and phone 390, light and dark, of the list, the filtered-empty state, the bulk bar, the dialog and an unlabeled-id All Tasks. It found three real defects, fixed before the run: wrapped Assignee/Due cells on desktop, the project name taking its own line at S, and the `STANDALONE` tag breaking mid-word. The dialog shot caught its open animation mid-fade, which is the animation, not a defect |
+
+### A4.10 Independent review remediation (2026-10-01)
+
+The independent review's verdict was **small remediation**; the architecture was accepted. Owner decisions applied:
+
+- **D1.** Single-row list assignment is required and belongs to **WP5**; exit criterion 7 stays **open**. Not built in WP4; WP6 is optional and WP7 is not its implementation package (A4.1, A4.8(3)).
+- **D2.** Row timer state (live styling and "Timer running") is the WP4 requirement; the ticking row clock is optional WP6; the pill stays the authoritative clock. §15.3 is amended.
+- **D3.** Browser-derived "Today" removed: the due cell always shows the canonical formatted date in a `<time>`; `overdue`, the due filter and the sort are untouched; no backend change.
+- **D4 / N1.** Strict two bands at 390px: one-line visually truncated title (full text stays in the DOM), the tag and "Timer running" do not shrink, and the second band is status, priority, flexible context and compact due date (A4.6).
+
+Fixes made (all frontend): the S row geometry; `localToday`/"Today" removed; the select-all checkbox hidden at S so it is not an unseen Tab stop; deliberate focus repair after a chip is removed (the next chip, else the search; only when focus was actually lost; `lib/focus.ts` holds the one shared check), after the BulkBar unmounts (the row that last held table focus, else the first row, else the empty state) and after Complete removes the only row (the empty state, which is now a `tabindex=-1` region); a stale-`focusAfter` guard so a refused action, whose redirect also delivers fresh props, never moves focus (the entry is dropped when the row is still there in the same state); and bulk Complete/Reopen enabled only when a selected visible row's server ability allows it.
+
+Tests: the geometry regression now measures cell boxes at 390px for an ordinary dated row, an overdue Critical row with a long title, a long project name and a running timer (served by a mocked active-timers response, so no timer row is written), and a Standalone row; it fails on a wrapped cell or a third band (mutation-checked: restoring the wrapping classes turned it red). New Vitest cases cover the Today removal, the full title in the DOM, select-all at S, chip-removal focus, bulk-bar focus, the empty-state focus, the refused-action ordering and bulk availability; new Playwright cases cover chip, bulk-clear and last-row focus, with a guard for 419/429/5xx.
+
+**Not measured in a browser:** a 40-character user-defined status (no UI creates one). The layout probe used a 22-character status ("Awaiting client review", truncated cleanly); anything longer relies on the status cell's S-only cap and truncation, which is not browser-tested.
+
+**Non-blocking follow-ups, deliberately deferred (not part of this remediation):**
+- F7 a partial bulk failure clears the whole selection;
+- F8 a focused row's accessible name is verbose (every cell, the title three times);
+- F9 `useOptionalTimers()` is a general API where `useTimers()` with a test wrapper would do;
+- F11 `FormDialog`'s first-field selector accepts checkbox/radio/readonly/hidden inputs and overrides a consumer's own initial focus;
+- F12 the filter bar is tall at S, the S row is 82px against Direction D's 52–56px, hover/selection replace the running tint, and a truly empty list shows two "New task" actions;
+- F13 `focusFirstRow` (now used by the bulk-bar focus repair) is no longer unused, but the plain `Chip` still has no consumer.

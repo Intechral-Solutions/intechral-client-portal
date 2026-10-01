@@ -306,6 +306,15 @@ export function TimerProvider({ enabled, children }: PropsWithChildren<{ enabled
     return <TimerContext.Provider value={value}>{children}</TimerContext.Provider>;
 }
 
+/**
+ * The timer context, or `null` outside a provider. For a passive reader (a list row showing that its
+ * task has a running timer) that must render in a page tree the provider does not wrap, such as a unit
+ * test or a surface the shell does not host; anything that acts on timers uses `useTimers`.
+ */
+export function useOptionalTimers() {
+    return useContext(TimerContext);
+}
+
 export function useTimers() {
     const context = useContext(TimerContext);
 

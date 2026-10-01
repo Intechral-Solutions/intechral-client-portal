@@ -103,6 +103,18 @@ export type TaskFilterOptions = {
     organizations: NamedOption[];
 };
 
+/**
+ * The per-task outcome of `POST /tasks/bulk` (EPIC-014 §15.2, `flash.bulk`): every submitted id lands in
+ * exactly one bucket. An id the viewer may not act on, or that does not exist, is `notPermitted`.
+ */
+export type TaskBulkResult = {
+    action: 'complete' | 'reopen';
+    succeeded: number[];
+    notPermitted: number[];
+    configurationError: number[];
+    failed: number[];
+};
+
 /** Labelled vocabulary for the standalone-task create form (§15: the server names the options). */
 export type TaskCreateOptions = {
     priorities: { value: TaskPriority; label: string }[];
