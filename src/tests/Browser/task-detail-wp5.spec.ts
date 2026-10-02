@@ -62,10 +62,28 @@ async function createStandalone(page: Page, title: string, assignee: 'Me' | 'Una
     await expect(page.getByRole('status').filter({ hasText: 'Task created.' })).toBeVisible();
 }
 
-/** Delete the open standalone task through its own page (the supported route), and land on the list. */
+/**
+ * Delete the open standalone task through its own page (the supported route), and land on the list.
+ * The DELETE's own response is asserted before the URL, so a failure says which step broke: the
+ * delete itself, or the `/tasks` page it redirects to.
+ */
 async function deleteStandaloneFromDetail(page: Page) {
+    // Callers may arrive by a row link whose Inertia visit is still in flight.
+    await expect(page).toHaveURL(/\/tasks\/\d+$/);
+    const path = new URL(page.url()).pathname;
+
     await page.getByRole('button', { name: 'Delete task' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete task' }).click();
+    const [response] = await Promise.all([
+        page.waitForResponse(
+            (candidate) =>
+                new URL(candidate.url()).pathname === path && candidate.request().method() === 'DELETE',
+        ),
+        page.getByRole('dialog').getByRole('button', { name: 'Delete task' }).click(),
+    ]);
+
+    // Inertia answers a non-GET redirect with 303, so the browser follows it with GET /tasks.
+    expect(response.status(), `DELETE ${path}`).toBe(303);
+    expect(new URL(response.headers()['location'] ?? '', page.url()).pathname, `DELETE ${path} redirect`).toBe('/tasks');
     await expect(page).toHaveURL(/\/tasks$/, { timeout: 15000 });
 }
 

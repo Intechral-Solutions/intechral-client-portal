@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -154,16 +155,24 @@ final class TaskQuery
         return $this->sorted($query, $state);
     }
 
-    /** The page of rows the list renders, with the relations TaskListPresenter reads. */
+    /**
+     * The page of rows the list renders, with the relations TaskListPresenter reads.
+     *
+     * One logical read, one snapshot: the count, the rows and the eager loads all run inside one
+     * transaction, so under InnoDB's REPEATABLE READ they read the same consistent snapshot. Read
+     * statement by statement instead, a project deleted (cascading its tasks) between the row query
+     * and the `project` eager load left a board row with a null `project`. The paginator is fully
+     * materialized before the closure returns; no lock is taken and no writer waits on it.
+     */
     public function paginate(TaskListState $state, ?int $page = null): LengthAwarePaginator
     {
-        return $this->results($state)
+        return DB::transaction(fn () => $this->results($state)
             ->with([
                 'assignee:id,name',
                 'project:id,name',
                 'column:id,project_id,name,is_done_column',
             ])
-            ->paginate(self::PER_PAGE, ['tasks.*'], 'page', $page);
+            ->paginate(self::PER_PAGE, ['tasks.*'], 'page', $page));
     }
 
     /**
