@@ -36,6 +36,40 @@ function shellSeamReferences(string $source, string $forbidden): bool
     return (bool) preg_match('#\bimport\b[^;]*\b'.$name.'\b[^;]*\bfrom\b|<'.$name.'[\s/>]#', $source);
 }
 
+/**
+ * The component a page's `Page.layout` renders, or null when it has none. It matches a layout that
+ * passes props (`<AppShell trail={…}>`, EPIC-014 WP5) as well as the bare `<AppShell>`: the earlier
+ * pattern required `>` straight after the name, so a layout with any prop was never counted at all
+ * and could have named anything without the guard noticing.
+ */
+function shellLayoutComponent(string $source): ?string
+{
+    return preg_match('/\.layout\s*=\s*\(page[^)]*\)\s*=>\s*\(?\s*(?:\{[^}]*\breturn\s*\(?\s*)?<(\w+)[\s>]/s', $source, $match) ? $match[1] : null;
+}
+
+/** How many `Page.layout =` declarations a source declares, however they are written. */
+function shellLayoutDeclarations(string $source): int
+{
+    return preg_match_all('/\.layout\s*=(?!=)/', $source);
+}
+
+it('counts every layout declaration, whatever its shape', function () {
+    expect(shellLayoutDeclarations('X.layout = (page) => <AppShell>{page}</AppShell>;'))->toBe(1)
+        ->and(shellLayoutDeclarations('X.layout = page => <AppShell>{page}</AppShell>;'))->toBe(1)
+        ->and(shellLayoutDeclarations('X.layout = function (page) { return <AppShell>{page}</AppShell>; };'))->toBe(1)
+        ->and(shellLayoutDeclarations('X.layout = withShell;'))->toBe(1)
+        ->and(shellLayoutDeclarations('if (a.layout === b) {}'))->toBe(0)
+        ->and(shellLayoutDeclarations('const nothing = 1;'))->toBe(0);
+});
+
+it('finds the component a layout renders, with or without props', function () {
+    expect(shellLayoutComponent('X.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;'))->toBe('AppShell')
+        ->and(shellLayoutComponent('X.layout = (page) => <AppShell trail={[{ label: "t" }]}>{page}</AppShell>;'))->toBe('AppShell')
+        ->and(shellLayoutComponent("X.layout = (page: ReactElement) => {\n    const p = f(page);\n\n    return (\n        <AppShell trail={p}>\n{page}</AppShell>\n    );\n};"))->toBe('AppShell')
+        ->and(shellLayoutComponent('X.layout = (page) => <OtherLayout>{page}</OtherLayout>;'))->toBe('OtherLayout')
+        ->and(shellLayoutComponent('const nothing = 1;'))->toBeNull();
+});
+
 it('detects a shell reference, and only a real one', function () {
     // The guard below must be able to fail: it is asserted against positive and negative samples.
     expect(shellSeamReferences("import { Breadcrumb } from '@/components/shell/breadcrumb';", 'Breadcrumb'))->toBeTrue()
@@ -52,14 +86,24 @@ it('finds the page tree it is asserting over', function () {
 
 it('enters the shell through AppShell alone', function () {
     $layouts = [];
+    $unresolved = [];
 
     foreach (shellPageFiles() as $file) {
         $source = (string) file_get_contents($file);
+        $declared = shellLayoutDeclarations($source);
 
-        if (preg_match('/\.layout\s*=\s*\(page[^)]*\)\s*=>\s*<(\w+)>/', $source, $match)) {
-            $layouts[$file] = $match[1];
+        if (($component = shellLayoutComponent($source)) !== null) {
+            $layouts[$file] = $component;
+        }
+
+        // Fail closed: a layout written in a shape the pattern cannot read is a page the guard would
+        // otherwise skip without a word. Update `shellLayoutComponent()` for the new shape instead.
+        if ($declared !== (isset($layouts[$file]) ? 1 : 0)) {
+            $unresolved[] = str_replace(resource_path('js/pages').'/', '', $file);
         }
     }
+
+    expect($unresolved)->toBe([], 'Page layout declarations the seam guard could not inspect');
 
     // Seam 2: the 12 `Page.layout` lines are the entire coupling between pages and chrome, so they
     // all name the one shell-resolution boundary.

@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 implemented, in review)
+**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 implemented, in review)
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S · [Amendment 5 (2026-10-01)](#amendment-5-wp5-results-2026-10-01): WP5 results — `tasks.show`, the shared Direction D task detail (board and standalone), standalone edit, single-row assignment from the list (exit criterion 7), contextual time on both details, the one shell breadcrumb (A13.12 closed)
 
 ---
 
@@ -41,6 +41,7 @@
 - [Amendment 2: WP2 Results (2026-09-30)](#amendment-2-wp2-results-2026-09-30)
 - [Amendment 3: WP3 Results (2026-09-30)](#amendment-3-wp3-results-2026-09-30)
 - [Amendment 4: WP4 Results (2026-10-01)](#amendment-4-wp4-results-2026-10-01)
+- [Amendment 5: WP5 Results (2026-10-01)](#amendment-5-wp5-results-2026-10-01)
 
 ---
 
@@ -1366,3 +1367,198 @@ Tests: the geometry regression now measures cell boxes at 390px for an ordinary 
 - F11 `FormDialog`'s first-field selector accepts checkbox/radio/readonly/hidden inputs and overrides a consumer's own initial focus;
 - F12 the filter bar is tall at S, the S row is 82px against Direction D's 52–56px, hover/selection replace the running tint, and a truly empty list shows two "New task" actions;
 - F13 `focusFirstRow` (now used by the bulk-bar focus repair) is no longer unused, but the plain `Chip` still has no consumer.
+
+---
+
+## Amendment 5: WP5 Results (2026-10-01)
+
+WP5 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `60b433e` (WP4 merged, PR #12; its push-to-`main` CI was green). It is the task detail, edit and assignment package: `tasks.show`, the shared Direction D detail for board and standalone tasks, standalone edit, and the **required single-row assignment from the Tasks list** that WP4 deferred (owner decision D1, A4.10). It adds no migration, permission, dependency or time-domain change. Status stays **In Progress**.
+
+### A5.1 Package boundary, as recovered from the final EPIC
+
+| Item | Where the final EPIC puts it | WP5 |
+|---|---|---|
+| `tasks.show` (§10, §13.1, P6) | WP2 (backend) with the page in WP5 (A2.3.1) | **Done**: standalone page; authorize first (403), then a board task **redirects** to `projects.tasks.show`; a ticket-kind task is **404** for its authorized viewer and a dual-linked row is denied (A5.2, A5.15) |
+| Board detail on the shared grammar; page-owned breadcrumb removed (§14.2, A13.12) | WP5 | **Done**; route and domain behaviour unchanged |
+| Standalone detail page (Description, Details, Time only) | WP5 | **Done** |
+| Complete/Reopen and Delete actions on detail, per abilities | WP5 | **Done**; no new route |
+| Shared task form fields; Edit as a `FormDialog` | WP5 | **Done** |
+| Contextual time panel on both detail kinds (R9) | WP5 | **Done**: the existing `TaskTimePanel`, unchanged |
+| Single-row list assignment (R6, §18.7) | WP5 (owner decision D1) | **Done**; exit criterion 7 **closed** |
+| Row `TimerControl`/`T`, bulk assign, peek inspector, Home feed, `?` sheet (S1–S5) | WP6, optional | **Not built** |
+| Row ticking elapsed time (D2) | WP6 | **Not built** |
+| `E2eCleanup`/A9.7, doc sweep, exhaustive AT matrices | WP7 | **Not built** |
+
+The prompt and the EPIC agreed on every point; nothing was pulled forward from WP6 or WP7, and no stop condition fired.
+
+### A5.2 `tasks.show` (§13.1, P6, Q6)
+
+`GET /tasks/{task}`, `TaskController::show`, in this order (corrected after the independent review, A5.15 F1):
+
+1. **A missing id → 404** (route-model binding), as everywhere.
+2. **`TaskPolicy::view` → 403, first.** Authorization comes before any kind-specific behaviour, as every other `tasks.*` route answers (the §13.1 convention and A2's "403 before any kind 404"). An unauthorized actor therefore gets 403 for a standalone task, a board task, a ticket-kind task and a malformed project-and-ticket row alike, and **cannot compare routes to learn a row's kind**. A malformed row (INV-13) is denied by the policy (`kindOf` is null), so it can never fall through as a board task.
+3. **Then the kind, for an authorized actor only.** A ticket-kind task is not surfaced by EPIC-014 (Q6): its authorized viewer (the ticket's owner, an operator) gets **404**. A board task **redirects** to `projects.tasks.show`, so there is one canonical board detail (P6); a departed assignee and an outsider got 403 at step 2, never a redirect. A standalone task renders here for its creator or current assignee (Q4).
+
+The security invariant is therefore: **unauthorized actors are given no pre-authorization kind oracle; after authorization, ticket tasks are not surfaced and the route answers 404.** It is *not* claimed that a ticket task is indistinguishable from a missing id: an authorized ticket viewer already knows the task exists, and Laravel's JSON 404 message differs between model-not-found and `abort(404)` (pinned in `TaskShowTest`). A 403 on `/tasks/{id}` still reveals that a task with that id exists, the inherited convention shared with `tasks.update` and the rest.
+
+The page's prop contract is explicit (`StandaloneTaskPresenter`): `task` (id, title, description, priority, due date, overdue, `status` display DTO, `statusValue` for the edit form, assignee `{id, name}`), `abilities` (`update`, `complete`, `reopen`, `delete`, `assign` from `TaskPolicy`, and `logTime`), `options` (server-named priorities and statuses, and `assignees.self` only) and `timeSummary`. No email, creator id, project, milestone, column, checklist or comment key exists on it.
+
+### A5.3 The shared detail architecture (§14.2)
+
+`components/tasks/task-detail-frame.tsx` composes the existing primitives: a `grid` `PageFrame` whose `EntityHeader` (overline, title, `Status`, actions, strata) spans the page, a main column and a labelled `<aside>` "Task details". It adds no layout and no domain. `TaskDetailsList` holds the facts both kinds have (assignee, due date with an overdue glyph and cue, priority) and takes a kind's own rows as children, so a standalone detail shows no Milestone or Column and a board detail adds both, **without a flag** such as `isStandalone`.
+
+| Piece | Shared by | Notes |
+|---|---|---|
+| `TaskDetailFrame`, `TaskDetailsList` | both pages | the grammar |
+| `TaskCompleteAction` | both pages | "Complete task" / "Reopen task", from `abilities`, the WP2 routes, a config error shown in a live alert; `aria-disabled` while in flight so focus stays |
+| `TaskAssigneeMenu` | both pages and the list | one assignment control |
+| `TaskDeleteButton` | both pages | now takes a `url`: `tasks.destroy` or `projects.tasks.destroy`; the confirmation dialog and the recorded-time refusal are unchanged |
+| `task-fields.tsx` (Title, Priority, Due date, Description) | create dialog, standalone edit dialog, board edit dialog | the shared field set |
+
+Board detail keeps its route, domain behaviour, checklist and comments (their components are untouched), and renders the project in the overline and the Milestone and Column rows. Standalone detail has Description, Details and Time only.
+
+### A5.4 Edit and the shared form architecture
+
+The sidebar edit form became an **Edit dialog** (`FormDialog`), opened from the entity header, on both kinds. The board dialog (`TaskEditDialog`) is the former `TaskEditForm` over the same `projects.tasks.update`, with the same member-assignee and milestone fields and the I8 departed-assignee option. The standalone dialog (`StandaloneEditDialog`) puts title, status, priority, due date and description to `tasks.update`.
+
+- **Not a universal form.** The four fields the three forms share live in `task-fields.tsx`; everything kind-specific stays explicit in each form.
+- **Raw status (§12 of the WP5 prompt).** Only the standalone dialog has a Status field: a standalone task's status is its own field (WP2). The board dialog has **none**; a board task's completion is its column's (INV-1) and moves only through Complete/Reopen. A test pins both.
+- The standalone dialog sends **no assignee**: an absent `assignee_id` leaves it alone (WP2), and assignment goes through the narrow control, so editing can never hand a task over by accident. It never sends a project, ticket or creator (INV-9).
+- The create dialog now uses the shared fields; its labels, ids and behaviour are unchanged.
+- Dialogs are mounted only while open, so each opening starts from the task's current values, and focus returns to the opener (tested, and measured in Playwright).
+
+### A5.5 Single-row assignment from the list (R6, exit criterion 7)
+
+**Closed.** The affordance is `TaskAssigneeMenu`: a real `button` that opens a radio menu (Unassigned, then the choices, the current holder checked), shown **only** on rows whose server `abilities.assign` is true. Its name is "Assignee: *holder*. Change assignee of “*title*”", so a row's control is never an anonymous "Assignee". It is `aria-disabled`/`aria-busy` (not `disabled`) while its request is in flight, single-flight per row, and sends nothing when the current value is chosen again. A refusal is shown in the page's existing live alert naming the task. Rows without the ability keep the assignee as plain text.
+
+**Candidate source (security-sensitive).** `App\Queries\TaskAssigneeOptions::forPage` returns one page-level prop, `assigneeOptions`:
+
+- `self`: the actor, the only person a standalone task may be handed to (Q4);
+- `projects`: for each project with a row the actor may assign on this page (`TaskRowAbilities`' `assign`, which is `TaskPolicy::assign`), that project's **current members**, the exact set `ProjectTaskAssignee` accepts for a new assignment, from **one** query for the whole page.
+
+No `User::all()`, no email, no member of a project whose rows the actor cannot assign, and no departed member as a candidate. A holder who is not in the offered set (a legacy standalone holder, a departed project member) is shown as the labelled, checked **current** value and is never a new choice. Authority is unchanged: `PUT /tasks/{task}/assignee` re-authorizes through `TaskPolicy::assign` and re-validates through `ProjectTaskAssignee` / `StandaloneTaskAssignee` and the locked-row check (A2.5), whatever the page offered. Nothing about membership is re-derived in React: it only compares the row's holder with the list the server sent.
+
+**`TaskRow` gains `projectId`** (int or null), the key into `assigneeOptions.projects`. It is the minimum DTO field: a board row is only ever on a page for a project the actor can view (§9.1.1) and its URLs already carry the id. `TaskQuery` is unchanged.
+
+**D9 impact: none on the contract.** At S the control is the avatar mark alone (its name is read by assistive technology only), added to the second band, where the context is the flexible item and truncates. A row without the ability keeps the assignee as an `sr-only` cell exactly as in WP4 (`DataTable`'s `area` may now be a per-row function). Measured in Playwright at 390px: two bands, at most 96px, no overflow, the control inside the viewport and still two bands after an assignment. Desktop is the same row with the name beside the mark.
+
+**Focus.** After an assignment the control is the same element and keeps focus. When the reassignment takes the row out of the list (My Tasks), focus moves to the next row, the previous one at the end, or the empty state, and only when it was actually lost; a refusal moves nothing.
+
+### A5.6 Contextual time (R9, §15.3)
+
+Both detail pages render the existing `TaskTimePanel` (the shared `TimerControl`, the existing time summary), unchanged. `AccessibleTimeContext`, decision (c), the billing locks and timer ownership are untouched.
+
+- Board: unchanged `abilities.logTime` (`time.log`).
+- Standalone: `abilities.logTime` is `time.log` **and** `AccessibleTimeContext::allows(task)`, so the creator of an unassigned task sees the summary but is not offered Start until they take it (P5). Releasing a task through the assign control drops the Start control, which the browser flow shows.
+- A viewer with neither time permission gets no time data (`timeSummary` null), as on the board page.
+
+Row `TimerControl`, `T` and the ticking row clock are not built (S1, D2).
+
+### A5.7 Complete / Reopen and Delete on detail
+
+Complete/Reopen are rendered from `abilities` and call the WP2 routes; no role inference, no optimistic state, timers untouched (INV-15). The ring is not reused: a detail header has room for a named text button, so it is one ("Complete task" / "Reopen task", the same element before and after, so focus stays on it as its name flips). Delete uses the existing routes (`tasks.destroy`, `projects.tasks.destroy`), the existing confirmation dialog and the recorded-time guard; its refusal shows in the dialog, and a standalone delete returns to `tasks.index`. There is no new pathway.
+
+### A5.8 Breadcrumb: A13.12 closed
+
+`AppShell` takes an optional `trail` (`BreadcrumbSegment[]`, the page-supplied trail EPIC-013 §13.2 defines), passed through `OperatorShell` and `UtilityBar` to the one `Breadcrumb`. A page supplies it from its layout line, which still names `AppShell` alone (`layout = (page) => <AppShell trail={…}>{page}</AppShell>`), reading the trail from the page element it wraps (`lib/inertia-layout.ts`), so no shared Inertia prop and no server contract changed. **Inertia 3 calls a layout function twice**, first with the raw props object to learn what it returns, so a function that read `page.props` directly crashed the page with a blank screen in the browser (Vitest had not caught it: it called the function with an element); `layoutPageProps` returns undefined for the probe. Both pages have a test that renders the layout inside the shell and one that probes the function with raw props. **`ShellSeamContractTest` (EPIC-013 §23.2) caught a first attempt** that used page-local layout components: every `Page.layout` must name `AppShell`. The attempt was dropped rather than the guard weakened; the guard's own pattern was tightened instead, because it required `>` straight after the component name, so a layout passing *any* prop was never counted and could have named anything (`shellLayoutComponent`, with positive and negative samples).
+
+- Board trail: Projects › All projects › *project* (a link to the board) › *task* (`aria-current="page"`).
+- Standalone trail: Tasks › My tasks › *task*.
+- While the drawer is collapsed the active view stays a `ViewSwitcher`; a long task name truncates.
+- **At S** the 48px bar also carries the timer pill, and four segments were each truncated to a fragment ("P… › A… › E2E … › E2E …", found in a 390px screenshot). With a trail the bar now keeps the **parent and the current page**: the workspace hides, and the view too once the trail has a parent of its own (a project above a task); from M up every segment shows. The hiding is `display: none`, so the shortened trail is still a valid one ending on the current page, and its separators hide with it.
+- Without a `trail` the breadcrumb is exactly as before.
+
+**Verified:** Vitest (`app-shell.test.tsx`: one landmark, the segments, the current page, Inertia links, the collapsed switcher, truncation, no trail unchanged; the page tests assert no `navigation` role in the page body); Playwright on both detail pages and for a member viewer, using the Chromium accessibility tree (`ariaSnapshot`) to count `navigation "Breadcrumb"` landmarks: exactly one.
+
+### A5.9 Navigation, URLs and return behaviour
+
+- `tasks.show` is an active route of both Tasks items (the A3.6 deviation, now closed): the standalone detail keeps the Tasks workspace active, on My tasks (it carries no `view`).
+- A standalone list row's `url` is its `tasks.show`; its `context.url` stays null ("Standalone" is a label). A board row's `url` is unchanged. A ticket row remains impossible (Q6).
+- Return behaviour is the shell trail's canonical routes (Tasks, My tasks, the project board). No return-target framework was added.
+
+### A5.10 Findings and deviations
+
+1. **The board detail's assignee is edited in two places**: the Details assign control (the narrow endpoint) and the Edit dialog's select (the existing `projects.tasks.update`). Both pass through the same `ProjectTaskAssignee` rule. The dialog's field is kept so the existing board behaviour is not removed in a presentation migration; a later cleanup could drop it.
+2. **The standalone edit dialog has no assignee**; the standalone create dialog still does (as WP4).
+3. **`StandaloneTaskPresenter` sends `statusValue`**, the editable raw status, for the edit form's select. It is a field the form edits, not a leaked attribute; the display state remains `status`.
+4. **Wayfinder**: generated route modules were regenerated (`npm run wayfinder:generate`, gitignored).
+5. Playwright specs updated for the move from an inline edit form to a dialog: `task-detail-migration.spec.ts` (edit flow; the time panel locator is now the labelled `Time` region) and `tasks-migration.spec.ts` (the `assignToBoardCreator` helper; the standalone row now has a title link and an assignment control, and the S-width geometry test includes the assignee cell in the second band).
+6. **Defects found by measuring, fixed in WP5 because the new surface exposed them.** (a) `DataTable`'s scroll wrapper was not positioned, so the `sr-only` (absolutely positioned) text of its far-right cell sat outside the wrapper's clip and widened the *document* once the assignee control made the table wider than the viewport at 768px; the wrapper is now `relative` (tested; the strict two-band spec found it). (b) Inertia 3's layout probe (A5.8). (c) The breadcrumb at S (A5.8). (d) The assign control showed the name only for assistive technology at S everywhere; that is now the list's choice (`compactAtSmall`), and a detail page shows the name. (e) The assign menu's checked item had no visible mark beyond weight; it now draws a check. (f) `TaskTimePanel`'s Start button wrapped onto two lines in the aside (`whitespace-nowrap`; presentation only, no time behaviour).
+7. **Deferred WP4 findings were not touched** (F7 partial bulk selection retention, F8 verbose row name, F9 `useOptionalTimers`, F11 `FormDialog` selector edge cases, F12 filter-bar height/row density/duplicate empty-state button, F13 plain `Chip`): recorded for WP7. `FormDialog` is unchanged; its consumers (create task, milestone, and the two new edit dialogs) were re-run.
+8. **Playwright name collisions.** The assign control's accessible name contains the task title, so `getByRole('button', { name: 'Edit task' })` can match it when a title contains those words, and `getByLabel('Assignee')` matches every row's control as well as the filter select. The specs now use `exact: true` and the `combobox` role. The names themselves are right for assistive technology.
+9. **NVDA was not available in this environment.** The landmark count was verified through Chromium's accessibility tree. A manual NVDA checklist for the owner is in A5.11.
+
+### A5.11 Manual NVDA checklist (not run)
+
+On a board task detail and a standalone task detail, with NVDA + Firefox/Chrome:
+1. Landmarks list (`D`): exactly one "Breadcrumb" navigation, one main, one "Task details" complementary, and the shell's others; no second Breadcrumb.
+2. Headings list (`H`): one level-1 (the task), level-2 sections (Description, [Checklist, Comments,] Details, Time).
+3. Tab order: header actions (Complete task, Edit task, Delete task) before the main sections; the aside follows the main column.
+4. Complete task / Reopen task: the name flips, "Task completed." is announced, focus stays on the button.
+5. Assignee control: announced as "Assignee: …. Change assignee of “…”, menu button"; the menu items are announced as radio items with their state; focus returns to the button.
+6. Edit dialog: opens on the title, labels and errors read, Esc closes and focus returns to Edit task.
+7. Delete: the confirmation is a dialog; a recorded-time refusal is announced as an alert.
+8. List: an assignable row's control reads its holder and task; a row without the ability has no such control.
+9. List at S (phone width): the assignment control shows only the avatar mark, with the holder's name visually hidden; it must still be announced as "Assignee: …. Change assignee of “…”".
+10. Departed holder: a task held by someone who has left the project announces the "(no longer a project member)" current entry as a checked radio item, including on a project with no current members.
+11. Assignment refusal: a refused assignment is announced through the live alert, naming the task.
+12. S breadcrumb: at phone width the trail shows the parent and the current page only; confirm the shortened trail reads as a valid Breadcrumb ending on the current page, with no stray separator.
+
+### A5.12 Evidence
+
+| Gate | Result |
+|---|---|
+| Test-first | `TaskShowTest` and `TaskAssigneeOptionsTest` were written first and were red (no route, no component, no prop) before any production code; so were the Vitest suites for the shared components, the two pages, the shell trail and the table/page assignment cases. The rewritten pins (§16.3: the D3 route pin gains `tasks.show`, the standalone row link, the matrix row, the navigation case) were rewritten with them |
+| Start | `main` @ `60b433e` == `origin/main`, tree clean, latest push-to-`main` CI green (run 36902921303). Local `main` had been stale at `3612a56` and was fast-forwarded; the branch was fast-forwarded from `fbbce1c`. No history rewritten |
+| Focused Pest | `tests/Feature/Tasks`, `Projects`, `Time`, `Unit/Architecture`, `NavigationBuilderTest`, `ShellContractTest`: 960 passed, 1 failed (the D3 route pin, edited after that run started); the pin, `TaskShowTest` and `TaskAssigneeOptionsTest` re-run: 43 passed (170 assertions) |
+| Focused Vitest | `components/tasks`, `components/projects`, `components/shell`, `components/ui`, `pages/tasks`, `pages/projects`: 62 files, 633 tests |
+| `./dev check` (final, run alone) | green: CLI self-tests 196 assertions; Vitest **92 files / 1029 tests**; Pest **1452 passed (8093 assertions)**; build; Pint; `git diff --check` |
+| `./dev test:e2e` (full) | **111 passed**, 0 failed, 3 workers, 4.4 minutes. The new `task-detail-wp5.spec.ts` has 7 tests; the older specs pass after the edit-dialog and assignee-name updates. The dev database gained 2 standalone tasks from the older specs (A9.7, WP7); `task-detail-wp5.spec.ts` leaves none (it deletes what it creates through the task page) |
+| Visual inspection | Desktop 1400 and phone 390 of both details, the Edit dialog, the list with the assign menu open and the S list row. It found the S breadcrumb, the invisible assignee name on a phone detail, the missing check mark, and the wrapped Start button (all fixed, A5.10) |
+| Mutation / failure checks | The strict two-band spec went red when the assignee control widened the table (the `DataTable` clip, A5.10); the seam guard went red on the first layout attempt (A5.8); a blank page in the first browser run exposed the Inertia 3 layout probe |
+| Query budget | One query for the whole page, and only when it holds an assignable board row; none otherwise. `TaskAssigneeOptionsTest` grows the world from 3 to 13 projects, two rows each, and requires no growth beyond the suite's one-query warm tolerance; `ProjectQueryBudgetTest` (the five list shapes) is unchanged and green |
+
+### A5.13 Files changed
+
+**Backend:** `TaskController` (`show`, the shared `formOptions`, `assigneeOptions`), `routes/web.php`, `TaskListPresenter` (`projectId`, standalone `url`), `NavigationBuilder` (`tasks.show` active), new `StandaloneTaskPresenter` and `Queries/TaskAssigneeOptions`. No migration, permission, seeder, policy, service, query-layer or time-domain file.
+
+**Frontend:** new `components/tasks/` `task-detail-frame`, `task-assignee-menu`, `task-assignee-choices`, `task-complete-action`, `task-delete-button` (moved from `projects/`), `task-fields`, `task-priority`, `standalone-edit-dialog`; `components/projects/task-edit-dialog` (replaces `task-edit-form`); `pages/tasks/show`; `pages/projects/tasks/show` (rewritten); `pages/tasks/index` (assignment); `task-table`, `create-task-dialog`, `data-table`, `dropdown-menu`, `task-time-panel` (small); shell `app-shell`, `operator-shell`, `utility-bar`, `breadcrumb` (the `trail`); `lib/inertia-layout.ts`; `types/tasks.ts`.
+
+**Tests:** `TaskShowTest`, `TaskAssigneeOptionsTest`, the Vitest suites for each new component and page, `test/menu.ts`, `tests/Browser/task-detail-wp5.spec.ts`; updated `ProjectAuthorizationMatrixTest`, `ProjectPinnedBehaviorTest`, `ProjectVisibilityTest`, `TaskListInertiaTest`, `TaskListPageTest`, `NavigationBuilderTest`, `ShellSeamContractTest`, `task-detail-migration.spec.ts`, `tasks-migration.spec.ts`.
+
+**Docs:** this amendment and the header status line. Amendments 1-4 are unchanged.
+
+### A5.14 Exit criteria and what stays open
+
+- **Exit criterion 7 (assignment from detail and from the list): closed.**
+- **Exit criterion 9 (task detail on the §14.2 grammar; A13.12): closed.** One Breadcrumb landmark on both details, in Vitest and in Chromium's accessibility tree.
+- **Criterion 6 (standalone detail, edit, Complete/Reopen, delete):** met; delete with recorded time is refused through the shared guard (Pest, Vitest; the board's browser flow is D4 in `task-detail-migration.spec.ts`).
+- **Open for later packages, unchanged:** A9.7 and the doc sweep (WP7), S1-S5 (WP6, optional), the WP4 deferred findings (A4.10).
+- **No owner decision is pending.** Nothing in WP5 chose a consequential policy: the routing, the 403/404 convention, the candidate source and the D9 fit all follow the committed EPIC.
+
+### A5.15 Independent review remediation (2026-10-01)
+
+An independent review of the uncommitted WP5 diff returned **WP5 needs small remediation**: architecture, assignment security, board-detail parity and scope sound, no owner decision. F1-F6 were fixed on the same branch, test-first where a test could be written first.
+
+| # | Finding | Fix |
+|---|---|---|
+| F1 | `tasks.show` returned 404 for a ticket-kind or malformed row *before* authorizing, contradicting A2 and letting an unauthorized caller compare routes to infer kind | `view` is authorized first; only then ticket → 404, board → redirect, standalone → page. A malformed row is denied by the policy (403). A5.2 rewritten with the exact invariant (no pre-authorization kind oracle; **not** "indistinguishable from a missing id", which the JSON 404 messages disprove). `TaskShowTest` pins missing 404, standalone 200/403, board redirect/403, authorized ticket viewer 404, unauthorized ticket actor 403, malformed 403, and that the JSON 404 messages differ |
+| F2 | `ShellSeamContractTest` skipped layout shapes its regex could not read | Fails closed: the declarations in each page (`.layout =`) must equal those the guard resolved, else the test lists the unreadable pages. Mutation-checked: a page rewritten as `function (page) { return <OtherShell>… }` turned it red, then restored. No parser added |
+| F3 | A non-managing board viewer saw the raw `high` | The page passes a label only when found in `options`; `TaskPriorityMark` names it otherwise. Vitest for low/high/critical with no options |
+| F4 | Standalone edit Status had no error wiring | `aria-invalid`, `aria-describedby`, `FormFieldError` and first-error focus, as `TaskEditDialog`. Vitest: association, invalid state, focus to the first invalid field for each of five fields and when Status is first of several |
+| F5 | The assignee menu prevented every key while pending, trapping Tab and blocking DataTable shortcuts | Only Enter, Space, ArrowDown and ArrowUp are held back. Vitest: those four prevented; Tab, Shift+Tab, Escape and other keys not; Tab leaves the control; it opens after the request |
+| F6 | A departed holder vanished from the menu on a project with no current members | The `choices.length > 0` guard is gone: the holder is the labelled, checked `current` value and never a new candidate. Vitest for both |
+
+**Deferred, non-blocking (WP7 owns fixture hardening):** **F7** the WP5 browser spec uses some fixed board project/task names and could collide with residue after an interrupted run; **F8** no dedicated test pins "+0 assignment-options queries when the page has no assignable board row" (the code skips the query when there is no project id).
+
+**Evidence after remediation.** Focused Pest (`Tasks`, `Projects`, `NavigationBuilderTest`, `ShellSeamContractTest`): 833 passed (5124 assertions). Focused Vitest (`components/tasks`, `components/projects`, `pages/tasks`, `pages/projects/tasks`, `data-table`, `components/shell`, `lib/inertia-layout`): 42 files, 502 tests. Focused Playwright (`task-detail-wp5`, `shell`, `blade-shell`, `task-detail-migration`, `tasks-migration`): 52 passed, 3 workers; the dev database gained 2 tasks from the older `tasks-migration` spec (A9.7, WP7). **`./dev check`, run alone: green.** CLI self-tests 196 assertions; Vitest **92 files / 1052 tests**; Pest **1455 passed (8105 assertions)**; build; Pint; `git diff --check`. NVDA was not run; A5.11 gained four items.
+
+### A5.16 Hosted CI remediation: `TaskQuery` read consistency (2026-10-01)
+
+Hosted WP5 CI failed a standalone delete. The delete itself **succeeded**: `tasks.destroy` redirected to `/tasks`, and that `GET /tasks` returned 500. Another worker deleted a project (cascading its tasks) between `TaskQuery::paginate`'s task-row SELECT and its `project` eager load, so a board row reached `TaskListPresenter` with `project_id` set and `project` null. The browser stayed on `/tasks/{id}`. The `/time` URL in the report was `E2eCleanup.run()` navigating during teardown after the timeout, not the delete's redirect. The race is **pre-existing** (it predates WP5) and is a read-consistency defect, not a delete defect.
+
+- **Fix:** `TaskQuery::paginate` returns its fully materialized paginator from inside one `DB::transaction`, so the pagination count, the task rows and the three eager loads (`assignee`, `project`, `column`) read one InnoDB REPEATABLE-READ snapshot. No lock, no isolation change, no writer serialized. Visibility, views, filters, search, sort, page size, the eager-load set and the presenter are unchanged. The presenter is **not** null-guarded: a fallback would render a ghost row and hide the defect.
+- **Regression:** `TaskQueryReadConsistencyTest` injects the race deterministically on two connections with committed fixtures (the RefreshDatabase transaction ended, as in `TaskCompletionConcurrencyTest`; cleaned up in `finally`). A second connection deletes the project and commits from a listener on the first connection's task-row SELECT. The control case (the pre-fix statement-by-statement read) shows the null `project` and the presenter exception. The fixed case shows the row, count and project from one snapshot, and every eager load at transaction level 1. With the fix reverted, the fixed case fails.
+- **Query budget:** unchanged. Query-log counts for the five WP3 shapes stay 11/12/12/12/13, small = large. BEGIN/COMMIT go through PDO, not the query log.
+- **Delete helper:** `deleteStandaloneFromDetail` now asserts the `DELETE /tasks/{id}` response (303, `Location` `/tasks`) before the URL, so a future failure says whether the delete or the list failed. The UI delete remains the behaviour under test. The `/time` teardown navigation is unchanged (WP7).
+- **Still open, unchanged:** A9.7 (the known `tasks-migration` residue, WP7). One unreproduced local A1 viewport-loop timeout is recorded as unproven and non-actionable.

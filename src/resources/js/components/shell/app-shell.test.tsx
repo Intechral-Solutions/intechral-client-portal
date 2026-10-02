@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { emitInertiaNavigate, resetInertiaMock, setPageProps } from '@/test/inertia';
 import type { Navigation, Workspace } from '@/types';
 
-import { AppShell } from './app-shell';
+import { AppShell, type BreadcrumbSegment } from './app-shell';
 import {
     helpdesk,
     home,
@@ -30,7 +30,7 @@ const user = {
     avatar: { initials: 'DW', url: null },
 };
 
-function mount(nav: Navigation, permissions: string[] = []) {
+function mount(nav: Navigation, permissions: string[] = [], trail?: BreadcrumbSegment[]) {
     setPageProps({
         auth: { user, permissions },
         shell: { presentation: 'operational' },
@@ -38,7 +38,7 @@ function mount(nav: Navigation, permissions: string[] = []) {
     });
 
     return render(
-        <AppShell>
+        <AppShell trail={trail}>
             <h1>Projects</h1>
         </AppShell>,
     );
@@ -259,6 +259,111 @@ it('renders the breadcrumb from the server trail, ending with the current page',
     expect(crumbs).toHaveTextContent('Projects');
     expect(crumbs).toHaveTextContent('All projects');
     expect(within(crumbs).getByText('All projects')).toHaveAttribute('aria-current', 'page');
+});
+
+describe('a page-supplied trail (EPIC-013 §13.2; EPIC-014 WP5, A13.12)', () => {
+    const trail: BreadcrumbSegment[] = [
+        { label: 'Portal rebuild', href: '/projects/7/board' },
+        { label: 'Ship it' },
+    ];
+
+    it("extends the one breadcrumb with the page's segments and ends on the current page", () => {
+        mount(navigation([projects], 'projects'), [], trail);
+
+        const crumbs = screen.getAllByRole('navigation', { name: 'Breadcrumb' });
+        expect(crumbs).toHaveLength(1);
+
+        const [landmark] = crumbs;
+        expect(within(landmark!).getByRole('link', { name: 'Projects' })).toHaveAttribute(
+            'href',
+            '/projects',
+        );
+        // The view the server marked active stays in the trail, now as a link back to it.
+        expect(within(landmark!).getByRole('link', { name: 'All projects' })).toHaveAttribute(
+            'href',
+            '/projects',
+        );
+        expect(within(landmark!).getByRole('link', { name: 'Portal rebuild' })).toHaveAttribute(
+            'href',
+            '/projects/7/board',
+        );
+        const current = within(landmark!).getByText('Ship it');
+        expect(current).toHaveAttribute('aria-current', 'page');
+        expect(
+            within(landmark!).getAllByText(/./, { selector: '[aria-current="page"]' }),
+        ).toHaveLength(1);
+    });
+
+    it('links segments with Inertia visits, never document navigations', () => {
+        mount(navigation([projects], 'projects'), [], trail);
+
+        expect(screen.getByRole('link', { name: 'Portal rebuild' })).toHaveAttribute(
+            'data-inertia-link',
+            'true',
+        );
+    });
+
+    it('keeps the view switcher while the drawer is collapsed, so the view stays switchable', async () => {
+        mount(navigation([tasks], 'tasks'), [], [{ label: 'Pack the van' }]);
+
+        const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+        expect(
+            within(crumbs).getByRole('button', { name: 'Tasks views: My tasks' }),
+        ).toBeInTheDocument();
+        expect(within(crumbs).getByText('Pack the van')).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('renders the long last segment truncated, not wrapping the bar', () => {
+        mount(navigation([projects], 'projects'), [], [{ label: 'A'.repeat(300) }]);
+
+        expect(screen.getByText('A'.repeat(300))).toHaveClass('truncate');
+    });
+
+    it('keeps only the parent and the current page at S: the workspace and the view hide, with their separators', () => {
+        mount(navigation([projects], 'projects'), [], trail);
+        const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+
+        // trail = [project, task]: both leading segments hide at S.
+        expect(within(crumbs).getByRole('link', { name: 'Projects' })).toHaveClass('max-md:hidden');
+        expect(
+            within(crumbs).getByRole('link', { name: 'All projects' }).parentElement,
+        ).toHaveClass('max-md:hidden');
+        expect(within(crumbs).getByRole('link', { name: 'Portal rebuild' })).not.toHaveClass(
+            'max-md:hidden',
+        );
+        // The first separator that would sit at the front of the shortened trail hides too; later ones stay.
+        const separators = crumbs.querySelectorAll('svg');
+        expect(separators).toHaveLength(3);
+        expect(separators[0]).toHaveClass('max-md:hidden'); // workspace › view
+        expect(separators[1]).toHaveClass('max-md:hidden'); // view › project (project is first visible)
+        expect(separators[2]).not.toHaveClass('max-md:hidden'); // project › task
+    });
+
+    it('keeps the view at S when the trail is only the record (a standalone task), hiding just the workspace', () => {
+        mount(navigation([tasks], 'tasks'), [], [{ label: 'Pack the van' }]);
+        const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+
+        expect(within(crumbs).getByRole('link', { name: 'Tasks' })).toHaveClass('max-md:hidden');
+        const separators = crumbs.querySelectorAll('svg');
+        expect(separators[0]).toHaveClass('max-md:hidden'); // workspace › view
+        expect(separators[1]).not.toHaveClass('max-md:hidden'); // view › task
+    });
+
+    it('hides nothing at S for a page with no trail', () => {
+        mount(navigation([projects], 'projects'));
+        const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+
+        expect(within(crumbs).getByRole('link', { name: 'Projects' })).not.toHaveClass(
+            'max-md:hidden',
+        );
+    });
+
+    it('leaves a page with no trail exactly as before: the workspace and the active view', () => {
+        mount(navigation([projects], 'projects'));
+
+        const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+        expect(within(crumbs).getByText('All projects')).toHaveAttribute('aria-current', 'page');
+    });
 });
 
 it('moves the current view into a switcher while the drawer is collapsed', async () => {

@@ -1,12 +1,16 @@
 import { useForm } from '@inertiajs/react';
-import type { FormEvent } from 'react';
+import { useRef } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+    DescriptionField,
+    DueDateField,
+    PriorityField,
+    TitleField,
+} from '@/components/tasks/task-fields';
+import { FormDialog } from '@/components/ui/form-dialog';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { Textarea } from '@/components/ui/textarea';
 import { update } from '@/routes/projects/tasks';
 import type { TaskDetail, TaskEditOptions, TaskPriority, UserRef } from '@/types/projects';
 
@@ -45,35 +49,58 @@ function toFormData(task: TaskDetail): TaskEditFormData {
     };
 }
 
-type TaskEditFormProps = {
+const id = (field: string) => `task-edit-${field}`;
+
+/**
+ * The board task edit dialog (EPIC-011E §11, D1; EPIC-014 §14.2): title, priority, assignee,
+ * milestone (I4), due date and description, one `useForm` mapped to the existing
+ * `projects.tasks.update` endpoint, now on a `FormDialog` opened from the entity header instead of a
+ * sidebar form. Only a viewer the server lets manage the project is offered it (`options` is null
+ * otherwise).
+ *
+ * It shares the title, priority, due date and description fields with the standalone forms
+ * (`task-fields`) and keeps what is board-specific explicit: the project-member assignee (the
+ * current holder is kept as an option even when they have since left, I8, so an unrelated save
+ * cannot unassign them) and the milestone. There is deliberately **no status field**: a board task's
+ * completion is its column's (INV-1), moved by the semantic Complete/Reopen action, never edited as a
+ * raw `status` here.
+ *
+ * The dialog is mounted only while open (the page renders it that way), so every opening starts from
+ * the task's current values and a closed dialog holds no stale draft.
+ */
+export function TaskEditDialog({
+    open,
+    onOpenChange,
+    projectId,
+    task,
+    options,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     projectId: number;
     task: TaskDetail;
     options: TaskEditOptions;
-};
-
-/**
- * The manager-only structural edit form (EPIC-011E §11, D1): title, priority, assignee,
- * milestone (I4), due date, and description, one `useForm` mapped to the existing
- * `projects.tasks.update` endpoint. A plain full-page response (no `only`) is fine here: the
- * read-only summary elsewhere on the page needs the same fresh task anyway.
- */
-export function TaskEditForm({ projectId, task, options }: TaskEditFormProps) {
+}) {
     const form = useForm<TaskEditFormData>(toFormData(task));
     const errors: Record<string, string | undefined> = form.errors;
-    const id = (field: string) => `task-edit-${field}`;
-    const invalid = (field: string) => ({
-        'aria-invalid': Boolean(errors[field]),
-        'aria-describedby': errors[field] ? `${id(field)}-error` : undefined,
-    });
+    const submitting = useRef(false);
 
-    // The current assignee always has an option, even when they have since left the project
-    // (I8): the select never silently drops them, so an unrelated save cannot unassign them.
-    // They are shown only here, never folded into the reusable candidate pool.
     const departedAssignee: (UserRef & { departed: true }) | null =
         task.assignee && !task.assigneeIsMember ? { ...task.assignee, departed: true } : null;
 
-    function submit(event: FormEvent) {
-        event.preventDefault();
+    function handleOpenChange(next: boolean) {
+        if (!next) {
+            form.reset();
+            form.clearErrors();
+        }
+
+        onOpenChange(next);
+    }
+
+    function submit() {
+        if (submitting.current) return;
+        submitting.current = true;
+
         form.transform((data) => ({
             ...data,
             assignee_id: data.assignee_id === '' ? null : Number(data.assignee_id),
@@ -81,47 +108,41 @@ export function TaskEditForm({ projectId, task, options }: TaskEditFormProps) {
         }));
         form.put(update.url({ project: projectId, task: task.id }), {
             preserveScroll: true,
+            onSuccess: () => handleOpenChange(false),
             onError: (submitted) => {
                 const field = firstTaskErrorField(submitted);
                 if (field) document.getElementById(id(field))?.focus();
+            },
+            onFinish: () => {
+                submitting.current = false;
             },
         });
     }
 
     return (
-        <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-                <Label htmlFor={id('title')}>Title</Label>
-                <Input
-                    id={id('title')}
-                    value={form.data.title}
-                    onChange={(event) => form.setData('title', event.target.value)}
-                    required
-                    maxLength={255}
-                    {...invalid('title')}
-                />
-                <FormFieldError id={`${id('title')}-error`} message={errors.title} />
-            </div>
+        <FormDialog
+            open={open}
+            onOpenChange={handleOpenChange}
+            title="Edit task"
+            description="Change this task's details, assignee or milestone."
+            submitLabel="Save changes"
+            onSubmit={submit}
+            processing={form.processing}
+        >
+            <TitleField
+                id={id('title')}
+                value={form.data.title}
+                onChange={(value) => form.setData('title', value)}
+                error={errors.title}
+            />
 
-            <div className="space-y-2">
-                <Label htmlFor={id('priority')}>Priority</Label>
-                <NativeSelect
-                    id={id('priority')}
-                    className="w-full"
-                    value={form.data.priority}
-                    onChange={(event) =>
-                        form.setData('priority', event.target.value as TaskPriority)
-                    }
-                    {...invalid('priority')}
-                >
-                    {options.priorities.map((priority) => (
-                        <option key={priority.value} value={priority.value}>
-                            {priority.label}
-                        </option>
-                    ))}
-                </NativeSelect>
-                <FormFieldError id={`${id('priority')}-error`} message={errors.priority} />
-            </div>
+            <PriorityField
+                id={id('priority')}
+                value={form.data.priority}
+                onChange={(value) => form.setData('priority', value)}
+                options={options.priorities}
+                error={errors.priority}
+            />
 
             <div className="space-y-2">
                 <Label htmlFor={id('assignee_id')}>Assignee</Label>
@@ -135,7 +156,8 @@ export function TaskEditForm({ projectId, task, options }: TaskEditFormProps) {
                             event.target.value === '' ? '' : Number(event.target.value),
                         )
                     }
-                    {...invalid('assignee_id')}
+                    aria-invalid={Boolean(errors.assignee_id)}
+                    aria-describedby={errors.assignee_id ? `${id('assignee_id')}-error` : undefined}
                 >
                     <option value="">Unassigned</option>
                     {options.members.map((member) => (
@@ -164,7 +186,10 @@ export function TaskEditForm({ projectId, task, options }: TaskEditFormProps) {
                             event.target.value === '' ? '' : Number(event.target.value),
                         )
                     }
-                    {...invalid('milestone_id')}
+                    aria-invalid={Boolean(errors.milestone_id)}
+                    aria-describedby={
+                        errors.milestone_id ? `${id('milestone_id')}-error` : undefined
+                    }
                 >
                     <option value="">No milestone</option>
                     {options.milestones.map((milestone) => (
@@ -176,35 +201,20 @@ export function TaskEditForm({ projectId, task, options }: TaskEditFormProps) {
                 <FormFieldError id={`${id('milestone_id')}-error`} message={errors.milestone_id} />
             </div>
 
-            <div className="space-y-2">
-                <Label htmlFor={id('due_date')}>Due date</Label>
-                <Input
-                    id={id('due_date')}
-                    type="date"
-                    value={form.data.due_date}
-                    onChange={(event) => form.setData('due_date', event.target.value)}
-                    {...invalid('due_date')}
-                />
-                <FormFieldError id={`${id('due_date')}-error`} message={errors.due_date} />
-            </div>
+            <DueDateField
+                id={id('due_date')}
+                value={form.data.due_date}
+                onChange={(value) => form.setData('due_date', value)}
+                error={errors.due_date}
+            />
 
-            <div className="space-y-2">
-                <Label htmlFor={id('description')}>Description</Label>
-                <Textarea
-                    id={id('description')}
-                    rows={4}
-                    value={form.data.description}
-                    onChange={(event) => form.setData('description', event.target.value)}
-                    {...invalid('description')}
-                />
-                <FormFieldError id={`${id('description')}-error`} message={errors.description} />
-            </div>
-
-            <div className="flex justify-end">
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing ? 'Saving...' : 'Save changes'}
-                </Button>
-            </div>
-        </form>
+            <DescriptionField
+                id={id('description')}
+                rows={4}
+                value={form.data.description}
+                onChange={(value) => form.setData('description', value)}
+                error={errors.description}
+            />
+        </FormDialog>
     );
 }

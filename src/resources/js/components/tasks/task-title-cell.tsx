@@ -11,10 +11,10 @@ const sourceTag: Record<TaskRow['kind'], string> = { board: 'Board', standalone:
 
 /**
  * A row's title, source tag and, while the viewer's own timer runs on it, the running state
- * (EPIC-014 §14.1, §15.3). Only a project-board task has a detail page from this list so far (`url`
- * is `null` for standalone rows until EPIC-014 WP5), so the title is a link for exactly those and
- * plain text for the rest — never a dead anchor. A present `url` is always the migrated React task
- * page, so it is always an Inertia `Link`, never a document navigation guessed from the URL shape.
+ * (EPIC-014 §14.1, §15.3). The title is a link exactly when the row has a page to open (`url`: a board
+ * task's `projects.tasks.show`, a standalone task's `tasks.show`) and plain text otherwise — never a
+ * dead anchor. A present `url` is always a migrated React task page, so it is always an Inertia
+ * `Link`, never a document navigation guessed from the URL shape.
  *
  * At S (D9) the title band is one visual line: the title truncates visually (`text-overflow`, the DOM
  * text is the full title, so assistive technology reads all of it) while the tag and the running

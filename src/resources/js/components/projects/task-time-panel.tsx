@@ -100,7 +100,11 @@ export function TaskTimePanel({ taskId, canLog, timeSummary }: TaskTimePanelProp
                             disabled={starting}
                             onChange={(event) => setDescription(event.target.value)}
                         />
-                        <Button type="submit" disabled={starting}>
+                        <Button
+                            type="submit"
+                            disabled={starting}
+                            className="shrink-0 whitespace-nowrap"
+                        >
                             {starting ? 'Starting...' : 'Start timer'}
                         </Button>
                     </form>

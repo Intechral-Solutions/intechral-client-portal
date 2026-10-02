@@ -53,7 +53,7 @@ it('renders the unified list as the tasks/index component with a minimal DTO', f
     $row = $props['tasks']['data'][0];
     // EPIC-014 WP3 (§13.3) added `kind` and the batch-computed `abilities`; every earlier field stays.
     expect(array_keys($row))->toBe([
-        'id', 'title', 'kind', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
+        'id', 'title', 'kind', 'projectId', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
     ]);
     expect($row['id'])->toBe($task->id);
     expect(array_keys($row['context']))->toBe(['kind', 'label', 'url']);

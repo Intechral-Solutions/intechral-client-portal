@@ -10,6 +10,7 @@ import { usePanelState } from '@/hooks/use-panel-state';
 import type { SharedPageProps } from '@/types';
 
 import { AccountMenu } from './account-menu';
+import type { BreadcrumbSegment } from './breadcrumb';
 import { Drawer } from './drawer';
 import { NavSheet } from './nav-sheet';
 import { Rail } from './rail';
@@ -26,7 +27,10 @@ import { UtilityBar } from './utility-bar';
  * Geometry — including docked versus overlay and the whole narrow-width reshape — is CSS off
  * `html[data-drawer]` and the width classes, so no JavaScript decides layout (§16).
  */
-export function OperatorShell({ children }: PropsWithChildren) {
+export function OperatorShell({
+    children,
+    trail,
+}: PropsWithChildren<{ trail?: BreadcrumbSegment[] }>) {
     const { auth, navigation, flash } = usePage<SharedPageProps>().props;
 
     const workspace =
@@ -218,7 +222,7 @@ export function OperatorShell({ children }: PropsWithChildren) {
                 ) : null}
 
                 <div data-shell-canvas>
-                    <UtilityBar workspace={workspace} collapsed={collapsed}>
+                    <UtilityBar workspace={workspace} collapsed={collapsed} trail={trail}>
                         {auth.permissions.includes('time.log') ? <TimerPill /> : null}
                     </UtilityBar>
 

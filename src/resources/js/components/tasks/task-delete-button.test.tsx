@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { TaskDeleteButton } from '@/components/projects/task-delete-button';
+import { TaskDeleteButton } from '@/components/tasks/task-delete-button';
 import { resetInertiaMock, setFormErrors, submitted } from '@/test/inertia';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
@@ -9,7 +9,7 @@ vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertia
 afterEach(resetInertiaMock);
 
 function renderButton() {
-    return render(<TaskDeleteButton projectId={7} taskId={3} taskTitle="Ship it" />);
+    return render(<TaskDeleteButton url="/projects/7/tasks/3" taskTitle="Ship it" />);
 }
 
 it('asks for confirmation and does nothing until confirmed', async () => {

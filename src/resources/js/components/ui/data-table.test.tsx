@@ -343,3 +343,40 @@ describe('DataTable focus handle', () => {
         expect(handle.current!.focusedRowKey()).toBe(3);
     });
 });
+
+describe('DataTable per-row area', () => {
+    it('lets a column choose its small-width area per row', () => {
+        render(
+            <DataTable
+                label="Things"
+                rows={[
+                    { id: 1, name: 'One', note: 'a' },
+                    { id: 2, name: 'Two', note: 'b' },
+                ]}
+                getRowKey={(row) => row.id}
+                columns={[
+                    { id: 'name', header: 'Name', area: 'title', cell: (row) => row.name },
+                    {
+                        id: 'note',
+                        header: 'Note',
+                        area: (row) => (row.id === 1 ? 'meta' : 'detail'),
+                        cell: (row) => row.note,
+                    },
+                ]}
+            />,
+        );
+
+        const cells = screen.getAllByRole('cell').filter((cell) => ['a', 'b'].includes(cell.textContent ?? ''));
+        expect(cells[0]).toHaveClass('max-md:order-4');
+        expect(cells[0]).not.toHaveClass('max-md:sr-only');
+        expect(cells[1]).toHaveClass('max-md:sr-only');
+    });
+});
+
+it('is the containing block for its visually hidden text, so a wide table never widens the document', () => {
+    const { container } = render(<Table />);
+
+    // `sr-only` is absolutely positioned: only a positioned wrapper (which also scrolls at M+) clips it.
+    const wrapper = container.querySelector('table')!.parentElement!;
+    expect(wrapper).toHaveClass('relative', 'md:overflow-x-auto');
+});

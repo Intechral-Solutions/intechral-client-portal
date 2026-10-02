@@ -103,6 +103,9 @@ function projectMatrixExpectations(): array
         'tasks.update' => MATRIX_BOARD_KIND_MISMATCH,
         'tasks.destroy' => MATRIX_BOARD_KIND_MISMATCH,
         'tasks.bulk' => MATRIX_AUTH,
+        // EPIC-014 WP5 (§13.1, P6): on a board task tasks.show authorizes `view` (ProjectPolicy) and
+        // then redirects to the canonical projects.tasks.show; the standalone page is TaskShowTest.
+        'tasks.show' => MATRIX_VIEW,
     ];
 }
 
@@ -159,6 +162,7 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
         'tasks.update' => $test->put(route('tasks.update', $ctx->task), ['title' => 'Renamed', 'priority' => 'high', 'status' => 'todo']),
         'tasks.destroy' => $test->delete(route('tasks.destroy', $ctx->task)),
         'tasks.bulk' => $test->post(route('tasks.bulk'), ['action' => 'complete', 'ids' => [$ctx->task->id]]),
+        'tasks.show' => $test->get(route('tasks.show', $ctx->task)),
     };
 }
 

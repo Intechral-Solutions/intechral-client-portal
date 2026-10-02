@@ -139,18 +139,20 @@ it('shapes each row with its surfaced kind and batch-computed abilities, and not
     $rows = collect(listProps($this->actingAs($this->member)->get(route('tasks.index')))['tasks']['data'])->keyBy('title');
 
     expect(array_keys($rows['Visible mine']))->toBe([
-        'id', 'title', 'kind', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
+        'id', 'title', 'kind', 'projectId', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
     ])
         ->and($rows['Visible mine']['kind'])->toBe('board')
         ->and($rows['Visible mine']['context'])->toBe(['kind' => 'project', 'label' => 'Visible Venture', 'url' => route('projects.board', $this->visible)])
         ->and($rows['Visible mine']['url'])->toBe(route('projects.tasks.show', [$this->visible, $this->mine]))
+        ->and($rows['Visible mine']['projectId'])->toBe($this->visible->id)
         // Q1: the member-assignee may complete/reopen but not assign.
         ->and($rows['Visible mine']['abilities'])->toBe(['complete' => true, 'reopen' => true, 'assign' => false]);
 
-    // tasks.show ships with the WP5 page (A2.3.1), so a standalone row has no destination yet.
+    // WP5: tasks.show exists, so a standalone row opens its own detail page (its context stays unlinked).
     expect($rows['My loose end']['kind'])->toBe('standalone')
+        ->and($rows['My loose end']['projectId'])->toBeNull()
         ->and($rows['My loose end']['context'])->toBe(['kind' => 'standalone', 'label' => 'Standalone', 'url' => null])
-        ->and($rows['My loose end']['url'])->toBeNull()
+        ->and($rows['My loose end']['url'])->toBe(route('tasks.show', $rows['My loose end']['id']))
         ->and($rows['My loose end']['abilities'])->toBe(['complete' => true, 'reopen' => true, 'assign' => true]);
 });
 

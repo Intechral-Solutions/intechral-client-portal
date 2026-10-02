@@ -183,7 +183,7 @@ it('lists no ticket-kind task, whether or not TicketPolicy would open the ticket
     }
 });
 
-it('keeps standalone tasks unlinked and My Tasks to what is mine under Q4', function () {
+it('links standalone tasks to their own page and keeps My Tasks to what is mine under Q4', function () {
     Task::factory()->standalone()->create(['title' => 'Standalone mine', 'assignee_id' => $this->orgUser->id]);
     Task::factory()->standalone()->create(['title' => 'Standalone created, unassigned', 'created_by' => $this->orgUser->id, 'assignee_id' => null]);
     Task::factory()->standalone()->create(['title' => 'Standalone created, handed on', 'created_by' => $this->orgUser->id, 'assignee_id' => $this->owner->id]);
@@ -193,9 +193,9 @@ it('keeps standalone tasks unlinked and My Tasks to what is mine under Q4', func
     $rows = collect(taskIndexRows($response))->keyBy('title');
 
     expect($rows->keys()->sort()->values()->all())->toBe(['Standalone created, unassigned', 'Standalone mine']);
-    // No standalone destination until the WP5 detail page ships tasks.show (A2.3.1).
+    // WP5: a standalone row opens tasks.show (its creator/assignee may view it); its context stays unlinked.
     expect($rows['Standalone mine']['context'])->toBe(['kind' => 'standalone', 'label' => 'Standalone', 'url' => null]);
-    expect($rows['Standalone mine']['url'])->toBeNull();
+    expect($rows['Standalone mine']['url'])->toBe(route('tasks.show', $rows['Standalone mine']['id']));
 });
 
 it('clamps the retired org view to My Tasks for everyone, and a company link grants no row', function () {

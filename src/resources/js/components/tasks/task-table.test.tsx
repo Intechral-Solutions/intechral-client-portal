@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 
 import { TaskTable } from '@/components/tasks/task-table';
+import { chooseRadio, openMenu } from '@/test/menu';
 import { resetInertiaMock } from '@/test/inertia';
-import type { TaskRow } from '@/types/tasks';
+import type { TaskAssigneeOptions, TaskRow } from '@/types/tasks';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
 
@@ -16,6 +17,7 @@ const board: TaskRow = {
     id: 1,
     title: 'Ship it',
     kind: 'board',
+    projectId: 1,
     priority: 'high',
     status: { label: 'In Progress', done: false, source: 'column' },
     dueDate: null,
@@ -29,14 +31,28 @@ const standalone: TaskRow = {
     id: 2,
     title: 'Loose end',
     kind: 'standalone',
+    projectId: null,
     priority: 'low',
     status: { label: 'To Do', done: false, source: 'status' },
     dueDate: null,
     overdue: false,
     assignee: { id: 5, name: 'Mia Member' },
     context: { kind: 'standalone', label: 'Standalone', url: null },
-    url: null,
+    url: '/tasks/2',
     abilities: { complete: true, reopen: true, assign: true },
+};
+
+const assigneeOptions: TaskAssigneeOptions = {
+    self: { id: 5, name: 'Mia Member' },
+    projects: [
+        {
+            projectId: 1,
+            members: [
+                { id: 5, name: 'Mia Member' },
+                { id: 6, name: 'Noor Newhire' },
+            ],
+        },
+    ],
 };
 
 function Harness({
@@ -46,6 +62,8 @@ function Harness({
     onToggle = vi.fn(),
     onOpen = vi.fn(),
     withSelection = true,
+    assigning = new Set<number>(),
+    onAssign = vi.fn(),
 }: {
     tasks?: TaskRow[];
     running?: Set<number>;
@@ -53,6 +71,8 @@ function Harness({
     onToggle?: (task: TaskRow) => void;
     onOpen?: (task: TaskRow) => void;
     withSelection?: boolean;
+    assigning?: Set<number>;
+    onAssign?: (task: TaskRow, userId: number | null) => void;
 }) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -64,6 +84,9 @@ function Harness({
             pendingIds={pending}
             onToggle={onToggle}
             onOpen={onOpen}
+            assigneeOptions={assigneeOptions}
+            assigningIds={assigning}
+            onAssign={onAssign}
             selection={withSelection ? { selected, onChange: setSelected } : undefined}
         />
     );
@@ -98,13 +121,22 @@ describe('TaskTable content', () => {
         expect(boardRow.getByText('Board')).toHaveClass('font-mono');
     });
 
-    it('renders a standalone title as plain text, never a dead link', () => {
+    it('links a standalone title to its own page (WP5), though its context stays plain text', () => {
         render(<Harness />);
 
         const standaloneRow = within(row('Loose end'));
-        expect(standaloneRow.queryByRole('link')).not.toBeInTheDocument();
+        expect(standaloneRow.getByRole('link', { name: 'Loose end' })).toHaveAttribute(
+            'href',
+            '/tasks/2',
+        );
         expect(standaloneRow.getAllByText('Standalone').length).toBeGreaterThan(0);
         expect(standaloneRow.getByText('Mia Member')).toBeVisible();
+    });
+
+    it('renders a title as plain text, never a dead link, when a row has no page to open', () => {
+        render(<Harness tasks={[{ ...standalone, url: null }]} />);
+
+        expect(within(row('Loose end')).queryByRole('link')).not.toBeInTheDocument();
     });
 
     it('shows an unassigned task as an em dash and its priority with the server label', () => {
@@ -259,6 +291,102 @@ describe('TaskTable controls', () => {
     });
 });
 
+describe('TaskTable assignment (EPIC-014 R6)', () => {
+    it('offers an assign control only on rows whose server ability allows it', () => {
+        render(<Harness tasks={[board, standalone]} />);
+
+        // `board.abilities.assign` is false: read-only text, no control.
+        expect(
+            within(row('Ship it')).queryByRole('button', { name: /Change assignee/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            within(row('Loose end')).getByRole('button', {
+                name: 'Assignee: Mia Member. Change assignee of “Loose end”',
+            }),
+        ).toBeVisible();
+    });
+
+    it('keeps the assignee readable, and in the table, on a row the viewer may not assign', () => {
+        render(<Harness tasks={[{ ...board, assignee: { id: 6, name: 'Noor Newhire' } }]} />);
+
+        expect(within(row('Ship it')).getByText('Noor Newhire')).toBeInTheDocument();
+    });
+
+    it('draws the control compactly at S: the name stays for assistive technology only', () => {
+        render(<Harness tasks={[standalone]} />);
+
+        expect(within(row('Loose end')).getByText('Mia Member')).toHaveClass('max-md:sr-only');
+    });
+
+    it('offers a standalone row Me and Unassigned, and nobody else', async () => {
+        const user = userEvent.setup();
+        render(<Harness tasks={[{ ...standalone, assignee: null }]} />);
+
+        await openMenu(
+            user,
+            screen.getByRole('button', { name: /Change assignee of “Loose end”/ }),
+        );
+
+        expect(
+            (await screen.findAllByRole('menuitemradio')).map((item) => item.textContent),
+        ).toEqual(['Unassigned', 'Me']);
+    });
+
+    it('offers a managed board row its project members from the server list', async () => {
+        const user = userEvent.setup();
+        render(
+            <Harness
+                tasks={[{ ...board, abilities: { complete: true, reopen: true, assign: true } }]}
+            />,
+        );
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+
+        expect(
+            (await screen.findAllByRole('menuitemradio')).map((item) => item.textContent),
+        ).toEqual(['Unassigned', 'Mia Member', 'Noor Newhire']);
+    });
+
+    it('reports the chosen person and the row', async () => {
+        const user = userEvent.setup();
+        const onAssign = vi.fn();
+        render(
+            <Harness
+                onAssign={onAssign}
+                tasks={[{ ...board, abilities: { complete: true, reopen: true, assign: true } }]}
+            />,
+        );
+
+        await openMenu(user, screen.getByRole('button', { name: /Change assignee of “Ship it”/ }));
+        await chooseRadio(user, 'Noor Newhire');
+
+        expect(onAssign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 1 }), 6);
+    });
+
+    it("marks the control busy while that row's assignment is in flight", () => {
+        render(<Harness assigning={new Set([2])} />);
+
+        expect(
+            screen.getByRole('button', { name: /Change assignee of “Loose end”/ }),
+        ).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('does not let row shortcuts fire from inside an open assign menu', async () => {
+        const user = userEvent.setup();
+        const onToggle = vi.fn();
+        render(<Harness onToggle={onToggle} />);
+
+        await openMenu(
+            user,
+            screen.getByRole('button', { name: /Change assignee of “Loose end”/ }),
+        );
+        await screen.findByRole('menu');
+        await user.keyboard('e');
+
+        expect(onToggle).not.toHaveBeenCalled();
+    });
+});
+
 describe('TaskTable row keys (EPIC-014 §15.1)', () => {
     it('E completes the focused row when its ability allows, and does nothing when it does not', async () => {
         const user = userEvent.setup();
@@ -315,7 +443,7 @@ describe('TaskTable row keys (EPIC-014 §15.1)', () => {
     it('Enter on the row opens a task that has a page and ignores one that has none', async () => {
         const user = userEvent.setup();
         const onOpen = vi.fn();
-        render(<Harness onOpen={onOpen} />);
+        render(<Harness onOpen={onOpen} tasks={[board, { ...standalone, url: null }]} />);
 
         row('Ship it').focus();
         await user.keyboard('{Enter}');

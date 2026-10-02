@@ -70,11 +70,15 @@ async function assignToBoardCreator(
 ) {
     await page.getByRole('link', { name: taskTitle }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
-    await page.getByLabel('Assignee').selectOption({ label: 'Dev Operator' });
+    // The edit form is a dialog on the task page (EPIC-014 WP5), over the same endpoint.
+    await page.getByRole('button', { name: 'Edit task', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit task' });
+    await dialog.getByLabel('Assignee').selectOption({ label: 'Dev Operator' });
     if (details.priority)
-        await page.getByLabel('Priority').selectOption({ label: details.priority });
-    if (details.due) await page.getByLabel('Due date').fill(details.due);
-    await page.getByRole('button', { name: 'Save changes' }).click();
+        await dialog.getByLabel('Priority').selectOption({ label: details.priority });
+    if (details.due) await dialog.getByLabel('Due date').fill(details.due);
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(page.getByRole('definition').filter({ hasText: 'Dev Operator' })).toBeVisible();
 }
 
@@ -138,7 +142,7 @@ test('the tasks list loads and navigates over Inertia, both to a task page and b
     }, entryId);
 });
 
-test('a project task is linked and a standalone task is not, and the standalone row offers exactly the controls its abilities allow', async ({
+test('a project task and a standalone task are both linked, and the standalone row offers exactly the controls its abilities allow', async ({
     page,
     cleanup,
 }) => {
@@ -171,15 +175,25 @@ test('a project task is linked and a standalone task is not, and the standalone 
 
     const standaloneRow = page.getByRole('row').filter({ hasText: standaloneTitle });
     await expect(standaloneRow).toBeVisible();
-    await expect(standaloneRow.getByRole('link')).toHaveCount(0);
+    // EPIC-014 WP5 (§16.3): the standalone row offers exactly the controls its abilities allow: a
+    // link to its own detail page, Complete, the Me/Unassigned assignment menu and the selection
+    // box. No Edit or Delete is offered on the list.
+    await expect(standaloneRow.getByRole('link')).toHaveCount(1);
+    await expect(standaloneRow.getByRole('link', { name: standaloneTitle })).toHaveAttribute(
+        'href',
+        /\/tasks\/\d+$/,
+    );
     await expect(standaloneRow.getByText('Standalone', { exact: true }).first()).toBeVisible();
-    // The creator holds Complete (and can select the row for bulk); there is no Edit or Delete
-    // here, and no detail link until the WP5 page exists.
     await expect(
         standaloneRow.getByRole('button', { name: `Complete ${standaloneTitle}` }),
     ).toBeVisible();
+    await expect(
+        standaloneRow.getByRole('button', {
+            name: new RegExp(`Change assignee of “${standaloneTitle}”`),
+        }),
+    ).toBeVisible();
     await expect(standaloneRow.getByRole('checkbox')).toHaveCount(1);
-    await expect(standaloneRow.getByRole('button')).toHaveCount(1);
+    await expect(standaloneRow.getByRole('button')).toHaveCount(2);
 
     // Complete it, so the leftover row leaves the default open list (the row stays until WP7).
     await standaloneRow.getByRole('button', { name: `Complete ${standaloneTitle}` }).click();
@@ -386,7 +400,7 @@ test('filters, search and sort live in the URL, history restores each state, and
     // All Tasks is the operator's (tasks.view_all); the assignee filter exists only there.
     await page.goto('/tasks?view=all');
     await expect(page.getByRole('heading', { level: 1, name: 'All tasks' })).toBeVisible();
-    await expect(page.getByLabel('Assignee')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Assignee' })).toBeVisible();
 
     // A viewer without the permission asking for view=all is served My tasks, with no Assignee
     // control and no All tasks view in the drawer: the server, not the URL, decides.
@@ -395,7 +409,7 @@ test('filters, search and sort live in the URL, history restores each state, and
         const memberPage = await memberContext.newPage();
         await memberPage.goto('/tasks?view=all');
         await expect(memberPage.getByRole('heading', { level: 1, name: 'My tasks' })).toBeVisible();
-        await expect(memberPage.getByLabel('Assignee')).toHaveCount(0);
+        await expect(memberPage.getByRole('combobox', { name: 'Assignee' })).toHaveCount(0);
         await memberPage.getByRole('button', { name: 'Show workspace views' }).click();
         await expect(drawerLink(memberPage, 'Tasks', 'My tasks')).toBeVisible();
         await expect(drawerLink(memberPage, 'Tasks', 'All tasks')).toHaveCount(0);
@@ -583,10 +597,10 @@ test('the list is a strict two-band row at 390px for ordinary and worst-case row
 
                         return {
                             row: rect(node),
-                            // 0 selection, 1 ring, 2 title, 3 status, 4 priority, 5 context, 6 assignee
-                            // (visually hidden), 7 due
+                            // 0 selection, 1 ring, 2 title, 3 status, 4 priority, 5 context, 6 assignee (WP5: the
+                            // compact control when assignable), 7 due
                             first: [0, 1, 2].map((i) => rect(tds[i]!)),
-                            second: [3, 4, 5, 7].map((i) => rect(tds[i]!)),
+                            second: [3, 4, 5, 6, 7].map((i) => rect(tds[i]!)),
                             titleScroll: (() => {
                                 const text = tds[2]!.querySelector('a, span');
 

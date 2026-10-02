@@ -15,8 +15,8 @@ export type TaskRowKind = 'board' | 'standalone';
 
 /**
  * Where a row's context (project name, or "Standalone") points, if anywhere. `null` means the
- * viewer's own policy would deny that destination (D2/§16) or, for a standalone task, that no
- * such destination exists yet (its detail page ships with EPIC-014 WP5) — never a placeholder.
+ * viewer's own policy would deny that destination (D2/§16), or that the context has none (a
+ * standalone task's context is a plain label) — never a placeholder.
  */
 export type TaskContext = {
     kind: TaskKind;
@@ -40,13 +40,15 @@ export type TaskRowAbilities = {
  * fields here are genuinely shared by both surfaced kinds (id, title, priority, status, due
  * date, assignee); `context` and `url` are the kind-scoped parts, and both are computed
  * server-side from the same checks their destination route enforces — React never guesses a
- * visit mode from a URL shape. A standalone row's `context.url` and `url` are `null` until its
- * detail page exists (EPIC-014 WP5).
+ * visit mode from a URL shape. A standalone row's `url` is its own page, `tasks.show` (EPIC-014
+ * WP5); its `context.url` stays `null` because "Standalone" is a label, not a destination.
  */
 export type TaskRow = {
     id: number;
     title: string;
     kind: TaskRowKind;
+    /** A board row's project, the key into `TaskAssigneeOptions.projects`; `null` for a standalone row. */
+    projectId: number | null;
     priority: TaskPriority;
     status: TaskStatusDto;
     /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
@@ -54,7 +56,7 @@ export type TaskRow = {
     overdue: boolean;
     assignee: UserRef | null;
     context: TaskContext;
-    /** The task's own detail destination — only ever set for a project-board task (for now). */
+    /** The task's own detail page: `projects.tasks.show` for a board task, `tasks.show` for a standalone one. */
     url: string | null;
     abilities: TaskRowAbilities;
 };
@@ -119,4 +121,53 @@ export type TaskBulkResult = {
 export type TaskCreateOptions = {
     priorities: { value: TaskPriority; label: string }[];
     statuses: { value: 'todo' | 'in_progress' | 'done'; label: string }[];
+};
+
+/** The labelled vocabulary the standalone create and edit forms share (INV-19). */
+export type TaskFormOptions = TaskCreateOptions;
+
+/**
+ * Who a Tasks-list row may be assigned to (EPIC-014 §7.3, R6), from `TaskAssigneeOptions`. `self` is
+ * the only person a standalone task may be handed to; `projects` lists, for each project the viewer may
+ * assign a row in on this page, that project's current members. The server sends nothing for a project
+ * whose rows the viewer may not assign, and never a departed member, so this is the whole candidate
+ * pool: the browser derives no membership of its own. It is a convenience: the assign endpoint
+ * authorizes and validates every request again.
+ */
+export type TaskAssigneeOptions = {
+    self: UserRef;
+    projects: { projectId: number; members: UserRef[] }[];
+};
+
+/**
+ * The standalone task detail DTO (StandaloneTaskPresenter). It has no project, milestone, column,
+ * checklist or comments, because a standalone task has none. `status` is the display state;
+ * `statusValue` is the editable field, for the edit form.
+ */
+export type StandaloneTaskDetail = {
+    id: number;
+    title: string;
+    description: string | null;
+    priority: TaskPriority;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    dueDate: string | null;
+    overdue: boolean;
+    status: TaskStatusDto;
+    statusValue: 'todo' | 'in_progress' | 'done';
+    assignee: UserRef | null;
+};
+
+/** What the viewer may do to a standalone task, from `TaskPolicy`; `logTime` also needs time eligibility (P5). */
+export type StandaloneTaskAbilities = {
+    update: boolean;
+    complete: boolean;
+    reopen: boolean;
+    delete: boolean;
+    assign: boolean;
+    logTime: boolean;
+};
+
+/** Present only when the viewer may update. `assignees.self` is the one person a standalone task may be handed to. */
+export type StandaloneTaskOptions = TaskFormOptions & {
+    assignees: { self: UserRef };
 };

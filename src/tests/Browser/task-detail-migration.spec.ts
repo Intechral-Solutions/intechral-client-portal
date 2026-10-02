@@ -34,9 +34,9 @@ async function quickAdd(page: Page, columnName: string, title: string) {
     await expect(page.getByRole('link', { name: title })).toBeVisible();
 }
 
-/** The "Time" panel, scoped away from the persistent bar's own identically-named controls. */
+/** The "Time" panel (a labelled section), scoped away from the persistent bar's own identically-named controls. */
 function timePanel(page: Page): Locator {
-    return page.getByRole('heading', { name: 'Time' }).locator('..');
+    return page.getByRole('region', { name: 'Time' });
 }
 
 test('board to task detail and back over Inertia, with the persistent timer surviving navigation', async ({
@@ -55,10 +55,10 @@ test('board to task detail and back over Inertia, with the persistent timer surv
 
     // Start the task's own timer through the persistent provider, from the task page itself.
     await timePanel(page).getByRole('button', { name: 'Start timer' }).click();
-    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
-    await expect(timerPill(page)).toContainText(
-        'E2E WP7 nav task',
-    );
+    await expect(
+        timePanel(page).getByRole('button', { name: 'Stop timer: this task' }),
+    ).toBeVisible();
+    await expect(timerPill(page)).toContainText('E2E WP7 nav task');
 
     // Board and back: an Inertia navigation, so the timer pill is never remounted.
     await page.getByRole('link', { name: 'E2E WP7 task nav project', exact: true }).click();
@@ -67,10 +67,14 @@ test('board to task detail and back over Inertia, with the persistent timer surv
 
     await page.getByRole('link', { name: 'E2E WP7 nav task', exact: true }).click();
     await expect(page).toHaveURL(taskUrl);
-    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
+    await expect(
+        timePanel(page).getByRole('button', { name: 'Stop timer: this task' }),
+    ).toBeVisible();
 
     // Stop from the task panel; the summary updates without a full reload.
-    await timePanel(page).getByRole('button', { name: /^Stop timer/ }).click();
+    await timePanel(page)
+        .getByRole('button', { name: /^Stop timer/ })
+        .click();
     await expect(timePanel(page).getByRole('button', { name: 'Start timer' })).toBeVisible();
     await expect(timePanel(page).getByText(/time logged/)).toBeVisible();
 });
@@ -94,27 +98,33 @@ test('a manager edits task fields and assigns, then clears, a milestone (I4)', a
     await page.getByRole('link', { name: 'E2E WP7 edit task' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
 
-    await page.getByLabel('Title').fill('E2E WP7 edited title');
-    await page.getByLabel('Priority').selectOption('high');
-    await page.getByLabel('Milestone').selectOption({ label: 'E2E milestone' });
-    // exact: true — otherwise matches the timer panel's "Timer description" field too.
-    await page.getByLabel('Description', { exact: true }).fill('Edited from the task page.');
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    // WP5: the edit form is a dialog opened from the entity header, over the same endpoint.
+    await page.getByRole('button', { name: 'Edit task', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit task' });
+    await dialog.getByLabel('Title').fill('E2E WP7 edited title');
+    await dialog.getByLabel('Priority').selectOption('high');
+    await dialog.getByLabel('Milestone').selectOption({ label: 'E2E milestone' });
+    await dialog.getByLabel('Description', { exact: true }).fill('Edited from the task page.');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog).toHaveCount(0);
 
-    await expect(page.getByRole('heading', { name: 'E2E WP7 edited title' })).toBeVisible();
-    // Scoped to the header's badges: the Priority <select> also has an "High" option.
-    await expect(page.locator('header').getByText('High', { exact: true })).toBeVisible();
+    await expect(
+        page.getByRole('heading', { level: 1, name: 'E2E WP7 edited title' }),
+    ).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: 'High' })).toBeVisible();
     await expect(page.getByRole('definition').filter({ hasText: 'E2E milestone' })).toBeVisible();
-    // Scoped to the read-only paragraph: the still-mounted edit form's own textarea holds the
-    // identical value.
     await expect(
         page.getByRole('paragraph').filter({ hasText: 'Edited from the task page.' }),
     ).toBeVisible();
 
     // Clearing the milestone is a supported edit (§12).
-    await page.getByLabel('Milestone').selectOption('');
-    await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByLabel('Milestone')).toHaveValue('');
+    await page.getByRole('button', { name: 'Edit task', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Edit task' }).getByLabel('Milestone').selectOption('');
+    await page
+        .getByRole('dialog', { name: 'Edit task' })
+        .getByRole('button', { name: 'Save changes' })
+        .click();
+    await expect(page.getByRole('definition').filter({ hasText: 'E2E milestone' })).toHaveCount(0);
 });
 
 test('a manager adds a checklist item; a plain member can toggle it but not author or remove it (D5)', async ({
@@ -190,8 +200,12 @@ test('an unreferenced task deletes; a task with recorded time is blocked and his
     // Recorded time against the task (a completed entry, via start-then-stop): D4 must refuse
     // the delete even though the timer is no longer running.
     await timePanel(page).getByRole('button', { name: 'Start timer' }).click();
-    await expect(timePanel(page).getByRole('button', { name: 'Stop timer: this task' })).toBeVisible();
-    await timePanel(page).getByRole('button', { name: /^Stop timer/ }).click();
+    await expect(
+        timePanel(page).getByRole('button', { name: 'Stop timer: this task' }),
+    ).toBeVisible();
+    await timePanel(page)
+        .getByRole('button', { name: /^Stop timer/ })
+        .click();
     await expect(timePanel(page).getByRole('button', { name: 'Start timer' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Delete task' }).click();
