@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** In Progress — WP7 implementation complete (2026-10-01): §18 criteria 1–12 satisfied with evidence, **criterion 13 pending PR CI**. **Verified** once the WP7 PR's CI is green; **Done** after the merge — see [Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01). WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 merged 2026-10-01, PR #13; **WP6 (optional) deferred by owner decision**; WP7 implemented, in review (PR not yet opened)
+**Status:** Verified (2026-10-02, WP7 PR #14: §18 criteria 1–13 satisfied, PR CI green on both jobs); **Done** follows the merge — see [Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01). WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 merged 2026-10-01, PR #13; **WP6 (optional) deferred by owner decision**; WP7 implemented, PR #14 open
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S · [Amendment 5 (2026-10-01)](#amendment-5-wp5-results-2026-10-01): WP5 results — `tasks.show`, the shared Direction D task detail (board and standalone), standalone edit, single-row assignment from the list (exit criterion 7), contextual time on both details, the one shell breadcrumb (A13.12 closed) · [Amendment 6 (2026-10-01)](#amendment-6-wp7-hardening-and-closeout-2026-10-01): WP7 hardening and closeout — WP6 deferred by owner decision, A9.7 closed through the cleanup fixture, §18 reconciled, deferred findings disposed, documentation sweep; criteria 1–12 satisfied, criterion 13 pending PR CI (status remains In Progress until it is green)
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S · [Amendment 5 (2026-10-01)](#amendment-5-wp5-results-2026-10-01): WP5 results — `tasks.show`, the shared Direction D task detail (board and standalone), standalone edit, single-row assignment from the list (exit criterion 7), contextual time on both details, the one shell breadcrumb (A13.12 closed) · [Amendment 6 (2026-10-01)](#amendment-6-wp7-hardening-and-closeout-2026-10-01): WP7 hardening and closeout — WP6 deferred by owner decision, A9.7 closed through the cleanup fixture, §18 reconciled, deferred findings disposed, documentation sweep; criteria 1–13 satisfied (criterion 13 closed by PR #14's CI), status **Verified**
 
 ---
 
@@ -1569,7 +1569,7 @@ Hosted WP5 CI failed a standalone delete. The delete itself **succeeded**: `task
 
 ## Amendment 6: WP7 Hardening and Closeout (2026-10-01)
 
-WP7 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `bb43f1b` (WP5 merged, PR #13). It is hardening and closeout, not a feature package: browser fixture cleanup, two small test hardenings, the §18 reconciliation and the documentation sweep. No product code, route, query, policy, permission, migration, dependency, Time or Billing rule changed. The epic stays **In Progress**: §18 criterion 13 names PR CI, which cannot run until the WP7 PR exists. It moves to **Verified** when that CI is green and to **Done** after the merge ([lifecycle](./README.md#epic-lifecycle)).
+WP7 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `bb43f1b` (WP5 merged, PR #13). It is hardening and closeout, not a feature package: browser fixture cleanup, two small test hardenings, the §18 reconciliation and the documentation sweep. No product code, route, query, policy, permission, migration, dependency, Time or Billing rule changed. §18 criterion 13 names PR CI, which could not run until the WP7 PR existed, so the epic stayed **In Progress** at implementation. PR #14's CI is green (A6.16), so it is **Verified**; **Done** follows the merge ([lifecycle](./README.md#epic-lifecycle)).
 
 ### A6.1 Starting checkpoint
 
@@ -1647,9 +1647,9 @@ The rows those mutation runs left were removed before the final proof (A6.13).
 | 10 | R9 contextual time and R10 keyboard/bulk minimums | **Done** | `TaskTimePanel` on both details (Playwright, Start offered and withdrawn with eligibility); running-row state (Vitest; Playwright with a mocked active timer); `J/K/E/X/Esc` and bulk (Vitest, Playwright) |
 | 11 | INV-1 to INV-19, each with a named test | **Done** | A6.7 |
 | 12 | A9.7 closed: no standalone residue, through the supported delete route | **Done** | A6.3–A6.4; two full runs with counts unchanged (A6.13) |
-| 13 | `./dev check`, `./dev test:e2e` and PR CI green on the final package | **Pending PR CI** | `./dev check` and `./dev test:e2e` green locally (A6.13). PR CI cannot run until the WP7 PR is opened (the package is uncommitted for independent review); the epic is not Verified until it is green (§23) |
+| 13 | `./dev check`, `./dev test:e2e` and PR CI green on the final package | **Done** | `./dev check` and `./dev test:e2e` green locally (A6.13); PR CI green on PR #14, both jobs (A6.16). Pending at implementation, closed by that run |
 
-S1–S5 are not criteria (§18) and are **Deferred** (A6.2). Criteria 1–12 are satisfied; **criterion 13 is open until the WP7 PR's CI is green**, so the epic is **In Progress, not yet Verified**.
+S1–S5 are not criteria (§18) and are **Deferred** (A6.2). Criteria 1–13 are satisfied; no required criterion is open (criterion 13 closed by PR #14's CI, A6.16).
 
 ### A6.7 Invariants (criterion 11)
 
@@ -1729,7 +1729,7 @@ Bias: defer unless correctness, security, an accessibility blocker, deterministi
 - **`rbac-design.md`:** a `TaskPolicy` section (abilities by kind, board delegation, the member-assignee Complete/Reopen arm, standalone creator/current-assignee, ticket tasks internal only, assignment targets for detail and list, the dual-linked denial). The existing `tasks.view_all`/`tasks.view_org` note was already accurate. No permission was added.
 - **`docs/testing/ci.md`:** the A9.7 limitation is removed from the inherited-debts bullet, and a new bullet records the verified behaviour (counts back to baseline; a second run starts from the same baseline; a hard-killed run can still leave rows).
 - **`docs/testing/e2e-browser-suite.md`:** the WP7 full-suite figure is added. The login budget is unchanged: WP7 adds no login and no persona.
-- **Index and roadmap:** EPIC-014 stays **In Progress** in `docs/epics/README.md`, and the roadmap's Tasks overhaul vehicle line records criteria 1–12 satisfied, criterion 13 pending PR CI, Verified once it is green, Done after merge, and WP6 deferred.
+- **Index and roadmap:** EPIC-014 is **Verified** in `docs/epics/README.md`, and the roadmap's Tasks overhaul vehicle line records Verified, Done after merge, and WP6 deferred.
 
 ### A6.11 Accessibility closeout
 
@@ -1774,6 +1774,17 @@ The suite grew from 111 (A5.12) to 114 with `e2e-cleanup.spec.ts`; it adds no lo
 
 ### A6.15 Deviations
 
-1. **Criterion 13's PR CI** is pending by construction: WP7 is left uncommitted for independent review. The epic stays In Progress until the PR's CI is green (then Verified), and becomes Done after the merge.
+1. **Criterion 13's PR CI** is pending by construction: WP7 is left uncommitted for independent review. The epic stayed In Progress until the PR's CI was green; it is now Verified (A6.16) and becomes Done after the merge.
 2. **`tasks-migration.spec.ts` fixed names** are deferred (A6.5), not converted.
 3. Nine residue rows (4 from earlier runs, 2 from the A9.7 proof run and 3 from the deliberate mutation runs) were removed **before** the final proof, through `TaskService::delete` (the guarded service path, not SQL), to start the proof from a clean baseline. No row was removed by hand between or after the final runs.
+
+### A6.16 PR CI and the Verified transition (2026-10-02)
+
+WP7 PR #14 (`feature/epic-014-tasks-overhaul` → `main`, commit `d10d7dd`), initial hosted CI, run 36979484322:
+
+| Job | Result |
+|---|---|
+| `./dev check` gates | pass, 7m52s |
+| Playwright browser suite | pass, 9m42s: **114 passed** in 5.2 minutes, 3 workers; product-data counts `projects=0 tasks=0 time_entries=0` before and after, "Product-data counts unchanged", no warning |
+
+One of the 114 is the intentional `test.fail` cleanup regression. Hosted Vitest and Pest totals were not readable from the log summary and are not recorded. Criterion 13 is satisfied, so criteria 1–13 hold and the epic is **Verified**; WP6 remains deferred (A6.2) and **Done** follows the merge. This transition is a documentation-only commit on the same branch.
