@@ -26,6 +26,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 | [EPIC-013](./EPIC-013-direction-d-shell-design-system.md) | Direction D Application Shell and Design System Foundation | **Done** |
 | [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md) | Tasks Workspace Overhaul | **Done** |
+| [EPIC-015](./EPIC-015-projects-ux-expansion.md) | Projects UX Expansion | **Planned** |
 
 ## Epic Lifecycle
 
@@ -45,4 +46,4 @@ All 9 product epics reached **Implemented** status by 2026-03-27. EPIC-010A (202
 
 Major milestone records are tracked in [docs/progress/](../progress/).
 
-As of 2026-09-24, strategic sequencing comes from the [Product Roadmap](../product/product-roadmap.md); epics remain the implementation contracts for the work it sequences. EPIC-013 (2026-09-25) is the implementation contract for the roadmap's paired *New application shell* and *Design system* items, built against the approved [Direction D design system](../design/direction-d-design-system.md). EPIC-014 (planned 2026-09-29) is the implementation contract for the roadmap's *Tasks overhaul* item.
+As of 2026-09-24, strategic sequencing comes from the [Product Roadmap](../product/product-roadmap.md); epics remain the implementation contracts for the work it sequences. EPIC-013 (2026-09-25) is the implementation contract for the roadmap's paired *New application shell* and *Design system* items, built against the approved [Direction D design system](../design/direction-d-design-system.md). EPIC-014 (planned 2026-09-29) is the implementation contract for the roadmap's *Tasks overhaul* item. EPIC-015 (planned 2026-10-02) is the implementation contract for the roadmap's *Projects UX expansion* item.

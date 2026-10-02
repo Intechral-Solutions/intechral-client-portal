@@ -991,6 +991,8 @@ The §12.2 characterization showed the risk is real (`TaskCurrentBehaviorCharact
 1. **Time domain: a stale board assignee keeps new-time eligibility.** A board assignee who leaves the project stays the stored assignee (INV-7), and `AccessibleTimeContext` admits the stored assignee for **new** time even though `TaskPolicy` (and `ProjectPolicy`) no longer let them view the task. They can still start a timer or log time on it. This is pinned as OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP (`TaskCurrentBehaviorCharacterizationTest`), not endorsed and not an EPIC-014 invariant. The likely direction is that stale assignment alone should not grant new-time eligibility once project visibility is lost, but that is **not** a locked decision. `AccessibleTimeContext` is unchanged.
 2. **`ProjectService::create` is not atomic.** A failure between the project insert and its default-column inserts can leave a project with no columns. The integrity audit surfaces it (`projects_with_no_done_column`); it is an existing issue, not introduced by WP1, and is left unfixed. The committed plan does not require it, so it is not assigned to WP2.
 
+> **Forward note (2026-10-02).** Both follow-ups are now required scope of [EPIC-015](./EPIC-015-projects-ux-expansion.md) WP1: (1) under EPIC-015 owner decision Q8, board-task time eligibility will require current `ProjectPolicy::view`, so stale assignment alone grants no new time (stop and unchanged-attribution edits stay allowed); (2) project creation becomes one service-owned transaction. The board-card Complete affordance (§5.3, §22 P8) is an optional EPIC-015 item. This amendment is otherwise unchanged.
+
 ### A1.4 Evidence
 
 | Gate | Result |

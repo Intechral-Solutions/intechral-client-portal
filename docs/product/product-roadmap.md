@@ -175,6 +175,8 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Depends on:** shell, design system; benefits from Tasks overhaul components.
 
+**Vehicle:** [EPIC-015: Projects UX Expansion](../epics/EPIC-015-projects-ux-expansion.md) (**Planned** 2026-10-02). It locks derived project health, explicit milestone completion, budget metadata visible only with effective Settings/Edit access, the Overview as the canonical project landing, a project-scoped Tasks list on the canonical task query, one project-time definition, and the stale board-assignee time fix. Dedicated stakeholder/customer presentation is deferred (EPIC-015 §22 records the missing customer-product roadmap item).
+
 ---
 
 ## LATER — Helpdesk MVP
