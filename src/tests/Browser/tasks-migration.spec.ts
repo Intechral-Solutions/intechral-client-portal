@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from './support/e2e-fixtures';
+import { expect, standaloneTaskId, test } from './support/e2e-fixtures';
 
 import { signedIn } from './support/auth';
 import { drawerLink, hasHorizontalOverflow, timerPill } from './support/shell';
@@ -14,17 +14,17 @@ import { drawerLink, hasHorizontalOverflow, timerPill } from './support/shell';
  * Two things this file deliberately does NOT attempt, and why:
  *  - A ticket-derived task row: nothing in this application creates one (§3.1, characterized in
  *    WP1 — only test factories do), so there is no real browser path to produce that row kind.
- *    Its rendering (context link, no title link) is pinned by Vitest and Pest instead.
+ *    Since EPIC-014 (Q6) such a row is never listed at all; Pest pins its absence.
  *  - D2's "company-linked but not a member" scenario: every locked-behavior browser spec in this
  *    suite so far (board, milestones, task detail) has left that scenario to Pest, because
  *    reproducing it needs an Organization/CrmCompany fixture this suite has never built. D2 is
  *    exhaustively pinned server-side (ProjectVisibilityTest.php, 10 cases); this file instead
  *    proves the plainer, still-real visibility fact a browser uniquely adds: a task assigned to
  *    one person never appears on someone else's list at all.
- *  - Standalone tasks are still not removed: the supported delete route exists (EPIC-014 WP2) but
- *    fixture cleanup through it is WP7's (A9.7). The one standalone row this file creates
- *    (`E2E WP8 standalone task`) is therefore Completed at the end of its test, so it leaves the
- *    default open list and cannot clutter later runs; the row itself remains until WP7.
+ *
+ * Every standalone task this file creates is registered with `cleanup.trackTask` as soon as its id
+ * is known, and the fixture teardown deletes it through `DELETE /tasks/{task}` whether the test passed
+ * or not (EPIC-014 WP7, A9.7; until then these rows were Completed and left behind).
  *
  * EPIC-014 WP4 rewrote the list as the Direction D page (filter bar, `DataTable`, Complete ring,
  * bulk bar, row shortcuts, D9 rows at S). The flows below are the browser half of that contract:
@@ -172,6 +172,9 @@ test('a project task and a standalone task are both linked, and the standalone r
     await dialog.getByRole('button', { name: 'Create task' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Task created.' })).toBeVisible();
     await expect(dialog).toHaveCount(0);
+    // Registered at once, so the fixture teardown deletes it even if an assertion below fails (A9.7).
+    // This leaves the page on a search for the row.
+    cleanup.trackTask(await standaloneTaskId(page, standaloneTitle));
 
     const standaloneRow = page.getByRole('row').filter({ hasText: standaloneTitle });
     await expect(standaloneRow).toBeVisible();
@@ -194,11 +197,6 @@ test('a project task and a standalone task are both linked, and the standalone r
     ).toBeVisible();
     await expect(standaloneRow.getByRole('checkbox')).toHaveCount(1);
     await expect(standaloneRow.getByRole('button')).toHaveCount(2);
-
-    // Complete it, so the leftover row leaves the default open list (the row stays until WP7).
-    await standaloneRow.getByRole('button', { name: `Complete ${standaloneTitle}` }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Task completed.' })).toBeVisible();
-    await expect(standaloneRow).toHaveCount(0);
 });
 
 test("a task assigned to one person never appears on another person's task list", async ({
@@ -528,8 +526,8 @@ test('the list is a strict two-band row at 390px for ordinary and worst-case row
         }),
     );
 
-    // A standalone task: the tag, a long title and a due date. Completed at the end, like the other
-    // standalone fixtures (A9.7 closes in WP7).
+    // A standalone task: the tag, a long title and a due date. Registered with the cleanup fixture as
+    // soon as its id is known, so teardown deletes it whatever happens below (A9.7).
     const standalone = `E2E D9 standalone phone task with a title long enough to need truncating ${Date.now()}`;
     await page.goto('/tasks');
     await page.getByRole('button', { name: 'New task' }).first().click();
@@ -538,6 +536,7 @@ test('the list is a strict two-band row at 390px for ordinary and worst-case row
     await dialog.getByLabel('Due date').fill('2099-12-31');
     await dialog.getByRole('button', { name: 'Create task' }).click();
     await expect(dialog).toHaveCount(0);
+    cleanup.trackTask(await standaloneTaskId(page, standalone));
 
     try {
         for (const theme of ['light', 'dark'] as const) {
@@ -695,11 +694,6 @@ test('the list is a strict two-band row at 390px for ordinary and worst-case row
     } finally {
         await page.evaluate(() => localStorage.setItem('theme', 'light'));
         await page.setViewportSize({ width: 1400, height: 900 });
-        await page.goto('/tasks?q=E2E+D9+standalone+phone');
-        await rowOf(page, standalone)
-            .getByRole('button', { name: `Complete ${standalone}` })
-            .click();
-        await expect(rowOf(page, standalone)).toHaveCount(0);
     }
     expect(failures).toEqual([]);
 });

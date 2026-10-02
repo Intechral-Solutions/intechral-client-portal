@@ -583,6 +583,8 @@ Populated entirely from `routes/web.php`, `NavigationBuilder.php` and the contro
 | **Pages** *(transitional, see §11.3)* | `cms.index` | Yes | `cms.view` **and not** `cms.edit` | None — single surface | **document** | Knowledge; public publishing |
 
 > **Forward note (2026-09-29).** The Tasks row above is superseded for future work by [EPIC-014 §9.8](./EPIC-014-tasks-workspace-overhaul.md#98-navigation-contract-update-planned-implemented-in-wp3): the views become *My tasks* and *All tasks* (`tasks.view_all`), and *Organisation tasks* (`tasks.org`) is retired in favour of an organization filter. This table remains the accurate record of what EPIC-013 built.
+>
+> **Status (2026-10-01).** Implemented in EPIC-014 WP3: the Tasks drawer views are *My tasks* (`tasks.mine`) and *All tasks* (`tasks.all`, `tasks.view_all`); `tasks.org` is gone and organization is a list filter. `tasks.show` (EPIC-014 WP5) is an active route of both views.
 
 ### 11.2 What this changes, and what it deliberately does not
 
@@ -1510,6 +1512,8 @@ Two notes this epic hands forward: the Playwright suite grows by roughly twelve 
 | `pageshow`/bfcache resync for the Blade shell (A10.16; not reproduced in Chromium, A13.8) | Final hardening |
 
 > **Forward note (2026-09-29).** The Tasks overhaul rows above (D2/D9 patterns, `DataTable`/`FilterBar`/`Chip`/`BulkBar`, shortcuts, peek inspector), A13.5, A13.12 and A9.7 are now owned by [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md); its [§5](./EPIC-014-tasks-workspace-overhaul.md#5-scope) classifies each as required or separable and its [§20](./EPIC-014-tasks-workspace-overhaul.md#20-deferred-and-inherited-items) records where each closes.
+>
+> **Status (2026-10-01, EPIC-014 WP7).** Closed by EPIC-014: the D2/D9 list patterns, `DataTable`, `FilterBar`, `Chip`/`FilterChip` and `BulkBar`, and the `J/K/X/E` row shortcuts (WP4); **A13.5** (WP4: two-band rows at S, no document scroll); **A13.12** (WP5: one shell Breadcrumb landmark, the page supplying its trail); **A9.7** (WP7: standalone browser fixtures are removed through `DELETE /tasks/{task}` in the fixture teardown). Still open, by owner decision: the `T` timer shortcut, the Tasks peek inspector and the Home "My work" feed, which are EPIC-014's optional WP6 and were **deferred**, not built ([EPIC-014 Amendment 6](./EPIC-014-tasks-workspace-overhaul.md#amendment-6-wp7-hardening-and-closeout-2026-10-01)). The other rows of this table keep their owners.
 
 ### 31.1 Shell presentation parity / unification (Future)
 

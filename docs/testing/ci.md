@@ -133,11 +133,17 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
 
 - **Not enforced** until required checks are available on the GitHub plan (above).
 - **Inherited debts CI will surface rather than cause** (EPIC-013 §31): `tests/Browser` is neither
-  type-checked nor linted; the standalone-task fixture leaks one row per browser run (A9.7 — harmless
-  in CI's throwaway database; `./dev test:e2e` reports it as a count warning, not a failure); two Pest
-  guards are vacuous (A13.13); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
+  type-checked nor linted; two Pest guards are vacuous (A13.13); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
   runners are smaller than the development machine, so a `userEvent` timeout in CI should be
   reproduced alone before being treated as a regression.
+- **Product-data counts return to baseline (A9.7 closed, EPIC-014 WP7).** Until WP7 the Tasks browser
+  spec left two standalone-task rows per run, which `./dev test:e2e` reported as a count warning. The
+  cleanup fixture (`tests/Browser/support/e2e-fixtures.ts`) now removes every standalone task a test
+  registers through `DELETE /tasks/{task}` in its teardown, which runs whether the test passed or not,
+  and fails a test that creates a standalone task without registering it. A full local run now
+  reports the tracked `projects`/`tasks`/`time_entries` counts unchanged, and a second full run starts
+  from the same baseline ([EPIC-014 Amendment 6](../epics/EPIC-014-tasks-workspace-overhaul.md#amendment-6-wp7-hardening-and-closeout-2026-10-01)).
+  A run killed outright (no teardown) can still leave rows; they are development data.
 - **Only the Blade no-shift test measures a cold paint; the Inertia one does not.**
   `blade-shell.spec.ts` loads `/operator/tickets` as the first document of a fresh context (session
   cookies only, empty HTTP cache) and counts shell-owned layout shift only, as `shell.spec.ts` always
