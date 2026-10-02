@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './support/e2e-fixtures';
+import { expect, standaloneTaskId, test } from './support/e2e-fixtures';
 
 import { signedIn } from './support/auth';
 import { hasHorizontalOverflow } from './support/shell';
@@ -12,12 +12,17 @@ import { hasHorizontalOverflow } from './support/shell';
  * Vitest.
  *
  * Runs against the shared development database. Every project is registered with
- * `cleanup.trackProject`. Every standalone task this file creates is also DELETED by the file, through
- * the task page's own Delete action (the supported `tasks.destroy` route), so it leaves no residue. A
- * standalone task WITH recorded time cannot be deleted by design (INV-11), so the recorded-time refusal is
- * pinned by Pest and Vitest, and the board's by `task-detail-migration.spec.ts` (D4), rather than leaving
- * an undeletable row behind here. Fixture cleanup for the older specs stays WP7 (A9.7).
+ * `cleanup.trackProject`, and every standalone task with `cleanup.trackTask` as soon as it exists, so
+ * the fixture teardown removes both even when a test fails part-way (WP7). The flows still delete
+ * their standalone tasks through the task page's own Delete action, which is behaviour under test;
+ * the teardown's later `DELETE` then answers 404. A standalone task WITH recorded time cannot be
+ * deleted by design (INV-11), so the recorded-time refusal is pinned by Pest and Vitest, and the
+ * board's by `task-detail-migration.spec.ts` (D4), rather than leaving an undeletable row behind here.
+ * Fixture names carry a per-run token, so a project or task left by an interrupted run can never be
+ * matched by a later run's list or menu lookups (WP5 review F7).
  */
+
+const run = Date.now().toString(36);
 
 async function createProject(
     page: Page,
@@ -51,7 +56,16 @@ async function addMember(page: Page, projectId: number) {
     await expect(page.getByRole('status')).toContainText('Members updated.');
 }
 
-async function createStandalone(page: Page, title: string, assignee: 'Me' | 'Unassigned' = 'Me') {
+/**
+ * Create a standalone task and register it with the cleanup fixture at once, so it is deleted even when
+ * the test fails before its own Delete step (WP7). Leaves the page on a search for the row.
+ */
+async function createStandalone(
+    page: Page,
+    cleanup: { trackTask: (id: number) => void },
+    title: string,
+    assignee: 'Me' | 'Unassigned' = 'Me',
+) {
     await page.goto('/tasks');
     await page.getByRole('button', { name: 'New task' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'New task' });
@@ -60,6 +74,7 @@ async function createStandalone(page: Page, title: string, assignee: 'Me' | 'Una
     await dialog.getByRole('button', { name: 'Create task' }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByRole('status').filter({ hasText: 'Task created.' })).toBeVisible();
+    cleanup.trackTask(await standaloneTaskId(page, title));
 }
 
 /**
@@ -101,10 +116,11 @@ async function expectSingleBreadcrumb(page: Page) {
 
 test('a standalone task is created, opened, edited, assigned, completed, reopened and deleted from its own page', async ({
     page,
+    cleanup,
 }) => {
     await signedIn(page);
     const title = `E2E WP5 standalone ${Date.now()}`;
-    await createStandalone(page, title);
+    await createStandalone(page, cleanup, title);
 
     // The row links to its own detail page (tasks.show).
     await page.goto('/tasks');
@@ -185,10 +201,11 @@ test('a standalone task is created, opened, edited, assigned, completed, reopene
 test('a standalone task is a 403 to a stranger and a missing task id is a 404', async ({
     page,
     contextFor,
+    cleanup,
 }) => {
     await signedIn(page);
     const title = `E2E WP5 private ${Date.now()}`;
-    await createStandalone(page, title);
+    await createStandalone(page, cleanup, title);
     await page.goto('/tasks');
     await rowOf(page, title).getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(/\/tasks\/\d+$/);
@@ -213,9 +230,9 @@ test('a board task detail is the shared grammar with one shell breadcrumb, Compl
     cleanup,
 }) => {
     await signedIn(page);
-    const projectName = 'E2E WP5 board detail project';
+    const projectName = `E2E WP5 board detail project ${run}`;
     const projectId = await createProject(page, cleanup, projectName);
-    const title = 'E2E WP5 board detail task';
+    const title = `E2E WP5 board detail task ${run}`;
     await quickAdd(page, 'Backlog', title);
     await page.getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
@@ -277,10 +294,10 @@ test('a member-assignee completes and reopens a board task from its detail, and 
     cleanup,
 }) => {
     await signedIn(page);
-    const projectId = await createProject(page, cleanup, 'E2E WP5 member-assignee project');
+    const projectId = await createProject(page, cleanup, `E2E WP5 member-assignee project ${run}`);
     await addMember(page, projectId);
     await page.goto(`/projects/${projectId}/board`);
-    const title = 'E2E WP5 member task';
+    const title = `E2E WP5 member task ${run}`;
     await quickAdd(page, 'Backlog', title);
     await page.getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
@@ -328,10 +345,10 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
     cleanup,
 }) => {
     await signedIn(page);
-    const projectId = await createProject(page, cleanup, 'E2E WP5 list assign project');
+    const projectId = await createProject(page, cleanup, `E2E WP5 list assign project ${run}`);
     await addMember(page, projectId);
     await page.goto(`/projects/${projectId}/board`);
-    const boardTitle = 'E2E WP5 list board task';
+    const boardTitle = `E2E WP5 list board task ${run}`;
     await quickAdd(page, 'Backlog', boardTitle);
     await page.getByRole('link', { name: boardTitle }).click();
     await assignTrigger(page, boardTitle).click();
@@ -339,7 +356,7 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
     await expect(page.getByRole('status').filter({ hasText: 'Assignee updated.' })).toBeVisible();
 
     const standaloneTitle = `E2E WP5 list standalone ${Date.now()}`;
-    await createStandalone(page, standaloneTitle);
+    await createStandalone(page, cleanup, standaloneTitle);
 
     // Standalone row: exactly Me and Unassigned.
     await page.goto('/tasks');
@@ -368,8 +385,9 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
     await expect(boardRow).toHaveCount(0);
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
 
-    // All tasks (the operator holds tasks.view_all) still shows it, now held by Dev User.
-    await page.goto('/tasks?view=all');
+    // All tasks (the operator holds tasks.view_all) still shows it, now held by Dev User. Searched by
+    // title: All tasks also holds every other worker's board tasks, which could push it off page one.
+    await page.goto(`/tasks?view=all&q=${encodeURIComponent(boardTitle)}`);
     await expect(
         rowOf(page, boardTitle).getByRole('button', { name: /Assignee: Dev User/ }),
     ).toBeVisible();
@@ -397,10 +415,11 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
 
 test('the S-width list row stays a valid two-band row with the assignment control, and the menu works at 390px', async ({
     page,
+    cleanup,
 }) => {
     await signedIn(page);
     const title = `E2E WP5 phone assign ${Date.now()}`;
-    await createStandalone(page, title);
+    await createStandalone(page, cleanup, title);
 
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto('/tasks');
@@ -453,10 +472,10 @@ test('the detail pages have no horizontal overflow and keep their actions reacha
 }) => {
     await signedIn(page);
     const title = `E2E WP5 responsive ${Date.now()}`;
-    await createStandalone(page, title);
-    const projectId = await createProject(page, cleanup, 'E2E WP5 responsive project');
-    await quickAdd(page, 'Backlog', 'E2E WP5 responsive board task');
-    await page.getByRole('link', { name: 'E2E WP5 responsive board task' }).click();
+    await createStandalone(page, cleanup, title);
+    const projectId = await createProject(page, cleanup, `E2E WP5 responsive project ${run}`);
+    await quickAdd(page, 'Backlog', `E2E WP5 responsive board task ${run}`);
+    await page.getByRole('link', { name: `E2E WP5 responsive board task ${run}` }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/tasks/\\d+$`));
     const boardUrl = page.url();
 

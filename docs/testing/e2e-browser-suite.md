@@ -137,3 +137,9 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   three tests and no logins: all three use the default `operator` persona and create no fixture and no
   timer. This is the authoritative full-suite figure at the close of EPIC-013 (A12.14's 89/89 predated
   WP7's remediation).
+- At the EPIC-014 WP7 closeout (EPIC-014 Amendment 6): **114/114 passed, 3 workers, 3.6 minutes**,
+  then 114/114 again in 3.9 minutes as a second, separate invocation; each run 12 `POST /login` (all
+  302), 0 `429`, 0 `419`, 0 application `5xx`, and the tracked product-data counts unchanged (0/0/0
+  before and after both runs). `e2e-cleanup.spec.ts` (new in WP7) uses the default `operator` persona
+  and adds no login; one of its three tests is an intentional `test.fail()` that proves the cleanup
+  fixture's teardown removes a registered standalone task.

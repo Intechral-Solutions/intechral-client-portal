@@ -161,7 +161,7 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Depends on:** shell, design system, CI baseline (all three Done — dependency satisfied). **Needs design:** designated Done column and Reopen policy — resolved by owner decision Q2 in EPIC-014 (Q1 locks who may Complete/Reopen).
 
-**Vehicle:** [EPIC-014: Tasks Workspace Overhaul](../epics/EPIC-014-tasks-workspace-overhaul.md) (**Planned** 2026-09-29; **In Progress** since WP1 merged 2026-09-30). It locks the Complete/Reopen authorization, the Done-column and Reopen rules, `tasks.view_all` for All Tasks, the standalone-task lifecycle (superseding EPIC-011E D3) and the retirement of the "My organization" view in favour of an organization filter; ticket-task product UX stays Future.
+**Vehicle:** [EPIC-014: Tasks Workspace Overhaul](../epics/EPIC-014-tasks-workspace-overhaul.md) (**Planned** 2026-09-29; **In Progress** since WP1 merged 2026-09-30; WP7 implemented 2026-10-01 with exit criteria 1–12 satisfied and criterion 13 pending the WP7 PR's CI; **Verified** once that CI is green, **Done** after the merge). The optional enhancements (row timer control, bulk assign, peek inspector, Home "My work", shortcut sheet; EPIC-014 WP6) were **deferred** by owner decision and remain future work. It locks the Complete/Reopen authorization, the Done-column and Reopen rules, `tasks.view_all` for All Tasks, the standalone-task lifecycle (superseding EPIC-011E D3) and the retirement of the "My organization" view in favour of an organization filter; ticket-task product UX stays Future.
 
 ### Timer UX improvement
 

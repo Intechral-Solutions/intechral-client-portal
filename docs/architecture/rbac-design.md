@@ -63,6 +63,19 @@ settings.manage
 
 **Tasks — `tasks.view_all` and the inert `tasks.view_org` (EPIC-014 WP3):** `tasks.view_all` offers the **All Tasks** view (`TaskPolicy::viewAll`; the `tasks.all` navigation item; `/tasks?view=all`). It is a surface capability, never an object grant: the rows inside All Tasks are exactly the ones `TaskPolicy::view` allows (board tasks of projects the actor may view, and the actor's own standalone tasks), so holding it never reveals another user's standalone task, a project the actor cannot view, or a ticket-kind task. It is granted to `operator` through the usual all-permissions sync and is **not** in the `user` defaults; any role may be given it. `tasks.view_org` lost its only consumer when the "My organization" view was retired (EPIC-014 Q5): it stays in the catalogue and the `user` defaults, unused, as recorded permission debt (EPIC-014 §22 P1), the same treatment `projects.view_org` received in EPIC-011E. Existing development databases need `PermissionSeeder` and `RoleSeeder` re-run to pick up `tasks.view_all`.
 
+**Tasks — object authorization (`TaskPolicy`, EPIC-014 §7):** every `tasks.*` route authorizes through `App\Policies\TaskPolicy`, and the Tasks list computes its row abilities as a batched restatement of it (`TaskRowAbilities`, parity-tested). No permission beyond `tasks.view_all` is involved.
+
+| Ability | Board task (`project_id` set) | Standalone task (no project, no ticket) | Ticket-kind task |
+|---|---|---|---|
+| `view` | `ProjectPolicy::view` (membership or `projects.admin`) | creator **or** current assignee | `TicketPolicy::view`, internal only: never listed or opened in the Tasks workspace |
+| `update`, `delete`, `assign` | `ProjectPolicy::manage` | creator or current assignee | denied |
+| `complete`, `reopen` | `ProjectPolicy::manage`, **or** the current assignee while still a project member | creator or current assignee | denied |
+| `move` (arbitrary column/position) | `ProjectPolicy::manage` only; never the member-assignee | n/a | n/a |
+
+- **Board tasks delegate** to `ProjectPolicy` through the Gate; `TaskPolicy` adds only the member-assignee Complete/Reopen arm. Assignment alone grants nothing: a departed assignee is denied `view` like any outsider.
+- **Assignment targets** are validation, not policy: a board task takes a current project member or null (re-saving an unchanged departed assignee is allowed); a standalone task takes the actor or null, or keeps its unchanged holder (no cross-person standalone assignment). The same rules apply from task detail and from the list's single-row control, whose candidates come only from the projects the actor may assign on.
+- A malformed row linked to both a project and a ticket is denied every ability. Standalone delete runs through the shared recorded-time guard like board delete.
+
 ## Built-in Roles
 
 ### `operator` (Platform Operator)

@@ -1,13 +1,13 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** In Progress (WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 implemented, in review)
+**Status:** In Progress — WP7 implementation complete (2026-10-01): §18 criteria 1–12 satisfied with evidence, **criterion 13 pending PR CI**. **Verified** once the WP7 PR's CI is green; **Done** after the merge — see [Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01). WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 merged 2026-10-01, PR #13; **WP6 (optional) deferred by owner decision**; WP7 implemented, in review (PR not yet opened)
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (Verified; source of the current task architecture and of lock D3, superseded here) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md) · [EPIC-010D: Helpdesk Security and Integrity Hardening](./EPIC-010D-helpdesk-security-hardening.md)
 **Planning baseline:** `main` @ `0b1939c` (post-PR #7), working tree clean, latest push-to-`main` CI green, verified 2026-09-29
-**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S · [Amendment 5 (2026-10-01)](#amendment-5-wp5-results-2026-10-01): WP5 results — `tasks.show`, the shared Direction D task detail (board and standalone), standalone edit, single-row assignment from the list (exit criterion 7), contextual time on both details, the one shell breadcrumb (A13.12 closed)
+**Amendments:** [Amendment 1 (2026-09-29)](#amendment-1-wp1-results-2026-09-29): WP1 results — characterization suite, `TaskPolicy`, `TaskService` delete seam, shared `RecordedTimeGuard`, Done-column resolver, audit checks, the time-entry owner decision recorded for WP2, two follow-ups · [Amendment 2 (2026-09-30)](#amendment-2-wp2-results-2026-09-30): WP2 results — Complete/Reopen, standalone lifecycle, assignment, bulk, owner decision (c) implemented · [Amendment 3 (2026-09-30)](#amendment-3-wp3-results-2026-09-30): WP3 results — `TaskQuery`, My/All Tasks, `tasks.view_all`, filters/search/sort, row abilities, navigation, no index · [Amendment 4 (2026-10-01)](#amendment-4-wp4-results-2026-10-01): WP4 results — the Direction D Tasks list: `DataTable`, `FilterBar`/`Chip`, `BulkBar`, Complete ring, row shortcuts, create dialog, D9 rows at S · [Amendment 5 (2026-10-01)](#amendment-5-wp5-results-2026-10-01): WP5 results — `tasks.show`, the shared Direction D task detail (board and standalone), standalone edit, single-row assignment from the list (exit criterion 7), contextual time on both details, the one shell breadcrumb (A13.12 closed) · [Amendment 6 (2026-10-01)](#amendment-6-wp7-hardening-and-closeout-2026-10-01): WP7 hardening and closeout — WP6 deferred by owner decision, A9.7 closed through the cleanup fixture, §18 reconciled, deferred findings disposed, documentation sweep; criteria 1–12 satisfied, criterion 13 pending PR CI (status remains In Progress until it is green)
 
 ---
 
@@ -42,6 +42,7 @@
 - [Amendment 3: WP3 Results (2026-09-30)](#amendment-3-wp3-results-2026-09-30)
 - [Amendment 4: WP4 Results (2026-10-01)](#amendment-4-wp4-results-2026-10-01)
 - [Amendment 5: WP5 Results (2026-10-01)](#amendment-5-wp5-results-2026-10-01)
+- [Amendment 6: WP7 Hardening and Closeout (2026-10-01)](#amendment-6-wp7-hardening-and-closeout-2026-10-01)
 
 ---
 
@@ -827,6 +828,7 @@ The discovery structure is kept with one boundary change: **bulk Complete/Reopen
 - **Objective:** any of S1–S5 the owner chooses, **each as its own small PR**.
 - **Rule:** WP6 is **not** required for §18. The epic may reach Verified with WP6 empty, and unshipped items return to §20 as deferred.
 - **Depends on:** WP4 (S1–S3, S5); WP3 (S4).
+- **Owner decision (2026-10-01): deferred.** No WP6 PR was opened; WP7 closed the epic with WP6 empty, as this rule allows. S1–S5 and the D2 row clock return to §20 as deferred future work ([Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01), A6.2).
 
 ### WP7: Hardening and closeout
 
@@ -899,7 +901,7 @@ The discovery report's "missing indexes on `assignee_id`/`created_by`" was wrong
 | `task_dependencies` schema-only | Unchanged (§5.3) |
 | `tasks.created_by` user-delete cascade | Unchanged (§12.2) |
 | Plex Sans 600 M2, `tests/Browser` lint/typecheck gap, jsdom load sensitivity, vacuous Pest guards (A13.13), operator-persona timer isolation (A11.15), lockfile caret (A11.2) | Not absorbed; they stay with their existing owners ([EPIC-013 §31](./EPIC-013-direction-d-shell-design-system.md#31-deferred-follow-on-work), [`docs/testing/ci.md`](../testing/ci.md#known-limitations-and-deferred-items)) |
-| S1–S5 not shipped in WP6 | Return here as deferred at closeout |
+| S1–S5 not shipped in WP6 | Return here as deferred at closeout. **Deferred (owner decision, 2026-10-01; A6.2):** S1 row `TimerControl` and `T`, S2 bulk assign, S3 peek inspector, S4 Home "My work", S5 `?` sheet, and the D2 ticking row clock. None was built; each is future work |
 
 ## 21. Risks and rollback
 
@@ -1562,3 +1564,216 @@ Hosted WP5 CI failed a standalone delete. The delete itself **succeeded**: `task
 - **Query budget:** unchanged. Query-log counts for the five WP3 shapes stay 11/12/12/12/13, small = large. BEGIN/COMMIT go through PDO, not the query log.
 - **Delete helper:** `deleteStandaloneFromDetail` now asserts the `DELETE /tasks/{id}` response (303, `Location` `/tasks`) before the URL, so a future failure says whether the delete or the list failed. The UI delete remains the behaviour under test. The `/time` teardown navigation is unchanged (WP7).
 - **Still open, unchanged:** A9.7 (the known `tasks-migration` residue, WP7). One unreproduced local A1 viewport-loop timeout is recorded as unproven and non-actionable.
+
+---
+
+## Amendment 6: WP7 Hardening and Closeout (2026-10-01)
+
+WP7 implemented on `feature/epic-014-tasks-overhaul`, fast-forwarded to `main` @ `bb43f1b` (WP5 merged, PR #13). It is hardening and closeout, not a feature package: browser fixture cleanup, two small test hardenings, the §18 reconciliation and the documentation sweep. No product code, route, query, policy, permission, migration, dependency, Time or Billing rule changed. The epic stays **In Progress**: §18 criterion 13 names PR CI, which cannot run until the WP7 PR exists. It moves to **Verified** when that CI is green and to **Done** after the merge ([lifecycle](./README.md#epic-lifecycle)).
+
+### A6.1 Starting checkpoint
+
+- `origin/main` @ `bb43f1b`, the merge commit of PR #13 (WP5), merged 2026-10-02 03:31 UTC. Local `main` had been stale at `60b433e` and was fast-forwarded; the epic branch was fast-forwarded from `48ac7cd`. No history rewritten.
+- The push-to-`main` CI run for `bb43f1b` (run 36960526470) was green: `./dev check gates` success, `Playwright browser suite` success.
+- Working tree clean before WP7.
+
+### A6.2 Owner decision: WP6 deferred
+
+**WP6 is optional, separable and deferred (owner decision, 2026-10-01).** §17 already allowed it ("WP6 is not required for §18. The epic may reach Verified with WP6 empty") and §18 excludes S1–S5, so no plan text had to change; the decision is recorded in §17 WP6 and §20. Deferred, not built, and not counted as failed scope:
+
+| Item | Source | Disposition |
+|---|---|---|
+| S1 row `TimerControl` and the `T` shortcut | §5.2 | Deferred, future work |
+| D2 ticking elapsed clock on a running row | A4.5, A4.10 | Deferred, future work (the pill stays the one clock) |
+| S2 bulk assign | §5.2 | Deferred, future work |
+| S3 Tasks peek inspector | §5.2 | Deferred, future work |
+| S4 Home "My work" feed | §5.2 | Deferred, future work (`new TaskQuery($user, 'mine')` is reusable, A3.9, inside a request, A3.7(3)) |
+| S5 `?` shortcut sheet | §5.2 | Deferred, future work |
+
+The dependency graph (§17) already had WP6 independent of WP7, and WP7's own "Depends on" lists only WP2–WP5 and "whichever WP6 PRs merged" (none). Nothing implied WP6 → WP7, so only the WP6 entry gained the decision note.
+
+### A6.3 A9.7: diagnosis
+
+Proved before any change, by running `tasks-migration.spec.ts` alone on the unchanged tree: `tasks` 4 → 6, `projects` 0 → 0, `time_entries` 0 → 0. The two new rows, and the four already in the development database from two earlier runs, were all standalone tasks, created by the operator persona and left `done`:
+
+| Test (`tasks-migration.spec.ts`) | Row left behind (the run above) |
+|---|---|
+| "a project task and a standalone task are both linked, and the standalone row offers exactly the controls its abilities allow" | id 100, `E2E WP8 standalone task 1790913150277` |
+| "the list is a strict two-band row at 390px …" | id 110, `E2E D9 standalone phone task with a title long enough to need truncating …` |
+
+**Why cleanup missed them.** `E2eCleanup` could only remove time entries, projects (cascading their board tasks) and manual entries. It had no way to register a standalone task, because before WP2 there was no delete route, and the two specs only **Completed** their row so it left the default open list. `task-detail-wp5.spec.ts` deleted its own standalone tasks through the detail page, but only on the happy path: a failure before its final Delete step leaked the row too.
+
+### A6.4 A9.7: remediation
+
+**Architecture: the smallest extension of `E2eCleanup`** (`tests/Browser/support/e2e-fixtures.ts`):
+
+- `trackTask(id)` registers a standalone task. The fixture teardown deletes each one through `DELETE /tasks/{task}`, the supported route, authorized by `TaskPolicy` and guarded by `RecordedTimeGuard`. Nothing uses SQL. Tasks are removed **last**, after every time entry, so a refusal can only mean a real recorded-time conflict; that refusal (422) is reported like any other failed removal. A 404 (the test already deleted it) is success, as for projects.
+- `standaloneTaskId(page, title)` reads the new task's id from its row link on a title search of the creator's own list (`completion=any&kind=standalone&q=…`). Titles are run-unique. `tasks.store` redirects back without an id, so the id has to be read from the list.
+- **Untracked creations fail by name.** The fixture counts standalone creations on its page, recognising the store's own "Task created." flash on the redirect that follows `POST /tasks`. If a test created more than it registered, its teardown fails with "… standalone task(s) created on this page were never registered with cleanup.trackTask". A new leak is therefore reported by the test that causes it, not only by the outer count warning. Only the test's own `page` is watched; a task created from a `contextFor(...)` page would need its own cleanup (no spec does that).
+
+**Failure safety.** The teardown is a Playwright fixture teardown, which runs whether the test passed or failed. Every standalone task is registered **immediately** after creation, before any further assertion, in both `tasks-migration.spec.ts` flows and in `task-detail-wp5.spec.ts`'s `createStandalone` helper. The WP5 flows still delete through the detail page's own Delete action, which is behaviour under test; the teardown's later DELETE answers 404. The two `tasks-migration` flows no longer Complete their row "to hide it".
+
+**Regression (`tests/Browser/e2e-cleanup.spec.ts`, 3 tests):**
+
+1. A serial pair: the first test creates and registers a standalone task, then **fails deliberately** (`test.fail`); the second asserts `GET /tasks/{that id}` is **404**. It checks the exact row, so a leak moved to another row cannot pass, and it proves that teardown, not the happy path, did the removal.
+2. A probe `E2eCleanup` on the same page sees a creation that was never registered, and its `run()` **rejects** with the unregistered-creation message. Once the task is registered the same run passes and the task is 404.
+
+**Mutation checks**, each run red and then restored:
+
+- **(A)** The task-delete loop removed: tests 1 and 2 fail ("Expected: 404, Received: 200") and the count warning returns (6 → 8).
+- **(B)** The unregistered-creation check removed: test 2 fails ("Received promise resolved instead of rejected").
+
+The rows those mutation runs left were removed before the final proof (A6.13).
+
+### A6.5 Fixture names and shared-persona concurrency
+
+- **WP5 review F7: fixed.** `task-detail-wp5.spec.ts` gives its fixed board project and task names a per-run token (`Date.now().toString(36)`), so a row left by an interrupted run can never match a later run's list, menu or breadcrumb lookup. Its standalone titles were already run-unique.
+- **Concurrency review.** Every EPIC-014 browser flow owns the rows whose presence it asserts: its own projects, its own board tasks assigned to the operator, and its own run-unique standalone tasks. Member-persona contexts only read rows their own test created. `shell.spec.ts`'s `/tasks` checks assert geometry that holds for any rows. One flow depended on ambient volume: WP5's `/tasks?view=all` lookup of its board row, where the operator's All Tasks also holds every other worker's board tasks and could push the row off page one. It now searches by title. `E2eCleanup`'s manual-entry sweep deletes every "Browser manual entry" row on the persona's `/time`, and workers share persona users, so `TimeEntry::forUser` does not isolate workers. The current topology is safe for a different reason: `time-migration.spec.ts` is the only cleanup-fixture spec that creates those member-persona entries, and a spec file runs in one worker; the member-persona blocks in `shell.spec.ts`, `blade-shell.spec.ts` and `inertia-coexistence.spec.ts` use the plain `support/auth` fixture, not the cleanup fixture. No competing sweep exists today; a future member-persona spec that uses `cleanup` and creates manual entries would need to revisit this. Workers stay at 3; no persona was added.
+- **Deferred:** `tasks-migration.spec.ts`'s WP8/WP4/D9 board fixture names are still fixed. They can collide only after a run killed outright, without teardown (standalone rows are now removed even on failure), and making them unique means rewriting about 25 search and ordering assertions in a green spec. Recorded, not done.
+
+### A6.6 §18 exit criteria
+
+| # | Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | `TaskPolicy` governs every `tasks.*` route; matrix ability × kind × actor; board delegates; `projects.*` matrix unchanged | **Done** | `TaskPolicyMatrixTest` 25 (240 assertions); `ProjectAuthorizationMatrixTest` 259 (410), `projects.*` rows unchanged since WP1, `tasks.*` rows added (A2.6, A5.13); `TaskShowTest` |
+| 2 | Complete/Reopen per §8, list and detail, manager and member-assignee; member-assignee cannot move; ticket tasks not surfaced or mutated | **Done** | `TaskCompletionTest`, `TaskCompletionConcurrencyTest`, `TaskBulkTest`, `StandaloneLifecycleTest`, `TaskPolicyMatrixTest` (`move`); Playwright: list Complete/Reopen and keyboard/bulk (`tasks-migration`), manager and member-assignee on detail, the member's row Complete control (`task-detail-wp5`) |
+| 3 | Zero or several Done columns: clear configuration error, no 500, no guess; audit lists them | **Done** | `DoneColumnResolverTest`, `TaskCompletionTest`, `ProjectIntegrityAuditTest` |
+| 4 | My Tasks per Q4 (F1 fixed); All Tasks gated, union of `view`, excludes others' standalone; "My organization" gone | **Done** | `TaskQueryTest`, `TaskListPageTest`, the flipped characterizations (A3.8), `NavigationBuilderTest`; Playwright: forged `view=all` served as My tasks |
+| 5 | Search, sort, every §9.5 filter: server-side, URL state, clamped, never widen; budget holds; any index justified | **Done** | `TaskQueryTest` (filters never widen), `TaskListPageTest`, `ProjectQueryBudgetTest` 11 (67); EXPLAIN, no index (A3.5); Playwright URL/history/unlabeled-id flow |
+| 6 | Standalone detail, edit, Complete/Reopen, delete for creator and assignee only; delete refused with time, through the shared guard | **Done** | `StandaloneLifecycleTest`, `TaskShowTest`, `TaskServiceTest`, `TaskDeletionAuthorityTest` 8; Playwright WP5 standalone lifecycle and the stranger's 403 |
+| 7 | Assignment per §7.3 from detail and from the list | **Done** | `TaskAssigneeOptionsTest` 11 (40, incl. the WP7 +0 case and its positive control), `StandaloneLifecycleTest`, `TaskListPageTest`; Playwright detail and list assignment |
+| 8 | List §14.1 grammar; A13.5 closed; truly empty vs filtered empty | **Done** | Vitest page/table/filter suites; Playwright two bands at 390/767, a table at 768/1400, phone viewport, empty states and their focus |
+| 9 | Detail §14.2 grammar; A13.12 closed (one Breadcrumb landmark) | **Done** | Vitest (`app-shell`, both pages); Playwright `ariaSnapshot` count on both details and for the member |
+| 10 | R9 contextual time and R10 keyboard/bulk minimums | **Done** | `TaskTimePanel` on both details (Playwright, Start offered and withdrawn with eligibility); running-row state (Vitest; Playwright with a mocked active timer); `J/K/E/X/Esc` and bulk (Vitest, Playwright) |
+| 11 | INV-1 to INV-19, each with a named test | **Done** | A6.7 |
+| 12 | A9.7 closed: no standalone residue, through the supported delete route | **Done** | A6.3–A6.4; two full runs with counts unchanged (A6.13) |
+| 13 | `./dev check`, `./dev test:e2e` and PR CI green on the final package | **Pending PR CI** | `./dev check` and `./dev test:e2e` green locally (A6.13). PR CI cannot run until the WP7 PR is opened (the package is uncommitted for independent review); the epic is not Verified until it is green (§23) |
+
+S1–S5 are not criteria (§18) and are **Deferred** (A6.2). Criteria 1–12 are satisfied; **criterion 13 is open until the WP7 PR's CI is green**, so the epic is **In Progress, not yet Verified**.
+
+### A6.7 Invariants (criterion 11)
+
+| INV | Named test(s) |
+|---|---|
+| 1 column-authoritative done | `ProjectPinnedBehaviorTest`, `ProjectIntegrityTest`, `TaskCurrentBehaviorCharacterizationTest` |
+| 2 no `status` write on board moves | `ProjectPinnedBehaviorTest`, `TaskCompletionTest`, `TaskCompletionConcurrencyTest` |
+| 3 dense positions | `ProjectIntegrityTest`, `TaskCompletionTest`, `TaskCompletionConcurrencyTest` |
+| 4 lock ordering, restart | `ProjectMoveConcurrencyTest` (unmodified), `TaskCompletionConcurrencyTest`, `TaskBulkTest` |
+| 5 own column and milestone | `ProjectIntegrityTest`, `ProjectIntegrityAuditTest` |
+| 6 new board assignee is a member | `ProjectIntegrityTest`, `StandaloneLifecycleTest`, `TaskAssigneeOptionsTest` |
+| 7 departed assignee kept, grants nothing | `ProjectIntegrityTest`, `ProjectTaskDetailInertiaTest`, `TaskPolicyMatrixTest`, `TaskQueryTest` |
+| 8 exactly one Done column | `DoneColumnResolverTest`, `TaskCompletionTest`, `ProjectIntegrityAuditTest` |
+| 9 project/kind identity fixed | `StandaloneLifecycleTest`, `TaskCurrentBehaviorCharacterizationTest`, `ProjectIntegrityTest` |
+| 10 time attribution follows INV-9 | as INV-9 |
+| 11 no hard delete with recorded time | `ProjectDeletionGuardTest`, `StandaloneLifecycleTest`, `TaskServiceTest`, `TaskDeletionAuthorityTest` |
+| 12 RESTRICT authoritative, 1451 mapped | `ProjectDeletionGuardTest`, `TaskServiceTest`, `TimeEntryForeignKeyMigrationTest` |
+| 13 dual-linked rows excluded and audited | `ProjectIntegrityAuditTest`, `TaskQueryTest`, `TaskPolicyMatrixTest`, `TaskServiceTest`, `TaskShowTest` |
+| 14 billed time immutable | `BilledTimeEntryLockingTest`, `TimeEntryTaskAttributionTest`, `TaskCurrentBehaviorCharacterizationTest` |
+| 15 Complete touches no timer | `TaskCompletionTest` |
+| 16 filters only narrow | `TaskQueryTest`, `TaskListPageTest` |
+| 17 DTOs leak nothing | `TaskListInertiaTest`, `TaskListPageTest`, `TaskShowTest`, `TaskAssigneeOptionsTest`, `ProjectTaskDetailInertiaTest` |
+| 18 navigation is not authorization | `NavigationBuilderTest`, `ShellContractTest`, `ProjectAuthorizationMatrixTest` |
+| 19 server vocabulary | `TaskListInertiaTest`, `TaskShowTest`; Vitest page tests (labels from props) |
+
+### A6.8 Required journeys: coverage reconciliation
+
+Each required behaviour has automated coverage at the layer that proves it. No browser test was added to duplicate strong Pest or Vitest coverage.
+
+| Journey | Browser (Playwright) | Server / component |
+|---|---|---|
+| My Tasks; All Tasks with `tasks.view_all`; forged `view=all` falls back | `tasks-migration` filter flow, `task-detail-wp5` list assignment | `TaskQueryTest`, `TaskListPageTest`, `NavigationBuilderTest` |
+| Completion, priority, search, sort, unlabeled id, back/forward | `tasks-migration` | same |
+| Project, milestone, assignee, organization, due, kind filters; pagination | the project filter through the unlabeled id; the assignee control's presence | `TaskQueryTest`, `TaskListPageTest` (45-row two-page walk, normalized page links); Vitest filter bar and query builder |
+| Responsive S (list and detail) | `tasks-migration` (390/767/768/1400, both themes), `task-detail-wp5` (390/1400) | Vitest `DataTable` |
+| Standalone create, discoverable unassigned, edit, assign/release, Complete/Reopen, delete | `task-detail-wp5`, `tasks-migration` | `StandaloneLifecycleTest`, `TaskShowTest` |
+| Recorded-time delete refusal | board: `task-detail-migration` (D4) | `StandaloneLifecycleTest`, `ProjectDeletionGuardTest`, Vitest delete button |
+| Board detail, assignment, manager Complete/Reopen, member-assignee Complete/Reopen, candidate restriction | `task-detail-wp5` | `TaskAssigneeOptionsTest`, `TaskPolicyMatrixTest` |
+| Standalone authorization (creator/assignee), Me/Unassigned, raw status, contextual time | `task-detail-wp5` (403 to a stranger, Me/Unassigned menu, Start offered/withdrawn) | `StandaloneLifecycleTest`, Vitest standalone edit dialog (Status field and errors) |
+| One h1, one Breadcrumb landmark, responsive detail, time panel | `task-detail-wp5` | Vitest pages and `app-shell` |
+
+### A6.9 Deferred findings: disposition
+
+Bias: defer unless correctness, security, an accessibility blocker, deterministic test instability, an exit criterion or very small WP7 hardening.
+
+| Finding | Source | Disposition |
+|---|---|---|
+| Stale board assignee keeps new-time eligibility | A1.3.1(1), A2.4(1) | **DEFER**: a Time-domain rule; no decision locked. `AccessibleTimeContext` unchanged |
+| `ProjectService::create` not atomic | A1.3.1(2), A2.4(2) | **DEFER**: a Projects issue; the audit surfaces it |
+| Decision (c) is task-only (project/ticket contexts) | A2.4(3) | **DEFER**: extending it would be a new Time decision |
+| Review-accepted items (board assignee validated outside the lock, route-bound policy model, legacy dual-context entries, Done/open column resolution before the locks) | A2.5 | **ALREADY RESOLVED** (accepted by review); revisit when column management lands |
+| `tasks.view_org` inert | P1, A3.9 | **DEFER**: permission debt, recorded in `rbac-design.md` |
+| `TaskQuery` request-context constraint (CRM tenant scope reads `Auth::user()`) | A3.7(3) | **DEFER**: constraint recorded; relevant to S4 |
+| `kind` vocabularies differ (`project` vs `board`) | A3.7(8) | **DEFER**: no defect; documented |
+| All Tasks `UNION` lever | A3.5 | **DEFER**: only on production-scale evidence |
+| F7 partial bulk failure clears the selection | A4.10 | **DEFER**: usability; the result summary is shown |
+| F8 verbose focused-row accessible name | A4.10 | **DEFER**: verbose, not blocking; every control has its own name |
+| F9 `useOptionalTimers()` | A4.10 | **DEFER**: API taste |
+| F11 `FormDialog` first-field selector | A4.10 | **DEFER**: the task dialogs open on their Title field (Vitest, Playwright); no current consumer leads with a checkbox, radio, read-only or hidden input |
+| F12 filter-bar height, S row density, hover/selection over the running tint, two empty-state "New task" actions | A4.10 | **DEFER**: polish |
+| F13 plain `Chip` unused | A4.10 | **DEFER**: harmless |
+| 40-character status not browser-measured | A4.10 | **DEFER**: no UI creates one |
+| Board assignee edited in two places (detail control and Edit dialog) | A5.10(1) | **DEFER**: both run the same rule |
+| WP5 F7 fixed browser fixture names | A5.15 | **FIX NOW**: per-run token in `task-detail-wp5.spec.ts` (A6.5); `tasks-migration` names deferred (A6.5) |
+| WP5 F8 "+0 assignment-options queries" not pinned | A5.15 | **FIX NOW**: `TaskAssigneeOptionsTest` "runs no member query at all when the page has no row the actor may assign (+0)". Mutation: making the member query unconditional turns it red |
+| `/time` navigation in `E2eCleanup.run()` | A5.16 | **ALREADY RESOLVED / by design**: teardown reads its CSRF token and the manual entries there; the WP5 report's confusion was explained in A5.16 |
+| One unreproduced A1 viewport-loop timeout | A5.16 | **DEFER**: unproven; not seen in WP7's runs |
+| A9.7 standalone residue | §20, A2–A5 | **FIX NOW**: closed (A6.3–A6.4) |
+| M2 Plex Sans 600 cold-load shift | §5.3, `ci.md` | **DEFER**: EPIC-013's, unchanged |
+| A13.13 vacuous Pest guards, `tests/Browser` lint/typecheck gap, jsdom load sensitivity, A11.15 timer isolation, A11.2 lockfile caret | §20 | **DEFER**: their existing owners |
+| `time.view_own`, `task_dependencies`, `tasks.created_by` cascade | §20 | **DEFER**: unchanged |
+
+### A6.10 Documentation sweep
+
+- **EPIC-011E:** a dated **Status** line under the existing D3 forward note: the supersession is implemented, with creator/current-assignee authorization and the current contract in EPIC-014 §7.2/§10. D3 and its table are untouched.
+- **EPIC-013:** dated **Status** lines under the §11.1 Tasks forward note (views implemented in WP3) and the §31 forward note (A13.5, A13.12 and A9.7 closed; the components and `J/K/X/E` delivered; `T`, the peek inspector and Home "My work" deferred with WP6). The history and the amendments are unchanged.
+- **`rbac-design.md`:** a `TaskPolicy` section (abilities by kind, board delegation, the member-assignee Complete/Reopen arm, standalone creator/current-assignee, ticket tasks internal only, assignment targets for detail and list, the dual-linked denial). The existing `tasks.view_all`/`tasks.view_org` note was already accurate. No permission was added.
+- **`docs/testing/ci.md`:** the A9.7 limitation is removed from the inherited-debts bullet, and a new bullet records the verified behaviour (counts back to baseline; a second run starts from the same baseline; a hard-killed run can still leave rows).
+- **`docs/testing/e2e-browser-suite.md`:** the WP7 full-suite figure is added. The login budget is unchanged: WP7 adds no login and no persona.
+- **Index and roadmap:** EPIC-014 stays **In Progress** in `docs/epics/README.md`, and the roadmap's Tasks overhaul vehicle line records criteria 1–12 satisfied, criterion 13 pending PR CI, Verified once it is green, Done after merge, and WP6 deferred.
+
+### A6.11 Accessibility closeout
+
+| Requirement | Evidence |
+|---|---|
+| One h1 | Playwright on both details (`toHaveCount(1)`) and the list headings |
+| One Breadcrumb landmark on details | Playwright `ariaSnapshot` count (operator and member), Vitest |
+| Table controls named | "Complete/Reopen *title*", per-row selection, "Select all tasks" (hidden at S, not a Tab stop); Vitest, Playwright |
+| Assignment menu semantics | A menu button named with holder and task; `menuitemradio` items with checked state; pending keys held back without trapping Tab (A5.15 F5); Vitest, Playwright |
+| Complete/Reopen names | Name flips on the same focused element; Playwright |
+| Dialog focus | Opens on the first field, Escape closes, focus returns to the opener; Playwright (create and edit), Vitest |
+| Validation associations | `aria-invalid`/`aria-describedby`/first-error focus (A5.15 F4), the create dialog's inline alert; Vitest, Playwright |
+| Responsive reading order | Aside below main at 390px (Playwright) |
+| Focus repair | Next row after `E`; chip removal; bulk-bar clear; last row → empty state; a reassigned row leaving My Tasks; Playwright, Vitest |
+
+**NVDA was not run.** It is not a §18 criterion; §17 WP7 asks for "an accessibility pass on the new widgets (keyboard, focus, names)" and leaves exhaustive AT to FINAL HARDENING. The A5.11 checklist is kept as a manual follow-up aid.
+
+### A6.12 Query and performance closeout
+
+No query, index or presenter changed. `ProjectQueryBudgetTest` 11 passed (67 assertions; the five WP3 list shapes constant across growth); `TaskAssigneeOptionsTest` 11 passed (40), now including the +0 case and its positive control; `TaskQueryReadConsistencyTest` 2 passed (23): the A5.16 snapshot transaction and its deterministic race regression are intact and were not replaced by a presenter guard. The A3.5 EXPLAIN conclusions (no index, All Tasks accepted at this stage) stand; no benchmark was re-run, because no regression appeared.
+
+### A6.13 Evidence
+
+| Gate | Result |
+|---|---|
+| Test-first (A9.7) | The leak reproduced on the unchanged tree: `tasks-migration.spec.ts` alone, 11 passed, `tasks` 4 → 6 (ids 100, 110; A6.3). `e2e-cleanup.spec.ts` was then run red under mutations (A) and (B) and green with the fix (A6.4) |
+| Focused Playwright | `tasks-migration` + `task-detail-wp5` + `task-detail-migration` + `e2e-cleanup`: 25 passed (one is the deliberate `test.fail`, reported as expected), 3 workers, counts unchanged |
+| Focused Pest | `tests/Feature/Tasks`, `Projects`, `Time`, `tests/Unit/Architecture`, `NavigationBuilderTest`, `ShellContractTest`, `ShellSeamContractTest`, `PermissionCatalogueTest`: **997 passed (5930 assertions)**. Individually: `TaskPolicyMatrixTest` 25 (240), `ProjectAuthorizationMatrixTest` 259 (410), `ShellSeamContractTest` 26 (551), `TaskDeletionAuthorityTest` 8 (10), `ProjectQueryBudgetTest` 11 (67), `TaskQueryReadConsistencyTest` 2 (23), `TaskAssigneeOptionsTest` 11 (40, after the +0 case and its positive control; the +0 case was red under its mutation) |
+| `./dev check` (run alone) | green: CLI self-tests 196 assertions; Vitest **92 files / 1052 tests**; build; Pint; `git diff --check`; Pest **1458 passed (8133 assertions)** |
+| Clean baseline | Nine residue rows removed through `TaskService::delete` (A6.15(3)); `projects=0 tasks=0 time_entries=0` |
+| `./dev test:e2e`, full run 1 | **114 passed**, 0 failed, 0 skipped, 3 workers, 3.6 minutes. Counts **0/0/0 → 0/0/0**, "Product-data counts unchanged", no warning. 12 `POST /login` (all 302), 0 `429`, 0 `419`, 0 `5xx` in the nginx log; no new `laravel.log` lines |
+| `./dev test:e2e`, full run 2 | A separate invocation started 14 seconds after run 1, with nothing touched in between: **114 passed**, 3 workers, 3.9 minutes. Counts **0/0/0 → 0/0/0**, no warning. 12 `POST /login` (all 302; the limiter was not reached), 0 `429`/`419`/`5xx`; no new `laravel.log` lines |
+
+The suite grew from 111 (A5.12) to 114 with `e2e-cleanup.spec.ts`; it adds no login and no persona.
+
+### A6.14 Files changed
+
+- **Browser tests:** `tests/Browser/support/e2e-fixtures.ts` (`trackTask`, the teardown delete, the unregistered-creation check, `standaloneTaskId`, header note rewritten); `tests/Browser/e2e-cleanup.spec.ts` (new); `tests/Browser/tasks-migration.spec.ts` (both standalone fixtures registered, the "Complete it to hide it" steps and the stale A9.7 header note removed, a stale ticket-row sentence corrected); `tests/Browser/task-detail-wp5.spec.ts` (`createStandalone` registers, per-run fixture names, All Tasks lookup by title).
+- **Pest:** `tests/Feature/Tasks/TaskAssigneeOptionsTest.php` (+1 case).
+- **Docs:** this amendment, the header, the contents, §17 WP6 and §20; EPIC-011E and EPIC-013 forward-note status lines; `docs/architecture/rbac-design.md`; `docs/testing/ci.md`; `docs/testing/e2e-browser-suite.md`; `docs/epics/README.md`; `docs/product/product-roadmap.md`.
+- **No** application, route, migration, permission, seeder, dependency or configuration file.
+
+### A6.15 Deviations
+
+1. **Criterion 13's PR CI** is pending by construction: WP7 is left uncommitted for independent review. The epic stays In Progress until the PR's CI is green (then Verified), and becomes Done after the merge.
+2. **`tasks-migration.spec.ts` fixed names** are deferred (A6.5), not converted.
+3. Nine residue rows (4 from earlier runs, 2 from the A9.7 proof run and 3 from the deliberate mutation runs) were removed **before** the final proof, through `TaskService::delete` (the guarded service path, not SQL), to start the proof from a clean baseline. No row was removed by hand between or after the final runs.

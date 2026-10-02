@@ -29,6 +29,8 @@ Owner decisions D1 to D6 are **locked**. At the time of this amendment, D7 remai
 | WP1 | Backend and Blade-visible defects are fixed and regression-tested before any React route flip | §29 |
 
 > **Forward note (2026-09-29).** D3 is superseded for future work by [EPIC-014 Q4](./EPIC-014-tasks-workspace-overhaul.md#191-epic-011e-d3-standalone-tasks-are-createlist-only): standalone tasks gain detail, edit, Complete/Reopen and delete for their creator or current assignee, under the recorded-time guard. D3 remains the accurate record of this epic's scope; the behaviour changes in EPIC-014 WP2/WP5.
+>
+> **Status (2026-10-01, EPIC-014 WP7).** The supersession is implemented: `tasks.show`, `tasks.update`, `tasks.destroy`, `tasks.complete`, `tasks.reopen` and `tasks.assignee.update` exist for standalone tasks (EPIC-014 WP2 backend, WP5 detail page), authorized by `TaskPolicy` for the task's **creator or current assignee** only, with delete through the shared recorded-time guard. The current contract is [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md) §7.2 and §10. The D3 pin in `ProjectPinnedBehaviorTest` was rewritten to that route surface, and the AA10/A9.7 browser residue closed in EPIC-014 WP7. D3 above is preserved as history.
 
 ### Conflicts and corrections found while amending
 

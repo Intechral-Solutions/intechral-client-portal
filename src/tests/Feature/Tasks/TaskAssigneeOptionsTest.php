@@ -144,6 +144,43 @@ it('does not grow its query count with the number of projects or rows on the pag
     expect($large)->toBeLessThanOrEqual($small + 1);
 });
 
+/** Queries on the page that are the candidate source's project-members-joined-to-users read. */
+function memberQueryCount(): int
+{
+    return collect(DB::getQueryLog())->pluck('query')
+        ->filter(fn (string $sql) => str_contains($sql, 'project_members') && str_contains($sql, 'join `users`'))
+        ->count();
+}
+
+it('runs exactly one member query when the page has a row the actor may assign (positive control)', function () {
+    // The same matcher the +0 case below uses: it must be live, or that case proves nothing.
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $response = $this->actingAs($this->manager)->get(route('tasks.index'))->assertOk();
+    $matched = memberQueryCount();
+    DB::disableQueryLog();
+
+    expect(projectMembers(optionProps($response), $this->project->id))->not->toBeNull()
+        ->and($matched)->toBe(1);
+});
+
+it('runs no member query at all when the page has no row the actor may assign (+0)', function () {
+    // Ann sees the board row as its member-assignee but may not assign it; her standalone row needs
+    // no member list either. The candidate query (project_members joined to users) must not run.
+    $this->mine->update(['assignee_id' => $this->ann->id]);
+    Task::factory()->standalone()->create(['created_by' => $this->ann->id, 'assignee_id' => $this->ann->id]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $response = $this->actingAs($this->ann)->get(route('tasks.index'))->assertOk();
+    $matched = memberQueryCount();
+    DB::disableQueryLog();
+
+    expect($response->viewData('page')['props']['tasks']['data'])->toHaveCount(2)
+        ->and(optionProps($response)['projects'])->toBe([])
+        ->and($matched)->toBe(0);
+});
+
 it('sends the options only on the list, never inside a row', function () {
     $props = $this->actingAs($this->manager)->get(route('tasks.index'))->assertOk()->viewData('page')['props'];
 
