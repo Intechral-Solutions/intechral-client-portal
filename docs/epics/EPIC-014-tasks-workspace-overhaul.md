@@ -1,6 +1,6 @@
 # EPIC-014: Tasks Workspace Overhaul
 
-**Status:** Verified (2026-10-02, WP7 PR #14: §18 criteria 1–13 satisfied, PR CI green on both jobs); **Done** follows the merge — see [Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01). WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 merged 2026-10-01, PR #13; **WP6 (optional) deferred by owner decision**; WP7 implemented, PR #14 open
+**Status:** Done (2026-10-02: WP7 merged via PR #14, merge commit `18b6f2e`, merge-triggered `main` CI green; every required §18 criterion satisfied, no required blocker open; Verified earlier the same day with PR CI green on both jobs; WP6 deferred) — see [Amendment 6](#amendment-6-wp7-hardening-and-closeout-2026-10-01). WP0 planning 2026-09-29; WP1 merged 2026-09-30, PR #9; WP2 merged 2026-09-30, PR #10; WP3 merged 2026-10-01, PR #11; WP4 merged 2026-10-01, PR #12; WP5 merged 2026-10-01, PR #13; **WP6 (optional) deferred by owner decision**; WP7 merged 2026-10-02, PR #14
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Tasks overhaul](../product/product-roadmap.md#tasks-overhaul))
 **Product direction:** [Platform Product & UX Direction → Task direction](../product/platform-product-ux-direction.md#task-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md)
@@ -1788,3 +1788,7 @@ WP7 PR #14 (`feature/epic-014-tasks-overhaul` → `main`, commit `d10d7dd`), ini
 | Playwright browser suite | pass, 9m42s: **114 passed** in 5.2 minutes, 3 workers; product-data counts `projects=0 tasks=0 time_entries=0` before and after, "Product-data counts unchanged", no warning |
 
 One of the 114 is the intentional `test.fail` cleanup regression. Hosted Vitest and Pest totals were not readable from the log summary and are not recorded. Criterion 13 is satisfied, so criteria 1–13 hold and the epic is **Verified**; WP6 remains deferred (A6.2) and **Done** follows the merge. This transition is a documentation-only commit on the same branch.
+
+### A6.17 Merge and Done (2026-10-02)
+
+PR #14 was merged to `main` on 2026-10-02 (merge commit `18b6f2e6d3aa23213f418f4a0fb61a10f352142a`). The merge-triggered push-to-`main` CI (run 36984583369) was green. The Verified checkpoint (A6.16) and all criterion-13 evidence above stand as recorded. All required §18 criteria are satisfied and no required EPIC-014 blocker remains, so the epic is **Done**. **WP6 remains optional and deferred** (A6.2): S1–S5 and the D2 row clock are future work, not part of Done. This lifecycle transition is a documentation-only commit.
