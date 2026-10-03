@@ -29,15 +29,16 @@ class ProjectMilestone extends Model
     /** Aggregates for the milestones page: every milestone in one query, not two each. */
     public function scopeWithTaskCounts(Builder $query): Builder
     {
+        // Valid kinds only: the malformed project+ticket row is in no count (EPIC-015 §8.4).
         return $query->withCount([
-            'tasks',
-            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->done(),
+            'tasks' => fn (Builder $tasks) => $tasks->ofValidKind(),
+            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->ofValidKind()->done(),
         ]);
     }
 
     public function completionPercentage(): int
     {
-        return Project::percentage($this->tasks()->done()->count(), $this->tasks()->count());
+        return Project::percentage($this->tasks()->ofValidKind()->done()->count(), $this->tasks()->ofValidKind()->count());
     }
 
     /** Same figure from the aggregates added by scopeWithTaskCounts(). */

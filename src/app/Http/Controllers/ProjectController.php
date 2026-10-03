@@ -78,15 +78,9 @@ class ProjectController extends Controller
             'companies.*' => [new AccessibleCrmCompany],
         ]);
 
+        // One service-owned transaction: the project, its board, the creator, the extra members and
+        // the company links all persist together or not at all (EPIC-015 INV-P10).
         $project = $this->service->create(auth()->user(), $data);
-
-        if (! empty($data['members'])) {
-            $this->service->syncMembers($project, $data['members']);
-        }
-
-        if (! empty($data['companies'])) {
-            $project->companies()->sync($data['companies']);
-        }
 
         // The board is a React page as of WP5, so an ordinary redirect is an ordinary Inertia
         // visit again (no Inertia::location() full-page-visit workaround needed).

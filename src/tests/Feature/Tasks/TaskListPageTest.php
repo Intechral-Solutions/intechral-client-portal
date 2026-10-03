@@ -224,7 +224,10 @@ it('leaks nothing unauthorized anywhere in the page props', function () {
         $json = json_encode(array_diff_key($props, array_flip(['auth', 'navigation', 'flash', 'errors', 'shell', 'ziggy', 'timer'])));
 
         foreach (['Hidden Harbor', 'Hidden secret', 'Outsider private', 'Ticket bound', 'Dual bound', 'TKT-4242', 'Secret notes', 'email', 'created_by', 'project_id', 'ticket_id', 'canViewOrg'] as $forbidden) {
-            expect($json)->not->toContain($forbidden, "{$view}: {$forbidden}");
+            // One needle per assertion, the diagnostic as the message: the earlier
+            // `->not->toContain($forbidden, "{$view}: {$forbidden}")` passed unless BOTH strings were
+            // present, and the second never is, so no leak could fail it (EPIC-015 review F4).
+            $this->assertStringNotContainsString($forbidden, $json, "{$view}: the page props leak {$forbidden}");
         }
     }
 });

@@ -86,10 +86,12 @@ class Project extends Model
     /** Aggregate counts the index needs, so rendering a card never queries per project. */
     public function scopeWithTaskStats(Builder $query): Builder
     {
+        // Every task aggregate counts VALID kinds only: the malformed project+ticket row has no valid
+        // product kind (EPIC-015 §8.4), so it is in no total, no progress and no overdue/health input.
         return $query->withCount([
-            'tasks',
-            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->done(),
-            'tasks as overdue_tasks_count' => fn (Builder $tasks) => $tasks->overdue(),
+            'tasks' => fn (Builder $tasks) => $tasks->ofValidKind(),
+            'tasks as done_tasks_count' => fn (Builder $tasks) => $tasks->ofValidKind()->done(),
+            'tasks as overdue_tasks_count' => fn (Builder $tasks) => $tasks->ofValidKind()->overdue(),
             'members',
         ]);
     }
@@ -103,7 +105,7 @@ class Project extends Model
 
     public function completionPercentage(): int
     {
-        return self::percentage($this->tasks()->done()->count(), $this->tasks()->count());
+        return self::percentage($this->tasks()->ofValidKind()->done()->count(), $this->tasks()->ofValidKind()->count());
     }
 
     /** Same figure from the aggregates added by scopeWithTaskStats(). */
@@ -114,7 +116,7 @@ class Project extends Model
 
     public function overdueTasks(): int
     {
-        return $this->tasks()->overdue()->count();
+        return $this->tasks()->ofValidKind()->overdue()->count();
     }
 
     public static function percentage(int $done, int $total): int

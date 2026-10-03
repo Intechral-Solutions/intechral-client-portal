@@ -319,8 +319,12 @@ it('offers timer context by kind and never a Done-column board task', function (
     $labels = collect($this->actingAs($user)->getJson(route('time.context.options', ['type' => 'task']))->assertOk()->json())
         ->pluck('label')->all();
 
-    expect($labels)->toContain('Open board task', 'Standalone open', 'Ticket open', 'Null column open')
-        ->not->toContain('Done board task', 'Standalone done', 'Ticket done');
+    expect($labels)->toContain('Open board task', 'Standalone open', 'Ticket open', 'Null column open');
+
+    // EPIC-013 A13.13 / EPIC-015 R2: `not->toContain(a, b, c)` passes unless ALL of a, b and c are
+    // present, so it let any one done task through. The forbidden set must be EMPTY, which is
+    // what a fail-closed assertion on the intersection says.
+    expect(array_values(array_intersect($labels, ['Done board task', 'Standalone done', 'Ticket done'])))->toBe([]);
 });
 
 it('applies one overdue rule: due before today and not done', function () {

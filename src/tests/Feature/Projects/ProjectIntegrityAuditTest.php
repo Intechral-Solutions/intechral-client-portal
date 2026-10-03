@@ -47,6 +47,8 @@ it('reports zero on a clean database', function () {
         'projects_with_no_done_column' => 0,
         'projects_with_multiple_done_columns' => 0,
         'tasks_linked_to_project_and_ticket' => 0,
+        'time_entries_with_task_and_project' => 0,
+        'time_entries_with_ticket_and_other_context' => 0,
     ]);
 });
 
@@ -95,6 +97,16 @@ it('counts every legacy integrity problem without modifying any data', function 
     makeTask($project->columns[0], ['ticket_id' => $ticket->id]);
     Task::factory()->standalone()->create(['ticket_id' => $ticket->id]);
 
+    // EPIC-015 §10.4: malformed time entries. Two carry a task AND a project (one on a board task,
+    // one on a standalone task), two carry a ticket plus another context key. Valid single-context
+    // entries (direct project, task only, ticket only) must not count.
+    $standalone = Task::factory()->standalone()->create();
+    TimeEntry::factory()->create(['user_id' => $member->id, 'task_id' => $timed->id, 'project_id' => $other->id]);
+    TimeEntry::factory()->create(['user_id' => $member->id, 'task_id' => $standalone->id, 'project_id' => $project->id]);
+    TimeEntry::factory()->create(['user_id' => $member->id, 'ticket_id' => $ticket->id, 'project_id' => $project->id]);
+    TimeEntry::factory()->create(['user_id' => $member->id, 'ticket_id' => $ticket->id, 'task_id' => $standalone->id]);
+    TimeEntry::factory()->create(['user_id' => $member->id, 'ticket_id' => $ticket->id]);
+
     $before = auditedTablesFingerprint();
     $counts = auditCounts();
 
@@ -106,10 +118,13 @@ it('counts every legacy integrity problem without modifying any data', function 
             'time_entries_with_missing_project_or_task' => 2,
             // $project (via its timed task) and $other (direct time)
             'projects_blocked_from_delete_by_time' => 2,
-            'tasks_blocked_from_delete_by_time' => 1,
+            // the timed board task, and the standalone task the malformed time entries reference
+            'tasks_blocked_from_delete_by_time' => 2,
             'projects_with_no_done_column' => 1,
             'projects_with_multiple_done_columns' => 1,
             'tasks_linked_to_project_and_ticket' => 2,
+            'time_entries_with_task_and_project' => 2,
+            'time_entries_with_ticket_and_other_context' => 2,
         ]);
 });
 
@@ -131,4 +146,30 @@ it('prints a readable table without the json flag', function () {
     $this->artisan('projects:audit-integrity')
         ->expectsOutputToContain('tasks_assigned_to_non_members')
         ->assertExitCode(0);
+});
+
+it('EPIC-015 INV-P3: projects_blocked_from_delete_by_time stays conservative — a malformed time entry blocks BOTH projects it references, though project time counts it under one', function () {
+    $c = makeProject(null, 'C');
+    $d = makeProject(null, 'D');
+    $taskD = makeTask($d->columns[0]);
+    TimeEntry::factory()->create(['user_id' => makeUser()->id, 'task_id' => $taskD->id, 'project_id' => $c->id]);
+
+    expect(auditCounts())->toMatchArray([
+        'projects_blocked_from_delete_by_time' => 2,
+        'time_entries_with_task_and_project' => 1,
+    ]);
+});
+
+it('EPIC-015 §10.4: the two malformed time-entry keys may OVERLAP on one row, because they report different violations', function () {
+    $project = makeProject();
+    $task = makeTask($project->columns[0]);
+    $ticket = Ticket::factory()->create();
+
+    // One row naming a ticket, a task AND a project: task+project, and ticket+another context.
+    TimeEntry::factory()->create(['user_id' => makeUser()->id, 'ticket_id' => $ticket->id, 'task_id' => $task->id, 'project_id' => $project->id]);
+
+    expect(auditCounts())->toMatchArray([
+        'time_entries_with_task_and_project' => 1,
+        'time_entries_with_ticket_and_other_context' => 1,
+    ]);
 });

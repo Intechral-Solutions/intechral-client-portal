@@ -251,15 +251,16 @@ it('FLIPPED IN WP2 (§12.2): omitting every context key from an entry update no 
     expect($entry->fresh()->only(['task_id', 'duration_minutes']))->toBe(['task_id' => $task->id, 'duration_minutes' => 120]);
 });
 
-it('OBSERVED (§12.2): an existing entry on a board task stays editable after its assignee leaves the project, because the stale assignment still grants task eligibility; FLIPPED IN WP2: it stays editable after unassigning too', function () {
+it('OBSERVED (§12.2): an existing entry on a board task stays editable after its assignee leaves the project; FLIPPED IN WP2: it stays editable after unassigning too; RATIONALE CHANGED IN EPIC-015 WP1: the unchanged attribution survives under decision (c), no longer because a stale assignment grants eligibility (it does not, Q8)', function () {
     $worker = projectActor('member', $this->project);
     $task = makeTask($this->open, ['assignee_id' => $worker->id]);
     $entry = TimeEntry::factory()->create(['user_id' => $worker->id, 'task_id' => $task->id, 'date' => today()->toDateString()]);
 
     $this->project->members()->detach($worker->id);
 
-    // Still the stored assignee (I8 keeps it), and AccessibleTimeContext admits the assignee, so
-    // a departed member is still eligible: the edit succeeds (unchanged by WP2).
+    // Still the stored assignee (I8 keeps it). Until EPIC-015 WP1 the edit passed because
+    // AccessibleTimeContext admitted the stale assignee; it now passes because the task is UNCHANGED
+    // (decision (c), keepsTask skips the eligibility rule) — Q8 would refuse this actor a new entry.
     $this->actingAs($worker)->put(route('time.update', $entry), [
         'date' => today()->toDateString(), 'hours' => 1, 'task_id' => $task->id,
     ])->assertSessionHasNoErrors();
@@ -273,12 +274,13 @@ it('OBSERVED (§12.2): an existing entry on a board task stays editable after it
     expect($entry->fresh()->task_id)->toBe($task->id);
 });
 
-it('OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP: a board assignee who left the project can still start NEW time on the task they are still stored against', function () {
-    // Pinned so the inconsistency is visible, NOT endorsed and NOT an EPIC-014 invariant. TaskPolicy
-    // (§7.2) denies this actor sight of the task, yet AccessibleTimeContext admits the stored
-    // assignee for new time. A future Time-domain package may intentionally change this (for
-    // example, stale assignment alone no longer granting new-time eligibility); if it does, this
-    // test is expected to flip. It is deliberately unowned by any EPIC-014 work package.
+it('FLIPPED IN EPIC-015 WP1 (Q8): a board assignee who left the project can no longer start NEW time on the task they are still stored against', function () {
+    // Until EPIC-015 WP1 (at 58c58f1) this was pinned OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP:
+    // TaskPolicy (§7.2) denied this actor sight of the task, yet AccessibleTimeContext admitted the
+    // stored assignee for new time, so the departed member could still start a timer and log time.
+    // Owner decision Q8 closed it: a board task's new-time eligibility is the actor's CURRENT
+    // ProjectPolicy::view. The assignee is still stored (INV-7); it just grants nothing alone.
+    // The full matrix, including what is preserved, is Time/StaleAssigneeTimeEligibilityTest.
     $worker = projectActor('member', $this->project);
     $task = makeTask($this->open, ['assignee_id' => $worker->id]);
 
@@ -288,14 +290,13 @@ it('OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP: a board assignee who left the pro
     expect($task->assignee_id)->toBe($worker->id)
         ->and(Gate::forUser($worker)->allows('view', $task->project))->toBeFalse();
 
-    $this->actingAs($worker)->postJson(route('time.timer.start'), ['task_id' => $task->id])->assertOk();
-    expect(TimeEntry::where('user_id', $worker->id)->where('task_id', $task->id)->running()->count())->toBe(1);
+    $this->actingAs($worker)->postJson(route('time.timer.start'), ['task_id' => $task->id])->assertUnprocessable();
+    expect(TimeEntry::where('user_id', $worker->id)->where('task_id', $task->id)->count())->toBe(0);
 
-    // A new manual entry is admitted the same way.
     $this->actingAs($worker)->post(route('time.store'), [
         'date' => today()->toDateString(), 'hours' => 1, 'task_id' => $task->id,
-    ])->assertSessionHasNoErrors();
-    expect(TimeEntry::where('user_id', $worker->id)->where('task_id', $task->id)->count())->toBe(2);
+    ])->assertSessionHasErrors('task_id');
+    expect(TimeEntry::where('user_id', $worker->id)->where('task_id', $task->id)->count())->toBe(0);
 });
 
 it('PRESERVED (timer ownership): a running timer on a task the actor is no longer eligible for can still be stopped', function () {

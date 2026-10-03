@@ -1,6 +1,6 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** Planned (WP0 planning, 2026-10-02). No implementation has started.
+**Status:** Planned. WP0 is complete (committed `58c58f1`). WP1 PR A (time and integrity) is implemented and independently reviewed: the first review requested small remediation, which was applied, and the short independent re-review passed ([Amendment 1](#amendment-1-wp1-implementation)); WP1 PR B has not started and nothing has merged, so the epic is not yet In Progress.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3))
@@ -809,3 +809,153 @@ None blocks WP1. Each is the plan's default, derived from the locked decisions, 
   - No branch is created for each small documentation or incidental fix; those go directly to `main` where safe.
 - **CI:** the PR gate is the merge gate for every package.
 - **Record:** each package's results are recorded as an amendment to this document in the same PR.
+
+---
+
+## Amendment 1: WP1 implementation
+
+> **Status (2026-10-02): WP1 PR A is implemented and independently reviewed (A1.1.10): the first review requested small remediation, which was applied, and the short independent re-review passed; PR B is not started. WP1 is therefore NOT complete and the epic stays Planned** (the lifecycle moves it to In Progress when WP1 merges, [§19](#19-exit-criteria)). This amendment records PR A only; PR B appends its own subsection.
+
+### A1.1 WP1 PR A: Time and integrity foundation
+
+**Starting point.** Branch `feature/epic-015-projects-ux` at `58c58f1` (`docs: plan EPIC-015 Projects UX expansion`), equal to `main` and `origin/main`, working tree clean. No migration, dependency, CI or frontend file changed.
+
+**Method.** Characterize first, then change. Each new test file was written against `58c58f1` code and run green; the behaviour tests were then flipped in place to the committed rule (labelled `FLIPPED IN WP1`, each keeping what it asserted before) and shown **red against the old production code** before the fix landed (time consumers: 12 of 15 red with the old consumers restored; create atomicity: 8 of 10 red with the old service restored; Q8: 5 of 17 red before the `AccessibleTimeContext` change). The two risky rules were mutation-checked: the A13.13 guard (below) and `CASE` versus `COALESCE` grouping (3 tests fail under `COALESCE`).
+
+#### Characterization findings
+
+| Area | Finding at `58c58f1` | Class |
+|---|---|---|
+| Create | A project row, then columns, then the creator row, then (controller) `syncMembers`, then `companies()->sync`, with **no transaction**. Proven with injected failures: a failure on the 3rd column left a committed project with 3 columns and no Done column; a failure on the creator insert left a project and 5 columns; a failure in the extra-member sync left a project whose creator had been **detached** by `sync()` (only the extra member remained); a failure linking companies left the project, members and the link. | KNOWN DEFECT, flipped |
+| Project time | Every consumer filtered and grouped on `time_entries.project_id` alone. A board-task entry has `project_id = NULL`, so task time was invisible to every project filter and by-project row; a malformed row was counted under its stored `project_id` (A: 10 + 160 + 320 = 490, B: 0 in the fixture; correct is A 30, B 160). The CSV and report rows named no project for task time. | KNOWN DEFECT, flipped |
+| Stale assignee | A departed board assignee could start a timer and log manual time (pinned since EPIC-014). | KNOWN DEFECT, flipped |
+| Preserved | Stopping a running timer after eligibility is lost; an unchanged board-task attribution stays editable (decision (c)); billed entries stay locked; standalone and ticket eligibility; a current member who is not the assignee may log time on any project task (`ProjectPolicy::view`); `time.log` is not widened; a departed assignee cannot open the task detail (so `logTime` is never reached). | PRESERVED |
+| Dual-linked project+ticket task | See [A1.1.5](#a115-dual-linked-projectticket-tasks-characterization-and-the-owner-ruling-resolved). | OBSERVED |
+
+#### A1.1.1 Atomic project creation (R1, INV-P10)
+
+`ProjectService::create` is now one `DB::transaction` covering the project row, the five columns (exactly one Done), the creator membership, the extra-member sync and the company sync. `$data['members']` and `$data['companies']` are optional keys, so every existing caller (`makeProject`, tests, seeders) is unchanged. `ProjectController::store` keeps authorization (`manageMembers` for extra members) and validation (`AccessibleCrmCompany`) and now makes **one** service call. No lock is taken (nothing is read that a concurrent request can change). No external side effect runs inside the transaction: the model has no observers or events, and nothing queues, mails or writes a file in this path.
+
+Failure injection throws from a `DB::listen` callback **after** the Nth INSERT into a named table has executed, so the failing row itself must be undone by the transaction. Tests: failures on the 1st and 3rd column, the creator row, the extra-member sync and the company link all leave **zero** rows in `projects`, `project_columns`, `project_members` and `project_company`; the service is also atomic without the controller; another project is undisturbed and a retry succeeds; the integrity audit reports no project without a Done column after a failed create. Preserved: a successful create (5 columns, 1 Done, creator manager, extras, companies) and the rule that an extra-member entry for the creator never demotes them.
+
+*Test-environment note.* The suite runs inside `RefreshDatabase`'s outer transaction, so these tests exercise a savepoint rollback; production uses a real transaction with the same semantics.
+
+#### A1.1.2 A13.13 guard (R2)
+
+`ProjectIntegrityTest` "offers timer context by kind and never a Done-column board task" used `->not->toContain('Done board task', 'Standalone done', 'Ticket done')`, which passes unless **all three** are present. **Mutation proof (before the fix):** production was temporarily changed to offer Done board tasks; the old assertion still passed. The assertion is now `array_intersect($labels, [...])` equals `[]`. **After the fix, the same mutation fails it** (`'Done board task'` reported); the mutation was reverted and the test passes on real code. Product behaviour was not changed to satisfy it. The review then found three more multi-argument `not->toContain` assertions: `TaskQueryTest` (the INV-13 "never surfaces a ticket-kind or dual-linked row" guard) and `TaskListPageTest` (the page-props leak guard) were **fully vacuous** (the second needle was a diagnostic string that is never present, so neither could fail), and `TaskAssigneeOptionsTest` was partly vacuous. All three were repaired in PR A ([A1.1.10](#a1110-independent-review-remediation)).
+
+#### A1.1.3 Canonical project-time attribution (R4, INV-P4)
+
+One seam, three faces, all on `TimeEntry`:
+
+| Face | Use |
+|---|---|
+| `scopeAttributedToProject($id)` | filtering: `(task_id IS NULL AND project_id = P) OR task_id IN (tasks of P with no ticket)` |
+| `scopeJoinedToTask()` + `attributedProjectIdSql()` | grouping: `CAST(CASE WHEN task_id IS NULL THEN time_entries.project_id WHEN tasks.ticket_id IS NULL THEN tasks.project_id ELSE NULL END AS UNSIGNED)` over a LEFT JOIN (the `CAST` keeps the id an integer; an `ELSE NULL` branch otherwise comes back from the driver as a string) |
+| `attributedProject()` | the per-entry project (report row name, CSV); null for a missing, standalone, ticket-linked or malformed task. Callers eager load `task:id,project_id,ticket_id` and `task.project` |
+
+`scopeForProject` (no callers) was **removed**, not left as a second definition. The grouping is a `CASE`, never `COALESCE`; mutation-checked. The first implementation of the grouping used a correlated subquery and **failed on MariaDB** (`ONLY_FULL_GROUP_BY`, error 1055), which is why it is a LEFT JOIN on plain columns; `tasks.id` is unique, so the join cannot multiply rows. `applyFilters`' columns are now table-qualified because the grouped query joins `tasks`.
+
+| Entry | Attributed project |
+|---|---|
+| Direct project entry | `project_id` |
+| Board-task entry | `task.project_id` |
+| Standalone-task entry | none |
+| Ticket-task entry | none |
+| Malformed: board task in B + `project_id` = A | **B** (`project_id` ignored) |
+| Malformed: standalone or ticket task + `project_id` = A | **none** |
+| Task **linked to both a project and a ticket** (owner ruling), whatever `project_id` says | **none** |
+
+**Consumers migrated:** `TimeEntryService::applyFilters` (hence `summaryByProject`, `summaryByUser`, `totalMinutes`, `exportCsv`); `summaryByProject` grouping; the CSV Project column; `Operator\TimeReportController::index` (entry list filter and each row's project name); the `/time` page filter, for both the list and the total. The `/time` page stays user-scoped. **Not changed:** the Dashboard time queries and the other user-only queries (no project dimension), and no write path. **The Overview consumer arrives in PR B** and joins the parity test then.
+
+Tests (`Time/ProjectTimeAttributionTest`, 15): the fixture has six entries with distinct power-of-two durations so a total identifies its members. Asserted: filter totals (A = 30, B = 160); the by-project groups (A 30, B 160, none 440, summing to every settled entry once); per-entry membership in at most one project; the null group for malformed standalone/ticket rows (including a ticket-task variant); filter = group = scope parity; operator page, `/time` page and service totals agree; the CSV rows; composition with the user/billable filters; running timers still excluded; and the guard distinction below.
+
+#### A1.1.4 Guard and audit stay conservative; the new audit checks
+
+`RecordedTimeGuard::deleteProject` and `ProjectIntegrityAudit::projects_blocked_from_delete_by_time` are **unchanged in behaviour**: any direct or task reference blocks the delete. Maintainer comments now say they must not be normalized to the reporting scope, and tests pin the distinction: a malformed row (task in D, `project_id` = C) is **reported under D only** but **blocks deleting both C and D**. The audit gains two read-only checks, `time_entries_with_task_and_project` and `time_entries_with_ticket_and_other_context`. **They may overlap**: one row carrying a ticket, a task and a project is counted by both, because each key reports a different violation; this is intended, documented in the audit and pinned by a test. No migration and no constraint was added, and the audit still writes nothing (its fingerprint test is extended).
+
+#### A1.1.5 Dual-linked project+ticket tasks: characterization and the owner ruling (resolved)
+
+`Tasks/DualLinkedTaskCharacterizationTest` was first written as seven OBSERVED tests recording what each authority did with a task carrying **both** `project_id` and `ticket_id` at `58c58f1`. They disagreed:
+
+| Authority | Before the ruling |
+|---|---|
+| `Task::kind()` | board task |
+| `TaskPolicy` (`kindOf`) | malformed: every ability denied for everyone |
+| `TaskQuery::authorizedFor` | excluded |
+| Project aggregates (`withTaskStats`, helpers, milestone counts) | counted (total, done, overdue, progress) |
+| Board page, task detail and the other project-task routes | shown / reachable to a project member or manager |
+| New-time eligibility (`AccessibleTimeContext`) | admitted (member, departed assignee, ticket owner) |
+| Project time attribution | to `tasks.project_id` ("project wins") |
+| Integrity audit | flagged |
+
+**Owner ruling (final).** Such a row has **no valid product kind**: it is neither a project task nor a ticket task, and neither "project wins" nor "ticket wins". It is refused and unsurfaced; it is **not** auto-deleted or auto-migrated; the audit keeps flagging it. Applied in PR A:
+
+| Seam | Result |
+|---|---|
+| `Task::isMalformedKind()` and `Task::scopeOfValidKind()` | the one classifier and the one scope (`project_id IS NULL OR ticket_id IS NULL`). `Task::kind()` is deliberately unchanged. `TaskPolicy`, `TaskService` and `TaskQuery` already refuse the row and keep their own equivalent checks |
+| `Project::scopeWithTaskStats`, `completionPercentage`, `overdueTasks`; `ProjectMilestone::scopeWithTaskCounts`, `completionPercentage` | count valid kinds only, via the shared scope: the row is in no total, no progress and no overdue/health input, and helper and aggregate cannot disagree |
+| `ProjectBoardController` | the board's task collection excludes it |
+| `ProjectTaskController` | one private `ensureProjectTask()` backstop for **every** bound-task route (show, update, destroy, move, comment, the three checklist routes): 404 unless the task belongs to the route's project **and** is not malformed. Called after the project authorization, so 403 still precedes 404. The review found these routes authorized on the project alone, so the row was reachable by URL even once the board hid it |
+| `AccessibleTimeContext::canUseTask` | denied for **new** time, classified before any other rule (see A1.1.6) |
+| Time attribution | none (A1.1.3) |
+| Future Project Tasks (WP3) | already excluded by `TaskQuery`; nothing to add |
+
+**Preserved.** An unchanged historical attribution on such a task stays editable (decision (c)); an already-running timer on it can be stopped; a billed entry on it stays locked; `RecordedTimeGuard` and `projects_blocked_from_delete_by_time` still treat the physical reference as a delete blocker.
+
+The characterization file keeps the **before** values in comments. Its tests are now: classifier and scope; TaskPolicy, TaskQuery and the audit (PRESERVED, plus "neither deleted nor migrated"); aggregates, helpers and milestone counts; the board; all eight project-task routes returning 404 for a manager and an operator (and a valid task still working, a member still getting 403 on a structural route, a foreign-project task still 404); new-time denial for a member, a departed assignee, a ticket owner, an operator and a manager through the rule **and** the real timer, manual-entry and picker routes; decision (c), timer stop and the billed lock; and the cross-surface check that the board, the project count and `/tasks` all show one task.
+
+#### A1.1.6 Q8: stale board-assignee new-time eligibility (R3, INV-P5)
+
+`AccessibleTimeContext::canUseTask` (the single authority: timer start, manual store, an entry changed to another task, and the context-options picker all go through it) now requires current `ProjectPolicy::view` for a board task (`project_id` set, `ticket_id` null). The stored `assignee_id` is untouched and grants nothing alone. The kind is classified in a fixed order so no later rule can rescue a refused row: missing task, denied; **malformed project+ticket, denied** (before the assignee shortcut, project and ticket handling); board task, current `ProjectPolicy::view` only; ticket task, assignee or ticket view (unchanged); standalone, assignee (unchanged). `ProjectPolicy` and every route are unchanged. The task-detail `logTime` ability needed no change: a departed member cannot open the page (403), so it is never reached.
+
+`Time/StaleAssigneeTimeEligibilityTest` (17): **flipped** (departed assignee denied a timer, manual time, the picker, a changed or added task); **preserved** (current member + assignee; current member not the assignee may log on any project task though the picker lists only assigned tasks; operator without membership; outsider denied; `time.log` not widened; standalone and ticket rules; re-adding the member restores access; unchanged-attribution edit after leaving, decision (c); running timer still stops after leaving; billed entry still locked). The dual-linked row is **denied** (A1.1.5). The EPIC-014 characterization "OBSERVED / DEFERRED TIME-DOMAIN FOLLOW-UP" was flipped in place (`FLIPPED IN EPIC-015 WP1`), and the §12.2 test's comment now says the unchanged edit survives under decision (c), no longer because a stale assignment grants eligibility.
+
+#### A1.1.7 Performance and billing
+
+- `QUERY BUDGET`: the by-project summary, the operator report, the `/time` page and the CSV cost the **same number of queries** after 12 more tasks, 36 task entries and 12 direct entries on the project (warm-up request excluded). Report rows load `task.project` by eager load, so a page of entries adds no per-row query.
+- No index was added and `EXPLAIN` was not needed: the filter is a semi-join on `tasks.project_id` and the grouping joins on `tasks.id`.
+- **Billing is unaffected.** After the change, no billing code references `TimeEntry` or `time_entries` (`InvoiceService` and the Billing controllers were re-read), and the only users of the new seam are the time report, the CSV and the `/time` page. Billing lock semantics are untouched and re-pinned.
+
+#### A1.1.8 Deviations and findings
+
+1. **Report totals rise.** Per-project totals in the operator report, CSV and `/time` filter now include task time (§23 R1); that is the fix.
+2. The grouping is a LEFT JOIN (not the correlated subquery first tried: MariaDB `ONLY_FULL_GROUP_BY`) and is wrapped in `CAST ... AS UNSIGNED` (see A1.1.3).
+3. The dual-linked rule is resolved by the owner ruling (A1.1.5); nothing in PR A is awaiting an owner decision.
+4. The three vacuous multi-argument `not->toContain` assertions are repaired in PR A (A1.1.10).
+5. No migration was needed.
+
+#### A1.1.9 Evidence
+
+| Gate | Result |
+|---|---|
+| New test files | `Projects/ProjectCreateAtomicityTest` (10), `Time/ProjectTimeAttributionTest` (15), `Time/StaleAssigneeTimeEligibilityTest` (17), `Tasks/DualLinkedTaskCharacterizationTest` (15, after the ruling) |
+| Extended / flipped | `ProjectIntegrityAuditTest` (now 6 tests: extended fixture and keys, the guard-distinction test, the overlap test), `ProjectIntegrityTest` (A13.13 guard), `TaskCurrentBehaviorCharacterizationTest` (Q8 flip, rationale comment), and the three repaired Tasks guards (A1.1.10) |
+| Baseline before PR A | `Projects` + `Time` + `Tasks/TaskCurrentBehaviorCharacterizationTest`: 664 passed (2623 assertions) |
+| Focused Pest (after remediation) | `tests/Feature/Projects`, `Time`, `Tasks`, `tests/Unit`, `NavigationBuilderTest`, `ShellContractTest`, `DashboardInertiaTest`: **1143 passed (6807 assertions)**, 310 s. (First pass, before the review: 1134 / 6718.) |
+| Query-budget test, run alone | 1 passed (7 assertions) |
+| Focused Playwright | `time-migration`, `projects-migration`, `task-detail-wp5`: **25 passed** (1.6 min); product-data counts before and after identical (projects 0, tasks 0, time_entries 0) |
+| `./dev check` (alone) | CLI self-tests 196 assertions; `git diff --check` pass; Pint pass; frontend `npm run check` pass (typecheck, ESLint `--max-warnings=0`, Prettier, **Vitest 92 files / 1052 tests**, `vite build` 413 modules); full Pest **1518 passed (8478 assertions)**. (First pass: 1509 / 8389.) |
+| Pint on changed files | 24 files, pass |
+| Scope | No migration, dependency, CI, `resources/js`, config or `database/` change; no milestone completion, health derivation, `ProjectSettingsAccess`, `ProjectOverviewPresenter`, tabs, Project Tasks or `StagePath` code |
+
+**Files changed (PR A).** Production: `Models/TimeEntry`, `Models/Task`, `Models/Project`, `Models/ProjectMilestone`, `Services/TimeEntryService`, `Services/ProjectService`, `Services/ProjectIntegrityAudit`, `Services/RecordedTimeGuard` (comment only), `Rules/AccessibleTimeContext`, `Http/Controllers/ProjectController`, `ProjectBoardController`, `ProjectTaskController`, `TimeEntryController`, `Operator/TimeReportController`. Tests: the four new files plus the extended and repaired ones above. Docs: this amendment and the status line.
+
+**Open for the owner.** Nothing. The EPIC status stays **Planned** until WP1 merges.
+
+#### A1.1.10 Independent-review remediation
+
+The first independent review of PR A returned **"WP1 PR A NEEDS SMALL REMEDIATION"**, with the findings below (the dual-linked owner ruling was supplied alongside it). All were applied here. The short independent re-review of the remediated work then returned **"WP1 PR A SAFE TO COMMIT"**; it found all of F1 to F9 closed and recorded two documentation-only corrections, which are made in this amendment.
+
+| Finding | Resolution |
+|---|---|
+| F1 dual-linked ruling | Applied (A1.1.5): classifier and scope on `Task`, aggregates, board, new-time rule |
+| F2 direct routes | The review found every `ProjectTaskController` bound-task route authorized on the project alone, so a malformed row stayed reachable by URL after the board hid it. One `ensureProjectTask()` backstop now serves all eight routes (404), with a test per route for a manager and an operator |
+| F3 time attribution | Malformed dual-linked task time attributes to **no project**, consistently in the scope, the SQL grouping and `attributedProject()` |
+| F4, F5 vacuous guards | `TaskQueryTest` (INV-13 never-surfaces guard) and `TaskListPageTest` (page-props leak guard) were fully vacuous; `TaskAssigneeOptionsTest` partly. Repaired with one needle per assertion (or an empty-intersection check) and the diagnostic as the message. **Mutation-checked, one prohibited value each:** dropping `whereNull('tasks.ticket_id')` from `TaskQuery` fails the INV-13 guard; adding one `created_by` key to a task row fails the leak guard; adding one `options` key fails the assignee-options guard. All three were green on real code first, so no existing leak was masked or found |
+| F6 running timer | The running fixtures now store non-zero durations (999 and 777) so including a running row would change the total; the test asserts the filter, the group, the scope and the filtered summary |
+| F7 parity | The COALESCE guard now groups the **unfiltered** fixture. A three-way parity test asserts, per project, filtered total = grouped total = sum of settled entries whose `attributedProject()` is that project, plus the unattributed group and the partition of all settled time. The fixture now also has a ticket task + `project_id`, a dual-linked task with matching and with conflicting `project_id`, and an entry with no context. A `COALESCE` grouping fails 5 tests; dropping the ticket exclusion from the scope fails 5 |
+| F8 amendment | This amendment: the ruling is recorded, no "owner decision requested" remains |
+| F9 audit overlap | Documented and pinned by a test (A1.1.4) |
+
+Atomic create, the delete-guard distinction and the Q8 matrix were accepted by the review and were not changed; their tests stay green.
