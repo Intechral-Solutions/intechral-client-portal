@@ -185,5 +185,7 @@ it('sends the options only on the list, never inside a row', function () {
     $props = $this->actingAs($this->manager)->get(route('tasks.index'))->assertOk()->viewData('page')['props'];
 
     expect($props)->toHaveKey('assigneeOptions')
-        ->and(array_keys($props['tasks']['data'][0]))->not->toContain('assigneeOptions', 'options');
+        // `->not->toContain('assigneeOptions', 'options')` passed unless BOTH keys were present, so
+        // one leaked key could not fail it (EPIC-015 review F5): the intersection must be empty.
+        ->and(array_values(array_intersect(array_keys($props['tasks']['data'][0]), ['assigneeOptions', 'options'])))->toBe([]);
 });

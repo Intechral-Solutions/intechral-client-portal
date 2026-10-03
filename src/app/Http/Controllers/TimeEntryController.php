@@ -37,7 +37,7 @@ class TimeEntryController extends Controller
 
         $entries = TimeEntry::forUser($user->id)
             ->with(['project', 'task', 'ticket'])
-            ->when($filters['project_id'], fn ($q, $id) => $q->where('project_id', $id))
+            ->when($filters['project_id'], fn ($q, $id) => $q->attributedToProject((int) $id))
             ->when($filters['ticket_id'], fn ($q, $id) => $q->where('ticket_id', $id))
             ->when($filters['from'], fn ($q, $date) => $q->where('date', '>=', $date))
             ->when($filters['to'], fn ($q, $date) => $q->where('date', '<=', $date))
@@ -61,7 +61,7 @@ class TimeEntryController extends Controller
         // stopTimer() normalizes them, so they stay out of the total until then.
         $totalMinutes = TimeEntry::forUser($user->id)
             ->whereNull('timer_started_at')
-            ->when($filters['project_id'], fn ($q, $id) => $q->where('project_id', $id))
+            ->when($filters['project_id'], fn ($q, $id) => $q->attributedToProject((int) $id))
             ->when($filters['ticket_id'], fn ($q, $id) => $q->where('ticket_id', $id))
             ->when($filters['from'], fn ($q, $date) => $q->where('date', '>=', $date))
             ->when($filters['to'], fn ($q, $date) => $q->where('date', '<=', $date))

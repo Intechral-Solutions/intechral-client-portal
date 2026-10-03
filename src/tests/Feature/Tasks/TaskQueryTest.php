@@ -145,7 +145,11 @@ it('never surfaces a ticket-kind or dual-linked row, whoever asks (Q6, INV-13)',
     foreach ($this->actors as $name => $actor) {
         foreach ([TaskQuery::VIEW_MINE, TaskQuery::VIEW_ALL] as $view) {
             $labels = labelsOf($this->world, idsOf((new TaskQuery($actor, $view))->results(anyState($view))));
-            expect($labels)->not->toContain('t1', "{$name} {$view}")->not->toContain('d1', "{$name} {$view}");
+            // Each needle is checked on its own and the diagnostic is the assertion message. The
+            // earlier `->not->toContain('t1', "{$name} {$view}")` passed unless BOTH needles were
+            // present, and the second never is, so it could not fail (EPIC-015 review F4).
+            $leaked = array_values(array_intersect($labels, ['t1', 'd1']));
+            $this->assertSame([], $leaked, "{$name} {$view} must not surface a ticket-kind or dual-linked row");
         }
     }
 

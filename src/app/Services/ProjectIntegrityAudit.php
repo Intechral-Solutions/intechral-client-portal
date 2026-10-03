@@ -48,7 +48,11 @@ class ProjectIntegrityAudit
                         ->whereNotExists(fn ($sub) => $sub->from('tasks')->whereColumn('tasks.id', 'time_entries.task_id'))))
                 ->count(),
 
-            // D4: rows the new rule would now refuse to delete.
+            // D4: rows the new rule would now refuse to delete. This mirrors RecordedTimeGuard, so
+            // it is deliberately CONSERVATIVE: any entry naming the project directly OR through one
+            // of its tasks counts, and a malformed entry naming two projects blocks both. It is NOT
+            // the project-time attribution rule (TimeEntry::scopeAttributedToProject), which counts
+            // an entry under one project; do not "normalize" one to the other (EPIC-015 INV-P3).
             'projects_blocked_from_delete_by_time' => DB::table('projects')
                 ->where(fn ($q) => $q
                     ->whereExists(fn ($sub) => $sub->from('time_entries')->whereColumn('time_entries.project_id', 'projects.id'))
@@ -77,6 +81,25 @@ class ProjectIntegrityAudit
             'tasks_linked_to_project_and_ticket' => DB::table('tasks')
                 ->whereNotNull('project_id')
                 ->whereNotNull('ticket_id')
+                ->count(),
+
+            // EPIC-015 §10.4: a time entry has ONE context. These rows are invalid legacy data; no
+            // write path produces them (TimeEntryController::contextRules makes the keys exclusive).
+            // Project time attributes a row with a task to the TASK's project and ignores its own
+            // project_id (TimeEntry::scopeAttributedToProject), which contains the damage; this
+            // audit keeps each such row visible rather than silently attributed.
+            'time_entries_with_task_and_project' => DB::table('time_entries')
+                ->whereNotNull('task_id')
+                ->whereNotNull('project_id')
+                ->count(),
+
+            // A ticket entry that also names a project or a task. The two time-entry keys MAY
+            // OVERLAP: one row carrying a ticket, a task and a project is counted by both, because
+            // each key reports a different violation (task + project; ticket + another context).
+            // They are deliberately not made mutually exclusive.
+            'time_entries_with_ticket_and_other_context' => DB::table('time_entries')
+                ->whereNotNull('ticket_id')
+                ->where(fn ($other) => $other->whereNotNull('project_id')->orWhereNotNull('task_id'))
                 ->count(),
         ];
     }

@@ -18,7 +18,10 @@ class ProjectBoardController extends Controller
         // task's own column (for the overdue rule), and checklist totals as aggregates, so the
         // query count does not grow with the number of cards.
         $project->load([
+            // The malformed project+ticket row has no valid kind and is not a board card (EPIC-015
+            // §8.4); the row itself is untouched.
             'columns.tasks' => fn ($q) => $q
+                ->ofValidKind()
                 ->with(['assignee:id,name', 'milestone:id,name', 'column'])
                 ->withCount([
                     'checklistItems',

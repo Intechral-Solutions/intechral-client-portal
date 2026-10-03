@@ -31,7 +31,7 @@ class ProjectTaskController extends Controller
     public function show(Project $project, Task $task): Response
     {
         $this->authorize('view', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         // Everything the page renders is loaded up front: the assignee, milestone, and column
         // for the DTO, and each comment's author, so the query count does not grow with the
@@ -118,7 +118,7 @@ class ProjectTaskController extends Controller
     public function update(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('manage', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $data = $request->validate($this->taskRules($project, $task));
 
@@ -130,7 +130,7 @@ class ProjectTaskController extends Controller
     public function destroy(Project $project, Task $task): RedirectResponse
     {
         $this->authorize('manage', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $this->service->deleteTask($task);
 
@@ -142,7 +142,7 @@ class ProjectTaskController extends Controller
     public function move(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('manage', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $data = $request->validate([
             'column_id' => ['required', Rule::exists('project_columns', 'id')->where('project_id', $project->id)],
@@ -160,7 +160,7 @@ class ProjectTaskController extends Controller
     public function storeChecklistItem(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('manage', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $data = $request->validate(['title' => 'required|string|max:255']);
 
@@ -189,7 +189,7 @@ class ProjectTaskController extends Controller
     public function destroyChecklistItem(Project $project, Task $task, int $item): RedirectResponse
     {
         $this->authorize('manage', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $task->checklistItems()->findOrFail($item)->delete();
 
@@ -201,7 +201,7 @@ class ProjectTaskController extends Controller
     public function addComment(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('view', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $data = $request->validate(['body' => 'required|string|max:5000']);
 
@@ -216,7 +216,7 @@ class ProjectTaskController extends Controller
     public function toggleChecklistItem(Request $request, Project $project, Task $task, int $item): RedirectResponse
     {
         $this->authorize('view', $project);
-        abort_unless($task->project_id === $project->id, 404);
+        $this->ensureProjectTask($project, $task);
 
         $data = $request->validate(['completed' => 'sometimes|boolean']);
 
@@ -235,6 +235,18 @@ class ProjectTaskController extends Controller
     }
 
     // ── Private ──────────────────────────────────────────────
+
+    /**
+     * The one backstop for every route that operates on a bound task: it answers 404 unless the
+     * task belongs to the route's project AND has a valid kind. A task linked to both a project and
+     * a ticket is malformed and has no valid product kind (EPIC-015 §8.4), so it is not reachable
+     * through any project-task URL even though its `project_id` matches; the Board hiding it is not
+     * enough. Called after the project authorization, so the order of 403 and 404 is unchanged.
+     */
+    private function ensureProjectTask(Project $project, Task $task): void
+    {
+        abort_unless($task->project_id === $project->id && ! $task->isMalformedKind(), 404);
+    }
 
     /**
      * Fields shared by create and update. Every referenced id must belong to the route's own

@@ -31,27 +31,51 @@ class ProjectService
 
     public function __construct(private RecordedTimeGuard $recordedTime) {}
 
+    /**
+     * Create a project: the row, its default board, the creator's membership, any extra members and
+     * any linked companies, as ONE transaction (EPIC-015 INV-P10, EPIC-014 A1.3.1(2)). A failure
+     * anywhere leaves no project, column, membership or company-link row behind, so every project
+     * that exists has exactly one Done column (INV-8).
+     *
+     * Optional `$data['members']` (`[['user_id' => X, 'role' => 'member|manager'], ...]`) and
+     * `$data['companies']` (company ids) are applied inside the same transaction. Whether the actor
+     * may supply members, and whether the companies are visible to them, is the caller's
+     * authorization and validation (ProjectController::store); this method only persists.
+     *
+     * Nothing leaves the database inside the transaction: no event, queue job, mail or file write.
+     * No lock is taken; nothing here reads a row another request can change.
+     */
     public function create(User $creator, array $data): Project
     {
-        $project = Project::create([
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'created_by' => $creator->id,
-            'start_date' => $data['start_date'] ?? null,
-            'target_date' => $data['target_date'] ?? null,
-            'status' => $data['status'] ?? 'active',
-            'budget' => $data['budget'] ?? null,
-        ]);
+        return DB::transaction(function () use ($creator, $data): Project {
+            $project = Project::create([
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'created_by' => $creator->id,
+                'start_date' => $data['start_date'] ?? null,
+                'target_date' => $data['target_date'] ?? null,
+                'status' => $data['status'] ?? 'active',
+                'budget' => $data['budget'] ?? null,
+            ]);
 
-        // Seed default columns
-        foreach (self::DEFAULT_COLUMNS as $col) {
-            $project->columns()->create($col);
-        }
+            // Seed default columns
+            foreach (self::DEFAULT_COLUMNS as $col) {
+                $project->columns()->create($col);
+            }
 
-        // Add creator as manager
-        $project->members()->attach($creator->id, ['role' => 'manager']);
+            // Add creator as manager
+            $project->members()->attach($creator->id, ['role' => 'manager']);
 
-        return $project;
+            if (! empty($data['members'])) {
+                $this->syncMembers($project, $data['members']);
+            }
+
+            if (! empty($data['companies'])) {
+                $project->companies()->sync($data['companies']);
+            }
+
+            return $project;
+        });
     }
 
     public function syncMembers(Project $project, array $memberData): void

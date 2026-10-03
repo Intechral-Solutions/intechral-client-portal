@@ -20,10 +20,10 @@ class TimeReportController extends Controller
     {
         $filters = $this->filters($request);
 
-        $entries = TimeEntry::with(['user:id,name', 'project:id,name', 'task:id,title'])
+        $entries = TimeEntry::with(['user:id,name', 'project:id,name', 'task:id,title,project_id,ticket_id', 'task.project:id,name'])
             ->whereNull('timer_started_at')
             ->when($filters['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))
-            ->when($filters['project_id'] ?? null, fn ($q, $v) => $q->where('project_id', $v))
+            ->when($filters['project_id'] ?? null, fn ($q, $v) => $q->attributedToProject((int) $v))
             ->when($filters['from'] ?? null, fn ($q, $v) => $q->where('date', '>=', $v))
             ->when($filters['to'] ?? null, fn ($q, $v) => $q->where('date', '<=', $v))
             ->when(isset($filters['billable']), fn ($q) => $q->where('billable', (bool) $filters['billable']))
@@ -35,7 +35,7 @@ class TimeReportController extends Controller
                 'id' => $entry->id,
                 'date' => $entry->date->format('Y-m-d'),
                 'userName' => $entry->user?->name ?? 'Unknown',
-                'projectName' => $entry->project?->name,
+                'projectName' => $entry->attributedProject()?->name,
                 'description' => $entry->description,
                 'durationMinutes' => $entry->duration_minutes,
                 'billable' => $entry->billable,

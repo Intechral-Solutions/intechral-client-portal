@@ -37,7 +37,16 @@ class RecordedTimeGuard
         $this->deleteRestricted($task, 'task');
     }
 
-    /** Refused when time references the project directly or through any of its tasks. */
+    /**
+     * Refused when time references the project directly or through any of its tasks.
+     *
+     * Deliberately conservative, and deliberately NOT the project-time attribution rule
+     * (EPIC-015 §10, `TimeEntry::scopeAttributedToProject`). Reporting asks "which ONE project does
+     * this entry belong to?"; this asks "does ANY row still reference this project?". A malformed
+     * entry carrying a task in project B and a project_id of A is reported under B only, yet it
+     * must block deleting both, so the `project_id` / `task_id` OR below must not be normalized to
+     * the reporting scope. `ProjectIntegrityAudit::projects_blocked_from_delete_by_time` mirrors it.
+     */
     public function deleteProject(Project $project): void
     {
         $hasTime = TimeEntry::where('project_id', $project->id)

@@ -124,6 +124,23 @@ class Task extends Model
         });
     }
 
+    /**
+     * Excludes the one MALFORMED shape: a task linked to both a project and a ticket. That row has
+     * NO valid product kind (EPIC-015 §8.4, owner ruling): it is neither a project task nor a
+     * ticket task, so no project aggregate, board collection, project task list or time
+     * attribution may count it. Everything else (board, standalone, ticket) is valid. The row is
+     * never deleted or migrated; the integrity audit keeps flagging it.
+     *
+     * The single predicate; see `isMalformedKind()` for the per-instance twin. TaskPolicy and
+     * TaskQuery already refuse this row and keep their own (equivalent) checks.
+     */
+    public function scopeOfValidKind(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q) => $q
+            ->whereNull('tasks.project_id')
+            ->orWhereNull('tasks.ticket_id'));
+    }
+
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNot(fn (Builder $q) => $q->done());
@@ -138,6 +155,16 @@ class Task extends Model
     }
 
     // ── Helpers ──────────────────────────────────────────────
+
+    /**
+     * True for the invalid legacy row linked to BOTH a project and a ticket (EPIC-014 INV-13,
+     * EPIC-015 §8.4). It has no valid kind; `kind()` still answers "board" for it and must not be
+     * used to decide whether the row is acceptable. No application path writes it.
+     */
+    public function isMalformedKind(): bool
+    {
+        return $this->project_id !== null && $this->ticket_id !== null;
+    }
 
     /** Which of the three task shapes this row is. */
     public function kind(): string

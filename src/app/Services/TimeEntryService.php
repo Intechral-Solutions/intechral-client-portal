@@ -319,14 +319,20 @@ class TimeEntryService
      */
     public function summaryByProject(array $filters = []): \Illuminate\Support\Collection
     {
+        // One group per ATTRIBUTED project (TimeEntry::attributedProjectIdSql), so an entry sits in
+        // exactly one group and each group equals the `project_id` filter's total. The expression is
+        // aliased `project_id` so the existing `project` relation loads the group's name.
+        $attributed = TimeEntry::attributedProjectIdSql();
+
         $query = TimeEntry::query()
-            ->selectRaw('project_id, SUM(duration_minutes) as total_minutes, SUM(CASE WHEN billable = 1 THEN duration_minutes ELSE 0 END) as billable_minutes')
+            ->joinedToTask()
+            ->selectRaw($attributed.' as project_id, SUM(time_entries.duration_minutes) as total_minutes, SUM(CASE WHEN time_entries.billable = 1 THEN time_entries.duration_minutes ELSE 0 END) as billable_minutes')
             ->with('project:id,name')
-            ->whereNull('timer_started_at');
+            ->whereNull('time_entries.timer_started_at');
 
         $this->applyFilters($query, $filters);
 
-        return $query->groupBy('project_id')->get();
+        return $query->groupByRaw($attributed)->get();
     }
 
     /**
@@ -364,7 +370,7 @@ class TimeEntryService
             escape: '',
         );
 
-        $query = TimeEntry::with(['user:id,name', 'project:id,name', 'task:id,title', 'ticket:id,ticket_number'])
+        $query = TimeEntry::with(['user:id,name', 'project:id,name', 'task:id,title,project_id,ticket_id', 'task.project:id,name', 'ticket:id,ticket_number'])
             ->whereNull('timer_started_at')
             ->orderBy('date')
             ->orderBy('user_id');
@@ -375,7 +381,7 @@ class TimeEntryService
             fputcsv($stream, [
                 $entry->date->format('Y-m-d'),
                 CsvText::safe($entry->user?->name),
-                CsvText::safe($entry->project?->name),
+                CsvText::safe($entry->attributedProject()?->name),
                 CsvText::safe($entry->task?->title),
                 CsvText::safe($entry->ticket?->ticket_number),
                 CsvText::safe($entry->description),
@@ -725,25 +731,26 @@ class TimeEntryService
         }
     }
 
+    /** Columns are table-qualified: the by-project summary joins `tasks` (TimeEntry::scopeJoinedToTask). */
     private function applyFilters($query, array $filters): void
     {
         if (! empty($filters['user_id'])) {
-            $query->where('user_id', $filters['user_id']);
+            $query->where('time_entries.user_id', $filters['user_id']);
         }
         if (! empty($filters['project_id'])) {
-            $query->where('project_id', $filters['project_id']);
+            $query->attributedToProject((int) $filters['project_id']);
         }
         if (! empty($filters['from'])) {
-            $query->where('date', '>=', $filters['from']);
+            $query->where('time_entries.date', '>=', $filters['from']);
         }
         if (! empty($filters['to'])) {
-            $query->where('date', '<=', $filters['to']);
+            $query->where('time_entries.date', '<=', $filters['to']);
         }
         if (isset($filters['billable'])) {
-            $query->where('billable', $filters['billable']);
+            $query->where('time_entries.billable', $filters['billable']);
         }
         if (isset($filters['billed'])) {
-            $query->where('billed', $filters['billed']);
+            $query->where('time_entries.billed', $filters['billed']);
         }
     }
 }
