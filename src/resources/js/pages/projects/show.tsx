@@ -20,6 +20,7 @@ import { layoutPageProps } from '@/lib/inertia-layout';
 import { cn } from '@/lib/utils';
 import { board, edit } from '@/routes/projects';
 import { index as milestonesIndex } from '@/routes/projects/milestones';
+import { index as tasksIndex } from '@/routes/projects/tasks';
 import type { MemberRole, MilestoneItem, ProjectOverviewProps } from '@/types/projects';
 
 /**
@@ -90,8 +91,9 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
  * Task progress and the open/overdue counts. The board column decides "done" on the server; nothing
  * here derives it, and the copy says "tasks", never effort (every task weighs the same).
  *
- * Until WP3 adds the project Tasks list the counts lead to the Board (§11.3.1), and say so: a link
- * that opens the board is never labelled as a task list.
+ * The counts open the project's Tasks tab with the matching filter (§11.3.1, WP3): open tasks with
+ * `completion=open`, overdue ones with `due=overdue` as well, so the list shows what was counted. The
+ * empty state still points at the Board, where tasks are created (P8).
  */
 function TasksSection({
     projectId,
@@ -101,6 +103,7 @@ function TasksSection({
     tasks: ProjectOverviewProps['tasks'];
 }) {
     const boardUrl = board.url(projectId);
+    const tasksUrl = tasksIndex.url(projectId);
 
     if (tasks.total === 0) {
         return (
@@ -129,12 +132,14 @@ function TasksSection({
             label: 'Open',
             value: tasks.open,
             spoken: plural(tasks.open, 'open task', 'open tasks'),
+            href: tasksIndex.url(projectId, { query: { completion: 'open' } }),
         },
         {
             key: 'overdue',
             label: 'Overdue',
             value: tasks.overdue,
             spoken: plural(tasks.overdue, 'overdue task', 'overdue tasks'),
+            href: tasksIndex.url(projectId, { query: { completion: 'open', due: 'overdue' } }),
         },
     ];
 
@@ -142,8 +147,8 @@ function TasksSection({
         <Section
             title="Tasks"
             actions={
-                <Link href={boardUrl} className={linkClass}>
-                    Open board
+                <Link href={tasksUrl} className={linkClass}>
+                    View tasks
                 </Link>
             }
         >
@@ -185,11 +190,11 @@ function TasksSection({
                             >
                                 {figure.value}
                             </dd>
-                            <p className="text-xs text-text-secondary">On the board</p>
+                            <p className="text-xs text-text-secondary">View in Tasks</p>
                             <Link
-                                href={boardUrl}
+                                href={figure.href}
                                 className="absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-                                aria-label={`${figure.spoken}: open the board`}
+                                aria-label={`${figure.spoken}: view in Tasks`}
                             />
                         </div>
                     ))}

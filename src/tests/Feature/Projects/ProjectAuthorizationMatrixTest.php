@@ -87,6 +87,8 @@ function projectMatrixExpectations(): array
         'projects.milestones.complete' => MATRIX_MANAGE_ROUTE,
         'projects.milestones.reopen' => MATRIX_MANAGE_ROUTE,
         'projects.tasks.show' => MATRIX_VIEW,
+        // EPIC-015 WP3 (§7, §11.2): the project Tasks tab is ProjectPolicy::view, like the Board.
+        'projects.tasks.index' => MATRIX_VIEW,
         'projects.tasks.store' => MATRIX_MANAGE_POLICY,
         'projects.tasks.update' => MATRIX_MANAGE_POLICY,
         'projects.tasks.destroy' => MATRIX_MANAGE_POLICY,
@@ -147,6 +149,7 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
         'projects.milestones.complete' => $test->put(route('projects.milestones.complete', [$p, $ctx->milestone])),
         'projects.milestones.reopen' => $test->put(route('projects.milestones.reopen', [$p, $ctx->milestone])),
         'projects.tasks.show' => $test->get(route('projects.tasks.show', [$p, $ctx->task])),
+        'projects.tasks.index' => $test->get(route('projects.tasks.index', $p)),
         'projects.tasks.store' => $test->post(route('projects.tasks.store', $p), [
             'column_id' => $ctx->todo->id, 'title' => 'Matrix task', 'priority' => 'low',
         ]),

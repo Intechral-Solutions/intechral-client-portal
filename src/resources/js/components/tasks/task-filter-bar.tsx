@@ -34,17 +34,17 @@ type Props = {
     onClear: () => void;
 };
 
-const ORDERS = [
+export const ORDERS = [
     { value: 'asc', label: 'Ascending' },
     { value: 'desc', label: 'Descending' },
 ] as const;
 
-const SEARCH_LIMIT = 100;
+export const SEARCH_LIMIT = 100;
 
 type Named = { id: number; name: string };
 
 /** The options for an id-valued select, plus a type-only entry when the active id has no label. */
-function idOptions(options: Named[], active: number | null, unlabeled: string) {
+export function idOptions(options: Named[], active: number | null, unlabeled: string) {
     const known = active === null || options.some((option) => option.id === active);
 
     return (
@@ -59,7 +59,7 @@ function idOptions(options: Named[], active: number | null, unlabeled: string) {
     );
 }
 
-const asId = (value: string) => (value === '' ? null : Number(value));
+export const asId = (value: string) => (value === '' ? null : Number(value));
 
 export function TaskFilterBar({ view, filters, filterOptions, sort, onChange, onClear }: Props) {
     const label = <T extends string>(options: { value: T; label: string }[], value: T) =>

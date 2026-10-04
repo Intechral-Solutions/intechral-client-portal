@@ -171,3 +171,40 @@ export type StandaloneTaskAbilities = {
 export type StandaloneTaskOptions = TaskFormOptions & {
     assignees: { self: UserRef };
 };
+
+// ── Project Tasks tab (EPIC-015 §13) ───────────────────────────────────────
+
+/** A milestone as a project task row names it: id and name only (EPIC-015 §13.3). */
+export type TaskMilestoneRef = { id: number; name: string };
+
+/**
+ * One row of a project's Tasks tab: the canonical `TaskRow` plus the task's milestone, which only
+ * project scope carries (EPIC-015 P4), so the global list's DTO is unchanged.
+ */
+export type ProjectTaskRow = TaskRow & { milestone: TaskMilestoneRef | null };
+
+/**
+ * The project tab's URL state as the server normalized it (EPIC-015 §13.2): the global vocabulary
+ * without `kind`, `project` and `organization` (the project is fixed). `milestone` is always one of
+ * the project's own; `assignee` is any well-formed id or `none`, applied only as a narrowing filter.
+ */
+export type ProjectTaskFilters = Pick<
+    TaskListFilters,
+    'completion' | 'priority' | 'due' | 'milestone' | 'assignee' | 'q'
+>;
+
+/** The global sorts plus the project-only board order (column, then position). */
+export type ProjectTaskSort = {
+    by: TaskListSort['by'] | 'board';
+    dir: TaskListSort['dir'];
+};
+
+/** Server-named vocabulary and options for the project tab, each drawn from the project. */
+export type ProjectTaskFilterOptions = Pick<
+    TaskFilterOptions,
+    'completion' | 'priorities' | 'due'
+> & {
+    sorts: Labelled<ProjectTaskSort['by']>[];
+    milestones: NamedOption[];
+    assignees: NamedOption[];
+};

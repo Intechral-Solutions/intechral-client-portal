@@ -25,6 +25,7 @@ use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\ProjectTaskController;
+use App\Http\Controllers\ProjectTaskListController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
@@ -141,7 +142,9 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
     // authority, so this route deliberately has no can:projects.manage middleware.
     Route::put('/{project}/members', [ProjectController::class, 'syncMembers'])->name('members.sync');
 
-    // Tasks (nested under project)
+    // Tasks (nested under project). The list is the project Tasks tab (EPIC-015 §13); creating a
+    // task stays the Board's quick-add (P8), on the POST below.
+    Route::get('/{project}/tasks', [ProjectTaskListController::class, 'index'])->name('tasks.index');
     Route::post('/{project}/tasks', [ProjectTaskController::class, 'store'])->name('tasks.store');
     Route::get('/{project}/tasks/{task}', [ProjectTaskController::class, 'show'])->name('tasks.show');
     Route::put('/{project}/tasks/{task}', [ProjectTaskController::class, 'update'])->name('tasks.update');

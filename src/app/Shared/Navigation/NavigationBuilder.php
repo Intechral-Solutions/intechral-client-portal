@@ -119,6 +119,7 @@ final class NavigationBuilder
                     'projects.create',
                     'projects.edit',
                     'projects.milestones.index',
+                    'projects.tasks.index',
                     'projects.tasks.show',
                 ]),
             ]),

@@ -1,5 +1,16 @@
-import { taskListClearedQuery, taskListQuery } from '@/components/tasks/task-list-query';
-import type { TaskListFilters, TaskListSort, TaskView } from '@/types/tasks';
+import {
+    projectTaskListClearedQuery,
+    projectTaskListQuery,
+    taskListClearedQuery,
+    taskListQuery,
+} from '@/components/tasks/task-list-query';
+import type {
+    ProjectTaskFilters,
+    ProjectTaskSort,
+    TaskListFilters,
+    TaskListSort,
+    TaskView,
+} from '@/types/tasks';
 
 /**
  * EPIC-014 WP4 — how a control change becomes the next `/tasks` query. The server is the only filter
@@ -135,5 +146,59 @@ describe('taskListQuery', () => {
                 sort: { by: 'title', dir: 'desc' },
             }),
         ).toEqual({ view: 'all', sort: 'title', dir: 'desc' });
+    });
+});
+
+describe('the project Tasks tab grammar (EPIC-015 §13.2)', () => {
+    const empty: ProjectTaskFilters = {
+        completion: 'open',
+        priority: [],
+        due: null,
+        milestone: null,
+        assignee: null,
+        q: '',
+    };
+    const pq = (patch = {}, filters: Partial<ProjectTaskFilters> = {}, sort?: ProjectTaskSort) =>
+        projectTaskListQuery(
+            { filters: { ...empty, ...filters }, sort: sort ?? { by: 'due', dir: 'asc' } },
+            patch,
+        );
+
+    it('omits every default, and never writes a view, project, kind or organization', () => {
+        expect(pq()).toEqual({});
+        expect(pq({ completion: 'any' })).toEqual({ completion: 'any' });
+    });
+
+    it('sends a milestone on its own, because the project is the route’s', () => {
+        expect(pq({ milestone: 31 })).toEqual({ milestone: 31 });
+        expect(pq({ milestone: null }, { milestone: 31 })).toEqual({});
+    });
+
+    it('keeps the other active filters through one change', () => {
+        expect(pq({ due: 'overdue' }, { assignee: 'none', priority: ['high'], q: 'docs' })).toEqual(
+            {
+                assignee: 'none',
+                priority: ['high'],
+                q: 'docs',
+                due: 'overdue',
+            },
+        );
+    });
+
+    it('names the board sort and lets the server pick a new sort’s direction', () => {
+        expect(pq({ sort: 'board' })).toEqual({ sort: 'board' });
+        expect(pq({ dir: 'desc' }, {}, { by: 'board', dir: 'asc' })).toEqual({
+            sort: 'board',
+            dir: 'desc',
+        });
+    });
+
+    it('clears every filter and the search but keeps the sort', () => {
+        expect(
+            projectTaskListClearedQuery({
+                filters: { ...empty, milestone: 31, assignee: 6, due: 'today', q: 'x' },
+                sort: { by: 'board', dir: 'asc' },
+            }),
+        ).toEqual({ sort: 'board', dir: 'asc' });
     });
 });
