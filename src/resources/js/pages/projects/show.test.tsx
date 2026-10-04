@@ -81,21 +81,28 @@ describe('the Direction D entity grammar', () => {
         expect(container.querySelector('[data-page-frame="grid"]')).not.toBeNull();
     });
 
-    it('carries the project navigation as page links, Overview current, no Tasks yet', () => {
+    // FLIPPED IN EPIC-015 WP3: WP2 pinned "Overview · Board · Milestones, no Tasks yet"; WP3 adds
+    // the Tasks tab (§11.3.1), so the strip is the final four.
+    it('carries the project navigation as page links, Overview current, all four tabs', () => {
         renderPage();
 
         const nav = screen.getByRole('navigation', { name: 'Project' });
         expect(
             within(nav)
                 .getAllByRole('link')
-                .map((link) => link.textContent),
-        ).toEqual(['Overview', 'Board', 'Milestones']);
+                .map((link) => [link.textContent, link.getAttribute('href')]),
+        ).toEqual([
+            ['Overview', '/projects/7'],
+            ['Board', '/projects/7/board'],
+            ['Tasks', '/projects/7/tasks'],
+            ['Milestones', '/projects/7/milestones'],
+        ]);
         expect(within(nav).getByRole('link', { name: 'Overview' })).toHaveAttribute(
             'aria-current',
             'page',
         );
         expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-        expect(screen.queryByRole('link', { name: /^tasks$/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     });
 
     it('draws no breadcrumb of its own', () => {
@@ -296,24 +303,27 @@ describe('task progress and summary', () => {
         expect(within(section('Tasks')).getByText('41%')).toBeInTheDocument();
     });
 
-    it('shows open and overdue counts that lead to the Board, and say so, before WP3', () => {
+    // FLIPPED IN EPIC-015 WP3: WP2 sent both counts and "Open board" to the Board (§11.3.1), and
+    // pinned that nothing pointed at /tasks. WP3 retargets them to the project Tasks tab with the
+    // filter that matches what was counted; the empty state's explicit "Open board" stays (P8).
+    it('shows open and overdue counts that open the filtered project Tasks tab', () => {
         renderPage();
 
         const tasks = section('Tasks');
-        const open = within(tasks).getByRole('link', { name: '6 open tasks: open the board' });
+        const open = within(tasks).getByRole('link', { name: '6 open tasks: view in Tasks' });
         const overdue = within(tasks).getByRole('link', {
-            name: '2 overdue tasks: open the board',
+            name: '2 overdue tasks: view in Tasks',
         });
 
-        expect(open).toHaveAttribute('href', '/projects/7/board');
-        expect(overdue).toHaveAttribute('href', '/projects/7/board');
-        expect(within(tasks).getByRole('link', { name: 'Open board' })).toHaveAttribute(
+        expect(open).toHaveAttribute('href', '/projects/7/tasks?completion=open');
+        expect(overdue).toHaveAttribute('href', '/projects/7/tasks?completion=open&due=overdue');
+        expect(within(tasks).getByRole('link', { name: 'View tasks' })).toHaveAttribute(
             'href',
-            '/projects/7/board',
+            '/projects/7/tasks',
         );
-        // Nothing points at the not-yet-existing project Tasks route or calls the board a task list.
-        expect(tasks.querySelector('a[href*="/tasks"]')).toBeNull();
-        expect(within(tasks).queryByText(/task list/i)).not.toBeInTheDocument();
+        // A link that opens the task list is never labelled as the board.
+        expect(tasks.querySelector('a[href$="/board"]')).toBeNull();
+        expect(within(tasks).queryByText(/board/i)).not.toBeInTheDocument();
     });
 
     it('marks overdue in danger only when there is overdue work', () => {

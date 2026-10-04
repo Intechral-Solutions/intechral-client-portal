@@ -49,4 +49,45 @@ final class TaskListPresenter
             'abilities' => $abilities->of($task),
         ];
     }
+
+    /**
+     * A project Tasks tab row (EPIC-015 §13.3): the canonical row plus the task's milestone, which
+     * only project scope carries (P4), so the global list's DTO is unchanged. `TaskQuery::forProject`
+     * eager loads `milestone:id,name`; names only.
+     *
+     * @return array<string, mixed>
+     */
+    public static function projectRow(Task $task, TaskRowAbilities $abilities): array
+    {
+        return [
+            ...self::row($task, $abilities),
+            'milestone' => $task->milestone ? ['id' => $task->milestone->id, 'name' => $task->milestone->name] : null,
+        ];
+    }
+
+    /**
+     * The list's server-named filter and sort vocabulary (INV-19), in control order. The project tab
+     * uses the same labels for the parameters it shares, so the two lists never name a value apart.
+     *
+     * @return array{completion: list<array{value: string, label: string}>, priorities: list<array{value: string, label: string}>, due: list<array{value: string, label: string}>, kinds: list<array{value: string, label: string}>, sorts: list<array{value: string, label: string}>}
+     */
+    public static function vocabulary(): array
+    {
+        return [
+            'completion' => self::labelled(['open' => 'Open', 'done' => 'Done', 'any' => 'Any']),
+            'priorities' => self::labelled(array_combine(Task::PRIORITIES, array_map('ucfirst', Task::PRIORITIES))),
+            'due' => self::labelled(['overdue' => 'Overdue', 'today' => 'Due today', 'next7' => 'Next 7 days', 'none' => 'No due date']),
+            'kinds' => self::labelled(['project' => 'Project', 'standalone' => 'Standalone']),
+            'sorts' => self::labelled(['due' => 'Due date', 'priority' => 'Priority', 'title' => 'Title', 'updated' => 'Last updated', 'created' => 'Created']),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $labels  value => label
+     * @return list<array{value: string, label: string}>
+     */
+    private static function labelled(array $labels): array
+    {
+        return array_map(fn (string $value, string $label) => ['value' => $value, 'label' => $label], array_keys($labels), $labels);
+    }
 }

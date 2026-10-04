@@ -372,3 +372,97 @@ it('derives index-shaped health for a page of projects without a query per proje
         ->and(collect($page()->items())->pluck('reasons.0.earliest')->unique()->all())->toBe([null])
         ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "index health queries: 3={$small}, 30={$large}");
 });
+
+/*
+ * EPIC-015 WP3 (§17): the project Tasks tab costs a constant number of queries per request shape as
+ * the project grows. Each step adds a member who is assigned work, a milestone, open/overdue/done
+ * tasks on it, an unassigned task, a malformed project+ticket row and a task in another project, so a
+ * per-row milestone, assignee, ability or option query would show.
+ */
+function growProjectTasksWorld(Project $project, Project $elsewhere, int $n): void
+{
+    static $step = 0;
+
+    for ($i = 0; $i < $n; $i++, $step++) {
+        $person = makeUser('user', ['name' => "Assignee {$step}"]);
+        $project->members()->attach($person->id, ['role' => 'member']);
+        $milestone = $project->milestones()->create(['name' => "Milestone {$step}", 'due_date' => today()->addDays($step % 9)]);
+        makeTask($project->columns[$step % 4], ['title' => "Budget open {$step}", 'assignee_id' => $person->id, 'milestone_id' => $milestone->id, 'priority' => 'high', 'position' => 100 + $step]);
+        makeTask($project->columns[1], ['title' => "Budget overdue {$step}", 'assignee_id' => $person->id, 'milestone_id' => $milestone->id, 'due_date' => today()->subDay(), 'position' => 200 + $step]);
+        makeTask($project->columns[4], ['title' => "Budget done {$step}", 'assignee_id' => $person->id, 'milestone_id' => $milestone->id, 'position' => 300 + $step]);
+        makeTask($project->columns[0], ['title' => "Budget loose {$step}", 'position' => 400 + $step]);
+        makeTask($project->columns[1], ['title' => "Budget malformed {$step}", 'assignee_id' => $person->id, 'ticket_id' => Ticket::factory()->create()->id, 'position' => 500 + $step]);
+        makeTask($elsewhere->columns[1], ['title' => "Budget elsewhere {$step}", 'assignee_id' => $person->id]);
+    }
+}
+
+it('keeps the project Tasks tab constant as tasks, milestones and assignees grow (WP3)', function (string $who, array $query) {
+    $owner = makeUser('operator');
+    $project = makeProject($owner, 'Tasks tab budget');
+    $elsewhere = makeProject($owner, 'Elsewhere');
+    $firstMilestone = $project->milestones()->create(['name' => 'First', 'due_date' => today()]);
+    $assignee = makeUser('user', ['name' => 'Fixed assignee']);
+    $project->members()->attach($assignee->id, ['role' => 'member']);
+    makeTask($project->columns[1], ['title' => 'Budget seed', 'assignee_id' => $assignee->id, 'milestone_id' => $firstMilestone->id]);
+    $viewer = match ($who) {
+        'operator' => $owner,
+        'project manager' => projectActor('project_manager', $project),
+        'customer member' => projectActor('member', $project),
+    };
+    $query = array_map(fn ($value) => match ($value) {
+        '@milestone' => $firstMilestone->id,
+        '@assignee' => $assignee->id,
+        default => $value,
+    }, $query);
+    $request = fn () => $this->actingAs(User::findOrFail($viewer->id))
+        ->get(route('projects.tasks.index', $project).'?'.http_build_query($query))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    growProjectTasksWorld($project, $elsewhere, 3);
+    $small = warmQueries($request);
+    $smallProps = $request();
+    growProjectTasksWorld($project, $elsewhere, 27);
+    $large = warmQueries($request);
+    $largeProps = $request();
+
+    // The world really grew, so the comparison is not vacuous.
+    expect(count($largeProps['filterOptions']['milestones']))->toBe(count($smallProps['filterOptions']['milestones']) + 27)
+        ->and(count($largeProps['filterOptions']['assignees']))->toBe(count($smallProps['filterOptions']['assignees']) + 27)
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "project tasks {$who} ".json_encode($query).": small={$small}, large={$large}");
+})->with([
+    'customer member, default' => ['customer member', []],
+    'project manager, default (assignment candidates)' => ['project manager', []],
+    'operator, every completion' => ['operator', ['completion' => 'any']],
+    'customer member, milestone' => ['customer member', ['milestone' => '@milestone', 'completion' => 'any']],
+    'customer member, assignee' => ['customer member', ['assignee' => '@assignee']],
+    'customer member, unassigned' => ['customer member', ['assignee' => 'none']],
+    'project manager, priority/due' => ['project manager', ['priority' => ['high'], 'due' => 'overdue']],
+    'customer member, search + board sort' => ['customer member', ['q' => 'Budget', 'sort' => 'board', 'dir' => 'desc']],
+    'customer member, no match' => ['customer member', ['q' => 'zzz-nothing']],
+]);
+
+it('keeps the global Tasks list free of milestone data: project scope alone loads it (WP3, P4)', function () {
+    $owner = makeUser('operator');
+    $member = makeUser('user');
+    $member->givePermissionTo('tasks.view_all');
+    $project = makeProject($owner, 'Global budget');
+    $project->members()->attach($member->id, ['role' => 'member']);
+    $milestone = $project->milestones()->create(['name' => 'Global milestone', 'due_date' => today()]);
+    foreach (range(1, 5) as $i) {
+        makeTask($project->columns[1], ['title' => "Global {$i}", 'assignee_id' => $member->id, 'milestone_id' => $milestone->id, 'position' => $i]);
+    }
+
+    foreach ([[], ['view' => 'all'], ['view' => 'all', 'completion' => 'any', 'q' => 'Global']] as $query) {
+        $request = fn () => $this->actingAs($member)->get(route('tasks.index', $query))->assertOk();
+        $request();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $props = $request()->viewData('page')['props'];
+        $sql = collect(DB::getQueryLog())->pluck('query')->implode("\n");
+        DB::disableQueryLog();
+
+        expect($sql)->not->toContain('project_milestones')
+            ->and(array_key_exists('milestone', $props['tasks']['data'][0]))->toBeFalse(json_encode($query));
+    }
+});

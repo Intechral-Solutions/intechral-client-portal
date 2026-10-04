@@ -547,6 +547,9 @@ it('keeps an item active on the nested routes that belong to it', function () {
         ->toBe(['projects', 'projects.all'])
         ->and(navigationActiveKeysDeep(navigationFor($operator, 'projects.milestones.index', ['project' => 1])))
         ->toBe(['projects', 'projects.all'])
+        // EPIC-015 WP3 (§11.3): the project Tasks tab is a project route, never the Tasks workspace's.
+        ->and(navigationActiveKeysDeep(navigationFor($operator, 'projects.tasks.index', ['project' => 1])))
+        ->toBe(['projects', 'projects.all'])
         ->and(navigationActiveKeysDeep(navigationFor($operator, 'tickets.create')))
         ->toBe(['helpdesk', 'helpdesk.requests'])
         ->and(navigationActiveKeysDeep(navigationFor($operator, 'roles.edit', ['role' => 1])))

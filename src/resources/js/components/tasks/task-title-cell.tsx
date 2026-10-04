@@ -22,7 +22,16 @@ const sourceTag: Record<TaskRow['kind'], string> = { board: 'Board', standalone:
  *
  * Done-ness is the row's job (muted text); this cell inherits the colour and adds no strike-through.
  */
-export function TaskTitleCell({ task, running = false }: { task: TaskRow; running?: boolean }) {
+export function TaskTitleCell({
+    task,
+    running = false,
+    showSource = true,
+}: {
+    task: TaskRow;
+    running?: boolean;
+    /** Off in a project's Tasks tab, where every row is a board task and the tag says nothing. */
+    showSource?: boolean;
+}) {
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 max-md:flex-nowrap">
             {task.url ? (
@@ -44,7 +53,7 @@ export function TaskTitleCell({ task, running = false }: { task: TaskRow; runnin
                     {task.title}
                 </span>
             )}
-            <Tag className="shrink-0">{sourceTag[task.kind]}</Tag>
+            {showSource ? <Tag className="shrink-0">{sourceTag[task.kind]}</Tag> : null}
             {running ? (
                 <Status tone="live" className="shrink-0 whitespace-nowrap">
                     Timer running

@@ -11,7 +11,7 @@ import { DataTable, type DataTableColumn, type DataTableHandle } from '@/compone
 import { Status } from '@/components/ui/status';
 import { formatDate } from '@/lib/dates';
 import type { TaskPriority } from '@/types/projects';
-import type { TaskAssigneeOptions, TaskRow } from '@/types/tasks';
+import type { TaskAssigneeOptions, TaskMilestoneRef, TaskRow } from '@/types/tasks';
 
 /**
  * EPIC-014 WP4 — the Tasks list's `DataTable` (§14.1): Complete ring · Task (title + source tag) ·
@@ -24,8 +24,38 @@ import type { TaskAssigneeOptions, TaskRow } from '@/types/tasks';
  * viewer assign (`abilities.assign`) draws the assignee as a compact control, the mark alone at S, so the
  * band does not grow (EPIC-014 R6); any other row keeps the assignee for assistive technology only
  * (`detail`), as before.
+ *
+ * In a project's Tasks tab (`scope="project"`, EPIC-015 §13.3) every row belongs to the page's project,
+ * so the Context column and the source tag would repeat it on every row: the milestone takes the
+ * Context column's place, including its flexible slot in the second band at S, so the row stays two
+ * bands.
  */
-function DueCell({ task }: { task: TaskRow }) {
+type Row = TaskRow & { milestone?: TaskMilestoneRef | null };
+
+function MilestoneCell({ task }: { task: Row }) {
+    if (!task.milestone) {
+        return (
+            <span data-cell="milestone" className="text-text-muted">
+                <span className="sr-only">No milestone</span>
+                <span aria-hidden="true">—</span>
+            </span>
+        );
+    }
+
+    // The leading word is for assistive technology at S, where the column header is hidden.
+    return (
+        <span
+            data-cell="milestone"
+            title={task.milestone.name}
+            className="break-words text-text-secondary"
+        >
+            <span className="sr-only">Milestone: </span>
+            {task.milestone.name}
+        </span>
+    );
+}
+
+function DueCell({ task }: { task: Row }) {
     if (!task.dueDate) {
         return (
             <span data-cell="due" className="text-text-muted">
@@ -60,6 +90,7 @@ function DueCell({ task }: { task: TaskRow }) {
 
 export function TaskTable({
     tasks,
+    scope = 'workspace',
     priorityLabels,
     runningTaskIds,
     pendingIds,
@@ -71,7 +102,9 @@ export function TaskTable({
     selection,
     ref,
 }: {
-    tasks: readonly TaskRow[];
+    tasks: readonly Row[];
+    /** `project`: a project's Tasks tab, with Milestone in place of Context (EPIC-015 §13.3). */
+    scope?: 'workspace' | 'project';
     /** Server-named priority labels (INV-19), by value. */
     priorityLabels: Record<TaskPriority, string>;
     runningTaskIds: ReadonlySet<number>;
@@ -86,7 +119,33 @@ export function TaskTable({
     selection?: { selected: ReadonlySet<number>; onChange: (next: Set<number>) => void };
     ref?: Ref<DataTableHandle<number>>;
 }) {
-    const columns: DataTableColumn<TaskRow>[] = [
+    // At S the context (or, in project scope, the milestone) is the flexible item of the second band:
+    // it takes what the status, priority and due date leave and truncates, so a long name never
+    // claims a line of its own (D9: two lines).
+    const flexible =
+        'max-md:min-w-0 max-md:shrink max-md:grow max-md:basis-0 max-md:truncate max-md:px-0';
+
+    const contextColumn: DataTableColumn<Row> =
+        scope === 'project'
+            ? {
+                  id: 'milestone',
+                  header: 'Milestone',
+                  className: flexible,
+                  cell: (task) => <MilestoneCell task={task} />,
+              }
+            : {
+                  id: 'context',
+                  header: 'Context',
+                  className: flexible,
+                  cell: (task) => (
+                      <TaskContextLink
+                          context={task.context}
+                          className="text-text-secondary hover:underline"
+                      />
+                  ),
+              };
+
+    const columns: DataTableColumn<Row>[] = [
         {
             id: 'complete',
             header: 'Complete',
@@ -106,7 +165,13 @@ export function TaskTable({
             header: 'Task',
             area: 'title',
             className: 'min-w-0 md:w-[40%]',
-            cell: (task) => <TaskTitleCell task={task} running={runningTaskIds.has(task.id)} />,
+            cell: (task) => (
+                <TaskTitleCell
+                    task={task}
+                    running={runningTaskIds.has(task.id)}
+                    showSource={scope !== 'project'}
+                />
+            ),
         },
         {
             id: 'status',
@@ -135,21 +200,7 @@ export function TaskTable({
                 />
             ),
         },
-        {
-            id: 'context',
-            header: 'Context',
-            // At S the context is the flexible item of the second band: it takes what the status,
-            // priority and due date leave and truncates, so a long project name never claims a
-            // line of its own (D9: two lines).
-            className:
-                'max-md:min-w-0 max-md:shrink max-md:grow max-md:basis-0 max-md:truncate max-md:px-0',
-            cell: (task) => (
-                <TaskContextLink
-                    context={task.context}
-                    className="text-text-secondary hover:underline"
-                />
-            ),
-        },
+        contextColumn,
         {
             id: 'assignee',
             header: 'Assignee',
@@ -182,14 +233,14 @@ export function TaskTable({
     ];
 
     /** The one place Complete/Reopen availability for a keyboard press is decided: the row's abilities. */
-    function toggleFromKey(task: TaskRow) {
+    function toggleFromKey(task: Row) {
         const allowed = task.status.done ? task.abilities.reopen : task.abilities.complete;
 
         if (allowed && !pendingIds.has(task.id)) onToggle(task);
     }
 
     return (
-        <DataTable<TaskRow, number>
+        <DataTable<Row, number>
             ref={ref}
             label="Tasks"
             columns={columns}

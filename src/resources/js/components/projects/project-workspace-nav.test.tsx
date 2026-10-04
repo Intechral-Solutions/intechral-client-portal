@@ -8,26 +8,31 @@ function links() {
     return within(screen.getByRole('navigation', { name: 'Project' })).getAllByRole('link');
 }
 
-it('offers exactly the WP2 destinations that exist: Overview, Board, Milestones', () => {
+// FLIPPED IN EPIC-015 WP3: WP2 pinned Overview · Board · Milestones and no Tasks tab (§11.3.1). WP3
+// adds projects.tasks.index, so the strip is the final Overview · Board · Tasks · Milestones.
+it('offers the final four destinations in order: Overview, Board, Tasks, Milestones', () => {
     render(<ProjectWorkspaceNav projectId={7} current="overview" />);
 
     expect(links().map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
         ['Overview', '/projects/7'],
         ['Board', '/projects/7/board'],
+        ['Tasks', '/projects/7/tasks'],
         ['Milestones', '/projects/7/milestones'],
     ]);
 });
 
-it('has no Tasks tab before WP3 adds projects.tasks.index (§11.3.1)', () => {
-    render(<ProjectWorkspaceNav projectId={7} current="overview" />);
+it('is page navigation, not an ARIA tab widget', () => {
+    render(<ProjectWorkspaceNav projectId={7} current="tasks" />);
 
-    expect(screen.queryByRole('link', { name: /tasks/i })).not.toBeInTheDocument();
-    expect(links().some((link) => link.getAttribute('href') === '/projects/7/tasks')).toBe(false);
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(links().every((link) => !link.hasAttribute('aria-selected'))).toBe(true);
 });
 
 it.each([
     ['overview', 'Overview'],
     ['board', 'Board'],
+    ['tasks', 'Tasks'],
     ['milestones', 'Milestones'],
 ] as const)('marks %s as the current page', (current, label) => {
     render(<ProjectWorkspaceNav projectId={7} current={current} />);

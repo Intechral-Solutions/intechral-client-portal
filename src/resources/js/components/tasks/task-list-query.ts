@@ -1,4 +1,10 @@
-import type { TaskListFilters, TaskListSort, TaskView } from '@/types/tasks';
+import type {
+    ProjectTaskFilters,
+    ProjectTaskSort,
+    TaskListFilters,
+    TaskListSort,
+    TaskView,
+} from '@/types/tasks';
 
 /**
  * EPIC-014 WP4 — how a control change becomes the next `/tasks` request.
@@ -102,10 +108,84 @@ function compact(
     if (filters.organization !== null) query.organization = filters.organization;
     if (filters.q !== '') query.q = filters.q;
 
+    return withSort(query, by, dir);
+}
+
+/** The default sort (due date, ascending) is left out of the URL; anything else names both parts. */
+function withSort(
+    query: TaskListQuery,
+    by: ProjectTaskSort['by'],
+    dir: TaskListSort['dir'] | undefined,
+): TaskListQuery {
     if (by !== 'due' || (dir !== undefined && dir !== 'asc')) {
         query.sort = by;
         if (dir !== undefined) query.dir = dir;
     }
 
     return query;
+}
+
+// ── Project Tasks tab (EPIC-015 §13.2) ─────────────────────────────────────
+
+/**
+ * The same request grammar for a project's Tasks tab. The project is the route's, so no `project`,
+ * `kind`, `organization` or `view` parameter is ever written; a milestone is one of the project's own
+ * and is sent on its own.
+ */
+export type ProjectTaskListState = {
+    filters: ProjectTaskFilters;
+    sort: ProjectTaskSort;
+};
+
+export type ProjectTaskListPatch = Pick<
+    TaskListPatch,
+    'completion' | 'priority' | 'due' | 'milestone' | 'assignee' | 'q' | 'dir'
+> & {
+    sort?: ProjectTaskSort['by'];
+};
+
+export function projectTaskListQuery(
+    state: ProjectTaskListState,
+    patch: ProjectTaskListPatch,
+): TaskListQuery {
+    const filters: ProjectTaskFilters = {
+        ...state.filters,
+        ...(patch.completion !== undefined && { completion: patch.completion }),
+        ...(patch.priority !== undefined && { priority: patch.priority }),
+        ...(patch.due !== undefined && { due: patch.due }),
+        ...(patch.milestone !== undefined && { milestone: patch.milestone }),
+        ...(patch.assignee !== undefined && { assignee: patch.assignee }),
+        ...(patch.q !== undefined && { q: patch.q }),
+    };
+
+    const by = patch.sort ?? state.sort.by;
+    const dir = patch.dir ?? (by === state.sort.by ? state.sort.dir : undefined);
+
+    return compactProject(filters, by, dir);
+}
+
+/** Every filter and the search off; the sort stays (it is not a filter). */
+export function projectTaskListClearedQuery(state: ProjectTaskListState): TaskListQuery {
+    return compactProject(
+        { completion: 'open', priority: [], due: null, milestone: null, assignee: null, q: '' },
+        state.sort.by,
+        state.sort.dir,
+    );
+}
+
+function compactProject(
+    filters: ProjectTaskFilters,
+    by: ProjectTaskSort['by'],
+    dir: TaskListSort['dir'] | undefined,
+): TaskListQuery {
+    const query: TaskListQuery = {};
+
+    if (filters.completion !== 'open') query.completion = filters.completion;
+    if (filters.priority.length > 0) query.priority = filters.priority;
+    if (filters.due) query.due = filters.due;
+    if (filters.milestone !== null) query.milestone = filters.milestone;
+    if (filters.assignee !== null) query.assignee = filters.assignee;
+    if (filters.q !== '') query.q = filters.q;
+
+    return withSort(query, by, dir);
 }

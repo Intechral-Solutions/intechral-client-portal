@@ -70,11 +70,7 @@ class TaskController extends Controller
             'view' => $view,
             'filters' => $state->filters(),
             'filterOptions' => [
-                'completion' => self::labelled(['open' => 'Open', 'done' => 'Done', 'any' => 'Any']),
-                'priorities' => self::labelled(array_combine(Task::PRIORITIES, array_map('ucfirst', Task::PRIORITIES))),
-                'due' => self::labelled(['overdue' => 'Overdue', 'today' => 'Due today', 'next7' => 'Next 7 days', 'none' => 'No due date']),
-                'kinds' => self::labelled(['project' => 'Project', 'standalone' => 'Standalone']),
-                'sorts' => self::labelled(['due' => 'Due date', 'priority' => 'Priority', 'title' => 'Title', 'updated' => 'Last updated', 'created' => 'Created']),
+                ...TaskListPresenter::vocabulary(),
                 ...$options,
             ],
             'sort' => $state->sort(),
@@ -313,17 +309,6 @@ class TaskController extends Controller
                 ->values()
                 ->all(),
         ];
-    }
-
-    /**
-     * Server-named vocabulary (INV-19), in the order the filter controls offer it.
-     *
-     * @param  array<string, string>  $labels  value => label
-     * @return array<int, array{value: string, label: string}>
-     */
-    private static function labelled(array $labels): array
-    {
-        return array_map(fn (string $value, string $label) => ['value' => $value, 'label' => $label], array_keys($labels), $labels);
     }
 
     /**

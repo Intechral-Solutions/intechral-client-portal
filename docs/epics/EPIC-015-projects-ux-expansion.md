@@ -1,6 +1,6 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 is implemented; independent review passed (safe to commit)** ([Amendment 2](#amendment-2-wp2-workspace-frame-and-overview)); the owner **waived** the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3), [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived)). The epic is not Verified or Done.
+**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 is complete:** PR #17 merged to `main` (merge commit `e33056d`, implementation `6d3dfe8`) after independent review ([Amendment 2](#amendment-2-wp2-workspace-frame-and-overview)); the owner **waived** the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3), [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived)). **WP3 (Project Tasks) is implemented and awaiting independent review** ([Amendment 3](#amendment-3-wp3-project-tasks)). The epic is not Verified or Done.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3); the gate was **waived by the owner** for all remaining EPIC-015 visual work, including WP4, [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived))
@@ -1073,7 +1073,7 @@ Each step adds a member, a milestone (alternately overdue, every third completed
 
 ## Amendment 2: WP2 Workspace Frame and Overview
 
-> **Status (2026-10-04): WP2 implemented; independent review passed (safe to commit, no blocking, high or medium findings).** The epic stays **In Progress**. Nothing in Amendment 1 is rewritten; §15's statement that the D3 gate existed is historical and stays as written.
+> **Status (2026-10-04): WP2 complete.** Independent review passed (safe to commit, no blocking, high or medium findings); merged as PR #17 (merge commit `e33056d`, implementation `6d3dfe8`). The epic stays **In Progress**. Nothing in Amendment 1 is rewritten; §15's statement that the D3 gate existed is historical and stays as written.
 
 ### A2.1 Owner decision: the D3 artboard gate is waived
 
@@ -1226,3 +1226,142 @@ The Overview trail is the shell's one breadcrumb, `Projects › All projects ›
 **Production:** `Http/Controllers/ProjectController` (`show` renders the Overview; `store` lands on it), `Http/Controllers/TimeEntryController` (two project context links), `Http/Presenters/TaskListPresenter` (project context link). Frontend new: `pages/projects/show.tsx`, `components/ui/stage-path.tsx`, `components/page-tabs.tsx`, `components/projects/project-workspace-nav.tsx`, `components/projects/project-health.tsx`. Frontend changed: `components/entity-header.tsx` (optional `navigation` slot), `types/projects.ts` (Overview/health types; `MilestoneItem` gains the WP1 keys), `components/projects/project-card.tsx`, `pages/projects/board.tsx` (trail), `pages/projects/tasks/show.tsx` (trail), `pages/projects/milestones/index.tsx` and `pages/projects/edit.tsx` (link targets only).
 **Tests:** as listed in A2.11. **Docs:** this amendment and the status and design-contract lines.
 **Not changed:** routes file, migrations, models, policies, `ProjectOverviewPresenter`, `ProjectHealth`, any Helpdesk, Directory, Finance or System file, dependencies, CI, config.
+
+---
+
+## Amendment 3: WP3 Project Tasks
+
+> **Status (2026-10-04): WP3 implemented and independently reviewed (verdict: needs small remediation; no product, security or architecture defect); the test-only remediation is applied (A3.12 #6). Uncommitted and unmerged.** The epic stays **In Progress**; WP4 is not started. Amendments 1 and 2 are not rewritten (only their status lines now record that WP2 merged).
+
+### A3.1 Starting point and method
+
+Branch `feature/epic-015-projects-ux` at `e33056d` (merge of PR #17, WP2), equal to `main` and `origin/main`, working tree clean; `6d3dfe8` (reviewed WP2 implementation) is an ancestor. No migration, dependency, CI or config change. The D3 gate is waived (A2.1); visual authority is the established Tasks workspace and the WP2 Overview. No material contradiction between the WP3 brief and §13 was found; decisions the brief left open are recorded in A3.12.
+
+### A3.2 One task query: `TaskQuery::forProject` (§13.1, Q6, INV-P12)
+
+Project scope is the EPIC-014 pipeline with a different step 2, not a second query class:
+
+| Step | Global (`new TaskQuery($actor, mine\|all)`) | Project (`TaskQuery::forProject($actor, $project)`) |
+|---|---|---|
+| 1 | `authorized()`: `ticket_id IS NULL`, board tasks of `Project::visibleTo`, own standalone | **same** |
+| 2 | Mine (assignee / own unassigned standalone) or All (nothing) | `tasks.project_id = project`, **inside the same parenthesised group** |
+| 3–4 | `results()`: completion (column-authoritative `open()`/`done()`), priority, due, kind, project, milestone, assignee, organization, search | **same method**; kind/project/organization cannot be set in project state |
+| 5 | `sorted()` allowlist + `id` tiebreak | same, plus the project-only `board` key |
+| page | `paginate()` in one snapshot transaction | `paginateProject()`: same transaction, eager loads `milestone:id,name` instead of `project:id,name`, and sets `project` from the instance in hand |
+
+- `TaskQuery::VIEW_PROJECT` is **not** in `VIEWS`, so `resolveView` can never return it; the constructor accepts it only with a project (and a project only with it).
+- The malformed project+ticket row is excluded by step 1's existing `ticket_id IS NULL` (A1.1.5 "nothing to add"); no predicate was duplicated. Standalone, ticket and other projects' rows cannot pass step 2.
+- No PHP-side filtering; every filter is an AND-ed `where` after the group. Mutation check: deleting the step-2 predicate fails **24** tests.
+- `TaskListState::fromProjectInput` normalizes with the same private normalizers; `projectFilters()` echoes only `completion, priority, due, milestone, assignee, q`; `PROJECT_SORTS = SORTS + board`. A directly constructed project state carrying `kind`, `project` or `organization` throws, and the global vocabulary rejects `board`.
+- `TaskQuery::projectFilterOptions()`: the project's milestones (`due_date, id`) and the distinct assignees of the project's step-1 rows (names only). Nothing is looked up by a requested id.
+- Shared labels moved from `TaskController::labelled` to `TaskListPresenter::vocabulary()` (byte-identical global output; `TaskListPageTest` unchanged and green).
+
+### A3.3 Route and authorization (§7, §11.2)
+
+- `GET /projects/{project}/tasks` → `projects.tasks.index` → `ProjectTaskListController::index` (one action). `authorize('view', $project)` first; no new permission; `tasks.view_all` is not involved. The other `projects/{project}/tasks*` routes are unchanged (route-surface pin).
+- Props: `project {id, name, status}`, `tasks` (paginator of project rows), `filters`, `filterOptions {completion, priorities, due, sorts, milestones, assignees}`, `sort`, `projectHasTasks`, `assigneeOptions` (unchanged `TaskAssigneeOptions`), `abilities` (`{openSettings: true}` through `ProjectSettingsAccess`, else `[]`).
+- `projectHasTasks` runs one `exists()` on the unfiltered project set **only when the page is empty**, so "no tasks yet" and "nothing matches" never conflate.
+- `NavigationBuilder`: `projects.tasks.index` joins `projects.all`'s active routes (not the Tasks workspace's).
+- Actor audit (Pest, HTTP): outsider 403, stale non-member assignee 403, guest → login; member, manager pivot, project manager, operator and `projects.admin` alone (A9) 200; matrix row `MATRIX_VIEW` across all 8 actor shapes. A customer member sees exactly the owner's rows; no email, other project, malformed, standalone or ticket row appears in the page props; `openSettings` present iff `projects.edit` admits the actor over all 10 `SETTINGS_ACCESS_ACTORS`.
+
+### A3.4 Project navigation (§11.3.1, §11.4)
+
+`ProjectWorkspaceNav` renders the final **Overview · Board · Tasks · Milestones**; `current` is `'overview' | 'board' | 'tasks' | 'milestones'`. Ordinary links in `nav "Project"`, `aria-current="page"`, no `tablist`/`tab`/`aria-selected`. The component was not redesigned. Board and Milestones still do not render it (WP4).
+
+**Carried WP2 finding closed (component-level overflow).** `project-tasks.spec.ts` asserts on the strip itself at 390 and 1440, light and dark: `overflow-x: auto` with a `nowrap` list (scroll, not wrap), the nav box inside the viewport, each of the four links reachable with `toBeInViewport` after `scrollIntoViewIfNeeded`, the last link fully in view whenever `scrollWidth > clientWidth`, and the focused Tasks link visible with a non-`none` outline whose offset is ≤ 0 (drawn inside the link, so the strip's overflow cannot clip it). Observed: at 390px all four links fit without scrolling, so that branch is not reached by the natural widths. The independent review therefore asked for a forced case (A3.12 #6): the navigation journey narrows the strip to 180px (a fixture, not a breakpoint contract) and asserts `scrollWidth > clientWidth`, that the last link starts clipped, scrolls fully into view (`scrollLeft > 0`), takes keyboard focus with a visible inset outline, and that the document never overflows.
+
+### A3.5 Filters, search and sort (§13.2)
+
+| Parameter | Project scope |
+|---|---|
+| `completion` | `open` (default) / `done` / `any`, column-authoritative (a Done-column task with `status=todo` is done; the reverse is open, pinned) |
+| `priority`, `due`, `q` | as EPIC-014: presets in the application timezone; `%`, `_` and `\` literal; 100-character cap |
+| `milestone` | kept **only** if it is one of the project's milestones; a foreign, nonexistent or malformed (`abc`, `-1`, `1.5`, `0`, array) id is **dropped** (ignored, not zero rows), never labelled. A project milestone with no tasks is kept and yields zero rows |
+| `assignee` | well-formed id or `none` kept as a narrowing predicate (EPIC-014 owner decision B): a forged id yields zero rows and gets the type-only chip "Assignee filter", never a name |
+| `view`, `project`, `kind`, `organization`, junk | dropped; never widen or retarget (pinned through HTTP with a hand-built query string) |
+| `sort` | `due` (undated last both ways), `priority` (rank), `title`, `updated`, `created`, **`board`** (column position, task position, id) |
+
+A combinatorial test (3 completions × 2 milestones × 3 assignees × 3 due × 3 searches) asserts every result is a subset of the project set. Pagination links carry only `state->query()` (junk, `view` and unknown priorities shed). Back/forward restore state from the URL alone (Playwright). Client: `ProjectTaskFilterBar` composes the same `FilterBar`/`FilterField`/`FilterSearch`/`FilterToggleGroup`/`FilterChip` primitives with `TaskFilterBar`'s exported helpers; `projectTaskListQuery`/`projectTaskListClearedQuery` share the sort serializer. The milestone control is omitted when a project has no milestones (A3.12 #2).
+
+### A3.6 Milestone row contract (§13.3, P4)
+
+`TaskListPresenter::projectRow` = the canonical `row()` plus `milestone: {id, name} | null`. Nothing else is added (no lifecycle, provenance or due date). The global `row()` and `/tasks` DTO are unchanged: pinned that a global page loads no `milestone` relation, sends no `milestone` key and issues **no** `project_milestones` query (default, All, filtered shapes). `ProjectTaskRow = TaskRow & { milestone }` in TypeScript.
+
+### A3.7 Table, actions and focus
+
+- `TaskTable` gains `scope="project"`: the Milestone column takes Context's place **and its flexible second-band slot at S** (two bands kept), and the "Board" source tag is omitted (every row is a board task). The project name is never repeated per row.
+- Row abilities: unchanged `TaskRowAbilities` (one membership query), parity with `TaskPolicy` complete/reopen/assign asserted per row for five actor shapes. Complete/Reopen, the assignment menu and `BulkBar` Complete/Reopen call the unchanged `tasks.*` endpoints (`back()` returns to the filtered tab, pinned). No project-specific mutation logic.
+- **Shared, not copied:** the Tasks page's selection/in-flight/focus-repair/bulk logic moved verbatim into `components/tasks/task-list-actions.tsx` (`useTaskListActions`, `TaskActionAlerts`, `TaskBulkBar`). The page owns the table/empty-region refs (React compiler rule). The global page's 30+ existing focus and action tests pass unchanged on the refactor.
+- Timer state: `TimerProvider` via the shared hook; no server timer query.
+- No create action anywhere on the page (P8). Delete is not surfaced; `ProjectTaskController::destroy` still redirects to the Board, re-pinned with a Tasks-tab referer (P7).
+- Empty states: no tasks yet ("Tasks are added and moved on the project board", link to Board); filtered ("No tasks match these filters", Clear filters); open default with only done tasks ("Every task in this project is done", Show all tasks → `completion=any`). The focusable empty region receives focus when the last row leaves (Vitest).
+
+### A3.8 Overview link retargeting (§11.3.1)
+
+Open figure → `projects.tasks.index?completion=open`; overdue figure → `?completion=open&due=overdue`; section action "Open board" → **"View tasks"** (plain list). Captions "On the board" → "View in Tasks"; accessible names "N open tasks: view in Tasks". The empty Tasks section's "Open board" stays on the Board (creation path). Parity pinned in Pest: the filtered list's totals equal the Overview's `open`, `overdue` and `total` for an operator and a customer member, with a malformed row present (§8.4 agreement). StagePath and the rest of the Overview are untouched.
+
+### A3.9 Query budgets (§17)
+
+Growth world per step: a new assigned member, a milestone, open/overdue/done tasks on it, an unassigned task, a malformed row and a task in another project; 3 → 30 steps, with assertions that milestone and assignee options grew by 27.
+
+| Shape | 3 steps | 30 steps |
+|---|---|---|
+| customer member, default | 16 | 16 |
+| project manager, default (assignment candidates) | 18 | 18 |
+| operator, `completion=any` | 16 | 16 |
+| customer, milestone | 16 | 16 |
+| customer, assignee id | 16 | 16 |
+| customer, `assignee=none` | 14 | 14 |
+| project manager, priority + overdue | 13 | 13 |
+| customer, search + board sort desc | 16 | 16 |
+| customer, no match (adds the `exists()`) | 12 | 12 |
+
+Mutation: removing the `milestone:id,name` eager load fails 4 shapes (e.g. 22 → 45). The global `/tasks` budgets (EPIC-014 WP3 shapes) are unchanged and green. No index added; `EXPLAIN` not needed (the board sort is a correlated scalar subselect on the `project_columns` primary key).
+
+### A3.10 Responsive, accessibility and visual review
+
+- **Automated:** one `h1` (the project name) and one Breadcrumb landmark; shell trail `Projects › All projects › {project} › Tasks`, project segment → Overview, no page-owned breadcrumb; a visually hidden `h2 "Tasks"`; the table named "Tasks"; at 390px a strict two-band row with the milestone on the second band, ring and checkbox reachable, no document overflow; `table-row` at 1440; light and dark.
+- **Visual review** (Chromium, 390 and 1440, light and dark; temporary screenshot test, removed): same Direction D language as `/tasks` and the Overview (ink/secondary buttons, teal `live` only for state, no blue control); the four tabs fit at 390; milestone truncates at S and wraps at desktop like Context; no project column; flat rules, no cards; focus ring visible on the Tasks tab. Finding (not a defect, unchanged from `/tasks`): at 390px the filter controls take most of the first screen.
+- Manual NVDA testing not performed (not required, §19.15).
+
+### A3.11 Evidence
+
+| Gate | Result |
+|---|---|
+| New Pest | `Tasks/ProjectTaskQueryTest` (63 tests, 283 assertions), `Projects/ProjectTasksPageTest` (47, 140) |
+| Extended Pest | `ProjectQueryBudgetTest` (+10: nine project shapes, global milestone-free pin), `ProjectAuthorizationMatrixTest` (+8 `projects.tasks.index` cases), `NavigationBuilderTest` (active state) |
+| Focused Pest | `tests/Feature/Projects`, `Tasks`, `Time`, `NavigationBuilderTest`, `ShellContractTest`: **1330 passed (7237 assertions)**, 474 s |
+| New Vitest | `pages/projects/tasks/index.test.tsx` (24); `task-list-query.test.ts` +5 |
+| Flipped Vitest | `project-workspace-nav.test.tsx` (**FLIPPED IN EPIC-015 WP3**: four links, Tasks current, no tab roles), `pages/projects/show.test.tsx` (nav and task links, **FLIPPED IN EPIC-015 WP3**) |
+| Focused Vitest | `pages/projects/tasks`, `pages/tasks`, `components/tasks`, `pages/projects/show`, `project-workspace-nav`, `page-tabs`, `ui/data-table`, `ui/filter-bar`, `ui/bulk-bar`: **23 files, 346 tests** passed |
+| Playwright | new `project-tasks.spec.ts` (5); `project-overview.spec.ts` updated (four tabs; open count → filtered Tasks). Focused set `project-tasks`, `project-overview`, `tasks-migration`, `board-migration`, `milestones-migration`, `projects-migration`: **35 passed** (author's pre-review run); product-data counts before/after: projects 0, tasks 0, time_entries 0 |
+| Independent review | Pest: 12 suites, **603 passed (3255 assertions)**; global-budget Pest (`TaskListInertiaTest`, `TaskAssigneeOptionsTest`): **19 passed (84)**; Vitest focused set: **23 files / 346 tests**; Playwright `project-tasks` + `project-overview` + `tasks-migration`: 20 passed, **1 failed** (the 30 s timeout of the `project-tasks` navigation journey; passes alone in ~23 s, 3/3 on repeat) |
+| Playwright after remediation | Focused set `project-tasks`, `project-overview`, `tasks-migration`, **3 workers**, product counts 0/0/0 → 0/0/0 on every run. **Run 1: 12 passed, 9 failed**: all in `tasks-migration`, each in under ~1.5 s, cause **not captured and unresolved** (the same test passed alone immediately after). **Run 2: 21 passed, 0 failed, 0 skipped. Run 3: 21 passed, 0 failed, 0 skipped.** The owner accepted the two consecutive clean runs as sufficient post-remediation evidence; hosted PR CI remains the merge gate. The transient is not investigated further unless hosted CI reproduces a failure |
+| Remediation facts | The navigation journey now uses `test.slow()`: under 3-worker load it took up to **32.9 s**, proving the old 30 s limit insufficient; the allowance is now **90 s**. No global timeout, retry, worker or CI setting changed. The forced-overflow navigation case (A3.4) is exercised in that journey, so the overflow branch is non-vacuous. `project-overview.spec.ts`'s project-navigation locator is `exact`. Production code is unchanged by the remediation (27 production files hash-identical before and after) |
+| Pint | 12 changed PHP files; 2 style fixes (new tests) |
+| `./dev check` (alone) | **All checks passed**: CLI self-tests 196 assertions; `git diff --check` pass; Pint pass; frontend `npm run check` pass (typecheck, ESLint, Prettier, **Vitest 97 files / 1150 tests**, `vite build` 421 modules); full Pest **1830 passed (10127 assertions)**, 524 s (WP2 close: Vitest 96 / 1120, Pest 1702 / 9560) |
+
+### A3.12 Deviations and findings
+
+1. **Header.** The tab reuses the Overview's `EntityHeader` grammar (overline "Project", name as `h1`, lifecycle, Settings, tabs) rather than a `PageHeader "Tasks"`; "Tasks" is the current tab, the trail's last segment, the document title and a visually hidden `h2`. Dates stay on the Overview.
+2. **Milestone control: a compliant reading of §13.2 (independent review ruling: COMPLIANT).** "Always offered" makes Milestone part of the project Tasks filter vocabulary, unlike the global list, where it exists only once a single project is selected (§9.5); the same cell defines the options as the project's milestones. With zero milestones the option set is empty, so the select is not rendered. The URL parameter remains supported: a real milestone with no tasks can still be selected and yields zero rows, and a foreign, nonexistent or malformed id is dropped and reveals no metadata. No UI change.
+3. **"View in Tasks" copy** for the Overview figures and "View tasks" for the section action, replacing the board wording.
+4. **Shared hook refactor** of the global Tasks page (A3.7) — behaviour-neutral; it keeps one implementation of focus repair and bulk.
+5. **Test-only issues found during the run** (no product change): `route()` binds a `project` query key to the `{project}` route parameter (tests now build such query strings by hand); a Playwright `navigation "Project"` locator also matched the drawer's "Projects views" (now `exact`); fast successive filter changes in one test raced the previous visit (the test waits for each URL, as `/tasks` tests do). Built assets were rebuilt (`npm run build`) before Playwright; no stale-asset failure recurred.
+
+6. **Independent review and test-only remediation (2026-10-04).** Verdict *WP3 needs small remediation*; the reviewer found **no product, security or architecture defect** (project-scoped `TaskQuery`, authorization, customer safety, the shared task-list hook and query budgets all confirmed). Applied, tests and this document only:
+   - **F1, timeout.** In the reviewer's focused 3-worker run `project-tasks.spec.ts` "the Overview counts open the filtered Tasks tab…" hit the 30 s timeout (20 passed, 1 failed; alone ~23 s, 3/3 passes). The test is one journey whose cost is `seed()`, so it is marked `test.slow()` (tripled timeout for that test only) rather than split, which would pay the seed twice. No global timeout, retry, worker or CI change.
+   - **F2, forced overflow.** Added to the (already `slow`) navigation journey as described in A3.4, not to the responsive test, which already used ~90% of its 30 s budget under 3-worker load and was left as reviewed.
+   - **F3, locator.** `project-overview.spec.ts` `projectNav` now uses `{ name: 'Project', exact: true }`, as the new spec does.
+   - **F4, board sort:** no change; the order is deterministic (`id` last) and only edge-cases with corrupt column positions.
+   - **Post-remediation evidence:** see A3.11.
+7. **Test-suite observation (non-blocking).** Under 3-worker load several other Playwright tests reached roughly 20-27 s; the longest observed was about 26.5 s against the default 30 s timeout. No further `test.slow()` markers were added because none has failed or crossed the timeout. If hosted CI exposes one as a real failure, harden that specific test rather than raising timeouts or retries globally.
+
+**Carried forward (unchanged):** StagePath blocked triangle; optional health-reason exhaustive typing; strict `dl` on the Overview figures; stale fixture strings; the E2E stale-asset warning; the duplicated minutes formatter; the Helpdesk/Directory/Finance/System blue-accent debt. **WP4** still owns Board/Milestones adopting `ProjectWorkspaceNav` and the shared header, the Milestones/Settings trails, the Projects index, Milestones and create/edit migration.
+
+### A3.13 Files changed
+
+**Production (PHP):** `Queries/TaskQuery` (project scope, board sort, project options, project paginate), `Queries/TaskListState` (project input/echo, `PROJECT_SORTS`, guards), `Http/Presenters/TaskListPresenter` (`projectRow`, `vocabulary`), `Http/Controllers/TaskController` (uses `vocabulary`), `Http/Controllers/ProjectTaskListController` (new), `routes/web.php`, `Shared/Navigation/NavigationBuilder`.
+**Frontend:** new `pages/projects/tasks/index.tsx`, `components/tasks/project-task-filter-bar.tsx`, `components/tasks/task-list-actions.tsx`; changed `components/projects/project-workspace-nav.tsx`, `components/tasks/task-table.tsx`, `task-title-cell.tsx`, `task-filter-bar.tsx` (exports), `task-list-query.ts`, `pages/tasks/index.tsx` (shared hook), `pages/projects/show.tsx` (links), `types/tasks.ts`.
+**Tests:** as in A3.11. **Docs:** this amendment and the status lines.
+**Not changed:** migrations, models, policies, `TaskRowAbilities`, `TaskAssigneeOptions`, `TaskService`, `ProjectTaskController`, `StagePath`, Board/Milestones/index/create/edit pages, any Helpdesk, Directory, Finance or System file, dependencies, CI, config.

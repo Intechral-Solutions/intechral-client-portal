@@ -5,8 +5,8 @@ import { hasHorizontalOverflow } from './support/shell';
 
 /**
  * EPIC-015 WP2 critical flows: the project Overview as the canonical `projects.show` page. Creation
- * lands on it; the project navigation (page links, not ARIA tabs) reaches the Board and Milestones,
- * which exist, and never a Tasks page, which does not yet; generic project links open it; a customer
+ * lands on it; the project navigation (page links, not ARIA tabs) reaches the Board, Tasks (WP3) and
+ * Milestones; generic project links open it; a customer
  * member's Overview carries nothing gated; and it holds together at 390px, the S/M boundary and on
  * desktop, light and dark. Every DTO and authorization permutation is covered by Pest
  * (ProjectOverviewPageTest, ProjectOverviewPresenterTest) and Vitest (show.test.tsx); this proves the
@@ -68,18 +68,21 @@ function isoDay(offsetDays: number) {
 }
 
 function projectNav(page: Page) {
-    return page.getByRole('navigation', { name: 'Project' });
+    return page.getByRole('navigation', { name: 'Project', exact: true });
 }
 
-async function expectProjectNavigation(page: Page, current: 'Overview' | 'Board' | 'Milestones') {
+async function expectProjectNavigation(
+    page: Page,
+    current: 'Overview' | 'Board' | 'Tasks' | 'Milestones',
+) {
     const nav = projectNav(page);
-    await expect(nav.getByRole('link')).toHaveText(['Overview', 'Board', 'Milestones']);
+    // FLIPPED IN EPIC-015 WP3: the final four, Tasks included (§11.3.1).
+    await expect(nav.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
     await expect(nav.getByRole('link', { name: current })).toHaveAttribute('aria-current', 'page');
     await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
-    // Page navigation, never the ARIA tab widget, and no Tasks destination before WP3.
+    // Page navigation, never the ARIA tab widget.
     await expect(page.getByRole('tablist')).toHaveCount(0);
     await expect(page.getByRole('tab')).toHaveCount(0);
-    await expect(nav.getByRole('link', { name: /tasks/i })).toHaveCount(0);
 }
 
 async function expectOneBreadcrumbAndHeading(page: Page) {
@@ -136,7 +139,8 @@ test('the Overview reaches the Board and Milestones, and each leads back to the 
     await expect(page.getByRole('region', { name: 'Kanban board' })).toBeVisible();
     await expectOneBreadcrumbAndHeading(page);
 
-    // A task on the board shows up in the Overview's summary, whose counts lead back to the board.
+    // A task on the board shows up in the Overview's summary, whose counts open the project's Tasks
+    // tab (WP3; WP2 sent them to the board).
     await page.getByRole('button', { name: 'Add task to Backlog' }).click();
     await page.getByLabel('New task title').fill('E2E WP2 task');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -154,8 +158,9 @@ test('the Overview reaches the Board and Milestones, and each leads back to the 
         'aria-valuemax',
         '1',
     );
-    await tasks.getByRole('link', { name: '1 open task: open the board' }).click();
-    await expect(page).toHaveURL(`/projects/${projectId}/board`);
+    await tasks.getByRole('link', { name: '1 open task: view in Tasks' }).click();
+    await expect(page).toHaveURL(`/projects/${projectId}/tasks?completion=open`);
+    await expect(page.getByRole('link', { name: 'E2E WP2 task' })).toBeVisible();
 
     // Overview -> Milestones, and back through the page's own (generic) back link.
     await page.goto(`/projects/${projectId}`);
@@ -280,7 +285,7 @@ test('the Overview holds together at 390px, the S/M boundary and desktop, light 
             await expectOneBreadcrumbAndHeading(page);
 
             // The navigation and the header action stay reachable at every width.
-            for (const label of ['Overview', 'Board', 'Milestones']) {
+            for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
                 await expect(projectNav(page).getByRole('link', { name: label }), at).toBeVisible();
             }
             await expect(

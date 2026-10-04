@@ -4,6 +4,7 @@ namespace App\Queries;
 
 use App\Models\CrmCompany;
 use App\Models\Project;
+use App\Models\ProjectColumn;
 use App\Models\ProjectMilestone;
 use App\Models\Task;
 use App\Models\User;
@@ -26,6 +27,12 @@ use InvalidArgumentException;
  * operator precedence, and nothing after step 1 ORs into anything. Authorization is SQL, never a
  * PHP pass over fetched rows.
  *
+ * Project scope (EPIC-015 §13.1, Q6) is the same pipeline with a different step 2: `forProject`
+ * replaces the view with `tasks.project_id = project`, inside the same parenthesised group. It has no
+ * Mine/All semantics and no second query: every filter, the search, the sort and the eager loads
+ * below are shared. Its caller has already authorized `ProjectPolicy::view(project)`; step 1 still
+ * runs, so the project set is a subset of `TaskPolicy::view` by construction (INV-P12).
+ *
  * The view is a surface capability (`TaskPolicy::viewAll`, resolved by `resolveView`), not an
  * object grant: an All Tasks query built for an actor without `tasks.view_all` still returns only
  * rows that actor may view. That keeps the capability and the row rule independently testable.
@@ -44,14 +51,33 @@ final class TaskQuery
 
     public const VIEWS = [self::VIEW_MINE, self::VIEW_ALL];
 
+    /**
+     * The project-scoped list (EPIC-015 §13). Not one of `VIEWS`: no request resolves to it, only
+     * `forProject` builds it, and `TaskListState` admits the project-only vocabulary under it alone.
+     */
+    public const VIEW_PROJECT = 'project';
+
     /** §9.1 step 5: as the list always had. */
     public const PER_PAGE = 30;
 
-    public function __construct(private readonly User $actor, private readonly string $view)
-    {
-        if (! in_array($view, self::VIEWS, true)) {
+    public function __construct(
+        private readonly User $actor,
+        private readonly string $view,
+        private readonly ?Project $project = null,
+    ) {
+        // The project view and a project travel together; a global view never carries one.
+        if ($project === null ? ! in_array($view, self::VIEWS, true) : $view !== self::VIEW_PROJECT) {
             throw new InvalidArgumentException("Unknown Tasks view [{$view}].");
         }
+    }
+
+    /**
+     * The project Tasks tab (EPIC-015 §13.1): the actor's authorized surfaced set, then this project.
+     * The caller authorizes `ProjectPolicy::view` first; this adds no authorization of its own.
+     */
+    public static function forProject(User $actor, Project $project): self
+    {
+        return new self($actor, self::VIEW_PROJECT, $project);
     }
 
     /**
@@ -82,6 +108,14 @@ final class TaskQuery
     {
         return Task::query()->where(function (Builder $q) {
             self::authorized($q, $this->actor);
+
+            // Project scope (EPIC-015 §13.1): this project's rows of step 1, whoever they belong to.
+            // Step 1 already excludes standalone, ticket and malformed project+ticket rows.
+            if ($this->project !== null) {
+                $q->where('tasks.project_id', $this->project->id);
+
+                return;
+            }
 
             // My Tasks (Q4): assigned to me, plus the unassigned standalone tasks I created. All
             // Tasks adds nothing: it is step 1, so All ⊇ Mine by construction.
@@ -128,11 +162,12 @@ final class TaskQuery
 
         if ($state->project !== null) {
             $query->where('tasks.project_id', $state->project);
+        }
 
-            // Only meaningful inside its project; a milestone never applies on its own (§9.5).
-            if ($state->milestone !== null) {
-                $query->where('tasks.milestone_id', $state->milestone);
-            }
+        // Only meaningful inside its project; a milestone never applies on its own (§9.5). In project
+        // scope the project is fixed, and the state admitted only one of its milestones.
+        if ($state->milestone !== null && ($state->project !== null || $this->project !== null)) {
+            $query->where('tasks.milestone_id', $state->milestone);
         }
 
         if ($state->assignee === 'none') {
@@ -166,6 +201,10 @@ final class TaskQuery
      */
     public function paginate(TaskListState $state, ?int $page = null): LengthAwarePaginator
     {
+        if ($this->project !== null) {
+            return $this->paginateProject($state, $page);
+        }
+
         return DB::transaction(fn () => $this->results($state)
             ->with([
                 'assignee:id,name',
@@ -173,6 +212,27 @@ final class TaskQuery
                 'column:id,project_id,name,is_done_column',
             ])
             ->paginate(self::PER_PAGE, ['tasks.*'], 'page', $page));
+    }
+
+    /**
+     * The project page (EPIC-015 §13.3, P4): the same snapshot, plus each row's milestone, which only
+     * project scope loads, so the global list's eager loads and query budget are unchanged. Every row
+     * belongs to the scoped project, so that relation is set from the instance already in hand rather
+     * than queried again.
+     */
+    private function paginateProject(TaskListState $state, ?int $page): LengthAwarePaginator
+    {
+        $tasks = DB::transaction(fn () => $this->results($state)
+            ->with([
+                'assignee:id,name',
+                'column:id,project_id,name,is_done_column',
+                'milestone:id,name',
+            ])
+            ->paginate(self::PER_PAGE, ['tasks.*'], 'page', $page));
+
+        $tasks->getCollection()->each(fn (Task $task) => $task->setRelation('project', $this->project));
+
+        return $tasks;
     }
 
     /**
@@ -250,9 +310,41 @@ final class TaskQuery
             'title' => $query->orderBy('tasks.title', $dir),
             'updated' => $query->orderBy('tasks.updated_at', $dir),
             'created' => $query->orderBy('tasks.created_at', $dir),
+            // Project scope only (EPIC-015 §13.2): the board's own order, column position then task
+            // position (`ProjectBoardController`), read from the columns the board already uses.
+            'board' => $query->orderBy(
+                ProjectColumn::select('position')->whereColumn('project_columns.id', 'tasks.column_id'),
+                $dir,
+            )->orderBy('tasks.position', $dir),
         };
 
         return $query->orderBy('tasks.id', $state->sort === 'due' ? 'desc' : $dir);
+    }
+
+    /**
+     * Project-scope filter options (EPIC-015 §13.2): the project's milestones, and the distinct
+     * assignees of the project's rows in the authorized set (names only, whatever their membership
+     * now, as All Tasks). Nothing is fetched by a requested id, so a forged parameter never earns a
+     * label.
+     *
+     * @return array{milestones: array<int, array{id: int, name: string}>, assignees: array<int, array{id: int, name: string}>}
+     */
+    public function projectFilterOptions(): array
+    {
+        if ($this->project === null) {
+            throw new InvalidArgumentException('Project filter options need a project scope.');
+        }
+
+        return [
+            'milestones' => self::named(
+                ProjectMilestone::where('project_id', $this->project->id)
+                    ->orderBy('due_date')->orderBy('id')->get(['id', 'name'])
+            ),
+            'assignees' => self::named(
+                User::whereIn('id', $this->inView()->whereNotNull('tasks.assignee_id')->select('tasks.assignee_id'))
+                    ->orderBy('name')->orderBy('id')->get(['id', 'name'])
+            ),
+        ];
     }
 
     /** @return array<int, array{id: int, name: string}> */
