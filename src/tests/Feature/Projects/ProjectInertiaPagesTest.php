@@ -217,22 +217,24 @@ it('serializes companies as id and name only', function () {
         ->and(json_encode($companies))->not->toContain('secret.acme.test')->not->toContain('555-0100');
 });
 
-it('sends a successful create to the board as an ordinary Inertia redirect', function () {
-    // The board is a React page as of WP5, so this is an ordinary redirect again: no
-    // Inertia::location() full-page-visit workaround (EPIC-011E §21, superseded W7/WP3 note).
+it('sends a successful create to the Overview as an ordinary Inertia redirect', function () {
+    // FLIPPED IN EPIC-015 WP2 (Q5, §16.3): creation used to land on the board
+    // (route('projects.board', $project)); it now lands on the project's Overview, projects.show.
+    // Still an ordinary redirect, so an Inertia request follows it as an Inertia visit.
     $response = $this->actingAs($this->manager)->withHeaders(['X-Inertia' => 'true'])
         ->post(route('projects.store'), ['name' => 'Inertia Created', 'status' => 'active']);
 
     $project = Project::where('name', 'Inertia Created')->firstOrFail();
 
-    $response->assertRedirect(route('projects.board', $project));
+    $response->assertRedirect(route('projects.show', $project));
     expect(session('success'))->toBe('Project created successfully.')
         ->and($project->members()->pluck('project_members.role', 'users.id')->all())->toBe([$this->manager->id => 'manager']);
 });
 
-it('still redirects a plain create to the board', function () {
+it('redirects a plain create to the Overview', function () {
+    // FLIPPED IN EPIC-015 WP2 (Q5): previously route('projects.board', ...).
     $this->actingAs($this->manager)->post(route('projects.store'), ['name' => 'Plain Created', 'status' => 'active'])
-        ->assertRedirect(route('projects.board', Project::where('name', 'Plain Created')->firstOrFail()));
+        ->assertRedirect(route('projects.show', Project::where('name', 'Plain Created')->firstOrFail()));
 });
 
 it('refuses a forged members payload from a non-admin over an Inertia request as well', function () {
@@ -402,7 +404,10 @@ it('keeps a project whose time history blocks deletion and reports it in the del
         ->toBe($entry->only(['project_id', 'task_id', 'duration_minutes']));
 })->with(['direct project time' => ['project'], 'time on one of its tasks' => ['task']]);
 
-it('keeps projects.show redirecting to the board', function () {
+it('renders projects.show as the Overview instead of redirecting to the board', function () {
+    // FLIPPED IN EPIC-015 WP2 (Q5, §16.3): this used to assert a redirect to projects.board.
+    // The full Overview page contract is pinned in ProjectOverviewPageTest.
     $this->actingAs($this->admin)->get(route('projects.show', $this->project))
-        ->assertRedirect(route('projects.board', $this->project));
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('projects/show'));
 });

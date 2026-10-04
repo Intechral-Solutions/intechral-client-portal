@@ -68,9 +68,10 @@ it('prefills the details form from the project, keeping the budget and dates as 
     expect(screen.getByLabelText('Status')).toHaveValue('active');
     expect(screen.getByLabelText('Budget ($)')).toHaveValue(1200.5);
     expect((screen.getByLabelText('Budget ($)') as HTMLInputElement).value).toBe('1200.50');
-    expect(screen.getByRole('link', { name: 'Back to board' })).toHaveAttribute(
+    // EPIC-015 §11.3: the back link is a generic project link, so it opens the Overview.
+    expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute(
         'href',
-        '/projects/7/board',
+        '/projects/7',
     );
 });
 

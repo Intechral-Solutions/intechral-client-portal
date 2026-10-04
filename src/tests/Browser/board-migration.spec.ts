@@ -22,9 +22,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }
@@ -70,7 +72,11 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
     await expect(timerPill(page)).toBeVisible();
 
+    // EPIC-015 WP2 (Q5): the index opens the project's Overview; its project navigation leads on
+    // to the board, still as Inertia visits.
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
+    await expect(page).toHaveURL(`/projects/${projectId}`);
+    await page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Board' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
     const clock = timerPill(page).locator('[data-timer-elapsed="wide"]');
     const firstReading = await clock.textContent();
@@ -78,11 +84,15 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
 
     // Board → Milestones → Board: both directions are now React pages (WP4, WP5), so this
     // is an Inertia visit each way; the timer keeps ticking uninterrupted throughout.
-    await page.getByRole('link', { name: 'Milestones' }).click();
+    await page.getByRole('link', { name: 'Milestones', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
     await expect(timerPill(page)).toBeVisible();
 
-    await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
+    // The milestones page's project link is a generic project link: it opens the Overview
+    // (EPIC-015 WP2), and the project navigation returns to the board.
+    await page.getByRole('main').getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).first().click();
+    await expect(page).toHaveURL(`/projects/${projectId}`);
+    await page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Board' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
     const secondReading = await clock.textContent();
     await expect(clock).not.toHaveText(secondReading ?? '', { timeout: 3000 });

@@ -21,7 +21,7 @@ import { SectionPanel } from '@/components/section-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { AppShell } from '@/components/shell/app-shell';
-import { board, destroy, update } from '@/routes/projects';
+import { destroy, show, update } from '@/routes/projects';
 import { sync as syncCompanies } from '@/routes/projects/companies';
 import { sync as syncMembers } from '@/routes/projects/members';
 import type {
@@ -246,12 +246,12 @@ export function EditProjectPage({
                     title="Edit project"
                     description={project.name}
                     actions={
-                        // The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link.
+                        // Back to the project's own page, its Overview (EPIC-015 Q5, §11.3).
                         <Link
-                            href={board.url(project.id)}
+                            href={show.url(project.id)}
                             className={buttonVariants({ variant: 'outline' })}
                         >
-                            Back to board
+                            Back to project
                         </Link>
                     }
                 />

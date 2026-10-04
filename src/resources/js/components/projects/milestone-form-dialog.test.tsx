@@ -18,7 +18,10 @@ const milestone: MilestoneItem = {
     dueDate: '2026-06-30',
     taskCount: 4,
     doneCount: 2,
+    openTaskCount: 2,
     completion: 50,
+    completedAt: null,
+    completedBy: null,
     overdue: false,
 };
 

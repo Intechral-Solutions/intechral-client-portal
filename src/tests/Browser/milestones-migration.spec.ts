@@ -18,9 +18,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }
@@ -32,8 +34,9 @@ test('board to milestones, create, edit and delete an unreferenced milestone', a
     await signedIn(page);
     const projectId = await createProject(page, cleanup, 'E2E WP4 milestones project');
 
-    // The board and milestones are both React pages as of WP5: an Inertia navigation.
-    await page.getByRole('link', { name: 'Milestones' }).click();
+    // The board and milestones are both React pages as of WP5: an Inertia navigation. `exact`:
+    // since EPIC-015 WP2 the board's breadcrumb names this project, whose name contains "milestones".
+    await page.getByRole('link', { name: 'Milestones', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
     await expect(page.getByRole('heading', { name: 'Milestones' })).toBeVisible();
     await expect(page.getByText('No milestones yet.')).toBeVisible();

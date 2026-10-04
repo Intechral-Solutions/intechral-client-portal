@@ -41,9 +41,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }
@@ -157,9 +159,10 @@ test('a project task and a standalone task are both linked, and the standalone r
         'href',
         new RegExp(`/projects/${projectId}/tasks/\\d+$`),
     );
+    // EPIC-015 WP2 (Q5): the project context is a generic project link, so it opens the Overview.
     await expect(
         projectRow.getByRole('link', { name: 'E2E WP8 mixed-kind project' }),
-    ).toHaveAttribute('href', new RegExp(`/projects/${projectId}/board$`));
+    ).toHaveAttribute('href', new RegExp(`/projects/${projectId}$`));
 
     // Standalone create (§14.1): a dialog opened from the page header, assignee limited to "Me" or
     // "Unassigned". The title carries a run-unique suffix so repeated runs never collide.

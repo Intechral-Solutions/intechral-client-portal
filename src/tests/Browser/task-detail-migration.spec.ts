@@ -20,9 +20,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }
@@ -60,8 +62,12 @@ test('board to task detail and back over Inertia, with the persistent timer surv
     ).toBeVisible();
     await expect(timerPill(page)).toContainText('E2E WP7 nav task');
 
-    // Board and back: an Inertia navigation, so the timer pill is never remounted.
+    // Board and back: an Inertia navigation, so the timer pill is never remounted. Since EPIC-015
+    // WP2 the trail's project segment opens the project's Overview; its navigation reaches the board.
     await page.getByRole('link', { name: 'E2E WP7 task nav project', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+    await expect(timerPill(page)).toBeVisible();
+    await page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Board' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/board$`));
     await expect(timerPill(page)).toBeVisible();
 

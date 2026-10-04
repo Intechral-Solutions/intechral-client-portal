@@ -8,7 +8,7 @@ import { MilestoneCard } from '@/components/projects/milestone-card';
 import { MilestoneFormDialog } from '@/components/projects/milestone-form-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { AppShell } from '@/components/shell/app-shell';
-import { board } from '@/routes/projects';
+import { show } from '@/routes/projects';
 import type { MilestoneItem } from '@/types/projects';
 
 export type MilestonesIndexProps = {
@@ -27,8 +27,8 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
             <Head title={`${project.name} — Milestones`} />
             <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
                 <p className="mb-2 text-sm text-muted-foreground">
-                    {/* The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link. */}
-                    <Link href={board.url(project.id)} className="hover:underline">
+                    {/* The project's own page is its Overview (EPIC-015 Q5, §11.3). */}
+                    <Link href={show.url(project.id)} className="hover:underline">
                         {project.name}
                     </Link>{' '}
                     / Milestones
@@ -81,10 +81,10 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
 
                 <div className="mt-8">
                     <Link
-                        href={board.url(project.id)}
+                        href={show.url(project.id)}
                         className={buttonVariants({ variant: 'outline' })}
                     >
-                        Back to board
+                        Back to project
                     </Link>
                 </div>
             </div>

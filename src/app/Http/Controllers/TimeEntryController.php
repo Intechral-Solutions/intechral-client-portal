@@ -331,7 +331,7 @@ class TimeEntryController extends Controller
                 'type' => 'Project',
                 'id' => $entry->project_id,
                 'label' => $entry->project->name,
-                'url' => route('projects.board', $entry->project),
+                'url' => route('projects.show', $entry->project),
             ];
         }
 
@@ -374,7 +374,7 @@ class TimeEntryController extends Controller
                 'kind' => 'project',
                 'id' => $entry->project_id,
                 'label' => $entry->project->name,
-                'url' => route('projects.board', $entry->project),
+                'url' => route('projects.show', $entry->project),
             ];
         }
 

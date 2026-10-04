@@ -1,10 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+
+import { navigation, projects, shellUser } from '@/components/shell/shell-fixtures';
 
 import { ProjectBoardPage, type ProjectBoardProps } from '@/pages/projects/board';
 import { resetInertiaMock, setPageProps } from '@/test/inertia';
 import type { BoardColumn } from '@/types/projects';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
+vi.mock('@/routes', () => ({ logout: { url: () => '/logout' } }));
+vi.mock('@/routes/profile', () => ({ show: { url: () => '/profile' } }));
+vi.mock('@/components/time/timer-pill', () => ({
+    TimerPill: () => <span data-testid="timer-pill" />,
+}));
 
 beforeEach(() => setPageProps({}));
 afterEach(resetInertiaMock);
@@ -82,4 +89,35 @@ it('states the project as an entity, with the strata motif §17 allows here', ()
         'data-page-frame',
         'canvas',
     );
+});
+
+it("names the project, linking to its Overview, then Board, in the shell's one breadcrumb (EPIC-015 §11.3)", () => {
+    const props: ProjectBoardProps = {
+        project,
+        columns,
+        abilities: { manage: true, openSettings: true },
+    };
+    setPageProps({
+        auth: { user: shellUser, permissions: [] },
+        shell: { presentation: 'operational' },
+        navigation: navigation([projects], 'projects'),
+        ...props,
+    });
+    const layout = ProjectBoardPage.layout as (page: React.ReactElement) => React.ReactElement;
+
+    render(layout(<ProjectBoardPage {...props} />));
+
+    const crumbs = screen.getAllByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveLength(1);
+    expect(within(crumbs[0]!).getByRole('link', { name: 'Portal rebuild' })).toHaveAttribute(
+        'href',
+        '/projects/7',
+    );
+    expect(within(crumbs[0]!).getByText('Board')).toHaveAttribute('aria-current', 'page');
+});
+
+it('survives Inertia 3 probing the layout function with the raw props object', () => {
+    const layout = ProjectBoardPage.layout as (page: unknown) => React.ReactElement;
+
+    expect(() => layout({ project: { id: 7 } })).not.toThrow();
 });

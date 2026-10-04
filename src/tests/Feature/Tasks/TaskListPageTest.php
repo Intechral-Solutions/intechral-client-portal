@@ -142,7 +142,8 @@ it('shapes each row with its surfaced kind and batch-computed abilities, and not
         'id', 'title', 'kind', 'projectId', 'priority', 'status', 'dueDate', 'overdue', 'assignee', 'context', 'url', 'abilities',
     ])
         ->and($rows['Visible mine']['kind'])->toBe('board')
-        ->and($rows['Visible mine']['context'])->toBe(['kind' => 'project', 'label' => 'Visible Venture', 'url' => route('projects.board', $this->visible)])
+        // EPIC-015 WP2 (Q5): the project context is a generic project link, so it opens the Overview.
+        ->and($rows['Visible mine']['context'])->toBe(['kind' => 'project', 'label' => 'Visible Venture', 'url' => route('projects.show', $this->visible)])
         ->and($rows['Visible mine']['url'])->toBe(route('projects.tasks.show', [$this->visible, $this->mine]))
         ->and($rows['Visible mine']['projectId'])->toBe($this->visible->id)
         // Q1: the member-assignee may complete/reopen but not assign.

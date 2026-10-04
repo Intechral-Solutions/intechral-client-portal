@@ -83,11 +83,12 @@ it('shows the overdue count instead of the due date when tasks are overdue', () 
     expect(screen.queryByText(/Due Dec/)).not.toBeInTheDocument();
 });
 
-it('links each card, by its title, to the board with a plain document link', () => {
+it('links each card, by its title, to the project Overview (EPIC-015 Q5)', () => {
     renderIndex();
 
+    // Opening a project is a generic project link: it targets projects.show, not the board.
     const link = screen.getByRole('link', { name: 'Portal rebuild' });
-    expect(link).toHaveAttribute('href', '/projects/5/board');
+    expect(link).toHaveAttribute('href', '/projects/5');
 });
 
 it('offers New project only to actors the create route admits', () => {

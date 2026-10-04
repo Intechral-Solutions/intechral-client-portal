@@ -32,9 +32,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }
@@ -257,9 +259,10 @@ test('a board task detail is the shared grammar with one shell breadcrumb, Compl
     await expectSingleBreadcrumb(page);
     const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
     await expect(crumbs.getByRole('link', { name: 'Projects', exact: true })).toBeVisible();
+    // EPIC-015 §11.3: the project segment opens the project's Overview.
     await expect(crumbs.getByRole('link', { name: projectName })).toHaveAttribute(
         'href',
-        new RegExp(`/projects/${projectId}/board$`),
+        new RegExp(`/projects/${projectId}$`),
     );
     await expect(crumbs.getByText(title)).toHaveAttribute('aria-current', 'page');
 
@@ -283,9 +286,9 @@ test('a board task detail is the shared grammar with one shell breadcrumb, Compl
     await expect(page.getByRole('button', { name: 'Complete task' })).toBeVisible();
     await expect(page.getByRole('definition').filter({ hasText: 'Done' })).toHaveCount(0);
 
-    // The shell's trail navigates back to the board over Inertia.
+    // The shell's trail navigates back to the project, its Overview (EPIC-015 §11.3), over Inertia.
     await crumbs.getByRole('link', { name: projectName }).click();
-    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/board$`));
+    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
 });
 
 test('a member-assignee completes and reopens a board task from its detail, and is offered nothing else', async ({

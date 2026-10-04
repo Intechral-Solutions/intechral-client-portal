@@ -298,6 +298,34 @@ it('keeps the Overview DTO constant as tasks, milestones, members and time grow 
     expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "overview queries as {$who}: small={$small}, large={$large}");
 })->with(['operator', 'project manager', 'customer member', 'staff member']);
 
+it('keeps the projects.show Overview PAGE constant as the project grows (WP2)', function (string $who) {
+    // EPIC-015 WP2 (§17, §39 of the WP2 brief): the real route, not just the presenter. The page adds
+    // the request's own fixed cost (session, auth, shared shell props) on top of the presenter's
+    // constant budget; neither may grow with tasks, milestones, members or time.
+    $owner = makeUser('operator');
+    $project = makeProject($owner, 'Overview page budget');
+    $project->update(['budget' => 1000, 'target_date' => today()->subDay()]);
+    $viewer = match ($who) {
+        'operator' => $owner,
+        'customer member' => projectActor('member', $project),
+    };
+    $request = fn () => $this->actingAs(User::findOrFail($viewer->id))
+        ->get(route('projects.show', $project))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    growOverviewWorld($project, $owner, 3);
+    $small = warmQueries($request);
+    $smallProps = $request();
+    growOverviewWorld($project, $owner, 27);
+    $large = warmQueries($request);
+    $largeProps = $request();
+
+    expect($largeProps['milestones']['total'])->toBe($smallProps['milestones']['total'] + 27)
+        ->and($largeProps['tasks']['total'])->toBe($smallProps['tasks']['total'] + 54)
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "overview page queries as {$who}: small={$small}, large={$large}");
+})->with(['operator', 'customer member']);
+
 it('loads milestone completion provenance without a per-milestone query on the milestones page (PR B)', function () {
     $admin = makeUser('operator');
     $project = makeProject($admin);
