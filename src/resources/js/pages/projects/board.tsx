@@ -7,7 +7,8 @@ import { Board } from '@/components/projects/board';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { buttonVariants } from '@/components/ui/button';
 import { AppShell } from '@/components/shell/app-shell';
-import { edit } from '@/routes/projects';
+import { layoutPageProps } from '@/lib/inertia-layout';
+import { edit, show } from '@/routes/projects';
 import { index as milestonesIndex } from '@/routes/projects/milestones';
 import type { BoardColumn, ProjectStatus } from '@/types/projects';
 
@@ -75,6 +76,25 @@ export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardPr
     );
 }
 
-ProjectBoardPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
+/**
+ * The shell's one breadcrumb names the project, linking to its Overview, then the Board (EPIC-015
+ * §11.3), so the board has a way back to the project's home before WP4 gives it the project tabs.
+ */
+ProjectBoardPage.layout = (page: ReactElement) => {
+    const props = layoutPageProps<ProjectBoardProps>(page);
+
+    return (
+        <AppShell
+            trail={
+                props && [
+                    { label: props.project.name, href: show.url(props.project.id) },
+                    { label: 'Board' },
+                ]
+            }
+        >
+            {page}
+        </AppShell>
+    );
+};
 
 export default ProjectBoardPage;

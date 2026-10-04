@@ -99,4 +99,20 @@ describe('Strata', () => {
         expect(root.children).toHaveLength(3);
         expect(root.children[2]!.className).toMatch(/h-0\.5/);
     });
+
+    it('draws page tabs directly on the strata, inside the header (EPIC-015 §11.4)', () => {
+        const { container } = render(
+            <EntityHeader
+                title="Atlas migration"
+                navigation={<nav aria-label="Project">tabs</nav>}
+            />,
+        );
+
+        const nav = screen.getByRole('navigation', { name: 'Project' });
+        const strata = container.querySelector('[data-strata]')!;
+
+        // Tabs then strata, as siblings with nothing between them, so the underline meets the rule.
+        expect(nav.nextElementSibling).toBe(strata);
+        expect(container.querySelectorAll('[data-strata]')).toHaveLength(1);
+    });
 });

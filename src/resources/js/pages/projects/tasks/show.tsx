@@ -17,7 +17,7 @@ import { TaskDetailFrame, TaskDetailsList } from '@/components/tasks/task-detail
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { layoutPageProps } from '@/lib/inertia-layout';
-import { board } from '@/routes/projects';
+import { show } from '@/routes/projects';
 import { destroy } from '@/routes/projects/tasks';
 import { update as assigneeUpdate } from '@/routes/tasks/assignee';
 import type {
@@ -247,7 +247,7 @@ ProjectTaskShowPage.layout = (page: ReactElement) => {
         <AppShell
             trail={
                 props && [
-                    { label: props.project.name, href: board.url(props.project.id) },
+                    { label: props.project.name, href: show.url(props.project.id) },
                     { label: props.task.title },
                 ]
             }

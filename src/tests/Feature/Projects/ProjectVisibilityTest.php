@@ -163,7 +163,7 @@ it('lists no row for a project the viewer cannot open, even one still assigned t
 
         $okRow = taskIndexRowByTitle($response, 'Assigned and member');
         expect($okRow['url'])->toBe(route('projects.tasks.show', [$this->memberOnly, $okRow['id']]));
-        expect($okRow['context']['url'])->toBe(route('projects.board', $this->memberOnly));
+        expect($okRow['context']['url'])->toBe(route('projects.show', $this->memberOnly)); // EPIC-015 WP2: Overview
     }
 });
 

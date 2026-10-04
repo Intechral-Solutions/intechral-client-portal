@@ -30,6 +30,7 @@ export function EntityHeader({
     status,
     meta,
     actions,
+    navigation,
 }: {
     /** The record's name. The page's one `h1`. */
     title: string;
@@ -41,6 +42,11 @@ export function EntityHeader({
     meta?: ReactNode;
     /** Already-authorized record actions. At most one ink primary (§6). */
     actions?: ReactNode;
+    /**
+     * The record's page tabs (`PageTabs`), drawn directly on the strata as Direction D §6 places them
+     * (EPIC-015 §11.4). Optional: a record with a single page has none.
+     */
+    navigation?: ReactNode;
 }) {
     return (
         <header className="flex flex-col gap-3">
@@ -68,8 +74,16 @@ export function EntityHeader({
                 ) : null}
             </div>
 
-            {/* Direction D §17: the strata closes an entity header and appears nowhere else. */}
-            <Strata />
+            {/* Direction D §17: the strata closes an entity header and appears nowhere else. Page
+                tabs sit directly on it (§6, §8), so the active tab's underline meets the rule. */}
+            {navigation ? (
+                <div>
+                    {navigation}
+                    <Strata />
+                </div>
+            ) : (
+                <Strata />
+            )}
         </header>
     );
 }

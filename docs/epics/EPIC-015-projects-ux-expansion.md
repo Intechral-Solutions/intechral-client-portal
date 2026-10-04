@@ -1,9 +1,9 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 has not started**, and the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3)) still applies before any WP2 visual implementation. The epic is not Verified or Done.
+**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 is implemented; independent review passed (safe to commit)** ([Amendment 2](#amendment-2-wp2-workspace-frame-and-overview)); the owner **waived** the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3), [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived)). The epic is not Verified or Done.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
-**Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3))
+**Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3); the gate was **waived by the owner** for all remaining EPIC-015 visual work, including WP4, [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived))
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Related:** [EPIC-011E: Projects and Kanban Migration](./EPIC-011E-projects-kanban.md) (source of the current project, board and milestone architecture, and of the A9 rule) · [EPIC-011D: Time Tracking and Persistent Timer Migration](./EPIC-011D-time-tracking-timer.md) · [EPIC-010C: Billed Time-Entry Locking](./EPIC-010C-billed-time-entry-locking.md)
 **Planning baseline:** `main` @ `76aa3c9` (`docs: close EPIC-014`), equal to `origin/main`, working tree clean, verified 2026-10-02
@@ -1068,3 +1068,161 @@ Each step adds a member, a milestone (alternately overdue, every third completed
 - **WP4:** review milestone copy where task progress reads "100% complete" while explicit milestone completion is still open or overdue.
 - **Optional test hygiene:** the static fixture step in `ProjectQueryBudgetTest`; two extra denied actor shapes (`projects.manage` with the `member` pivot role, and a member with no permissions) in `ProjectMilestoneLifecycleTest`.
 - Milestones with the same due date are ordered by id (A1.2.2).
+
+---
+
+## Amendment 2: WP2 Workspace Frame and Overview
+
+> **Status (2026-10-04): WP2 implemented; independent review passed (safe to commit, no blocking, high or medium findings).** The epic stays **In Progress**. Nothing in Amendment 1 is rewritten; §15's statement that the D3 gate existed is historical and stays as written.
+
+### A2.1 Owner decision: the D3 artboard gate is waived
+
+Recorded **before** any WP2 visual implementation began.
+
+- **Decision.** The owner explicitly **waived** the historical D3 Projects-artboard entry gate ([§15](#15-design-reference-gate-d3), Q7). The D3 light and dark artboards are **not required** to start or to complete WP2. This is a later owner decision; it does not rewrite WP0, which correctly recorded that the gate existed.
+- **Visual authority for WP2, in order:**
+  1. the committed Direction D design system ([`direction-d-design-system.md`](../design/direction-d-design-system.md));
+  2. the application's established current theme and shared primitives (semantic tokens, typography, spacing, rules, surfaces, focus treatment, dark mode, and the established green-accent control language);
+  3. EPIC-015's committed IA, content and authorization contracts (§7, §8, §9, §11, §12, §14);
+  4. existing polished Direction D surfaces, especially Tasks (EPIC-014) and the existing project-detail surfaces (Board, project task detail).
+- **Composition** (section order, what sits in the context rail, empty-state composition) may be adjusted case by case during implementation and review within that authority.
+- **No old artboard is required, and none is reconstructed.** If the historical D3 artboard is recovered later it is **optional reference material only** and does not override committed product or design decisions.
+- **No new visual theme** is invented: no new palette, no hard-coded replacement colours; shared primitives and tokens only.
+- **Scope of the waiver.** The owner's final ruling: the waiver applies to **all remaining EPIC-015 visual work, including WP4** (Projects index, Milestones layout, Board and shared-frame integration, create/edit visual migration). The D3 artboard is not required for any of them; the visual authority above applies throughout. No further owner decision is needed.
+
+
+### A2.2 Starting point and method
+
+Branch `feature/epic-015-projects-ux` at `a47e593` (`docs: close EPIC-015 WP1`), equal to `main` and `origin/main`, working tree clean; WP1 recorded complete, WP2 not started. No migration, dependency, CI or config change. Small route/controller plumbing only: the WP1 `ProjectOverviewPresenter` is served as is and no domain rule (health, milestone completion, project time, Settings access) is restated anywhere in WP2. No material contradiction between the WP2 brief and this epic was found; the two small differences are recorded as deviations (A2.12).
+
+### A2.3 Routing and landing (Q5, §11.2)
+
+- `projects.show` (`GET /projects/{project}`) now **renders** the Inertia component `projects/show` with exactly `ProjectOverviewPresenter::overview($project, $actor)` after `authorize('view')`. It no longer redirects to the Board. URI, name and middleware are unchanged; `/projects/{id}` links keep working.
+- `projects.board` stays `/projects/{project}/board`; Milestones keeps its route. **No `projects.tasks.index` route exists** (WP3).
+- `projects.store` redirects to `projects.show` (an ordinary redirect, so an Inertia request follows it as a visit). Validation, authorization (`create`, `manageMembers` for extra members) and the WP1 atomic create are untouched.
+- Active state: `projects.show` was already in `projects.all`'s active-route list (`NavigationBuilder`); pinned again through the real route (one active view).
+
+### A2.4 Project workspace navigation (§11.3.1, §11.4)
+
+- **`PageTabs`** (`components/page-tabs.tsx`): a new shared, domain-free primitive. A `nav` with an accessible name, a list of ordinary Inertia links, `aria-current="page"` on the current page, the Direction D §8 ink underline and 600 weight, horizontal scroll rather than wrap at narrow widths. **No** `role="tablist"`, `role="tab"` or `aria-selected` (P3; the forward note to Direction D §8 remains a WP6 item).
+- **`EntityHeader`** gains an optional `navigation` slot rendered directly on the strata (Direction D §6: "page tabs over the strata"). Existing consumers are unchanged (the slot is optional and the strata is still drawn once).
+- **`ProjectWorkspaceNav`** (`components/projects/project-workspace-nav.tsx`): the one project-level navigation, accessible name **"Project"**, rendering **Overview · Board · Milestones** (all three routes exist and are `view`-gated like the page). **No Tasks tab** (WP3 adds it here). It takes `current: 'overview' | 'board' | 'milestones'`, so WP4 reuses it unchanged on the Board and Milestones pages.
+- **Transitional rule applied:** only the Overview renders the navigation in WP2. Board and Milestones do **not** adopt the shared frame/tabs (WP4). The Board gains only a shell breadcrumb trail (A2.9).
+
+### A2.5 Overview composition
+
+Visual authority per A2.1; existing primitives only (`PageFrame grid`, `EntityHeader`, `Strata`, `Section`, `Status`, `Progress`, `Tag`, `EmptyState`, `buttonVariants`); no new colour, no hard-coded value, no local replacement for a shared component.
+
+| Region | Content |
+|---|---|
+| Entity header (spans) | Overline "Project"; the name as the one `h1`; **lifecycle** status (`ProjectStatusBadge`) beside it; start and target dates (only those set; none, no line); Settings only from `abilities.openSettings`; `ProjectWorkspaceNav` on the strata |
+| Main column | **Health** (state + reasons) → **Tasks** (progress, open/overdue figures) → **Milestones** (summary line, compact `StagePath`, key milestones) |
+| Context rail (`aside`, "Project details") | **About** (description, plain text) → **Details** (time, budget; each only when its key is present) → **People** (only when `members` is present). Absent entirely when none applies, so the frame has no empty split. Stacks below the main column under XL, in reading order |
+
+Composition decisions (case by case, A2.1): health is a **labelled section**, not part of the header status line §12.1 sketches, so lifecycle ("Active") and derived health ("Off track") are never read as one signal; the open/overdue counts reuse Home's figure-row grammar (rules, not cards); empty states are the shared `EmptyState` with tighter padding so a new project shows two short bands rather than large empty cards. Not on the page: linked companies, invoices, charts, burn, forecasts, days-to-target (deferred, A1.2.7 #3), "My open tasks here" (optional §12.1 item, not in the WP1 presenter, not added).
+
+### A2.6 Health, progress and task summary
+
+- **Health** renders the server's `{state, label, reasons}` only (INV-P13). Glyphs per Direction D §10.1 through `Status`: On track filled circle (success), At risk triangle (warning), Off track square (danger), Not started hollow circle (muted), Complete check (success). **Not enough data** is muted text with no glyph. `health: null` (on hold, archived) renders **no** health section; nothing is invented.
+- **Reasons** are mapped from structured codes in server order (`target_passed`, `milestones_overdue` with the named `earliest`, `tasks_overdue`, `starts_in_future`, `no_tracked_work`); each list item carries `data-reason={code}` so tests assert codes; an unknown code is skipped, never shown raw. The list is compact plain text, no alarm styling beyond the status mark.
+- **Progress:** "N of M tasks complete" with the server's `completion` as the mono figure and a named `progressbar` ("Task progress", `aria-valuenow = done`, `aria-valuemax = total`, `aria-valuetext` "N of M tasks complete, P%"). Nothing is recomputed from task status; copy says tasks, never effort.
+- **Task summary:** open and overdue counts. Until WP3 every task link targets **`projects.board`** and says so ("On the board", accessible names "N open tasks: open the board", section action "Open board"); nothing links to `/projects/{id}/tasks` or is labelled a task list. WP3 retargets them (§11.3.1).
+
+### A2.7 Milestones and `StagePath` (R10, §14.2)
+
+- **`StagePath`** (`components/ui/stage-path.tsx`): generic, domain-free. Props per §14.2 (`stages {key, label, state: done|current|planned|blocked, meta?}`, `variant: full|compact`, `label`, `hiddenBefore?`, `hiddenAfter?`). `label` is required for both variants. The primitive owns the state word ("Done", "Current", "Planned", "Blocked"), visible in `full` and visually hidden in `compact`, and renders the caller's `meta` after it, so state is always text. `role="list"` (restoring list semantics after the Tailwind reset), `listitem`s, `aria-current="step"` on the current stage, decorative segments `aria-hidden`. Geometry: equal columns, 4px gap, heights 6 + 3px per step capped at 24 (`full`) / 14 (`compact`), measured in Chromium as 6/9/12/14/14; tokens `progress-fill` (done), `live` (current, the only cyan), dashed `stage-future` (planned), `warning-glyph` (blocked; produced by nothing in EPIC-015). The `full` variant stacks at phone widths and becomes columns from S/M up; `compact` is always one row.
+- **Window rule** (`stagePathWindow`, exported): at most 7 visible, stable index order, the current stage always visible (else the first, or the last when all are done), later stages next, earlier stages backfill. The caller supplies `hiddenBefore`/`hiddenAfter` copy; the primitive adds none.
+- **Milestone mapping (Overview):** stages in server order (`due_date`, `id`); `done` = `completedAt` set; `current` = `milestones.currentId`; every other incomplete one `planned`; meta "Due {date}" or "Overdue · due {date}". Task progress never sets `done` (a milestone with every task done but no `completedAt` is `planned`/`current`). All complete: an all-done path with no current stage and "All milestones complete". No milestones: an `EmptyState`, never an empty path.
+- **Key milestones:** the current, the next upcoming and any other overdue milestones, in server order, **each once**. **`nextId === currentId` renders one row, tagged Current** (Amendment 1 carried finding, closed for the Overview). Overdue rows beyond five are summarised with a link to the Milestones page. Each row words task progress as "N of M linked tasks done" / "No linked tasks", never "complete" or a percentage; overdue is a clock glyph plus "Overdue · {date}" in danger text.
+- The **Milestones page** is unchanged apart from two link targets (A2.9); its 100% task-progress wording stays a WP4 item.
+
+### A2.8 Gated fields and customer-safe rendering (INV-P8, INV-P16, §7)
+
+The page renders a gated block only when its **key** is present and never hides a value it received:
+
+| Key | Rendered as | Absent |
+|---|---|---|
+| `members` | People: name + project role ("Owner · Manager", "Member"), server order, no email | No People section, no placeholder |
+| `budget` | Details › Budget: the stored decimal string with thousands separators in the edit form's unit ("$48,500.00"), never parsed to a number; an authorized `null` is "Not set" | No Budget row, no placeholder |
+| `time` (`all`) | Details › **Time logged** "3h 20m", "All team members" | — |
+| `time` (`own`) | Details › **Your time**, "Your entries only" (never presented as the project total) | No time row |
+| `abilities.openSettings` | Header **Settings** link to `projects.edit` | No Settings action |
+
+`abilities` is typed `Partial<{ openSettings: true }>`; the PHP empty array serializes as `[]` (A1.2.7 #2), which the page reads as no ability. No backend normalization was needed. Time is the presenter's total, not computed or fetched in React. Membership is never reconstructed from another list.
+
+**Customer member (proven over HTTP and in the browser):** receives and renders identity, lifecycle, health, progress, milestones and milestone `completedBy {id, name}` (accepted provenance), and **their own** time; receives **no** `budget` key, **no** `members` key, **no** `openSettings`, no other user's time, no colleague's name and no email in the page props. No customer shell was built.
+
+### A2.9 Generic link retargeting (§11.3)
+
+| Link | Before | After | Class |
+|---|---|---|---|
+| `ProjectController::store` redirect | Board | **Overview** | Landing (Q5) |
+| `projects.show` | 302 → Board | **renders Overview** | Canonical route |
+| Projects index card title (`project-card.tsx`) | Board | **Overview** | Generic "open project" |
+| `TaskListPresenter` project context (`/tasks` rows) | Board | **Overview** | Generic project context |
+| `TimeEntryController` project context (time entries and the running-timer payload) | Board | **Overview** | Generic project context |
+| Project task detail trail, project segment | Board | **Overview** | Breadcrumb |
+| Milestones page project-name link and back link ("Back to board" → "Back to project") | Board | **Overview** | Generic back links (§11.3) |
+| Edit page back link ("Back to board" → "Back to project") | Board | **Overview** | Generic back link (§11.3) |
+| Board page | no trail | shell trail **Projects › All projects › {project} › Board**, project → Overview | Breadcrumb (§11.3), the Board's way back before WP4 tabs |
+| Board header "Milestones" link | Milestones | unchanged | Explicit |
+| `ProjectTaskController::destroy` redirect | Board | **unchanged** (P7) | Explicit board action |
+| Overview task counts and "Open board" | — | Board, labelled as the board | Explicit, transitional (§11.3.1) |
+
+The Overview trail is the shell's one breadcrumb, `Projects › All projects › {project}` (the shell's view segment is part of every project trail, as on task detail); no page draws a breadcrumb. Milestones and Settings pages get their trails with WP4's header integration (the Milestones page still draws its own pre-Direction D "{project} / Milestones" line, which WP4 replaces). Pins: `ProjectOverviewPageTest` (server links, timer payload, explicit destroy), Vitest per page, and the Playwright specs.
+
+### A2.10 Responsive, accessibility and visual review
+
+**Automated (Vitest and Playwright):** exactly one `h1` and one `Breadcrumb` landmark (Overview, Board, task detail); `navigation "Project"` with `aria-current="page"` on the current link and no tab roles; no Tasks link; StagePath list semantics, `aria-current="step"`, state in text; health reasons as a named list with readable text; the named `progressbar`; the Settings link by name; keyboard order header action → Overview tab with a visible focus outline; at **390px, 768px (S/M boundary) and 1440px, light and dark**: no document-level horizontal overflow, the three project links, Settings, health, the StagePath and the key milestones all visible. The rail stacks below the main column under XL and splits at XL (1440 shown).
+
+**Visual review** (Chromium screenshots at 390, 1024 and 1440, light and dark, a realistic project and a brand-new one; taken by a temporary spec that was deleted afterwards):
+- Hierarchy reads identity → health → tasks → milestones, with the rail for context. Sections are rules, not cards; the only bordered band is the figure row and the empty states.
+- Lifecycle ("● Active") and health ("■ Off track") are visibly distinct and never adjacent.
+- Controls use the established ink/secondary button and the teal `live` stage only; **no blue accent** was introduced. Dark mode is token-driven with no light-only assumption.
+- At 390px the three tabs fit without scrolling, Settings wraps under the title, milestone rows wrap their date under the name, nothing overflows.
+- Findings (not defects): the compact StagePath's rise is subtle by specification (6→14px cap); an overdue figure of 0 still links to the board (consistent target, harmless). A brand-new project shows two short empty bands; judged acceptable rather than collapsing them.
+- Manual NVDA testing was not performed (not required, §19.15).
+
+### A2.11 Evidence
+
+| Gate | Result |
+|---|---|
+| New test files | Pest `Projects/ProjectOverviewPageTest` (38); Vitest `pages/projects/show.test.tsx` (39), `components/ui/stage-path.test.tsx` (16), `components/page-tabs.test.tsx` (5), `components/projects/project-workspace-nav.test.tsx` (5); Playwright `project-overview.spec.ts` (5) |
+| Extended / flipped | `ProjectInertiaPagesTest` (**FLIPPED IN EPIC-015 WP2**: store → Overview, Inertia and plain; `projects.show` renders), `ProjectQueryBudgetTest` (+2: the real `projects.show` page, operator and customer member), `TaskListPageTest` and `ProjectVisibilityTest` (project context → Overview); Vitest `board`, `edit`, `index`, `milestones/index`, `tasks/show`, `entity-header` and three milestone fixtures (new `MilestoneItem` keys); Playwright `projects-migration`, `board-migration`, `milestones-migration`, `board-drag`, `task-detail-migration`, `task-detail-wp5`, `tasks-migration`, `shell` (create now lands on the Overview; generic links and trails now open it; one `exact` selector because the board's trail names the project) |
+| Mutation checks | Spreading an extra `budget` into the `show` props fails 16 page tests (parity and key-presence); pointing the `/tasks` project context back at the Board fails its pin. Both reverted |
+| Query budget | `projects.show` page: **13 queries** at 3 and 30 growth steps for both the operator (presenter 10 + 3 request) and the customer member (presenter 9 + 4); the presenter budgets of A1.2.5 are unchanged. One presenter call per request; no client-side fetch. No index added |
+| Focused Pest | `tests/Feature/Projects`, `Tasks`, `Time`, `NavigationBuilderTest`, `ShellContractTest`: **1202 passed (6701 assertions)**, 504 s |
+| Focused Vitest | 12 files (new + touched): **149 passed** |
+| Focused Playwright | `project-overview`, `projects-migration`, `board-migration`, `milestones-migration`: **19 passed**; affected specs `shell`, `board-drag`, `task-detail-migration`, `tasks-migration`, `task-detail-wp5`: 66 passed with 2 trail expectations to update, then `task-detail-migration` + `task-detail-wp5` **11 passed**. Product-data counts before and after every run: projects 0, tasks 0, time_entries 0 |
+| Pint on changed PHP | 8 files; 1 style fix (the new test) |
+| `./dev check` (alone) | **All checks passed**: CLI self-tests 196 assertions; `git diff --check` pass; Pint pass; frontend `npm run check` pass (typecheck, ESLint, Prettier, **Vitest 96 files / 1120 tests**, `vite build`); full Pest **1702 passed (9560 assertions)**, 485 s (WP1 close: Vitest 92 / 1052, Pest 1662 / 9372) |
+
+### A2.12 Findings and owner decisions
+
+**Owner decision recorded:** the D3 gate is waived for all remaining EPIC-015 visual work, including WP4 (A2.1). Nothing is open for the owner.
+
+**Independent review (passed, safe to commit)** findings, carried forward and not implemented:
+- **WP3:** when the Tasks link is added to `ProjectWorkspaceNav`, add a component-level nav overflow/in-viewport regression, not only document-level overflow checks.
+- **Future/shared `StagePath`:** exhaustive typing of unknown health reason codes is optional hardening; the Direction D blocked-stage triangle is deferred until a real blocked-stage consumer exists.
+- **Optional cleanup (no separate work):** strict `dl` markup on the Overview task figures; stale `/projects/1/board` fixture strings in `timer-context-link.test.tsx`; a possible stale-asset warning in the local E2E launcher.
+
+**Deviations (recorded, not defects):**
+1. **Health placement.** §12.1 sketches health in the identity header's status line; WP2 renders it as the first labelled section of the main column so lifecycle and derived health cannot be read as one signal (the brief's §12, composition authority per A2.1).
+2. **Milestones tab in WP2.** §11.3.1's WP2 row says "Milestones where its page already renders inside the shared frame"; the brief asks for Overview · Board · Milestones wherever the route exists. The Milestones route exists and is `view`-gated, so the tab is rendered (no 404/405); the Milestones page itself is not yet in the shared frame (WP4).
+3. **Board breadcrumb trail.** §11.3's per-page trails are delivered for the Overview, the Board and task detail in WP2; Milestones and Settings get theirs with WP4's header integration.
+4. **"Back to board" → "Back to project"** on the Milestones and Edit pages: §11.3 lists them as generic back links; the label changed with the target so a link to the Overview is never called "board".
+5. **Process finding (test environment):** the first Playwright attempt ran against a **stale `public/build`** (3 Oct) without the new page, so every create stayed on `/projects/create`; the failures then restarted workers into the login throttle (HTTP 429). Those runs left **10 `E2E …` fixture projects** (no tasks, no time; created before their ids were tracked); they were removed through `ProjectService::deleteProject` and the counts returned to 0. After `npm run build` every run was clean. `./dev test:e2e` does not rebuild assets; a stale build fails loudly rather than silently, but leaves fixtures behind.
+
+**Carried forward:**
+- **WP2 (closed here):** `nextId === currentId` is de-duplicated in the Overview (one row, tagged Current), pinned in Vitest.
+- **WP3:** add Tasks to `ProjectWorkspaceNav`; retarget the Overview's open/overdue links and "Open board" to `projects.tasks.index` with `completion=open` / `due=overdue`.
+- **WP4:** milestones page copy where 100% task progress coexists with an open or overdue milestone; Board and Milestones adopt `ProjectWorkspaceNav` and the shared header; Milestones and Settings shell trails; the Milestones page's own "{project} / Milestones" line; full `StagePath` on the Milestones page; the A1.2.7 #1 Complete/Reopen UI.
+- **Optional test hygiene (unchanged from A1.2):** the static fixture step in `ProjectQueryBudgetTest`; two extra denied actor shapes in `ProjectMilestoneLifecycleTest`.
+- **Minor debt:** the minutes formatter now exists three times as local helpers (task time panel, `/time`, Overview); a shared formatter is a candidate cleanup outside EPIC-015's required scope.
+- **Design-system debt, explicitly OUT OF EPIC-015 scope:** controls in **Helpdesk, Directory, Finance and System** use a blue accent instead of the established green-accent control language. WP2 touched none of those modules and no shared primitive change affected them; this needs its own bounded normalization pass.
+
+### A2.13 Files changed
+
+**Production:** `Http/Controllers/ProjectController` (`show` renders the Overview; `store` lands on it), `Http/Controllers/TimeEntryController` (two project context links), `Http/Presenters/TaskListPresenter` (project context link). Frontend new: `pages/projects/show.tsx`, `components/ui/stage-path.tsx`, `components/page-tabs.tsx`, `components/projects/project-workspace-nav.tsx`, `components/projects/project-health.tsx`. Frontend changed: `components/entity-header.tsx` (optional `navigation` slot), `types/projects.ts` (Overview/health types; `MilestoneItem` gains the WP1 keys), `components/projects/project-card.tsx`, `pages/projects/board.tsx` (trail), `pages/projects/tasks/show.tsx` (trail), `pages/projects/milestones/index.tsx` and `pages/projects/edit.tsx` (link targets only).
+**Tests:** as listed in A2.11. **Docs:** this amendment and the status and design-contract lines.
+**Not changed:** routes file, migrations, models, policies, `ProjectOverviewPresenter`, `ProjectHealth`, any Helpdesk, Directory, Finance or System file, dependencies, CI, config.

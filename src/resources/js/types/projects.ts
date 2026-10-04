@@ -52,8 +52,16 @@ export type MilestoneItem = {
     dueDate: string;
     taskCount: number;
     doneCount: number;
-    /** 0 to 100, tasks in done columns/status over all tasks on this milestone. */
+    /** Task progress, informational only (EPIC-015 Q2): `taskCount - doneCount`. */
+    openTaskCount: number;
+    /** 0 to 100, tasks in done columns/status over all tasks on this milestone. Task progress,
+     * never the milestone's completion. */
     completion: number;
+    /** The explicit completion (ISO 8601), the milestone's source of truth; null while incomplete. */
+    completedAt: string | null;
+    /** Who completed it: accepted provenance metadata, name only (EPIC-015 §9.4). */
+    completedBy: UserRef | null;
+    /** `dueDate` before today and `completedAt` null, decided on the server. */
     overdue: boolean;
 };
 
@@ -134,4 +142,70 @@ export type TaskEditOptions = {
     members: UserRef[];
     milestones: MilestoneRef[];
     priorities: { value: TaskPriority; label: string }[];
+};
+
+/**
+ * Derived project health (EPIC-015 §8, `ProjectHealth`). React renders it and never derives it
+ * (INV-P13). Reasons are structured items in the server's fixed order.
+ */
+export type ProjectHealthState =
+    'complete' | 'not_started' | 'insufficient_data' | 'off_track' | 'at_risk' | 'on_track';
+
+export type ProjectHealthReason =
+    | { code: 'target_passed'; openTaskCount: number }
+    | {
+          code: 'milestones_overdue';
+          count: number;
+          /** The first overdue milestone by due date, then id. Always present on the Overview. */
+          earliest: { id: number; name: string; dueDate: string } | null;
+      }
+    | { code: 'tasks_overdue'; count: number }
+    | { code: 'starts_in_future'; date: string }
+    | { code: 'no_tracked_work' };
+
+export type ProjectHealthDto = {
+    state: ProjectHealthState;
+    label: string;
+    reasons: ProjectHealthReason[];
+};
+
+/**
+ * The project Overview page props (`ProjectOverviewPresenter::overview`, EPIC-015 §12.3).
+ *
+ * The gated keys are optional because the server **omits** them when the viewer may not see them
+ * (INV-P8): `budget` and `members` exist only with effective Settings access (an authorized
+ * `budget` may still be null), and `time` only with `time.view_all` (scope `all`) or `time.log`
+ * (scope `own`). Absence is the signal; React never hides a value it received.
+ */
+export type ProjectOverviewProps = {
+    project: {
+        id: number;
+        name: string;
+        description: string | null;
+        status: ProjectStatus;
+        /** `YYYY-MM-DD` calendar days. */
+        startDate: string | null;
+        targetDate: string | null;
+    };
+    /** Null for on hold and archived projects: the lifecycle status carries the meaning there. */
+    health: ProjectHealthDto | null;
+    /** Board column authoritative for done; every task weighted equally. */
+    tasks: { total: number; done: number; open: number; overdue: number; completion: number };
+    milestones: {
+        total: number;
+        completed: number;
+        overdue: number;
+        /** The first incomplete milestone in server order. */
+        currentId: number | null;
+        /** The first incomplete milestone that is not overdue. May equal `currentId`. */
+        nextId: number | null;
+        /** Ordered by due date, then id. */
+        items: MilestoneItem[];
+    };
+    /** An empty PHP array serializes as `[]`, so this is never read as anything but optional keys. */
+    abilities: Partial<{ openSettings: true }>;
+    /** A decimal string, never parsed into a JS number. */
+    budget?: string | null;
+    members?: ProjectMemberRef[];
+    time?: { scope: 'all' | 'own'; totalMinutes: number };
 };

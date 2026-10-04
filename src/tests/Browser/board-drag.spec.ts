@@ -21,9 +21,11 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview; this spec works on the board.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
+    await page.goto(`/projects/${projectId}/board`);
 
     return projectId;
 }

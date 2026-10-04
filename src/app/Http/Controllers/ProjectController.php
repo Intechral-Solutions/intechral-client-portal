@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
 use App\Rules\AccessibleCrmCompany;
@@ -82,17 +83,22 @@ class ProjectController extends Controller
         // the company links all persist together or not at all (EPIC-015 INV-P10).
         $project = $this->service->create(auth()->user(), $data);
 
-        // The board is a React page as of WP5, so an ordinary redirect is an ordinary Inertia
-        // visit again (no Inertia::location() full-page-visit workaround needed).
-        return redirect()->route('projects.board', $project)
+        // A new project lands on its Overview, the project's home (EPIC-015 Q5). An ordinary
+        // redirect, so an Inertia request follows it as an ordinary Inertia visit.
+        return redirect()->route('projects.show', $project)
             ->with('success', 'Project created successfully.');
     }
 
-    public function show(Project $project): RedirectResponse
+    /**
+     * The project Overview (EPIC-015 Q5, §12): the canonical project route. Every prop comes from
+     * `ProjectOverviewPresenter`, which decides each gated field from the viewer's capabilities
+     * before building the array (INV-P8); this action adds nothing to it.
+     */
+    public function show(Project $project): Response
     {
         $this->authorize('view', $project);
 
-        return redirect()->route('projects.board', $project);
+        return Inertia::render('projects/show', ProjectOverviewPresenter::overview($project, auth()->user()));
     }
 
     public function edit(Project $project): Response

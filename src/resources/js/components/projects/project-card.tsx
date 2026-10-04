@@ -3,7 +3,7 @@ import { Link } from '@inertiajs/react';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { Progress } from '@/components/ui/progress';
 import { formatDate } from '@/lib/dates';
-import { board } from '@/routes/projects';
+import { show } from '@/routes/projects';
 import type { ProjectCardData } from '@/types/projects';
 
 export function ProjectCard({ project }: { project: ProjectCardData }) {
@@ -17,11 +17,11 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
                     id={`project-${project.id}-title`}
                     className="text-base leading-snug font-semibold"
                 >
-                    {/* The board is a React page as of WP5 (EPIC-011E §21): an Inertia Link. The
-                        stretched link makes the whole card clickable while the accessible name
-                        stays the title. */}
+                    {/* Opening a project opens its Overview, the canonical project page (EPIC-015
+                        Q5). The stretched link makes the whole card clickable while the accessible
+                        name stays the title. */}
                     <Link
-                        href={board.url(project.id)}
+                        href={show.url(project.id)}
                         className="outline-none after:absolute after:inset-0 after:content-['']"
                     >
                         {project.name}

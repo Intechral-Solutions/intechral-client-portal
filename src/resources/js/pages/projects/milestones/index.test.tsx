@@ -17,7 +17,10 @@ const milestone = (overrides: Partial<MilestoneItem> = {}): MilestoneItem => ({
     dueDate: '2026-06-30',
     taskCount: 2,
     doneCount: 1,
+    openTaskCount: 1,
     completion: 50,
+    completedAt: null,
+    completedBy: null,
     overdue: false,
     ...overrides,
 });
@@ -54,13 +57,14 @@ it('renders one card per milestone with the project context and a link back to t
 
     expect(screen.getByRole('article', { name: 'Beta launch' })).toBeInTheDocument();
     expect(screen.getByRole('article', { name: 'GA release' })).toBeInTheDocument();
+    // EPIC-015 §11.3: the project link and the back link are generic, so they open the Overview.
     expect(screen.getAllByRole('link', { name: 'Portal rebuild' })[0]).toHaveAttribute(
         'href',
-        '/projects/7/board',
+        '/projects/7',
     );
-    expect(screen.getByRole('link', { name: 'Back to board' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute(
         'href',
-        '/projects/7/board',
+        '/projects/7',
     );
 });
 

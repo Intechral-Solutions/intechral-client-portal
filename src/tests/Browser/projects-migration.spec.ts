@@ -20,8 +20,9 @@ async function createProject(
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
 
     return projectId;
@@ -34,7 +35,7 @@ function artisan(php: string) {
     });
 }
 
-test('index to create, and the create page as projects.admin adds a member and lands on the board', async ({
+test('index to create, and the create page as projects.admin adds a member and lands on the Overview', async ({
     page,
     cleanup,
 }) => {
@@ -62,18 +63,12 @@ test('index to create, and the create page as projects.admin adds a member and l
         .selectOption({ label: 'Dev User (user@intechral.test)' });
     await page.getByRole('button', { name: 'Create project' }).click();
 
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview, as an ordinary Inertia
+    // navigation; the shared FlashRegion renders the success message with role="status", and
+    // `filter` on the flash text keeps the match specific.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
-    // The board is a React page as of WP5, so this landed as an ordinary Inertia navigation
-    // (no more Inertia::location() full-page-visit workaround, EPIC-011E §21); the shared
-    // FlashRegion renders a success message with role="status", not "alert" (that was the old
-    // Blade board's own markup, reached via the pre-WP5 location-visit fallback). `getByRole`
-    // alone is ambiguous here now that WP6's dnd-kit mounts its own empty `role="status"` live
-    // region on any board a manager can drag on (EPIC-011E §11: its announcement text is
-    // silenced, but the element itself always exists) — `filter` on the flash text is what picks
-    // out the real one, the same disambiguation `board-migration.spec.ts` already relies on for
-    // this board's `aria-live="polite"` region.
     await expect(
         page.getByRole('status').filter({ hasText: 'Project created successfully.' }),
     ).toBeVisible();
@@ -258,6 +253,6 @@ test('the projects index and create page are usable at a phone viewport with no 
     expect(createOverflow).toBe(false);
 
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    cleanup.trackProject(Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]));
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    cleanup.trackProject(Number(page.url().match(/\/projects\/(\d+)$/)![1]));
 });

@@ -148,9 +148,10 @@ describe('the shell trail seam (A13.12)', () => {
 
         const crumbs = screen.getAllByRole('navigation', { name: 'Breadcrumb' });
         expect(crumbs).toHaveLength(1);
+        // EPIC-015 §11.3: the project segment opens the project's Overview, not its Board.
         expect(within(crumbs[0]!).getByRole('link', { name: 'Portal rebuild' })).toHaveAttribute(
             'href',
-            '/projects/7/board',
+            '/projects/7',
         );
         expect(within(crumbs[0]!).getByText('Ship it')).toHaveAttribute('aria-current', 'page');
         expect(within(screen.getByRole('main')).queryByRole('navigation')).not.toBeInTheDocument();

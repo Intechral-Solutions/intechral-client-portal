@@ -38,7 +38,7 @@ final class TaskListPresenter
             'overdue' => $task->isOverdue(),
             'assignee' => ProjectTaskPresenter::userRef($task->assignee),
             'context' => $board
-                ? ['kind' => 'project', 'label' => $task->project->name, 'url' => $openable ? route('projects.board', $task->project_id) : null]
+                ? ['kind' => 'project', 'label' => $task->project->name, 'url' => $openable ? route('projects.show', $task->project_id) : null]
                 : ['kind' => 'standalone', 'label' => 'Standalone', 'url' => null],
             // A board task's page is projects.tasks.show (P6: tasks.show would only redirect there).
             // A standalone row is viewable by construction, since TaskQuery admits only the creator

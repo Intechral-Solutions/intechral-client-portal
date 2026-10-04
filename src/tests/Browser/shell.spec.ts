@@ -25,8 +25,9 @@ async function createProject(page: Page, cleanup: { trackProject: (id: number) =
     await page.goto('/projects/create');
     await page.getByLabel('Project name').fill(name);
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(/\/projects\/(\d+)\/board$/);
-    const projectId = Number(page.url().match(/\/projects\/(\d+)\/board$/)![1]);
+    // EPIC-015 WP2 (Q5): creation lands on the project Overview.
+    await expect(page).toHaveURL(/\/projects\/(\d+)$/);
+    const projectId = Number(page.url().match(/\/projects\/(\d+)$/)![1]);
     cleanup.trackProject(projectId);
 
     return projectId;
@@ -364,11 +365,12 @@ testWithProject(
         await expect(railLink(page, 'Projects')).toBeFocused();
 
         // An in-page link is inside the subtree the visit replaces, so focus is repaired to main.
-        // Scoped to this test's own project by id (not "the first board link on the page" and not
-        // by name, which is not guaranteed unique across concurrently running specs).
-        await page.locator(`main a[href="/projects/${projectId}/board"]`).focus();
+        // Scoped to this test's own project by id (not "the first project link on the page" and not
+        // by name, which is not guaranteed unique across concurrently running specs). Since
+        // EPIC-015 WP2 the card opens the project's Overview.
+        await page.locator(`main a[href="/projects/${projectId}"]`).focus();
         await page.keyboard.press('Enter');
-        await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/board$`));
+        await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
         await expect(page.locator('main#main-content')).toBeFocused();
         await expect(announcer).toHaveText(
             (await page.locator('main h1').textContent())?.trim() ?? '',
