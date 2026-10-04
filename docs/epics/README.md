@@ -26,7 +26,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-012](./EPIC-012-document-generation.md) | Document Generation and PDF Architecture | **Planned / Discovery** |
 | [EPIC-013](./EPIC-013-direction-d-shell-design-system.md) | Direction D Application Shell and Design System Foundation | **Done** |
 | [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md) | Tasks Workspace Overhaul | **Done** |
-| [EPIC-015](./EPIC-015-projects-ux-expansion.md) | Projects UX Expansion | **Planned** |
+| [EPIC-015](./EPIC-015-projects-ux-expansion.md) | Projects UX Expansion | **In Progress** |
 
 ## Epic Lifecycle
 

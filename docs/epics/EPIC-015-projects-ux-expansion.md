@@ -1,6 +1,6 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** Planned. WP0 is complete (committed `58c58f1`). WP1 PR A (time and integrity) is merged to `main` (`5a92f74`) after independent review ([Amendment 1](#amendment-1-wp1-implementation)). WP1 PR B (project domain) is implemented on the implementation branch and awaiting independent review ([A1.2](#a12-wp1-pr-b-project-domain-foundation)); WP1 is not complete until PR B merges, so the epic is not yet In Progress.
+**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 has not started**, and the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3)) still applies before any WP2 visual implementation. The epic is not Verified or Done.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3))
@@ -814,7 +814,7 @@ None blocks WP1. Each is the plan's default, derived from the locked decisions, 
 
 ## Amendment 1: WP1 implementation
 
-> **Status (2026-10-03): WP1 PR A is implemented, independently reviewed (A1.1.10) and merged (`5a92f74`). WP1 PR B is implemented and awaiting independent review (A1.2). WP1 is NOT complete until PR B merges, and the epic stays Planned** (the lifecycle moves it to In Progress when WP1 merges, [§19](#19-exit-criteria)). A1.1 records PR A; A1.2 records PR B.
+> **Status (2026-10-04): WP1 is complete and the epic is In Progress.** PR A (PR #15) was implemented, independently reviewed (A1.1.10) and merged (`5a92f74`). PR B (PR #16) was implemented, independently reviewed (verdict: safe to commit, no defects), verified by hosted CI and merged (`66d60a2`); the merge-triggered `main` CI was green. WP2 has not started and the D3 entry gate still applies. A1.1 records PR A; A1.2 records PR B (its text below describes the work as it stood at review time).
 
 ### A1.1 WP1 PR A: Time and integrity foundation
 
@@ -1061,4 +1061,10 @@ Each step adds a member, a milestone (alternately overdue, every third completed
 
 **Files changed (PR B).** Production: `Policies/ProjectSettingsAccess` (new), `Services/ProjectMilestoneService` (new), `Queries/ProjectHealth` and `Queries/ProjectHealthFacts` (new), `Http/Presenters/ProjectOverviewPresenter` (new), `Http/Presenters/ProjectMilestonePresenter`, `Models/ProjectMilestone`, `Models/Project`, `Http/Controllers/ProjectMilestoneController`, `Http/Controllers/ProjectBoardController`, `routes/web.php`, the migration. Tests: the four new files, the three extended ones, `ProjectTestHelpers`. Docs: this amendment and the status lines.
 
-**Open for the owner.** Finding 1 (transitional milestone display) only; nothing blocks review. The EPIC status stays **Planned** until WP1 merges.
+**Open for the owner.** Finding 1 (transitional milestone display) only; it did not block review or merge. PR B passed independent review and merged as PR #16 (`66d60a2`), completing WP1.
+
+**Review findings carried forward (none implemented in WP1):**
+- **WP2:** `nextId` may equal `currentId`; the UI must not render the same milestone as both Current and Next.
+- **WP4:** review milestone copy where task progress reads "100% complete" while explicit milestone completion is still open or overdue.
+- **Optional test hygiene:** the static fixture step in `ProjectQueryBudgetTest`; two extra denied actor shapes (`projects.manage` with the `member` pivot role, and a member with no permissions) in `ProjectMilestoneLifecycleTest`.
+- Milestones with the same due date are ordered by id (A1.2.2).
