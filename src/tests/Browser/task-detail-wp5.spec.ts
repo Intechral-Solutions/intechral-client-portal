@@ -93,14 +93,18 @@ async function deleteStandaloneFromDetail(page: Page) {
     const [response] = await Promise.all([
         page.waitForResponse(
             (candidate) =>
-                new URL(candidate.url()).pathname === path && candidate.request().method() === 'DELETE',
+                new URL(candidate.url()).pathname === path &&
+                candidate.request().method() === 'DELETE',
         ),
         page.getByRole('dialog').getByRole('button', { name: 'Delete task' }).click(),
     ]);
 
     // Inertia answers a non-GET redirect with 303, so the browser follows it with GET /tasks.
     expect(response.status(), `DELETE ${path}`).toBe(303);
-    expect(new URL(response.headers()['location'] ?? '', page.url()).pathname, `DELETE ${path} redirect`).toBe('/tasks');
+    expect(
+        new URL(response.headers()['location'] ?? '', page.url()).pathname,
+        `DELETE ${path} redirect`,
+    ).toBe('/tasks');
     await expect(page).toHaveURL(/\/tasks$/, { timeout: 15000 });
 }
 
@@ -347,6 +351,8 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
     contextFor,
     cleanup,
 }) => {
+    // Measured 17-24 s warm, but 34.1 s once cold: legitimate runtime can pass the 30 s default.
+    test.slow();
     await signedIn(page);
     const projectId = await createProject(page, cleanup, `E2E WP5 list assign project ${run}`);
     await addMember(page, projectId);
@@ -377,6 +383,18 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
 
     // Board row: the project's members, from the server's list.
     const boardRow = rowOf(page, boardTitle);
+
+    // Direction D §14.2: when the row that held focus leaves, focus goes to the row that takes its
+    // place (the next one, else the previous). The page is the shared development database, so the
+    // surviving neighbour is read from the live row order instead of assumed.
+    const rowKeys = await page
+        .locator('tr[data-row-key]')
+        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
+    const boardKey = await boardRow.getAttribute('data-row-key');
+    const position = rowKeys.indexOf(boardKey);
+    const neighbourKey = rowKeys[position + 1] ?? rowKeys[position - 1];
+    expect(neighbourKey, 'the list has a surviving neighbour (the standalone row)').toBeTruthy();
+
     await assignTrigger(boardRow, boardTitle).click();
     await expect(page.getByRole('menuitemradio')).toHaveText([
         'Unassigned',
@@ -384,9 +402,10 @@ test('single-row assignment from the list: standalone is Me or Unassigned, a boa
         'Dev User',
     ]);
     await page.getByRole('menuitemradio', { name: 'Dev User' }).click();
-    // Reassigned away from the operator, the row leaves My tasks; focus is not dropped on the page.
+    // Reassigned away from the operator, the row leaves My tasks and focus lands on that neighbour.
+    // The repair runs after the commit that removes the row, so this retries until it has.
     await expect(boardRow).toHaveCount(0);
-    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+    await expect(page.locator(`tr[data-row-key="${neighbourKey}"]`)).toBeFocused();
 
     // All tasks (the operator holds tasks.view_all) still shows it, now held by Dev User. Searched by
     // title: All tasks also holds every other worker's board tasks, which could push it off page one.
