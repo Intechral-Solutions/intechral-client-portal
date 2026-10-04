@@ -83,6 +83,9 @@ function projectMatrixExpectations(): array
         'projects.milestones.store' => MATRIX_MANAGE_ROUTE,
         'projects.milestones.update' => MATRIX_MANAGE_ROUTE,
         'projects.milestones.destroy' => MATRIX_MANAGE_ROUTE,
+        // EPIC-015 WP1 PR B (§9.2): Complete/Reopen share the milestone mutation gate (A9).
+        'projects.milestones.complete' => MATRIX_MANAGE_ROUTE,
+        'projects.milestones.reopen' => MATRIX_MANAGE_ROUTE,
         'projects.tasks.show' => MATRIX_VIEW,
         'projects.tasks.store' => MATRIX_MANAGE_POLICY,
         'projects.tasks.update' => MATRIX_MANAGE_POLICY,
@@ -141,6 +144,8 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
         'projects.milestones.store' => $test->post(route('projects.milestones.store', $p), ['name' => 'MS', 'due_date' => '2030-01-01']),
         'projects.milestones.update' => $test->put(route('projects.milestones.update', [$p, $ctx->milestone]), ['name' => 'MS2', 'due_date' => '2030-02-01']),
         'projects.milestones.destroy' => $test->delete(route('projects.milestones.destroy', [$p, $ctx->milestone])),
+        'projects.milestones.complete' => $test->put(route('projects.milestones.complete', [$p, $ctx->milestone])),
+        'projects.milestones.reopen' => $test->put(route('projects.milestones.reopen', [$p, $ctx->milestone])),
         'projects.tasks.show' => $test->get(route('projects.tasks.show', [$p, $ctx->task])),
         'projects.tasks.store' => $test->post(route('projects.tasks.store', $p), [
             'column_id' => $ctx->todo->id, 'title' => 'Matrix task', 'priority' => 'low',

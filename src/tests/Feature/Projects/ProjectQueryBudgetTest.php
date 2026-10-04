@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Models\CrmCompany;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskChecklistItem;
 use App\Models\Ticket;
+use App\Models\TimeEntry;
 use App\Models\User;
+use App\Queries\ProjectHealth;
+use App\Services\ProjectMilestoneService;
 use Illuminate\Support\Facades\DB;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
@@ -223,4 +227,120 @@ it('keeps milestone completion counts equal to the per-milestone method', functi
         expect($pageCompletionById[$milestone->id])->toBe($milestone->completionFromCounts());
         expect($milestone->completionFromCounts())->toBe($milestone->completionPercentage());
     }
+});
+
+/*
+ * EPIC-015 WP1 PR B (§17): the Overview DTO, the milestones page with completion provenance, and
+ * index-shaped health all cost a constant number of queries as the project grows. Every
+ * measurement uses FRESH Project and User instances, as a real request would, so no relation or
+ * permission loaded by an earlier call can make the budget vacuous.
+ */
+
+/** Grow one project: tasks (open, done, overdue, malformed), milestones (open, overdue, completed by different users), members, time. */
+function growOverviewWorld(Project $project, User $owner, int $n): void
+{
+    static $step = 0;
+
+    for ($i = 0; $i < $n; $i++, $step++) {
+        $member = makeUser();
+        $project->members()->attach($member->id, ['role' => $step % 3 ? 'member' : 'manager']);
+        $milestone = $project->milestones()->create(['name' => "Grow {$step}", 'due_date' => today()->addDays($step % 2 ? 5 : -5)]);
+        if ($step % 3 === 0) {
+            app(ProjectMilestoneService::class)->complete($milestone, $member);
+        }
+        $open = makeTask($project->columns[1], ['milestone_id' => $milestone->id, 'assignee_id' => $member->id, 'due_date' => today()->subDay(), 'position' => 3000 + $step]);
+        makeTask($project->columns[4], ['milestone_id' => $milestone->id, 'position' => 3000 + $step]);
+        $dual = makeTask($project->columns[2], ['position' => 3000 + $step]);
+        DB::table('tasks')->where('id', $dual->id)->update(['ticket_id' => Ticket::factory()->create()->id]);
+        TimeEntry::factory()->create(['user_id' => $member->id, 'task_id' => $open->id, 'duration_minutes' => 15, 'timer_started_at' => null]);
+        TimeEntry::factory()->create(['user_id' => $member->id, 'project_id' => $project->id, 'duration_minutes' => 30, 'timer_started_at' => null]);
+        TimeEntry::factory()->create(['user_id' => $owner->id, 'project_id' => $project->id, 'duration_minutes' => 45, 'timer_started_at' => null]);
+    }
+}
+
+it('keeps the Overview DTO constant as tasks, milestones, members and time grow (PR B)', function (string $who) {
+    $owner = makeUser('operator');
+    $project = makeProject($owner, 'Overview budget');
+    $project->update(['budget' => 1000, 'target_date' => today()->subDay()]);
+    $viewer = match ($who) {
+        // Settings access (budget + roster) and all-user time.
+        'operator' => $owner,
+        // Settings access through projects.manage + manager role, own time only.
+        'project manager' => projectActor('project_manager', $project),
+        // Customer member: own time, no gated fields.
+        'customer member' => projectActor('member', $project),
+        // Plain member with time.view_all: all-user time, no Settings fields.
+        'staff member' => tap(projectActor('member', $project))->givePermissionTo('time.view_all'),
+    };
+    $request = function () use ($project, $viewer) {
+        $dto = ProjectOverviewPresenter::overview(Project::findOrFail($project->id), User::findOrFail($viewer->id));
+        expect($dto)->toHaveKey('milestones');
+
+        return $dto;
+    };
+
+    growOverviewWorld($project, $owner, 3);
+    $small = warmQueries($request);
+    $smallDto = $request();
+    growOverviewWorld($project, $owner, 27);
+    $large = warmQueries($request);
+    $largeDto = $request();
+
+    // The world really grew, so the comparison is not vacuous.
+    expect($largeDto['milestones']['total'])->toBe($smallDto['milestones']['total'] + 27)
+        ->and($largeDto['tasks']['total'])->toBe($smallDto['tasks']['total'] + 54);
+    if ($largeDto['time']['scope'] === 'all') {
+        expect($largeDto['time']['totalMinutes'])->toBe($smallDto['time']['totalMinutes'] + 27 * 90);
+    }
+    if (array_key_exists('members', $largeDto)) {
+        expect(count($largeDto['members']))->toBe(count($smallDto['members']) + 27);
+    }
+    expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "overview queries as {$who}: small={$small}, large={$large}");
+})->with(['operator', 'project manager', 'customer member', 'staff member']);
+
+it('loads milestone completion provenance without a per-milestone query on the milestones page (PR B)', function () {
+    $admin = makeUser('operator');
+    $project = makeProject($admin);
+    $grow = function (int $n) use ($project) {
+        for ($i = 0; $i < $n; $i++) {
+            $milestone = $project->milestones()->create(['name' => "Done {$i}", 'due_date' => today()->subDays($i)]);
+            app(ProjectMilestoneService::class)->complete($milestone, makeUser('operator'));
+        }
+    };
+
+    $grow(3);
+    $small = warmQueries(fn () => $this->actingAs($admin)->get(route('projects.milestones.index', $project))->assertOk());
+    $grow(27);
+    $large = warmQueries(fn () => $this->actingAs($admin)->get(route('projects.milestones.index', $project))->assertOk());
+
+    expect($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "milestone completer queries: 3={$small}, 30={$large}");
+});
+
+it('derives index-shaped health for a page of projects without a query per project (WP4 readiness, PR B)', function () {
+    $member = makeUser('user');
+    $owner = makeUser('operator');
+    $grow = function (int $n) use ($member, $owner) {
+        for ($i = 0; $i < $n; $i++) {
+            $project = makeProject($owner, "Health index {$i}");
+            $project->members()->attach($member->id, ['role' => 'member']);
+            $project->milestones()->create(['name' => 'Late', 'due_date' => today()->subDays($i + 1)]);
+            makeTask($project->columns[1], ['due_date' => today()->subDay()]);
+        }
+    };
+    $page = function () use ($member) {
+        return ProjectHealth::withFacts(Project::visibleTo(User::findOrFail($member->id)))
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->through(fn (Project $project) => ProjectHealth::forIndex($project));
+    };
+
+    $grow(3);
+    $small = warmQueries($page);
+    $grow(27);
+    $large = warmQueries($page);
+
+    expect($page()->count())->toBe(20)
+        ->and(collect($page()->items())->pluck('state')->unique()->all())->toBe(['off_track'])
+        ->and(collect($page()->items())->pluck('reasons.0.earliest')->unique()->all())->toBe([null])
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "index health queries: 3={$small}, 30={$large}");
 });

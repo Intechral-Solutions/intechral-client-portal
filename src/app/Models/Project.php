@@ -96,6 +96,20 @@ class Project extends Model
         ]);
     }
 
+    /**
+     * Milestone aggregates for health and the Overview (EPIC-015 §8.1, §17): counts only, in the
+     * same query as the project, so a page of projects never queries per row. Overdue and
+     * completed follow the explicit completion state (Q2), never task progress.
+     */
+    public function scopeWithMilestoneStats(Builder $query): Builder
+    {
+        return $query->withCount([
+            'milestones',
+            'milestones as completed_milestones_count' => fn (Builder $milestones) => $milestones->completed(),
+            'milestones as overdue_milestones_count' => fn (Builder $milestones) => $milestones->overdue(),
+        ]);
+    }
+
     // ── Helpers ──────────────────────────────────────────────
 
     public function hasMember(User $user): bool
