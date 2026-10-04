@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ProjectMilestone;
+use App\Services\ProjectMilestoneService;
 use Carbon\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -14,7 +15,9 @@ require_once __DIR__.'/ProjectTestHelpers.php';
  * these tests are about what the page is given and how it behaves once React owns it.
  */
 
-const MILESTONE_ITEM_KEYS = ['id', 'name', 'description', 'dueDate', 'taskCount', 'doneCount', 'completion', 'overdue'];
+// EPIC-015 WP1 PR B (§9.4) added openTaskCount, completedAt and completedBy; `overdue` now follows
+// explicit completion (Q2). Lifecycle and DTO detail: ProjectMilestoneLifecycleTest.
+const MILESTONE_ITEM_KEYS = ['id', 'name', 'description', 'dueDate', 'taskCount', 'doneCount', 'openTaskCount', 'completion', 'completedAt', 'completedBy', 'overdue'];
 
 function milestonePageProps($response): array
 {
@@ -58,7 +61,10 @@ it('renders the milestones page as the projects/milestones/index component with 
             'dueDate' => '2026-06-30',
             'taskCount' => 2,
             'doneCount' => 1,
+            'openTaskCount' => 1,
             'completion' => 50,
+            'completedAt' => null,
+            'completedBy' => null,
             'overdue' => false,
         ]);
 });
@@ -220,18 +226,25 @@ it('agrees with completionPercentage() and uses the kind-aware done rule, not a 
         ->and($item['completion'])->toBe($milestone->fresh()->load('tasks.column')->completionPercentage());
 });
 
-it('is overdue only when due before today and not fully complete, matching isOverdueAt', function () {
+it('FLIPPED IN EPIC-015 WP1 PR B: is overdue only when due before today and not explicitly completed (Q2)', function () {
+    // Before PR B, `overdue` was `due < today AND task completion < 100` (ProjectMilestone::isOverdueAt),
+    // so "Done late" (every linked task done, never completed) was NOT overdue. Q2 makes explicit
+    // completion the source of truth: it is overdue until someone completes it.
     Carbon::setTestNow('2026-06-15 12:00:00');
     $overdue = $this->project->milestones()->create(['name' => 'Overdue', 'due_date' => '2026-06-14']);
     $dueToday = $this->project->milestones()->create(['name' => 'Due today', 'due_date' => '2026-06-15']);
     $doneAndLate = $this->project->milestones()->create(['name' => 'Done late', 'due_date' => '2026-06-01']);
     makeTask($this->project->columns[4], ['milestone_id' => $doneAndLate->id, 'position' => 0]);
+    $completedLate = $this->project->milestones()->create(['name' => 'Completed late', 'due_date' => '2026-06-01']);
+    app(ProjectMilestoneService::class)->complete($completedLate, $this->admin);
 
     $milestones = collect(milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)))['milestones'])->keyBy('name');
 
     expect($milestones['Overdue']['overdue'])->toBeTrue()
         ->and($milestones['Due today']['overdue'])->toBeFalse()
-        ->and($milestones['Done late']['overdue'])->toBeFalse();
+        ->and($milestones['Done late']['overdue'])->toBeTrue()
+        ->and($milestones['Done late']['completion'])->toBe(100)
+        ->and($milestones['Completed late']['overdue'])->toBeFalse();
 });
 
 it('never counts a task from another project toward a milestone (A2 scoping holds at read time too)', function () {

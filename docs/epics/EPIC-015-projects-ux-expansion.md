@@ -1,6 +1,6 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** Planned. WP0 is complete (committed `58c58f1`). WP1 PR A (time and integrity) is implemented and independently reviewed: the first review requested small remediation, which was applied, and the short independent re-review passed ([Amendment 1](#amendment-1-wp1-implementation)); WP1 PR B has not started and nothing has merged, so the epic is not yet In Progress.
+**Status:** Planned. WP0 is complete (committed `58c58f1`). WP1 PR A (time and integrity) is merged to `main` (`5a92f74`) after independent review ([Amendment 1](#amendment-1-wp1-implementation)). WP1 PR B (project domain) is implemented on the implementation branch and awaiting independent review ([A1.2](#a12-wp1-pr-b-project-domain-foundation)); WP1 is not complete until PR B merges, so the epic is not yet In Progress.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3))
@@ -814,7 +814,7 @@ None blocks WP1. Each is the plan's default, derived from the locked decisions, 
 
 ## Amendment 1: WP1 implementation
 
-> **Status (2026-10-02): WP1 PR A is implemented and independently reviewed (A1.1.10): the first review requested small remediation, which was applied, and the short independent re-review passed; PR B is not started. WP1 is therefore NOT complete and the epic stays Planned** (the lifecycle moves it to In Progress when WP1 merges, [§19](#19-exit-criteria)). This amendment records PR A only; PR B appends its own subsection.
+> **Status (2026-10-03): WP1 PR A is implemented, independently reviewed (A1.1.10) and merged (`5a92f74`). WP1 PR B is implemented and awaiting independent review (A1.2). WP1 is NOT complete until PR B merges, and the epic stays Planned** (the lifecycle moves it to In Progress when WP1 merges, [§19](#19-exit-criteria)). A1.1 records PR A; A1.2 records PR B.
 
 ### A1.1 WP1 PR A: Time and integrity foundation
 
@@ -959,3 +959,106 @@ The first independent review of PR A returned **"WP1 PR A NEEDS SMALL REMEDIATIO
 | F9 audit overlap | Documented and pinned by a test (A1.1.4) |
 
 Atomic create, the delete-guard distinction and the Q8 matrix were accepted by the review and were not changed; their tests stay green.
+
+### A1.2 WP1 PR B: Project domain foundation
+
+**Starting point.** Branch `feature/epic-015-projects-ux` at `5a92f74` (PR A merged), equal to `main` and `origin/main`, working tree clean. PR B is backend only: one migration, no `resources/js`, dependency, CI or config change, no Overview page, tabs, `StagePath`, Project Tasks or index redesign.
+
+**Method.** Characterize first. The Settings-access matrix (`projects.edit`, the Board `openSettings`, the Milestones `manage` ability, for ten actor shapes) was run against `5a92f74` with every PR B production change set aside: **10 of 10 green**, so the extraction had a pinned baseline. After the change the same tests are green and the new resolver/Overview assertions join them. The two flipped overdue pins were proven **red against the old rule** by restoring only the old `due < today AND task completion < 100` expression (both failed on the overdue assertion, not on a missing class), then restored.
+
+#### A1.2.1 `ProjectSettingsAccess` (§7, INV-P16): behaviour-neutral extraction
+
+`App\Policies\ProjectSettingsAccess::allows(User, Project)` returns exactly the A9 conjunction, `Gate::forUser($user)->allows('manage', $project) && $user->can('projects.manage')` (the actor it is given, not the authenticated user; pinned). Consumers: the Board `openSettings`, the Milestones page `manage` ability, and every gated Overview field. `projects.edit` (and the other Settings routes) keep enforcing it themselves through `can:projects.manage` middleware plus `authorize('manage')`; they were deliberately **not** rewritten to call the resolver, so route enforcement is byte-for-byte unchanged, and the parity test pins the resolver to a real `projects.edit` request. `ProjectController::index`'s `create` ability is a different conjunction (`create` policy, not `manage`) and is not part of this seam. A9 is not redesigned.
+
+Parity matrix (`Projects/ProjectSettingsAccessTest`, 42 tests): for outsider, customer member, member with no permission, member with `time.view_all`, member holding `projects.manage` with the `member` pivot role, manager pivot without `projects.manage`, project manager, operator, `projects.admin` alone, and `projects.admin` alone with the manager pivot: **`projects.edit` succeeds ⇔ resolver ⇔ Board `openSettings` ⇔ Milestones `manage` ⇔ Overview carries `budget` (key, value null) and `members` and `abilities.openSettings`**. Only the project manager and the operator are allowed. No inconsistency between the surfaces was found.
+
+#### A1.2.2 Milestone completion (R5, §9, Q2, INV-P9)
+
+- **Schema** (`2026_10_03_120000_add_completion_to_project_milestones`): `completed_at` nullable timestamp; `completed_by` nullable `foreignId` → `users`, `nullOnDelete` (as §9.1 specifies), indexed by the FK. No backfill: every existing milestone starts incomplete. Reversible (`dropConstrainedForeignId`). No other index.
+- **Domain:** `App\Services\ProjectMilestoneService::complete/reopen`, the only writer. Each is one conditional `UPDATE` (`WHERE completed_at IS NULL` / `IS NOT NULL`), so both are idempotent without a lock and a repeated Complete keeps the original `completed_at`/`completed_by`. The completion columns are **not** fillable, so the create/update routes cannot touch them even when the payload names them (pinned). Nothing touches a task, a task status, a column, a position or a timer (fingerprint-pinned, including a running timer on a linked task).
+- **Model:** `ProjectMilestone::isOverdue()` (`due_date < today AND completed_at IS NULL`) and its SQL twin `scopeOverdue`, `isCompleted()`/`scopeCompleted`, `completer()` (`completed_by` → `User`). `isOverdueAt(int $completion)` was **removed** (its only caller was the presenter), not left as a second rule.
+- **Routes:** `PUT /projects/{project}/milestones/{milestone}/complete|reopen` → `projects.milestones.complete|reopen`, inside the existing `can:projects.manage` group, with `authorize('manage')` and the existing foreign-milestone 404 (authorization first). Redirect to `projects.milestones.index` with a flash, like the other milestone mutations. Both added to `ProjectAuthorizationMatrixTest` as `MATRIX_MANAGE_ROUTE`.
+- **DTO** (`ProjectMilestonePresenter::item`, §9.4): adds `openTaskCount` (`taskCount − doneCount`), `completedAt` (ISO 8601 or null), `completedBy {id, name}` or null, and the recomputed `overdue`. `taskCount`, `doneCount` and `completion` keep their task-progress meaning (valid kinds only, PR A). `completedBy` is eager loaded (`completer:id,name`); no email. Milestones with the same due date are ordered by id for deterministic presentation.
+
+`Projects/ProjectMilestoneLifecycleTest` (24): schema and FK rule, user delete nulls `completed_by` and keeps the milestone complete, authorized Complete with time and actor, idempotent Complete (a later Complete by another actor keeps the first values), Reopen and idempotent Reopen, zero-task completion, the A9 actor matrix (allowed: project manager, operator; 403 with no state change: outsider, customer member, manager pivot without `projects.manage`, `projects.admin` alone), guest to login, foreign 404 and outsider 403 first, update never touches completion, delete while complete, INV-P9 both directions (all tasks done does not complete; reopening a task leaves the milestone complete and shows `openTaskCount = 1`), the flipped overdue rule (SQL scope = per-row rule), the DTO, the customer member receiving `completedBy` deliberately with no email, and the malformed dual-linked task excluded from milestone progress.
+
+#### A1.2.3 Health (R6, §8, Q1, INV-P13)
+
+One authority, `App\Queries\ProjectHealth`, with a plain value `App\Queries\ProjectHealthFacts`:
+
+| Entry point | Use | Queries |
+|---|---|---|
+| `withFacts(Builder)` | adds `Project::withTaskStats()` (valid kinds, column-authoritative done) and the new `Project::withMilestoneStats()` (`milestones_count`, `completed_milestones_count`, `overdue_milestones_count`, explicit completion) to any project query | 0 extra: subselects in the same query |
+| `forIndex(Project)` | count-only reasons, `earliest: null` (WP4 index) | none |
+| `forOverview(Project)` | adds `milestones_overdue.earliest {id, name, dueDate}` by (`due_date`, `id`) | one bounded query, only when an overdue milestone exists |
+| `derive(ProjectHealthFacts)` | the §8.2 table, pure | none |
+
+Output is `null` for `on_hold`/`archived` (any non-active, non-completed status), otherwise `{state, label, reasons}` with structured reasons in the fixed order `target_passed {openTaskCount}`, `milestones_overdue {count, earliest}`, `tasks_overdue {count}` (one milestone item however many are overdue; at most three items); `starts_in_future {date}` for rule 3, `no_tracked_work` for rule 4, `[]` for rules 1 and 7. No schema, no override, no threshold, no calendar percentage. Nothing in a controller, model accessor or React derives it.
+
+`Projects/ProjectHealthTest` (32): a 20-row truth table (completed with overdue work, archived/on_hold with overdue work, future start beats overdue work, no dates/no work, no work with a past target, no tasks with an open milestone, overdue zero-task milestone, open overdue task, past target with and without open work, past target with no open task but an overdue milestone, overdue milestone + overdue task, every signal in order, past target + overdue tasks, nothing wrong, all done); bounded reasons; then real data: lifecycle states, the date edges (due/target today not past, start today has started), the board column over `tasks.status`, explicit milestone completion (an overdue zero-task milestone is Off track until completed; finished tasks do not rescue it), earliest by `due_date` then `id` on the Overview with `null` on the index, the **malformed dual-linked task excluded from every input** (a project whose only task is malformed is Not enough data), per-project isolation, a page of projects in **one query** equal to each project alone, and the milestone aggregates equal to the per-row rules.
+
+#### A1.2.4 `ProjectOverviewPresenter` (§12.3, INV-P8, INV-P15)
+
+`App\Http\Presenters\ProjectOverviewPresenter::overview(Project, User)`, called only after `view` is authorized. No route renders it yet (WP2). Keys:
+
+| Key | Content | Present for |
+|---|---|---|
+| `project` | `id, name, description, status, startDate, targetDate` | every viewer |
+| `health` | `ProjectHealth::forOverview` (null for on_hold/archived; the key stays) | every viewer |
+| `tasks` | `total, done, open, overdue, completion` from `withTaskStats` | every viewer |
+| `milestones` | `total, completed, overdue` (aggregates), `currentId` (first incomplete by `due_date, id`), `nextId` (first incomplete and not overdue), `items` (the shared `ProjectMilestonePresenter::item`, including `completedBy`) | every viewer |
+| `abilities` | `{openSettings: true}`; **empty** otherwise | key `openSettings` only with Settings access |
+| `budget` | stored decimal string or null; metadata only, no derived figure | Settings access only |
+| `members` | `ProjectPresenter::members` (owner first, `{id, name, role, isOwner}`, no email) | Settings access only |
+| `time` | `{scope: all, totalMinutes}` with `time.view_all`; `{scope: own, totalMinutes}` with `time.log` alone | omitted with neither |
+
+Time is `TimeEntryService::totalMinutes(['project_id' => P] (+ 'user_id' for own))`, the operator report's own total over the PR A canonical scope, settled entries only, so the Overview cannot disagree with the report. Assignment-candidate lists are untouched and not reused. `milestones.items` carries everything the WP2 `StagePath` mapping needs (`completedAt`, `overdue`, order) without UI vocabulary in the domain.
+
+`Projects/ProjectOverviewPresenterTest` (24): the exact key list and values for a full-permission actor; roster order, roles, no email; health null for on_hold with the key kept; Overview health equal to `ProjectHealth`; the **key-presence matrix** for nine actor shapes (budget/members/openSettings present iff Settings access; time key and scope by permission); a customer member gets no budget, no roster, only their own time, `completedBy` present, and no other member's name anywhere; no raw model/internal column; **project time**: direct + valid board-task + own entries counted, a standalone task with a stale `project_id`, a ticket task with a stale `project_id` and a malformed dual-linked task contribute nothing, a running timer is excluded, a board task in B carrying `project_id = A` counts under B only; Overview total = `totalMinutes` = `summaryByProject` group = canonical scope; own-scope parity with the `/time` filter; `time.view_all` without Settings gets all time but no budget/roster; no time key without either permission; no time entry written. **Progress:** column-authoritative done, `tasks.status` ignored, due today not overdue, malformed rows excluded, equal to `completionPercentage()`, `completionFromCounts()` and `overdueTasks()`. **Milestones:** order by `due_date, id`, out-of-order completion shown as it is, an overdue current keeps `currentId`, `nextId` skips overdue ones, all complete gives null/null.
+
+#### A1.2.5 Query budgets (§17)
+
+Growth-world tests in `ProjectQueryBudgetTest`, measured on **fresh** `Project`/`User` instances per call after a warm-up, with assertions that the world really grew (milestones +27, tasks +54, roster +27, all-user minutes +27 × 90):
+
+| Shape | 3 steps | 30 steps |
+|---|---|---|
+| Overview, operator (Settings + all time) | 10 | 10 |
+| Overview, project manager (Settings + own time) | 11 | 11 |
+| Overview, customer member (own time) | 9 | 9 |
+| Overview, member with `time.view_all` | 9 | 9 |
+| Milestones page, 3 → 30 completed milestones, each by a different user | 5 | 5 |
+| Index-shaped health, 3 → 30 projects (paginated 20) | constant (pinned, tolerance 1) | |
+
+Each step adds a member, a milestone (alternately overdue, every third completed by a different user), an open overdue task, a done task, a malformed dual-linked task and three time entries. **Mutation check:** removing the `completer` eager load from the Overview fails all four Overview cases (operator 10 → 19). `ProjectHealthTest` also pins a page of projects with health at exactly one query. No index was added and `EXPLAIN` was not needed.
+
+#### A1.2.6 Pins changed (§16.3)
+
+- `ProjectMilestoneInertiaTest`: the item key list gains `openTaskCount`, `completedAt`, `completedBy`; the overdue test is **FLIPPED IN EPIC-015 WP1 PR B** ("Done late", every task done but never completed, is now overdue; a completed late milestone is not) and keeps the old rule in its comment.
+- `ProjectAuthorizationMatrixTest`: `projects.milestones.complete|reopen` added.
+- `ProjectTestHelpers`: gains the shared §7 actor shapes (`SETTINGS_ACCESS_ACTORS`, `settingsAccessActor`); existing helpers unchanged.
+
+#### A1.2.7 Deviations and findings
+
+1. **Transitional milestone display (owner attention).** The current (pre-WP4) milestones page renders `overdue` from the DTO. After PR B a past-due milestone is overdue until someone completes it, but the Complete/Reopen **UI** arrives only in WP4 (§14.1); until then completion is reachable only through the new `PUT` routes. A past-due milestone whose tasks are all done therefore shows Overdue with no button to clear it. This is the committed Q2/§16.3 behaviour placed in WP1 and is not changed here; the owner may prefer to land WP4's Complete/Reopen controls early or accept the interval (development data is disposable).
+2. `abilities` on the Overview is an empty PHP array for an actor without Settings access, so it serializes as JSON `[]`, not `{}`. Harmless for key-presence (`openSettings` is absent either way); WP2 may type it as `Partial<{openSettings: true}>`.
+3. "My open tasks here" (§12.1, useful/optional) and a server-computed days-to-target figure (§12.2) are **not** in the PR B presenter: no WP1 test or §12.3 bullet requires them, and adding fields "for later" is forbidden by §7. WP2 adds them with their page and tests if the composition keeps them.
+4. The settings routes were not rewritten to call the resolver (A1.2.1); the parity test pins the equality instead.
+5. No TypeScript type was changed: the new milestone DTO keys are additive and unused by the current page, so the build does not need them. WP2/WP4 add the types with their consumers.
+6. The development database was migrated with `./dev db:migrate` (backup `backups/dev/portal-2026-10-03_061946.sql`) to run the focused Playwright specs; the testing database migrates per run.
+
+#### A1.2.8 Evidence
+
+| Gate | Result |
+|---|---|
+| New test files | `Projects/ProjectSettingsAccessTest` (42), `Projects/ProjectMilestoneLifecycleTest` (24), `Projects/ProjectHealthTest` (32), `Projects/ProjectOverviewPresenterTest` (24) |
+| Extended / flipped | `ProjectQueryBudgetTest` (+6: four Overview shapes, milestone provenance, index health), `ProjectMilestoneInertiaTest` (keys, flipped overdue), `ProjectAuthorizationMatrixTest` (+16 route × actor cases) |
+| Against `5a92f74` | Settings-access characterization 10/10 green; flipped overdue pins red under the old rule (2/2) |
+| PR-B suites | 144 passed (940 assertions); query budgets 17 passed (122); authorization matrix 275 passed (434) |
+| Focused Pest | `tests/Feature/Projects`, `Time`, `Tasks`, `tests/Unit`, `NavigationBuilderTest`, `ShellContractTest`, `DashboardInertiaTest`: **1287 passed (7701 assertions)**, 315 s (PR A's set: 1143 / 6807) |
+| Focused Playwright | `milestones-migration`, `board-migration`, `projects-migration`: **14 passed**; product-data counts before and after identical (projects 0, tasks 0, time_entries 0) |
+| Pint on changed files | 20 files; 2 style fixes applied |
+| `./dev check` (alone) | **All checks passed**: CLI self-tests 196 assertions; `git diff --check` pass; Pint pass; frontend `npm run check` pass (typecheck, ESLint, Prettier, **Vitest 92 files / 1052 tests**, `vite build` 413 modules); full Pest **1662 passed (9372 assertions)**, 390 s (PR A: 1518 / 8478) |
+
+**Files changed (PR B).** Production: `Policies/ProjectSettingsAccess` (new), `Services/ProjectMilestoneService` (new), `Queries/ProjectHealth` and `Queries/ProjectHealthFacts` (new), `Http/Presenters/ProjectOverviewPresenter` (new), `Http/Presenters/ProjectMilestonePresenter`, `Models/ProjectMilestone`, `Models/Project`, `Http/Controllers/ProjectMilestoneController`, `Http/Controllers/ProjectBoardController`, `routes/web.php`, the migration. Tests: the four new files, the three extended ones, `ProjectTestHelpers`. Docs: this amendment and the status lines.
+
+**Open for the owner.** Finding 1 (transitional milestone display) only; nothing blocks review. The EPIC status stays **Planned** until WP1 merges.

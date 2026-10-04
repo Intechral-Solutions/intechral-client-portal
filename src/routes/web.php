@@ -158,6 +158,8 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
         Route::post('/{project}/milestones', [ProjectMilestoneController::class, 'store'])->name('milestones.store');
         Route::put('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'update'])->name('milestones.update');
         Route::delete('/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'destroy'])->name('milestones.destroy');
+        Route::put('/{project}/milestones/{milestone}/complete', [ProjectMilestoneController::class, 'complete'])->name('milestones.complete');
+        Route::put('/{project}/milestones/{milestone}/reopen', [ProjectMilestoneController::class, 'reopen'])->name('milestones.reopen');
     });
 });
 

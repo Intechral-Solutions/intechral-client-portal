@@ -100,6 +100,45 @@ function projectActor(string $kind, Project $project, ?Task $task = null): ?User
     throw new InvalidArgumentException("Unknown actor {$kind}");
 }
 
+/**
+ * EPIC-015 §7 actor shapes for effective Settings/Edit access (ProjectSettingsAccessTest,
+ * ProjectOverviewPresenterTest). Actor shape => whether it has that access on the project.
+ */
+const SETTINGS_ACCESS_ACTORS = [
+    'outsider' => false,               // `user` role, not a member
+    'customer_member' => false,        // `user` role (customer), plain member
+    'no_permission_member' => false,   // no role or permission at all, plain member
+    'staff_member' => false,           // plain member with time.view_all
+    'manage_permission_member' => false, // projects.manage, but only the `member` pivot role
+    'manager_role' => false,           // manager pivot role WITHOUT projects.manage
+    'project_manager' => true,         // manager pivot role AND projects.manage
+    'admin' => true,                   // operator: every permission, not a member
+    'admin_only' => false,             // projects.admin alone (A9): the policy allows, the route does not
+    'admin_only_manager' => false,     // projects.admin alone with the manager pivot role (A9)
+];
+
+function settingsAccessActor(string $kind, Project $project): User
+{
+    $member = function (User $user, string $role = 'member') use ($project): User {
+        $project->members()->attach($user->id, ['role' => $role]);
+
+        return $user;
+    };
+
+    return match ($kind) {
+        'outsider' => makeUser(),
+        'customer_member' => $member(makeUser()),
+        'no_permission_member' => $member(User::factory()->create()),
+        'staff_member' => $member(tap(makeUser())->givePermissionTo('time.view_all')),
+        'manage_permission_member' => $member(tap(makeUser())->givePermissionTo('projects.manage')),
+        'manager_role' => $member(makeUser(), 'manager'),
+        'project_manager' => $member(tap(makeUser())->givePermissionTo('projects.manage'), 'manager'),
+        'admin' => makeUser('operator'),
+        'admin_only' => tap(makeUser())->givePermissionTo('projects.admin'),
+        'admin_only_manager' => $member(tap(makeUser())->givePermissionTo('projects.admin'), 'manager'),
+    };
+}
+
 /** Task ids of a column in the order the board renders them. */
 function columnOrder(ProjectColumn|int $column): array
 {
