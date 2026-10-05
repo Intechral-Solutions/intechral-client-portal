@@ -3,6 +3,7 @@
 use App\Models\TaskChecklistItem;
 use App\Models\TimeEntry;
 use App\Models\User;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
@@ -97,6 +98,11 @@ function projectMatrixExpectations(): array
         'projects.tasks.checklist.destroy' => MATRIX_MANAGE_POLICY,
         'projects.tasks.comments.store' => MATRIX_VIEW,
         'projects.tasks.checklist.toggle' => MATRIX_VIEW,
+        // EPIC-015 WP5 (S3), added in WP6: ProjectPolicy::view, then a time scope. Every matrix actor
+        // but the operator holds the `user` role, whose defaults include time.log, so the outcome per
+        // actor is exactly MATRIX_VIEW. The "view but no time permission → 403" arm needs an actor this
+        // matrix does not have; ProjectTimePageTest pins it over every §7 actor shape.
+        'projects.time.index' => MATRIX_VIEW,
         'tasks.index' => MATRIX_AUTH,
         'tasks.store' => MATRIX_AUTH,
         // EPIC-014 WP2 (§13.1, Q1): the generic task routes, exercised on the board task. The
@@ -162,6 +168,7 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
         'projects.tasks.checklist.destroy' => $test->delete(route('projects.tasks.checklist.destroy', [$p, $ctx->task, $ctx->item->id])),
         'projects.tasks.comments.store' => $test->post(route('projects.tasks.comments.store', [$p, $ctx->task]), ['body' => 'Hello']),
         'projects.tasks.checklist.toggle' => $test->putJson(route('projects.tasks.checklist.toggle', [$p, $ctx->task, $ctx->item->id])),
+        'projects.time.index' => $test->get(route('projects.time.index', $p)),
         'tasks.index' => $test->get(route('tasks.index')),
         'tasks.store' => $test->post(route('tasks.store'), ['title' => 'Mine', 'priority' => 'low', 'status' => 'todo']),
         'tasks.complete' => $test->put(route('tasks.complete', $ctx->task)),
@@ -219,6 +226,16 @@ it('enforces the actor-by-route matrix', function (string $route, string $actor,
         expect($response->headers->get('Location'))->not->toEndWith('/login');
     }
 })->with(fn () => iterator_to_array(projectMatrixCases()));
+
+it('covers every registered projects.* route, so a new route cannot be left out of the matrix (INV-P14)', function () {
+    // EPIC-015 WP6: the matrix is a hand-kept list, and WP5's projects.time.index was missing from it
+    // until WP6. Every route named projects.* must have an expectation here.
+    $registered = collect(Route::getRoutes()->getRoutesByName())->keys()
+        ->filter(fn (string $name) => str_starts_with($name, 'projects.'))
+        ->sort()->values()->all();
+
+    expect(array_values(array_diff($registered, array_keys(projectMatrixExpectations()))))->toBe([]);
+});
 
 it('checks authorization before the child 404 so an outsider learns nothing about ids', function () {
     $project = makeProject();

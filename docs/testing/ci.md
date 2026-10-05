@@ -133,7 +133,7 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
 
 - **Not enforced** until required checks are available on the GitHub plan (above).
 - **Inherited debts CI will surface rather than cause** (EPIC-013 §31): `tests/Browser` is neither
-  type-checked nor linted; two Pest guards are vacuous (A13.13); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
+  type-checked nor linted; one Pest guard is still vacuous (A13.13: `BrowserAuthContractTest.php:84`, a message passed as a second `toContain` needle; the other, in `ProjectIntegrityTest`, was fixed by EPIC-015 WP1, and EPIC-015 WP6 repaired two more of the same shape in `ProjectTaskQueryTest` and `ProjectTimePageTest`); Vitest/jsdom is load-sensitive (A11.17, A12.14, A13.15), and hosted
   runners are smaller than the development machine, so a `userEvent` timeout in CI should be
   reproduced alone before being treated as a regression.
 - **Product-data counts return to baseline (A9.7 closed, EPIC-014 WP7).** Until WP7 the Tasks browser
@@ -144,6 +144,18 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   reports the tracked `projects`/`tasks`/`time_entries` counts unchanged, and a second full run starts
   from the same baseline ([EPIC-014 Amendment 6](../epics/EPIC-014-tasks-workspace-overhaul.md#amendment-6-wp7-hardening-and-closeout-2026-10-01)).
   A run killed outright (no teardown) can still leave rows; they are development data.
+  A test whose project-create redirect times out before the id is registered with
+  `cleanup.trackProject` also leaves that project behind (EPIC-015 A2.12 #5, A4.12 #6, A5.11): under a
+  contended local machine this has happened several times. Hosted CI starts from an empty database and
+  reports the counts, so it remains the authoritative leak check.
+- **`./dev test:e2e` serves the built assets and does not rebuild them (EPIC-015 A2.12 #5, A5.15).**
+  After any front-end change run `npm run build` first; a stale `public/build` fails loudly (for example
+  every create stays on `/projects/create`), and the resulting worker restarts can cascade into Fortify
+  `429`s on sign-in. Do not run two browser invocations back to back for the same reason.
+- **Query-count tests are deterministic (EPIC-015 A5.16).** `tests/TestCase.php` turns off the database
+  session driver's garbage-collection lottery (`[0, 100]`), because its random `delete from sessions`
+  landed inside measured HTTP requests and failed exact query-budget comparisons about one run in ten.
+  `TestHarnessDeterminismTest` pins it. Production session configuration is unchanged.
 - **Only the Blade no-shift test measures a cold paint; the Inertia one does not.**
   `blade-shell.spec.ts` loads `/operator/tickets` as the first document of a fresh context (session
   cookies only, empty HTTP cache) and counts shell-owned layout shift only, as `shell.spec.ts` always

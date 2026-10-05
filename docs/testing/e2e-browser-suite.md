@@ -143,3 +143,10 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   before and after both runs). `e2e-cleanup.spec.ts` (new in WP7) uses the default `operator` persona
   and adds no login; one of its three tests is an intentional `test.fail()` that proves the cleanup
   fixture's teardown removes a registered standalone task.
+- During EPIC-015 (WP4 onward) the owner ruled that **hosted PR CI is the authoritative complete-browser
+  gate**: on the shared local Docker VM, complete local runs repeatedly failed broadly on timeouts and
+  `429` cascades in specs unrelated to the change under test, with no product assertion failing. Local
+  browser runs are now targeted (the specs a change touches); a red local complete run is recorded as
+  red, not re-run until green. Hosted figures at the WP5 merge: **141/141 passed, 3 workers, 7.7 minutes**
+  (PR #20, head `451c74d`) and **141/141, 3 workers, 4.6 minutes** (PR #21, head `c21fa12`), each with
+  the tracked product-data counts 0/0/0 before and after ([EPIC-015 A5.14, A5.15, A5.16](../epics/EPIC-015-projects-ux-expansion.md#amendment-5-wp5-optional-project-workspace-enhancements)).

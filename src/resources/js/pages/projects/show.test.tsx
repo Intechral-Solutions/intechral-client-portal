@@ -82,8 +82,9 @@ describe('the Direction D entity grammar', () => {
     });
 
     // FLIPPED IN EPIC-015 WP3: WP2 pinned "Overview · Board · Milestones, no Tasks yet"; WP3 adds
-    // the Tasks tab (§11.3.1), so the strip is the final four.
-    it('carries the project navigation as page links, Overview current, all four tabs', () => {
+    // the Tasks tab (§11.3.1), so the strip has the four required tabs. (EPIC-015 WP5 adds Time only
+    // when the server offers it; this fixture has no time scope, so it renders the four.)
+    it('carries the project navigation as page links, Overview current, the four required tabs', () => {
         renderPage();
 
         const nav = screen.getByRole('navigation', { name: 'Project' });

@@ -993,6 +993,8 @@ The §12.2 characterization showed the risk is real (`TaskCurrentBehaviorCharact
 
 > **Forward note (2026-10-02).** Both follow-ups are now required scope of [EPIC-015](./EPIC-015-projects-ux-expansion.md) WP1: (1) under EPIC-015 owner decision Q8, board-task time eligibility will require current `ProjectPolicy::view`, so stale assignment alone grants no new time (stop and unchanged-attribution edits stay allowed); (2) project creation becomes one service-owned transaction. The board-card Complete affordance (§5.3, §22 P8) is an optional EPIC-015 item. This amendment is otherwise unchanged.
 
+> **Forward note (2026-10-05).** Both follow-ups were delivered by EPIC-015 WP1 (PR #15): board-task new-time eligibility now requires current `ProjectPolicy::view` (`AccessibleTimeContext`, `StaleAssigneeTimeEligibilityTest`), and `ProjectService::create` is one transaction (`ProjectCreateAtomicityTest`). The optional board-card Complete affordance was also delivered, in EPIC-015 WP5 (PR #20). See [EPIC-015 A1.1 and Amendment 5](./EPIC-015-projects-ux-expansion.md#a11-wp1-pr-a-time-and-integrity-foundation).
+
 ### A1.4 Evidence
 
 | Gate | Result |

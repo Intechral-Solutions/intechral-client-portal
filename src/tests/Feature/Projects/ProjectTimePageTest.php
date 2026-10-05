@@ -250,11 +250,12 @@ it('lists exactly the canonical project time: direct plus valid task time, settl
         ->and($propsB['summary']['totalMinutes'])->toBe(32 + 64)
         // The running timer, standalone, ticket and dual-linked rows are in neither.
         ->and(projectTimeIds($propsA))->not->toContain($this->running->id)
-        ->and(array_merge(projectTimeIds($propsA), projectTimeIds($propsB)))->not->toContain(
-            $this->entries['malformedStandalone']->id,
-            $this->entries['malformedTicket']->id,
-            $this->entries['dual']->id,
-        );
+        // The intersection must be empty: a negated multi-needle `toContain` passes unless EVERY
+        // needle is present, so one leaked malformed row could not have failed it (WP6 vacuity sweep).
+        ->and(array_values(array_intersect(
+            array_merge(projectTimeIds($propsA), projectTimeIds($propsB)),
+            [$this->entries['malformedStandalone']->id, $this->entries['malformedTicket']->id, $this->entries['dual']->id],
+        )))->toBe([]);
 });
 
 it('agrees with the Overview, the report service and its own rows, per scope', function (string $kind) {
