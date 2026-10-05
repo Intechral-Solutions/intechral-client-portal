@@ -374,6 +374,69 @@ it('derives index-shaped health for a page of projects without a query per proje
 });
 
 /*
+ * EPIC-015 WP4 (§17, §11.1): the Direction D projects index, with health, task progress and the next
+ * milestone, costs a constant number of queries per request shape. Each step adds a project the viewer
+ * can see, with members, open/overdue/done tasks, a malformed row, and overdue, upcoming and completed
+ * milestones, so a per-row health, progress, milestone or member query would show.
+ */
+function growProjectIndexWorld(User $owner, User $viewer, int $n): void
+{
+    static $step = 0;
+
+    for ($i = 0; $i < $n; $i++, $step++) {
+        $project = makeProject($owner, "Index budget {$step}");
+        if ($viewer->id !== $owner->id) {
+            $project->members()->attach($viewer->id, ['role' => 'member']);
+        }
+        $project->members()->attach(makeUser()->id, ['role' => 'member']);
+        if ($step % 3 === 0) {
+            $project->update(['status' => 'on_hold']);
+        }
+        makeTask($project->columns[1], ['due_date' => today()->subDay(), 'position' => 0]);
+        makeTask($project->columns[4], ['position' => 0]);
+        makeTask($project->columns[1], ['ticket_id' => Ticket::factory()->create()->id, 'position' => 1]);
+        $project->milestones()->create(['name' => "Late {$step}", 'due_date' => today()->subDays(2)]);
+        $project->milestones()->create(['name' => "Next {$step}", 'due_date' => today()->addDays(1 + $step % 5)]);
+        $project->milestones()->create(['name' => "Done {$step}", 'due_date' => today()->subWeek()])
+            ->forceFill(['completed_at' => now(), 'completed_by' => $owner->id])->save();
+    }
+}
+
+it('keeps the WP4 projects index constant as projects, tasks, milestones and members grow', function (string $who, array $query) {
+    $owner = makeUser('operator');
+    $viewer = match ($who) {
+        'operator' => $owner,
+        'project manager' => tap(makeUser('user'))->givePermissionTo('projects.manage'),
+        'customer member' => makeUser('user'),
+    };
+    $request = fn () => $this->actingAs(User::findOrFail($viewer->id))
+        ->get(route('projects.index', $query))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    growProjectIndexWorld($owner, $viewer, 3);
+    $small = warmQueries($request);
+    $smallProps = $request();
+    growProjectIndexWorld($owner, $viewer, 27);
+    $large = warmQueries($request);
+    $largeProps = $request();
+
+    $rows = $largeProps['projects']['data'];
+
+    // The world really grew and the page is full, so the comparison is not vacuous.
+    expect($largeProps['projects']['total'])->toBeGreaterThan($smallProps['projects']['total'])
+        ->and(count($rows))->toBeGreaterThan(count($smallProps['projects']['data']))
+        ->and(collect($rows)->whereNotNull('nextMilestone')->count())->toBeGreaterThan(3)
+        ->and(collect($rows)->whereNotNull('health')->count())->toBeGreaterThan(3)
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "projects index {$who} ".json_encode($query).": small={$small}, large={$large}");
+})->with([
+    'operator, every status' => ['operator', []],
+    'project manager, every status' => ['project manager', []],
+    'customer member, every status' => ['customer member', []],
+    'customer member, active only' => ['customer member', ['status' => 'active']],
+]);
+
+/*
  * EPIC-015 WP3 (§17): the project Tasks tab costs a constant number of queries per request shape as
  * the project grows. Each step adds a member who is assigned work, a milestone, open/overdue/done
  * tasks on it, an unassigned task, a malformed project+ticket row and a task in another project, so a

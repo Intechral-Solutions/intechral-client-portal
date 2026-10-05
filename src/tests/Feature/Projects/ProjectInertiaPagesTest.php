@@ -17,7 +17,9 @@ require_once __DIR__.'/ProjectTestHelpers.php';
  * member-management suites; the assertions here are about what the pages are given.
  */
 
-const CARD_KEYS = ['id', 'name', 'description', 'status', 'targetDate', 'completion', 'overdueCount', 'memberCount'];
+// FLIPPED IN EPIC-015 WP4: the index card DTO (id, name, description, status, targetDate, completion,
+// overdueCount, memberCount) became the §11.1 row, with health, task progress and the next milestone.
+const ROW_KEYS = ['id', 'name', 'status', 'health', 'tasks', 'targetDate', 'nextMilestone', 'memberCount'];
 const PROJECT_DETAIL_KEYS = ['id', 'name', 'description', 'startDate', 'targetDate', 'status', 'budget'];
 
 function pageProps($response): array
@@ -60,34 +62,60 @@ beforeEach(function () {
 
 // ── Index ────────────────────────────────────────────────────────────────────
 
-it('renders the index as the projects/index component with a minimal card DTO', function () {
+it('renders the index as the projects/index component with a minimal row DTO', function () {
     $this->project->update([
-        'description' => 'Short description', 'target_date' => '2026-12-31', 'budget' => '9999.50', 'status' => 'on_hold',
+        'description' => 'Short description', 'target_date' => '2026-12-31', 'budget' => '9999.50',
     ]);
     $this->project->members()->attach($this->candidate->id, ['role' => 'member']);
     makeTask($this->project->columns[1], ['due_date' => today()->subDay(), 'position' => 0]);
     makeTask($this->project->columns[4], ['due_date' => today()->subDay(), 'position' => 0]);
+    $this->project->milestones()->create(['name' => 'Late', 'due_date' => today()->subDays(2)]);
+    $next = $this->project->milestones()->create(['name' => 'Go-live', 'due_date' => today()->addWeek()]);
+    $this->project->milestones()->create(['name' => 'Later', 'due_date' => today()->addWeeks(2)]);
 
     $response = $this->actingAs($this->admin)->get(route('projects.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('projects/index')
             ->has('projects.data', 1)
             ->where('projects.current_page', 1)
+            ->where('filters', ['status' => null])
+            ->where('hasProjects', true)
             ->where('abilities.create', true));
 
-    $card = pageProps($response)['projects']['data'][0];
+    $row = pageProps($response)['projects']['data'][0];
 
-    expect(array_keys($card))->toBe(CARD_KEYS)
-        ->and($card)->toMatchArray([
+    expect(array_keys($row))->toBe(ROW_KEYS)
+        ->and($row)->toMatchArray([
             'id' => $this->project->id,
             'name' => 'Alpha',
-            'description' => 'Short description',
-            'status' => 'on_hold',
+            'status' => 'active',
+            // One of two tasks sits in the done column; the done task is not overdue.
+            'tasks' => ['total' => 2, 'done' => 1, 'completion' => 50],
             'targetDate' => '2026-12-31',
-            'completion' => 50,     // one of two tasks sits in the done column
-            'overdueCount' => 1,    // the done task is not overdue
+            // The first upcoming milestone: the overdue one is skipped, as on the Overview.
+            'nextMilestone' => ['id' => $next->id, 'name' => 'Go-live', 'dueDate' => today()->addWeek()->toDateString()],
             'memberCount' => 3,     // the creator, the project manager and the candidate
+        ])
+        // The index form of ProjectHealth: count-only reasons, `earliest` null by design (§8.2).
+        ->and($row['health'])->toBe([
+            'state' => 'off_track',
+            'label' => 'Off track',
+            'reasons' => [
+                ['code' => 'milestones_overdue', 'count' => 1, 'earliest' => null],
+                ['code' => 'tasks_overdue', 'count' => 1],
+            ],
         ]);
+});
+
+it('sends no derived health for an on-hold project, whose lifecycle status carries the meaning', function () {
+    $this->project->update(['status' => 'on_hold']);
+
+    $row = pageProps($this->actingAs($this->admin)->get(route('projects.index')))['projects']['data'][0];
+
+    expect($row['status'])->toBe('on_hold')
+        ->and($row)->toHaveKey('health')
+        ->and($row['health'])->toBeNull()
+        ->and($row['nextMilestone'])->toBeNull();
 });
 
 it('never puts raw model attributes, creators, members, companies, budgets or emails on the index', function () {
@@ -102,17 +130,43 @@ it('never puts raw model attributes, creators, members, companies, budgets or em
     }
 });
 
-it('truncates long descriptions on the server and keeps null descriptions null', function () {
-    $this->project->update(['description' => str_repeat('word ', 200)]);
-    $second = makeProject($this->admin, 'Bravo');
+// FLIPPED IN EPIC-015 WP4: the card sent a description truncated on the server; the §11.1 row has no
+// description column, so none is sent at all (it stays on the Overview and the Settings page).
+it('sends no description on the index', function () {
+    $this->project->update(['description' => 'Private-ish narrative']);
 
-    $cards = collect(pageProps($this->actingAs($this->admin)->get(route('projects.index')))['projects']['data'])->keyBy('name');
+    $json = json_encode(pageProps($this->actingAs($this->admin)->get(route('projects.index')))['projects']);
 
-    expect(mb_strlen($cards['Alpha']['description']))->toBeLessThanOrEqual(243)
-        ->and($cards['Alpha']['description'])->toEndWith('...')
-        ->and($cards['Bravo']['description'])->toBeNull()
-        ->and($cards['Bravo']['id'])->toBe($second->id);
+    expect($json)->not->toContain('Private-ish narrative')
+        ->and($json)->not->toContain('"description"');
 });
+
+it('gives every viewer the same minimal row, with no names, emails, budget, time or Settings datum (WP4)', function (string $who) {
+    $customer = makeUser('user', ['name' => 'Cara Customer', 'email' => 'cara@example.test']);
+    $this->project->members()->attach($customer->id, ['role' => 'member']);
+    $this->project->members()->attach($this->candidate->id, ['role' => 'member']);
+    $this->project->update(['budget' => '4321.00', 'description' => 'Internal narrative']);
+    $milestone = $this->project->milestones()->create(['name' => 'Shipped', 'due_date' => today()->subDay()]);
+    $milestone->forceFill(['completed_at' => now(), 'completed_by' => $this->candidate->id])->save();
+    makeProject($this->admin, 'Invisible to members');
+    $viewer = match ($who) {
+        'customer member' => $customer,
+        'project manager' => $this->manager,
+        'operator' => $this->admin,
+    };
+
+    $props = pageProps($this->actingAs($viewer)->get(route('projects.index')));
+    $rows = collect($props['projects']['data']);
+    $json = json_encode($props['projects']);
+
+    expect($rows->every(fn (array $row) => array_keys($row) === ROW_KEYS))->toBeTrue()
+        ->and($rows->firstWhere('name', 'Alpha')['memberCount'])->toBe(4);
+    foreach (['Candy Date', 'Cara Customer', 'Ada Admin', '@example.test', '4321', 'budget', 'Internal narrative', 'openSettings', 'completedBy', 'minutes'] as $forbidden) {
+        expect($json)->not->toContain($forbidden);
+    }
+    // Visibility is unchanged: a member sees only their own projects.
+    expect($rows->pluck('name')->contains('Invisible to members'))->toBe($who === 'operator');
+})->with(['customer member', 'project manager', 'operator']);
 
 it('derives abilities.create from what the create route actually admits (A9)', function (string $actor, bool $expected) {
     $user = projectActor($actor, $this->project);
@@ -157,21 +211,56 @@ it('does not list a project that is only linked to the viewer\'s company', funct
         ->assertInertia(fn (Assert $page) => $page->component('projects/index')->has('projects.data', 0));
 });
 
-it('paginates twenty per page and keeps the query string on page links', function () {
+// FLIPPED IN EPIC-015 WP4: page links carried the raw query string (`withQueryString`); they now carry
+// only the normalized status filter, so an unknown parameter never rides along.
+it('paginates twenty per page and keeps only the normalized filter on page links', function () {
     for ($i = 0; $i < 24; $i++) {
         makeProject($this->admin, "Bulk {$i}");
     }
 
-    $first = pageProps($this->actingAs($this->admin)->get(route('projects.index', ['q' => 'x'])))['projects'];
+    $first = pageProps($this->actingAs($this->admin)->get(route('projects.index', ['q' => 'x', 'status' => 'active'])))['projects'];
     $second = pageProps($this->actingAs($this->admin)->get(route('projects.index', ['page' => 2])))['projects'];
 
     expect($first['data'])->toHaveCount(20)
         ->and($first['total'])->toBe(25)
         ->and($first['last_page'])->toBe(2)
-        ->and($first['next_page_url'])->toContain('page=2')->toContain('q=x')
+        ->and($first['next_page_url'])->toContain('page=2')->toContain('status=active')->not->toContain('q=x')
         ->and($first['prev_page_url'])->toBeNull()
         ->and($second['data'])->toHaveCount(5)
         ->and($second['prev_page_url'])->not->toBeNull();
+});
+
+it('lists every status by default and narrows to one lifecycle status on request (P5)', function () {
+    $held = makeProject($this->admin, 'Held');
+    $held->update(['status' => 'on_hold']);
+    $done = makeProject($this->admin, 'Done');
+    $done->update(['status' => 'completed']);
+
+    $names = fn (array $query) => collect(pageProps($this->actingAs($this->admin)->get(route('projects.index', $query)))['projects']['data'])
+        ->pluck('name')->sort()->values()->all();
+
+    expect($names([]))->toBe(['Alpha', 'Done', 'Held'])
+        ->and($names(['status' => 'on_hold']))->toBe(['Held'])
+        ->and($names(['status' => 'completed']))->toBe(['Done'])
+        // An unknown or malformed value is dropped (every status), never a redirect.
+        ->and($names(['status' => 'deleted']))->toBe(['Alpha', 'Done', 'Held'])
+        ->and($names(['status' => ['active']]))->toBe(['Alpha', 'Done', 'Held']);
+
+    $props = pageProps($this->actingAs($this->admin)->get(route('projects.index', ['status' => 'deleted'])));
+    expect($props['filters'])->toBe(['status' => null])
+        ->and(array_column($props['filterOptions']['statuses'], 'value'))->toBe(['active', 'on_hold', 'completed', 'archived']);
+});
+
+it('tells an empty status filter from having no projects at all', function () {
+    $outsider = makeUser('user');
+
+    $none = pageProps($this->actingAs($outsider)->get(route('projects.index')));
+    $filtered = pageProps($this->actingAs($this->admin)->get(route('projects.index', ['status' => 'archived'])));
+
+    expect($none['hasProjects'])->toBeFalse()
+        ->and($none['projects']['data'])->toBe([])
+        ->and($filtered['hasProjects'])->toBeTrue()
+        ->and($filtered['projects']['data'])->toBe([]);
 });
 
 // ── Create ───────────────────────────────────────────────────────────────────

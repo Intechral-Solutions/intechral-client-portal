@@ -4,19 +4,29 @@ export type MemberRole = 'member' | 'manager';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
-/** One card on the projects index (ProjectPresenter::card). */
-export type ProjectCardData = {
+/**
+ * One projects-index row (`ProjectPresenter::row`, EPIC-015 §11.1). Health is the index form:
+ * count-only reasons, so `milestones_overdue.earliest` is always null here by design. Lifecycle
+ * `status` (what someone set) and `health` (what the data says) are separate facts.
+ */
+export type ProjectIndexRow = {
     id: number;
     name: string;
-    description: string | null;
     status: ProjectStatus;
+    /** Null for on hold and archived projects: the lifecycle status carries the meaning. */
+    health: ProjectHealthDto | null;
+    /** Valid tasks only, board column authoritative for done; `completion` is 0 to 100. */
+    tasks: { total: number; done: number; completion: number };
     /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
     targetDate: string | null;
-    /** 0 to 100, tasks in done columns over all tasks. */
-    completion: number;
-    overdueCount: number;
+    /** The first upcoming milestone (not completed, not overdue), or null. */
+    nextMilestone: { id: number; name: string; dueDate: string } | null;
+    /** The existing member-count aggregate; the index carries no member names. */
     memberCount: number;
 };
+
+/** The projects index's one filter (lifecycle status); `null` is every status (P5). */
+export type ProjectIndexFilters = { status: ProjectStatus | null };
 
 /** The project's own editable fields (ProjectPresenter::detail). */
 export type ProjectDetail = {

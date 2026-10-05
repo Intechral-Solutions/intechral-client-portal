@@ -4,8 +4,9 @@ namespace App\Http\Presenters;
 
 use App\Models\CrmCompany;
 use App\Models\Project;
+use App\Models\ProjectMilestone;
 use App\Models\User;
-use Illuminate\Support\Str;
+use App\Queries\ProjectHealth;
 
 /**
  * Page DTOs for the project index, create and edit pages (EPIC-011E §5). Every method returns
@@ -14,28 +15,62 @@ use Illuminate\Support\Str;
  */
 final class ProjectPresenter
 {
-    /** Long enough for the two-line card clamp; the full text stays on the edit page. */
-    private const DESCRIPTION_LIMIT = 240;
-
     /**
-     * One index card. The project must come from a query that used Project::withTaskStats().
+     * One projects-index row (EPIC-015 §11.1, WP4). The project must come from a query that used
+     * `ProjectHealth::withFacts()`, so health and progress are read from aggregates already loaded.
+     * Health is the index form: count-only reasons, `earliest` always null (§8.2). The member count is
+     * the existing aggregate; no member name, budget, time or Settings datum is on the index.
      *
-     * @return array{id: int, name: string, description: string|null, status: string, targetDate: string|null, completion: int, overdueCount: int, memberCount: int}
+     * @return array{id: int, name: string, status: string, health: array<string, mixed>|null, tasks: array{total: int, done: int, completion: int}, targetDate: string|null, nextMilestone: array{id: int, name: string, dueDate: string}|null, memberCount: int}
      */
-    public static function card(Project $project): array
+    public static function row(Project $project, ?ProjectMilestone $next): array
     {
         return [
             'id' => $project->id,
             'name' => $project->name,
-            'description' => $project->description === null
-                ? null
-                : Str::limit($project->description, self::DESCRIPTION_LIMIT),
             'status' => $project->status,
+            'health' => ProjectHealth::forIndex($project),
+            'tasks' => [
+                'total' => (int) $project->tasks_count,
+                'done' => (int) $project->done_tasks_count,
+                'completion' => $project->completionFromCounts(),
+            ],
             'targetDate' => $project->target_date?->toDateString(),
-            'completion' => $project->completionFromCounts(),
-            'overdueCount' => (int) $project->overdue_tasks_count,
+            'nextMilestone' => $next === null ? null : [
+                'id' => $next->id,
+                'name' => $next->name,
+                'dueDate' => $next->due_date->toDateString(),
+            ],
             'memberCount' => (int) $project->members_count,
         ];
+    }
+
+    /**
+     * Each listed project's next milestone, the first upcoming one (not completed, not overdue) by
+     * (`due_date`, `id`), the Overview's "next" rule: one query for the whole page (§11.1, §17).
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, ProjectMilestone> keyed by project id
+     */
+    public static function nextMilestones(array $projectIds): array
+    {
+        if ($projectIds === []) {
+            return [];
+        }
+
+        $next = [];
+        $upcoming = ProjectMilestone::query()
+            ->whereIn('project_id', $projectIds)
+            ->upcoming()
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->get(['id', 'project_id', 'name', 'due_date']);
+
+        foreach ($upcoming as $milestone) {
+            $next[$milestone->project_id] ??= $milestone;
+        }
+
+        return $next;
     }
 
     /**

@@ -124,14 +124,13 @@ final class ProjectOverviewPresenter
      */
     private static function milestones(Project $stats, $milestones): array
     {
-        $current = $milestones->first(fn (ProjectMilestone $milestone) => ! $milestone->isCompleted());
         $next = $milestones->first(fn (ProjectMilestone $milestone) => ! $milestone->isCompleted() && ! $milestone->isOverdue());
 
         return [
             'total' => (int) $stats->milestones_count,
             'completed' => (int) $stats->completed_milestones_count,
             'overdue' => (int) $stats->overdue_milestones_count,
-            'currentId' => $current?->id,
+            'currentId' => ProjectMilestonePresenter::currentId($milestones),
             'nextId' => $next?->id,
             'items' => $milestones->map(fn (ProjectMilestone $milestone) => ProjectMilestonePresenter::item($milestone))->values()->all(),
         ];

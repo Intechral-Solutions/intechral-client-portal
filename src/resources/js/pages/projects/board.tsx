@@ -1,15 +1,12 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import type { ReactElement } from 'react';
 
-import { EntityHeader } from '@/components/entity-header';
 import { PageFrame } from '@/components/page-frame';
 import { Board } from '@/components/projects/board';
-import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
-import { buttonVariants } from '@/components/ui/button';
+import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
 import { AppShell } from '@/components/shell/app-shell';
 import { layoutPageProps } from '@/lib/inertia-layout';
-import { edit, show } from '@/routes/projects';
-import { index as milestonesIndex } from '@/routes/projects/milestones';
+import { show } from '@/routes/projects';
 import type { BoardColumn, ProjectStatus } from '@/types/projects';
 
 export type ProjectBoardProps = {
@@ -24,19 +21,17 @@ export type ProjectBoardProps = {
 };
 
 /**
- * EPIC-013 WP7 — the board on a `canvas` frame (§19.3).
+ * EPIC-013 WP7 — the board on a `canvas` frame (§19.3); EPIC-015 WP4 — inside the project workspace.
  *
- * Canvas is the genuine win here: the board was already full-bleed, so moving it onto the frame hands
- * it the whole viewport minus the page gutters and lets its columns use the width the new shell
- * freed. Nothing about the board's own behaviour changes — drag, quick-add, move and reorder are the
- * `Board` component's, untouched.
+ * Canvas is the genuine win here: the board was already full-bleed, so the frame hands it the whole
+ * viewport minus the page gutters. Nothing about the board's own behaviour changes — drag, quick-add,
+ * move and reorder are the `Board` component's, untouched, and the Board stays where tasks are created
+ * (P8).
  *
- * The header is the WP7 change worth naming. A project board is an *entity* page in Direction D's
- * grammar (§6: an entity page shows the record's name, its state, its actions, then the strata), so
- * the hand-rolled title row this page carried becomes the real `EntityHeader` and is where the strata
- * motif legitimately appears (§17 lists the project workspace by name). That replaced row also held a
- * hand-built "Projects /" trail; the shell's utility bar has owned the breadcrumb since WP4, so the
- * page no longer draws a second one beside it.
+ * The header is the project's shared one (`ProjectWorkspaceHeader`, EPIC-015 §14.1): identity,
+ * lifecycle, Settings when the server allows it, and the four project tabs with Board current. The
+ * Milestones header link this page carried became the Milestones tab. The page's section heading is
+ * visually hidden, as on the Tasks tab: the current tab and the trail already name it on screen.
  */
 export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardProps) {
     return (
@@ -44,31 +39,15 @@ export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardPr
             <Head title={`${project.name} — Board`} />
 
             <PageFrame width="canvas" className="flex flex-col gap-4">
-                <EntityHeader
-                    overline="Project"
-                    title={project.name}
-                    status={<ProjectStatusBadge status={project.status} />}
-                    actions={
-                        <>
-                            <Link
-                                href={milestonesIndex.url(project.id)}
-                                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                            >
-                                Milestones
-                            </Link>
-                            {/* Still gated on the server's own answer: `openSettings` is whether
-                                projects.edit will actually admit this actor (A9), not a guess. */}
-                            {abilities.openSettings ? (
-                                <Link
-                                    href={edit.url(project.id)}
-                                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                                >
-                                    Settings
-                                </Link>
-                            ) : null}
-                        </>
-                    }
+                <ProjectWorkspaceHeader
+                    project={project}
+                    current="board"
+                    // Still gated on the server's own answer: `openSettings` is whether
+                    // projects.edit will actually admit this actor (A9), not a guess.
+                    openSettings={abilities.openSettings}
                 />
+
+                <h2 className="sr-only">Board</h2>
 
                 <Board projectId={project.id} columns={columns} abilities={abilities} />
             </PageFrame>
@@ -78,7 +57,7 @@ export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardPr
 
 /**
  * The shell's one breadcrumb names the project, linking to its Overview, then the Board (EPIC-015
- * §11.3), so the board has a way back to the project's home before WP4 gives it the project tabs.
+ * §11.3). No page-owned breadcrumb.
  */
 ProjectBoardPage.layout = (page: ReactElement) => {
     const props = layoutPageProps<ProjectBoardProps>(page);

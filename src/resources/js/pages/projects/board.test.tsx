@@ -42,13 +42,36 @@ it('renders the project name, status, and board region', () => {
     expect(screen.getByRole('region', { name: 'Kanban board' })).toBeInTheDocument();
 });
 
-it('always links to Milestones', () => {
+// FLIPPED IN EPIC-015 WP4: Milestones was a header button; it is now the project tab (§14.1), in the
+// shared four-link navigation with Board current, and there is no separate Milestones button.
+it('carries the shared project navigation, Board current, with Milestones as a tab', () => {
     renderPage();
 
-    expect(screen.getByRole('link', { name: 'Milestones' })).toHaveAttribute(
-        'href',
-        '/projects/7/milestones',
+    const nav = screen.getByRole('navigation', { name: 'Project' });
+    expect(
+        within(nav)
+            .getAllByRole('link')
+            .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+        ['Overview', '/projects/7'],
+        ['Board', '/projects/7/board'],
+        ['Tasks', '/projects/7/tasks'],
+        ['Milestones', '/projects/7/milestones'],
+    ]);
+    expect(within(nav).getByRole('link', { name: 'Board' })).toHaveAttribute(
+        'aria-current',
+        'page',
     );
+    expect(screen.getAllByRole('link', { name: 'Milestones' })).toHaveLength(1);
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+});
+
+it('names the page section Board for assistive technology, under the one h1', () => {
+    renderPage();
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: 'Board' })).toHaveClass('sr-only');
 });
 
 it('shows the Settings link only when abilities.openSettings is true', () => {
@@ -74,8 +97,12 @@ it('draws no trail of its own, because the shell owns the breadcrumb', () => {
     // provided is not lost — it moved to the shell, where `board-migration.spec.ts` asserts there is
     // exactly one of it. This inverts the old assertion rather than dropping it, which is the
     // clearest record of the boundary change.
+    // EPIC-015 WP4: the page's only navigation is now the project tabs; still no breadcrumb.
     expect(screen.queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('navigation').map((nav) => nav.getAttribute('aria-label'))).toEqual([
+        'Project',
+    ]);
 });
 
 it('states the project as an entity, with the strata motif §17 allows here', () => {

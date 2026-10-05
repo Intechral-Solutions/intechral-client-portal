@@ -76,23 +76,36 @@ test('index to a board with a persistent timer, and Board ↔ Milestones stays I
     // to the board, still as Inertia visits.
     await page.getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).click();
     await expect(page).toHaveURL(`/projects/${projectId}`);
-    await page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Board' }).click();
+    await page
+        .getByRole('navigation', { name: 'Project' })
+        .getByRole('link', { name: 'Board' })
+        .click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
     const clock = timerPill(page).locator('[data-timer-elapsed="wide"]');
     const firstReading = await clock.textContent();
     await expect(clock).not.toHaveText(firstReading ?? '', { timeout: 3000 });
 
     // Board → Milestones → Board: both directions are now React pages (WP4, WP5), so this
-    // is an Inertia visit each way; the timer keeps ticking uninterrupted throughout.
-    await page.getByRole('link', { name: 'Milestones', exact: true }).click();
+    // is an Inertia visit each way; the timer keeps ticking uninterrupted throughout. Since
+    // EPIC-015 WP4 Milestones is a project tab rather than a header button.
+    await page
+        .getByRole('navigation', { name: 'Project', exact: true })
+        .getByRole('link', { name: 'Milestones' })
+        .click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
     await expect(timerPill(page)).toBeVisible();
 
-    // The milestones page's project link is a generic project link: it opens the Overview
-    // (EPIC-015 WP2), and the project navigation returns to the board.
-    await page.getByRole('main').getByRole('link', { name: 'E2E WP5 board nav project', exact: true }).first().click();
+    // The milestones page's way back to the project is its Overview tab (EPIC-015 WP4; it was the
+    // page's own project-name link), and the project navigation returns to the board.
+    await page
+        .getByRole('navigation', { name: 'Project', exact: true })
+        .getByRole('link', { name: 'Overview' })
+        .click();
     await expect(page).toHaveURL(`/projects/${projectId}`);
-    await page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Board' }).click();
+    await page
+        .getByRole('navigation', { name: 'Project' })
+        .getByRole('link', { name: 'Board' })
+        .click();
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
     const secondReading = await clock.textContent();
     await expect(clock).not.toHaveText(secondReading ?? '', { timeout: 3000 });
@@ -219,11 +232,36 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
     );
     expect(bodyOverflow).toBe(false);
 
+    // EPIC-015 WP4: the shared project header and tabs sit above the board at 390px without taking
+    // over its own horizontal scrolling: every tab and Settings stay reachable, Board is current,
+    // and the board region still scrolls inside itself rather than the document.
+    const tabs = page.getByRole('navigation', { name: 'Project', exact: true });
+    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+        const link = tabs.getByRole('link', { name: label });
+        await link.scrollIntoViewIfNeeded();
+        await expect(link).toBeInViewport();
+    }
+    await expect(tabs.getByRole('link', { name: 'Board' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('main').getByRole('link', { name: 'Settings' })).toBeVisible();
+    const board = page.getByRole('region', { name: 'Kanban board' });
+    const [boardScroll, boardClient] = await board.evaluate((node) => [
+        node.scrollWidth,
+        node.clientWidth,
+    ]);
+    expect(boardScroll, 'the board scrolls inside its own region at 390px').toBeGreaterThan(
+        boardClient,
+    );
+
     await page.getByRole('button', { name: 'Move "E2E mobile task"' }).click();
     await page.getByRole('menuitem', { name: 'Move to To Do' }).click();
 
     const toDoColumn = page.locator('[data-column-id]').filter({ hasText: 'To Do' });
     await expect(toDoColumn.getByRole('link', { name: 'E2E mobile task' })).toBeVisible();
+    expect(
+        await page.evaluate(
+            () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        ),
+    ).toBe(false);
 });
 
 /**
@@ -256,9 +294,7 @@ test('the board reclaims the wide canvas on its page frame, under an entity head
 
     const padding = await frame.evaluate((node) => getComputedStyle(node).paddingLeft);
     expect(padding).toBe('40px');
-    expect(
-        await frame.evaluate((node) => getComputedStyle(node).maxWidth),
-    ).toBe('none');
+    expect(await frame.evaluate((node) => getComputedStyle(node).maxWidth)).toBe('none');
 
     // The entity header (Direction D §6): the record's name is the page's one h1, its state is a
     // glyph-and-label status rather than colour alone, and the strata rule closes the block. §17
@@ -273,8 +309,14 @@ test('the board reclaims the wide canvas on its page frame, under an entity head
     // breadcrumb since WP4, and two of them would be two sources of truth.
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(1);
 
-    // The actions survive the move into the header, as links, still Inertia.
-    await expect(page.getByRole('link', { name: 'Milestones' })).toBeVisible();
+    // EPIC-015 WP4: the header is the shared project one. Milestones moved from a header button
+    // into the four project tabs (Board current); Settings stays a header action, never a tab.
+    const tabs = page.getByRole('navigation', { name: 'Project', exact: true });
+    await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
+    await expect(tabs.locator('[aria-current="page"]')).toHaveText('Board');
+    await expect(page.getByRole('tablist')).toHaveCount(0);
+    await expect(page.getByRole('main').getByRole('link', { name: 'Settings' })).toBeVisible();
+    await expect(tabs.getByRole('link', { name: 'Settings' })).toHaveCount(0);
 
     const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,

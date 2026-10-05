@@ -3,7 +3,7 @@ import { memo } from 'react';
 import type { ReactNode } from 'react';
 
 import { MoveTaskMenu, type MoveTargetColumn } from '@/components/projects/move-task-menu';
-import { PriorityBadge } from '@/components/projects/priority-badge';
+import { TaskPriorityMark } from '@/components/tasks/task-priority';
 import { Avatar } from '@/components/ui/avatar';
 import { formatDate } from '@/lib/dates';
 import { show as taskShowRoute } from '@/routes/projects/tasks';
@@ -56,7 +56,7 @@ function TaskCardImpl({
             <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                     {dragHandle}
-                    <PriorityBadge priority={task.priority} />
+                    <TaskPriorityMark priority={task.priority} />
                 </div>
                 {task.milestone ? (
                     <span

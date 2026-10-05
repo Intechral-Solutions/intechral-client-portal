@@ -43,4 +43,22 @@ final class ProjectMilestonePresenter
             'overdue' => $milestone->isOverdue(),
         ];
     }
+
+    /**
+     * The current milestone (EPIC-015 §14.2): the first incomplete one, in the order given, which is
+     * the relation's (`due_date`, `id`). Explicit completion decides it, never task progress. The one
+     * rule the Overview and the Milestones page share.
+     *
+     * @param  iterable<ProjectMilestone>  $milestones
+     */
+    public static function currentId(iterable $milestones): ?int
+    {
+        foreach ($milestones as $milestone) {
+            if (! $milestone->isCompleted()) {
+                return $milestone->id;
+            }
+        }
+
+        return null;
+    }
 }

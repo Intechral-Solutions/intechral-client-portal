@@ -1,93 +1,143 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { CalendarClock, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { PageHeader } from '@/components/page-header';
-import { MilestoneCard } from '@/components/projects/milestone-card';
+import { PageFrame } from '@/components/page-frame';
 import { MilestoneFormDialog } from '@/components/projects/milestone-form-dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { MilestoneListItem } from '@/components/projects/milestone-list-item';
+import { milestoneStages } from '@/components/projects/milestone-stages';
+import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
+import { Section } from '@/components/section';
 import { AppShell } from '@/components/shell/app-shell';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StagePath, stagePathWindow } from '@/components/ui/stage-path';
+import { layoutPageProps } from '@/lib/inertia-layout';
 import { show } from '@/routes/projects';
-import type { MilestoneItem } from '@/types/projects';
+import type { MilestoneItem, ProjectStatus } from '@/types/projects';
 
+/**
+ * EPIC-015 WP4 — the project's Milestones tab (§11.1, §14.1), inside the shared project header.
+ *
+ * The full `StagePath` of every milestone (the same mapping as the Overview's compact one), then the
+ * milestones in order with their explicit completion, due date and linked-task progress, and, for an
+ * actor the server allows (`manage`, the Settings-access answer, A9), Complete/Reopen, Edit, Delete
+ * and New milestone. Completion is explicit stored state; linked-task progress is informational and
+ * never worded as completion (Q2, INV-P9). Overdue and the current milestone are the server's.
+ */
 export type MilestonesIndexProps = {
-    project: { id: number; name: string };
+    project: { id: number; name: string; status: ProjectStatus };
+    /** In the server's order: due date, then id. */
     milestones: MilestoneItem[];
+    /** The first incomplete milestone, the StagePath's current stage (the Overview's rule). */
+    currentId: number | null;
+    /** `manage` is `ProjectSettingsAccess` (A9): milestone mutations and the Settings action. */
     abilities: { manage: boolean };
 };
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; milestone: MilestoneItem } | null;
 
-export function MilestonesIndexPage({ project, milestones, abilities }: MilestonesIndexProps) {
+function plural(count: number, one: string, many: string) {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+export function MilestonesIndexPage({
+    project,
+    milestones,
+    currentId,
+    abilities,
+}: MilestonesIndexProps) {
     const [dialog, setDialog] = useState<DialogState>(null);
+    const openCreate = () => setDialog({ mode: 'create' });
+
+    const total = milestones.length;
+    const completed = milestones.filter((milestone) => milestone.completedAt !== null).length;
+    const overdue = milestones.filter((milestone) => milestone.overdue).length;
+    const stages = milestoneStages(milestones, currentId);
+    const { start, end } = stagePathWindow(stages);
 
     return (
         <>
             <Head title={`${project.name} — Milestones`} />
-            <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-                <p className="mb-2 text-sm text-muted-foreground">
-                    {/* The project's own page is its Overview (EPIC-015 Q5, §11.3). */}
-                    <Link href={show.url(project.id)} className="hover:underline">
-                        {project.name}
-                    </Link>{' '}
-                    / Milestones
-                </p>
-                <PageHeader
+            <PageFrame
+                width="grid"
+                header={
+                    <ProjectWorkspaceHeader
+                        project={project}
+                        current="milestones"
+                        // The same resolver as every milestone mutation (ProjectSettingsAccess).
+                        openSettings={abilities.manage}
+                    />
+                }
+            >
+                <Section
                     title="Milestones"
-                    description="Group tasks under a target date to track progress toward it."
+                    description="Dated checkpoints. A milestone is complete only when someone completes it; its linked tasks show progress toward it."
                     actions={
                         abilities.manage ? (
-                            <Button type="button" onClick={() => setDialog({ mode: 'create' })}>
+                            <Button type="button" size="sm" onClick={openCreate}>
                                 <Plus aria-hidden="true" />
                                 New milestone
                             </Button>
                         ) : undefined
                     }
-                />
-
-                {milestones.length === 0 ? (
-                    <div className="mt-8 flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-4 py-14 text-center">
-                        <CalendarClock
-                            className="h-10 w-10 text-muted-foreground"
-                            aria-hidden="true"
+                >
+                    {total === 0 ? (
+                        <EmptyState
+                            icon={CalendarClock}
+                            title="No milestones yet"
+                            description="Milestones are dated checkpoints, such as kickoff or go-live."
+                            action={
+                                abilities.manage ? (
+                                    <Button type="button" variant="secondary" onClick={openCreate}>
+                                        Create the first milestone
+                                    </Button>
+                                ) : undefined
+                            }
                         />
-                        <p className="text-sm font-medium text-muted-foreground">
-                            No milestones yet.
-                        </p>
-                        {abilities.manage ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setDialog({ mode: 'create' })}
+                    ) : (
+                        <div className="space-y-5">
+                            <p
+                                className="text-sm text-text-secondary"
+                                data-testid="milestone-summary"
                             >
-                                Create the first milestone
-                            </Button>
-                        ) : null}
-                    </div>
-                ) : (
-                    <section aria-label="Milestones" className="mt-8 space-y-4">
-                        {milestones.map((milestone) => (
-                            <MilestoneCard
-                                key={milestone.id}
-                                milestone={milestone}
-                                projectId={project.id}
-                                canManage={abilities.manage}
-                                onEdit={() => setDialog({ mode: 'edit', milestone })}
-                            />
-                        ))}
-                    </section>
-                )}
+                                {completed} of {plural(total, 'milestone', 'milestones')} complete
+                                {overdue > 0 ? (
+                                    <span className="font-medium text-danger">
+                                        {' '}
+                                        · {overdue} overdue
+                                    </span>
+                                ) : null}
+                            </p>
 
-                <div className="mt-8">
-                    <Link
-                        href={show.url(project.id)}
-                        className={buttonVariants({ variant: 'outline' })}
-                    >
-                        Back to project
-                    </Link>
-                </div>
-            </div>
+                            <StagePath
+                                variant="full"
+                                stages={stages}
+                                label={`Milestones: ${completed} of ${total} complete`}
+                                hiddenBefore={start > 0 ? `+${start} earlier` : undefined}
+                                hiddenAfter={end < total ? `+${total - end} later` : undefined}
+                            />
+
+                            <ul
+                                role="list"
+                                aria-label="Milestones"
+                                className="divide-y divide-rule border-y border-rule"
+                            >
+                                {milestones.map((milestone) => (
+                                    <MilestoneListItem
+                                        key={milestone.id}
+                                        milestone={milestone}
+                                        projectId={project.id}
+                                        canManage={abilities.manage}
+                                        onEdit={() => setDialog({ mode: 'edit', milestone })}
+                                    />
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </Section>
+            </PageFrame>
 
             {abilities.manage ? (
                 <MilestoneFormDialog
@@ -107,6 +157,25 @@ export function MilestonesIndexPage({ project, milestones, abilities }: Mileston
     );
 }
 
-MilestonesIndexPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
+/**
+ * The shell's one breadcrumb: `Projects › All projects › {project} › Milestones`, the project segment
+ * opening its Overview (§11.3). The page draws no trail of its own.
+ */
+MilestonesIndexPage.layout = (page: ReactElement) => {
+    const props = layoutPageProps<MilestonesIndexProps>(page);
+
+    return (
+        <AppShell
+            trail={
+                props && [
+                    { label: props.project.name, href: show.url(props.project.id) },
+                    { label: 'Milestones' },
+                ]
+            }
+        >
+            {page}
+        </AppShell>
+    );
+};
 
 export default MilestonesIndexPage;

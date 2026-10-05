@@ -59,6 +59,17 @@ class ProjectMilestone extends Model
         return $query->whereNotNull('project_milestones.completed_at');
     }
 
+    /**
+     * Not completed and not overdue: the milestones still ahead. SQL twin of the Overview's "next"
+     * rule (`! isCompleted() && ! isOverdue()`), composed from the two scopes above so neither rule is
+     * restated.
+     */
+    public function scopeUpcoming(Builder $query): Builder
+    {
+        return $query->whereNull('project_milestones.completed_at')
+            ->whereNot(fn (Builder $overdue) => $overdue->overdue());
+    }
+
     public function completionPercentage(): int
     {
         return Project::percentage($this->tasks()->ofValidKind()->done()->count(), $this->tasks()->ofValidKind()->count());

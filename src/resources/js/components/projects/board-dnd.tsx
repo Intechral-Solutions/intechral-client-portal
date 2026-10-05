@@ -76,7 +76,7 @@ import {
     isNoopMove,
     resolveDragTarget,
 } from '@/components/projects/board-moves';
-import { PriorityBadge } from '@/components/projects/priority-badge';
+import { TaskPriorityMark } from '@/components/tasks/task-priority';
 import { TaskCard, type TaskCardProps } from '@/components/projects/task-card';
 import { cn } from '@/lib/utils';
 import type { BoardColumn, BoardTask } from '@/types/projects';
@@ -239,7 +239,7 @@ function TaskCardOverlayPreview({ task }: { task: BoardTask }) {
             aria-hidden="true"
             className="w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 text-card-foreground shadow-lg"
         >
-            <PriorityBadge priority={task.priority} />
+            <TaskPriorityMark priority={task.priority} />
             <p className="text-sm leading-snug font-medium">{task.title}</p>
         </div>
     );

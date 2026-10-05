@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
+use App\Queries\ProjectHealth;
 use App\Rules\AccessibleCrmCompany;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
@@ -17,20 +18,42 @@ class ProjectController extends Controller
 {
     public function __construct(private ProjectService $service) {}
 
-    public function index(): Response
+    /** Lifecycle statuses, in the order the filter offers them (EPIC-015 §11.1, P5). */
+    public const STATUSES = ['active' => 'Active', 'on_hold' => 'On hold', 'completed' => 'Completed', 'archived' => 'Archived'];
+
+    /**
+     * The projects index (EPIC-015 §11.1, §14.1, WP4): a scanning list, not a dashboard. Health and
+     * progress come from the aggregates in the page query (`ProjectHealth::withFacts`), the next
+     * milestone from one bounded query for the page's ids, so a page costs no query per project.
+     *
+     * The one filter is lifecycle status, absent by default (P5: every status, as before). An unknown
+     * value is dropped, never a redirect; page links carry only the normalized filter.
+     */
+    public function index(Request $request): Response
     {
         $user = auth()->user();
+        $status = is_string($request->query('status')) && array_key_exists($request->query('status'), self::STATUSES)
+            ? $request->query('status')
+            : null;
 
-        $projects = Project::visibleTo($user)
-            ->withTaskStats()
+        $projects = ProjectHealth::withFacts(Project::visibleTo($user))
+            ->when($status !== null, fn ($query) => $query->where('projects.status', $status))
             ->latest()
             ->orderByDesc('id')
             ->paginate(20)
-            ->withQueryString()
-            ->through(fn (Project $project) => ProjectPresenter::card($project));
+            ->appends(array_filter(['status' => $status]));
+
+        $next = ProjectPresenter::nextMilestones($projects->getCollection()->modelKeys());
 
         return Inertia::render('projects/index', [
-            'projects' => $projects,
+            'projects' => $projects->through(fn (Project $project) => ProjectPresenter::row($project, $next[$project->id] ?? null)),
+            'filters' => ['status' => $status],
+            'filterOptions' => [
+                'statuses' => array_map(fn ($value, $label) => ['value' => $value, 'label' => $label], array_keys(self::STATUSES), self::STATUSES),
+            ],
+            // Distinguishes "no projects at all" from "none with this status"; asked only when the
+            // filtered page is empty.
+            'hasProjects' => $projects->total() > 0 || ($status !== null && Project::visibleTo($user)->exists()),
             // What projects.create actually admits: the route requires projects.manage even
             // though the create policy also allows projects.admin alone (A9), so a link built
             // from the policy alone would lead an administrator to a 403.
