@@ -97,7 +97,13 @@ test('a manager edits task fields and assigns, then clears, a milestone (I4)', a
     await page.getByLabel('Name', { exact: false }).fill('E2E milestone');
     await page.getByLabel('Due date', { exact: false }).fill('2030-01-01');
     await page.getByRole('button', { name: 'Create milestone' }).click();
-    await expect(page.getByText('E2E milestone')).toBeVisible();
+    // The milestone's own row in the Milestones list. EPIC-015 WP4 also draws its name in the page's
+    // StagePath, so a bare text match is no longer unique; `exact` keeps the StagePath list out.
+    await expect(
+        page
+            .getByRole('list', { name: 'Milestones', exact: true })
+            .getByRole('listitem', { name: 'E2E milestone', exact: true }),
+    ).toBeVisible();
 
     await page.goto(`/projects/${projectId}/board`);
     await quickAdd(page, 'Backlog', 'E2E WP7 edit task');
