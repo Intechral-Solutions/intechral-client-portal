@@ -196,6 +196,16 @@ The built-in `user` role receives the `*.view_org` permissions. `tasks.view_org`
 3. For tenant-scoped data, is the record reachable through one of the user's memberships? → Visible or hidden/404.
 4. Apply the model policy or ownership rule for the requested action.
 
+## Project workspace authorization (EPIC-015)
+
+EPIC-015 added **no permission** and changed no role; it introduced named seams over the existing ones ([EPIC-015 §7](../epics/EPIC-015-projects-ux-expansion.md#7-authorization-and-customer-safety-contract)):
+
+- **Settings access** (`ProjectSettingsAccess`) is the accepted A9 conjunction, `ProjectPolicy::manage` **and** `projects.manage`. It decides the Settings action, the Milestones `manage` ability, and on the Overview the budget and the names-and-roles roster, whose keys are absent from the props for everyone else. The Settings routes still enforce it themselves (route middleware plus `authorize('manage')`), and a parity test pins the resolver to a real `projects.edit` request.
+- **Project time visibility** (`ProjectTimeAccess`): `time.view_all` sees all of a project's attributed time, `time.log` alone sees only the viewer's own, and neither sees none (the Overview omits its time key; the Project Time tab answers 403 and is not offered). `ProjectPolicy::view` is checked first.
+- **New-time eligibility on a board task** (`AccessibleTimeContext`) requires current `ProjectPolicy::view`; a stored assignee alone grants nothing once the user has left the project. Stopping a running timer and editing an entry whose task is unchanged stay allowed.
+- **A task linked to both a project and a ticket** has no valid kind: every task ability and new time on it are refused, and it appears in no list or count.
+- **Project Tasks** (`TaskQuery::forProject`) is always a subset of `TaskPolicy::view`; milestone Complete/Reopen uses the same A9 rule as the other milestone mutations.
+
 ## Seeding
 
 Permissions are seeded from `database/seeders/PermissionSeeder.php`, which reads from a central permissions catalogue in `app/Shared/Permissions/PermissionCatalogue.php`. Each module registers its permissions there.

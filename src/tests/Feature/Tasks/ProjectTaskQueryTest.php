@@ -119,7 +119,9 @@ it('never surfaces a malformed project+ticket row, another project, a standalone
     $ids = projectRows($this->w['actors']['operator'], $this->w['p'], projectState());
 
     foreach (['d1', 'q1', 's1', 't1'] as $excluded) {
-        expect($ids)->not->toContain($this->w['tasks'][$excluded]->id, "{$excluded} leaked into project scope");
+        // One needle per assertion, the diagnostic as the message: `->not->toContain($id, $message)`
+        // treats the message as a second needle and so could never fail (EPIC-015 WP6 vacuity sweep).
+        $this->assertNotContains($this->w['tasks'][$excluded]->id, $ids, "{$excluded} leaked into project scope");
     }
 });
 

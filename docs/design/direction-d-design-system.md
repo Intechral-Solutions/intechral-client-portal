@@ -284,6 +284,14 @@ The drawer is **not** universally pinned. Each workspace declares a default, and
 4. State must be available **before first paint** to avoid layout shift. Recommended: a cookie read by Laravel and shared as an Inertia prop, mirroring the theme's no-flash contract. The server stays authoritative only for data, not this preference.
 5. A workspace with exactly one surface and no views has **no drawer**; its rail item links straight to the surface.
 
+> **Forward note (2026-10-05, EPIC-015 WP5).** As implemented and ruled by the owner, these rules are refined as follows; the table and numbered rules above are historical and are not rewritten.
+> - **Per-surface defaults.** Projects declares stable surface keys (`projects.board`, `projects.tasks`, `projects.time`), all collapsed; the projects list, Overview and Milestones keep the workspace default (open). A key names a kind of page, never a project or URL. A choice made on a surface is remembered under its surface key only; a workspace choice does not override a surface default. Earlier workspace-level choices are **not** migrated into surface keys.
+> - **Where the remembered state is written (rule 1, refined).** Only an explicit open/collapse **at XL** writes the remembered state. Below XL, opening and closing the overlay or sheet (including Esc, outside click and following a drawer link) is transient and never changes the XL preference.
+> - **The L pin (rule 2, refined).** The pin is per **workspace** and authoritative at L: a pinned workspace is docked on every one of its pages, whatever a surface default or an XL surface choice says. Pinning at L writes no XL value. Collapsing the drawer while it is docked at L releases the pin; there is no separate Unpin control.
+> - **M and S (rule 3).** The pin and the remembered state are both ignored for rendering at M and S.
+> - **Before first paint (rule 4).** Implemented without a cookie: the server stamps `data-workspace`, `data-drawer-default` and `data-drawer-surface` on the HTML root, and the inlined shell bootstrap resolves `data-drawer` from `localStorage` before paint (EPIC-013 S1). The preference is therefore per browser, not per user.
+> - These are **shared-shell** rules: they apply to every workspace that uses the drawer, not only Projects. One cross-renderer limit is accepted while unreachable: a Blade page has no pin control, so it cannot release a pin set from a React page of the same workspace; no current workspace has both. See [EPIC-015 A5.4 and A5.15](../epics/EPIC-015-projects-ux-expansion.md#a515-independent-review-owner-rulings-and-remediation).
+
 ### 5.4 Drawer states (D1, D2, D6)
 
 | State | Appearance | Controls |
@@ -364,6 +372,8 @@ The drawer is **not** universally pinned. Each workspace declares a default, and
 - The breadcrumb is always present in the operator utility bar and always ends with the current page.
 - `aria-current="page"` on the selected rail item and the selected drawer item; tabs use `role="tab"` / `aria-selected`.
 - Do not add a permanent third navigation level. Use tabs, the view menu or filters instead.
+
+> **Forward note (2026-10-05, EPIC-015).** Page tabs that each change the **route** use link semantics, not ARIA tabs. The project workspace navigation (Overview · Board · Tasks · Milestones, plus Time where the server offers it) is a labelled `nav` ("Project") of ordinary links with `aria-current="page"` on the current page, and has no `role="tablist"`, `role="tab"` or `aria-selected`, because each item is a separate page ([EPIC-015 §11.4, P3](../epics/EPIC-015-projects-ux-expansion.md#114-tabs)). The visual treatment above (2px ink underline, 600 weight, on the strata) is unchanged, and the strip scrolls horizontally at narrow widths rather than wrapping. `role="tab"` / `aria-selected` remain the rule for in-page tabs that switch panels without navigating. This note records the deviation; the rule text above is historical and is not rewritten.
 
 ---
 

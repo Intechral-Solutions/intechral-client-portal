@@ -82,7 +82,7 @@ const three = [
     }),
 ];
 
-it('sits in the shared project header: one h1, lifecycle, the four tabs with Milestones current', () => {
+it('sits in the shared project header: one h1, lifecycle, the four required tabs with Milestones current', () => {
     renderPage({ milestones: three, currentId: 2 });
 
     expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([

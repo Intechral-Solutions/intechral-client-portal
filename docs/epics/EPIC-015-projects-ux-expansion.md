@@ -1,6 +1,6 @@
 # EPIC-015: Projects UX Expansion
 
-**Status:** In Progress (2026-10-04). WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 is complete:** PR #17 merged to `main` (merge commit `e33056d`, implementation `6d3dfe8`) after independent review ([Amendment 2](#amendment-2-wp2-workspace-frame-and-overview)); the owner **waived** the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3), [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived)). **WP3 is complete:** PR #18 merged to `main` (merge commit `c24a900`, implementation `6f743c9`) after independent review, and the merge-triggered `main` CI is green after a test-only post-merge fix (`9685a25`) ([Amendment 3](#amendment-3-wp3-project-tasks)). **WP4 is complete:** PR #19 merged to `main` (merge commit `6fbbba3`, implementation `df06b1b`, test-only fix `1798531`) after independent review, with the merge-triggered `main` CI green ([Amendment 4](#amendment-4-wp4-remaining-direction-d-migration)). **WP5 (optional S1–S3, which the owner chose to implement rather than defer) is merged: PR #20 (head `451c74d`, merge commit `852578c`, 2026-10-05) shipped S1–S3 as one PR after an independent review, owner rulings, remediation and a short re-review (SAFE TO COMMIT), with both PR CI jobs green. Post-merge verification remediation is pending:** the merge-triggered `main` CI failed one query-budget assertion that was a test-measurement defect (a random session-garbage-collection query in the test harness), not a product regression; the test-only fix is in a follow-up PR and is not verified until that PR and `main` CI are green (the earlier local-validation history, including the red local browser runs, is kept in Amendment 5) ([Amendment 5](#amendment-5-wp5-optional-project-workspace-enhancements), [A5.15](#a515-independent-review-owner-rulings-and-remediation), [A5.16](#a516-post-merge-hosted-query-budget-failure-on-main-test-measurement-defect)). WP6 has not started. The epic is not Verified or Done.
+**Status:** Verified (2026-10-05); In Progress from 2026-10-04. WP0 is complete (committed `58c58f1`). **WP1 is complete:** PR A (time and integrity, PR #15) merged to `main` (`5a92f74`) and PR B (project domain, PR #16) merged to `main` (merge commit `66d60a2`, parents `5a92f74` and `0803dd7`), each after independent review, with the merge-triggered `main` CI green ([Amendment 1](#amendment-1-wp1-implementation)). **WP2 is complete:** PR #17 merged to `main` (merge commit `e33056d`, implementation `6d3dfe8`) after independent review ([Amendment 2](#amendment-2-wp2-workspace-frame-and-overview)); the owner **waived** the D3 design-reference entry gate ([§15](#15-design-reference-gate-d3), [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived)). **WP3 is complete:** PR #18 merged to `main` (merge commit `c24a900`, implementation `6f743c9`) after independent review, and the merge-triggered `main` CI is green after a test-only post-merge fix (`9685a25`) ([Amendment 3](#amendment-3-wp3-project-tasks)). **WP4 is complete:** PR #19 merged to `main` (merge commit `6fbbba3`, implementation `df06b1b`, test-only fix `1798531`) after independent review, with the merge-triggered `main` CI green ([Amendment 4](#amendment-4-wp4-remaining-direction-d-migration)). **WP5 (optional S1–S3, implemented by owner choice) is implemented, reviewed, merged and verified:** PR #20 (head `451c74d`, merge commit `852578c`, 2026-10-05) shipped Board Complete/Reopen, per-surface drawer defaults and persistence, and the Project Time tab as one PR, with both PR CI jobs green. Its post-merge test-harness remediation (a query-budget test-measurement defect, not a product regression) merged as PR #21 (head `c21fa12`, merge commit `146313d`) with green PR CI; that merge's `main` CI never executed (GitHub could not acquire hosted runners) and the owner waived it because the merged tree is identical to the tested head ([A5.16](#a516-post-merge-hosted-query-budget-failure-on-main-test-measurement-defect), [A6.13](#a613-github-actions-infrastructure-exception-pr-21-merge)). **WP6 (hardening and closeout) is implemented, independently reviewed (SAFE TO COMMIT — FINAL PR MAY OPEN) and its closeout PR #22 is green:** both hosted jobs passed on the package head `78b1aab` (run 37387148106; Playwright 141 passed, 3 workers, counts 0/0/0 → 0/0/0), so §19 #16 is satisfied and every one of the 16 criteria holds ([Amendment 6](#amendment-6-wp6-hardening-and-closeout), [A6.22](#a622-hosted-pr-ci-and-verification)). **The epic is Verified (2026-10-05); PR #22 is not yet merged.** Done follows its merge with green `main` CI.
 **Class:** Product functionality (Product Roadmap [NEXT — Core work management → Projects UX expansion](../product/product-roadmap.md#projects-ux-expansion))
 **Product direction:** [Platform Product & UX Direction → Project direction](../product/platform-product-ux-direction.md#project-direction) · [Information Architecture](../product/information-architecture.md) · [Product Roadmap](../product/product-roadmap.md)
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md) (D3 artboard: **not in the repository**, see [§15](#15-design-reference-gate-d3); the gate was **waived by the owner** for all remaining EPIC-015 visual work, including WP4, [A2.1](#a21-owner-decision-the-d3-artboard-gate-is-waived))
@@ -1488,6 +1488,8 @@ Growth per step: a project the viewer can see, two members, open/overdue/done ta
 
 > **Post-merge update (2026-10-05): WP5 is merged (PR #20, merge commit `852578c`); post-merge verification remediation is pending ([A5.16](#a516-post-merge-hosted-query-budget-failure-on-main-test-measurement-defect)). EPIC-015 remains In Progress; WP6 has not started.** The status below is the historical pre-merge state.
 >
+> **Later update (2026-10-05, WP6):** the remediation merged as PR #21 (merge `146313d`) and WP5 is verified; see [A6.13](#a613-github-actions-infrastructure-exception-pr-21-merge) for that merge's waived `main` run. The two updates above and below are kept as history.
+>
 > **Status (2026-10-05): WP5 implemented and independently reviewed once; uncommitted; remediation applied ([A5.15](#a515-independent-review-owner-rulings-and-remediation)), pending a short independent re-review. OWNER APPROVED: S1–S3 ship together as the single WP5 PR.** Earlier status, kept: WP5 implemented, uncommitted, in review. The owner chose to **implement** the optional package (S1 board-card Complete/Reopen, S2 per-surface drawer defaults, S3 Project Time tab) rather than defer it. S4 (Home "My work") is not part of it. Focused Pest, Vitest and browser evidence is green; the **one complete local browser run was red** (4 timeouts, A5.11) and stays recorded as red. The owner ruled on it (A5.14) and `./dev check` was then run (A5.14). The epic stays **In Progress**. Amendments 1–4 are not rewritten.
 
 ### A5.1 Starting point and contract
@@ -1721,3 +1723,227 @@ WP5's Project Time route, presenter and `ProjectTimeAccess` are not reached by a
 **Note on the earlier Board figure (A5.7, 14 small / 13 large).** One random extra query in a single small-world measurement would produce exactly such a one-query difference. That is a plausible explanation, **not proven** for that recorded figure; the budget contract (no growth with cards) is unaffected either way.
 
 **`./dev check` after the remediation: exit 0, "All checks passed".** CLI self-tests 196 assertions; `git diff --check` pass; Pint pass; Vitest 99 files / 1684 tests; build pass (424 modules); Pest **1915 passed (10739 assertions)** (one test and two assertions more than the pre-fix 1914 / 10737, the new determinism guard). Only PHP test code and documentation changed, so Playwright was not run; hosted CI is the final gate.
+
+---
+
+## Amendment 6: WP6 Hardening and Closeout
+
+> **Status (2026-10-05): EPIC-015 is Verified.** WP6 was implemented, independently reviewed (SAFE TO COMMIT — FINAL PR MAY OPEN) and opened as PR #22; both hosted jobs are green on the package head `78b1aab` (A6.22), which satisfied §19 #16. PR #22 is **not merged**; the epic moves to Done when it merges with green `main` CI (§19, repository lifecycle). Amendments 1–5 are not rewritten; only current status lines were updated.
+
+### A6.1 Starting point and method
+
+Branch `feature/epic-015-projects-ux` at **`146313d015fc2709899d15684dd75755afd267e1`** (merge of PR #21), equal to `main` and `origin/main`, working tree clean; `451c74d` (WP5), `852578c` (its merge) and `c21fa12` (the PR #21 head) are ancestors. The committed contract was re-read in full: §1–§25, Amendments 1–5, and the dependent EPIC-013 (Direction D shell, §31 forward notes, A13.13), EPIC-014 (A1.3.1 forward note) contracts, `rbac-design.md`, `docs/testing/ci.md`, `docs/testing/e2e-browser-suite.md`, the roadmap and the epic index. The WP6 contract is §18 WP6: the §19 acceptance matrix, an accessibility pass, full Playwright, the documentation sweep (README, roadmap, `rbac-design.md` if a rule changed, the `ci.md` A13.13 note, forward notes, the Direction D §8 forward note), query/performance verification, full gates, and the Verified and Done transitions. **No new product feature was found to be required by any §19 criterion**, and no production code changed in WP6.
+
+### A6.2 Package status
+
+| Package | Final status |
+|---|---|
+| WP0 | Complete (`58c58f1`) |
+| WP1 | Complete: PR A (#15, `5a92f74`) and PR B (#16, `66d60a2`), each independently reviewed, `main` CI green |
+| WP2 | Merged and verified (#17, `e33056d`) |
+| WP3 | Merged and verified (#18, `c24a900`; post-merge test fix `9685a25`) |
+| WP4 | Merged and verified (#19, `6fbbba3`) |
+| WP5 (optional, implemented by owner choice; **not deferred**) | **Implemented, reviewed, merged and verified**: Board Complete/Reopen, per-surface drawer defaults and persistence, the Project Time tab (#20, `852578c`); its test-harness follow-up (#21, `146313d`) |
+| WP6 | Implemented; independent closeout review returned SAFE TO COMMIT (A6.21); closeout PR #22 open and green (A6.22), not merged |
+
+### A6.3 Required-exit matrix (§19)
+
+S1–S4 (WP5) are not criteria; they appear only where they touch a required criterion's evidence. "Satisfied" means a named, passing, non-vacuous test enforces the criterion on the current tree (focused runs in A6.17).
+
+| # | Criterion | Status | Evidence / enforcing tests | Supplied by |
+|---|---|---|---|---|
+| 1 | Atomic creation (INV-P10), injected-failure proof, one Done column | **Satisfied** | `ProjectCreateAtomicityTest` (failures on 1st/3rd column, creator, members, companies leave zero rows; one Done column) | WP1 |
+| 2 | A13.13 `ProjectIntegrityTest` guard fails on any single forbidden label | **Satisfied** | `ProjectIntegrityTest` (`array_intersect` = `[]`), mutation-checked in A1.1.2 | WP1 |
+| 3 | Q8 departed assignee: no timer, manual time or context option; stop and unchanged edit work; standalone/ticket unchanged | **Satisfied** | `StaleAssigneeTimeEligibilityTest` (17), flipped `TaskCurrentBehaviorCharacterizationTest` | WP1 |
+| 4 | One canonical project-time scope; report, CSV, entry list, `/time` filter and Overview agree; `CASE` grouping; malformed rows; conservative delete guard | **Satisfied** | `ProjectTimeAttributionTest` (scope = group = Overview parity, `COALESCE` mutation fails, malformed rows), `ProjectOverviewPresenterTest` parity, `ProjectDeletionGuardTest` + `ProjectIntegrityAuditTest` (reported under one project, blocks both); WP5's `ProjectTimePageTest` joins the same parity (A6.8) | WP1 (+WP5) |
+| 5 | Explicit milestone Complete/Reopen under A9; Q2 overdue; zero-task milestones; task progress separate | **Satisfied** | `ProjectMilestoneLifecycleTest` (A9 actor matrix, idempotency, zero-task, INV-P9 both ways), `ProjectMilestoneInertiaTest` (flipped overdue), Milestones UI and `milestones-migration.spec.ts` | WP1, WP4 |
+| 6 | Health per §8: structured reasons in fixed order, index count-only, aggregates, no schema/override; dual-linked row characterized, Overview and Tasks agree | **Satisfied** | `ProjectHealthTest` (truth table, order, one-query page), `DualLinkedTaskCharacterizationTest`, `ProjectTasksPageTest` Overview↔Tasks count parity with a malformed row, Vitest renders server reasons only | WP1, WP3 |
+| 7 | `/projects/{project}` renders the Overview with §12.1 content; creation lands there; generic links target it; Board keeps its URI | **Satisfied** | `ProjectOverviewPageTest`, `ProjectInertiaPagesTest` (store → Overview), `TaskListPageTest`/`ProjectVisibilityTest` (generic links), matrix `projects.board`, `project-overview.spec.ts` | WP2 |
+| 8 | The four tabs on every project page; breadcrumbs, active state, one `h1`, one Breadcrumb landmark; no 404/405 at any boundary | **Satisfied** (the strip now also carries the optional Time tab when the server offers it) | `project-workspace-nav.test.tsx`, `projects-workspace.spec.ts` (five links on all five pages, customer member), `project-overview`/`project-tasks`/`project-time` specs (one `h1`, one breadcrumb), `NavigationBuilderTest` + `ProjectDrawerSurfaceTest` (one active view), boundary records A2.12/A3.4/A4.2 | WP2–WP4 (+WP5) |
+| 9 | Project Tasks per §13, never widens visibility | **Satisfied** | `ProjectTaskQueryTest` (INV-P12 parity, combinatorial subset; one vacuous guard repaired in WP6, A6.12), `ProjectTasksPageTest`, `project-tasks.spec.ts` | WP3 |
+| 10 | `StagePath` shared primitive, tested semantics, §14.2 window | **Satisfied** | `stage-path.test.tsx` (roles, `aria-current="step"`, window rule) | WP2 |
+| 11 | Index, Milestones, create/edit in Direction D; Board in the tab/header grammar | **Satisfied** | WP4 (A4.2–A4.7); WP6 visual closeout (A6.16) | WP4 |
+| 12 | Customer safety by key-absence DTO tests incl. the customer member; `completedBy` present; Overview budget/roster parity with `projects.edit` incl. the A9 actor | **Satisfied** | `ProjectOverviewPresenterTest` (nine-shape key matrix), `ProjectSettingsAccessTest` (ten actors, iff `projects.edit`), `ProjectOverviewPageTest`, index row minimality (`ProjectInertiaPagesTest`), `ProjectTasksPageTest`, `ProjectTimePageTest` (own scope: no person), browser customer flows | WP1–WP5 |
+| 13 | §17 budgets: Overview, index, Tasks tab, Milestones | **Satisfied** | `ProjectQueryBudgetTest` (A6.9) | WP1–WP4 |
+| 14 | INV-P1–P16 each with a named test | **Satisfied** after WP6's INV-P14 completion | A6.4 | WP1–WP6 |
+| 15 | No document overflow at 390px and the S/M boundary on every redesigned project page; nav name and `aria-current`; StagePath a11y tested; keyboard/focus pass. No NVDA | **Satisfied** after WP6 added the Tasks tab's 768px case (A6.11) | A6.11 | WP2–WP6 |
+| 16 | `./dev check`, `./dev test:e2e` and PR CI green **on the final package** | **Satisfied** (2026-10-05) | PR #22, run 37387148106 on head `78b1aab`: `./dev check gates` and the Playwright job (`./dev test:e2e`) both green (A6.22) | WP6 PR |
+
+### A6.4 Invariants (§6, §19 #14)
+
+| Invariant | Named test(s) |
+|---|---|
+| INV-P1 column-authoritative completion | `ProjectPinnedBehaviorTest` ("a board move never touches tasks.status"), `ProjectIntegrityTest`; WP5 card Complete/Reopen goes through `TaskService` (`ProjectBoardInertiaTest`) |
+| INV-P2 no project migration, no `project_id` on task endpoints | `TaskCurrentBehaviorCharacterizationTest` (INV-9), `StandaloneLifecycleTest` (INV-9), `ProjectTasksPageTest` read-only route surface |
+| INV-P3 conservative delete guard | `ProjectDeletionGuardTest`, `Unit/Architecture/TaskDeletionAuthorityTest`, `ProjectIntegrityAuditTest` (guard distinction) |
+| INV-P4 canonical project time | `ProjectTimeAttributionTest`, `ProjectTimePageTest` |
+| INV-P5 stale assignment grants no visibility or new time | `TaskPolicyMatrixTest` (departed assignee), `StaleAssigneeTimeEligibilityTest` |
+| INV-P6 stop and unchanged edit | `StaleAssigneeTimeEligibilityTest` |
+| INV-P7 billed immutable; Complete/Reopen touches no time | `BilledTimeEntryLockingTest`, `TaskCompletionTest` (INV-15) |
+| INV-P8 gated Overview fields | `ProjectOverviewPresenterTest`, `ProjectOverviewPageTest` |
+| INV-P9 milestone completion independent of tasks | `ProjectMilestoneLifecycleTest` |
+| INV-P10 atomic create | `ProjectCreateAtomicityTest` |
+| INV-P11 exactly one Done column | `DoneColumnResolverTest`, `ProjectIntegrityAuditTest` |
+| INV-P12 project scope ⊆ `TaskPolicy::view` | `ProjectTaskQueryTest` |
+| INV-P13 health is a server function | `ProjectHealthTest`; `pages/projects/show.test.tsx` (server order, unknown codes never rendered) |
+| INV-P14 navigation is presentation; every route authorizes itself | `ProjectAuthorizationMatrixTest` (**WP6: `projects.time.index` row added and a completeness guard**, A6.7), `NavigationBuilderTest` |
+| INV-P15 no email/raw model/unopenable link | `ProjectOverviewPageTest`, `ProjectTasksPageTest`, `ProjectInertiaPagesTest`, `ProjectTimePageTest`, `ProjectBoardInertiaTest` |
+| INV-P16 Overview budget/roster iff Settings access | `ProjectSettingsAccessTest` |
+
+### A6.5 Locked decisions reconciled
+
+Q1 (derived health, no override), Q2 (explicit milestone completion; overdue = due past and not completed), Q3 (budget metadata only, Settings-gated), Q4 (no stakeholder view; customer-safe workspace), Q5 (Overview as `projects.show`, Board keeps its URI), Q6 (`TaskQuery::forProject`), Q7 (D3 waived for all visual work, A2.1), Q8 (stale assignee), PT (task-first attribution, `CASE` grouping), and the later owner rulings (dual-linked rows have no valid kind, A1.1.5; one WP5 PR, transient narrow-width drawer use, workspace-wide L pin, no preference migration, A5.15; hosted CI as the complete-browser gate, A5.14) all hold on the current tree, each pinned by the tests in A6.3/A6.4. Nothing was re-opened.
+
+### A6.6 Final surface matrix
+
+| Surface | Route | Primary authorization | Frame / header | Shell trail | Project nav | Settings | Customer member | Responsive evidence | Budget evidence | Browser evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Projects index | `projects.index` | authenticated; rows `Project::visibleTo` | `PageFrame canvas`, `PageHeader` | Projects › All projects | none (portfolio) | n/a; New project only with `create` | sees own projects, no New project | 390/768/1440 | 9 = 9 (A4.9) | `projects-workspace`, `projects-migration` |
+| Overview | `projects.show` | `view` | `PageFrame grid`, `ProjectWorkspaceHeader` | … › {project} | yes, current | iff `ProjectSettingsAccess` | no budget, roster, Settings; own time | 390/768/1440 | 13 = 13 page; presenter 9–11 | `project-overview` |
+| Board | `projects.board` | `view` (mutations `manage`, per-card abilities) | `PageFrame canvas`, shared header | … › Board | yes | iff `openSettings` | read-only board; ring only where abilities allow | 390 (scrolls in its region)/768/1440 | 13 = 13 (A6.9) | `board-migration`, `board-drag`, `board-complete` |
+| Tasks | `projects.tasks.index` | `view`; row abilities | `PageFrame canvas`, shared header | … › Tasks | yes | iff Settings access | same rows, own actions only | 390/**768 (WP6)**/1440 | nine shapes constant (A3.9) | `project-tasks` |
+| Milestones | `projects.milestones.index` | `view`; mutations A9 | `PageFrame grid`, shared header | … › Milestones | yes | iff `manage` | read-only, `completedBy` shown | 390/768/1440 | 5 = 5 (A1.2.5) | `milestones-migration`, `projects-workspace` |
+| Time (optional) | `projects.time.index` | `view`, then a time scope (403 with neither) | `PageFrame canvas`, shared header | … › Time | yes; Time only with a scope | iff Settings access | own entries only, no person | 390/768/1440 | 10–13 constant (A5.7) | `project-time` |
+| Create | `projects.create` | `can:projects.manage` + `create` | `PageFrame reading`, `PageHeader` | … › New project | none | n/a | 403 | 390/768/1440 | not a §17 surface | `projects-workspace`, `projects-migration` |
+| Settings | `projects.edit` | A9 (`can:projects.manage` + `manage`) | `PageFrame reading`, `PageHeader` | … › {project} › Settings | none (Settings is a header action, not a tab) | — | 403 | 390/768/1440 | not a §17 surface | `projects-workspace` |
+
+**Cross-WP consistency.** No inconsistency was found between surfaces landed in different packages: every workspace page uses the one `ProjectWorkspaceHeader`, forwards the server's `tabs` (all five pages render `tabs={tabs}`; the browser proves five links on all five for the customer member), takes Settings from the one resolver, and shares one shell trail grammar. Create and Settings deliberately use `PageHeader` on the reading frame (§14.1). The shell segment "All projects" in every trail is the view segment recorded in A2.9.
+
+### A6.7 Authorization and customer-safety sweep
+
+Server enforcement was checked per actor shape against existing tests, not hidden UI: operator, project manager, plain member, customer member (`user` role), stale/non-member assignee, `projects.admin` without `projects.manage`, member without time permissions, `time.log`-only, `time.view_all`, outsider and guest (`ProjectAuthorizationMatrixTest`, `ProjectSettingsAccessTest`, `ProjectOverviewPresenterTest`, `ProjectTasksPageTest`, `ProjectTimePageTest`, `ProjectMilestoneLifecycleTest`, `StaleAssigneeTimeEligibilityTest`, the browser customer flows). The customer-safe guarantees hold: no budget, roster, email, other users' time under own scope, Settings, milestone controls or unauthorized task actions reach a customer member, and the routes refuse them too (`projects.edit`/`create` 403, milestone mutations 403, ability-gated task routes).
+
+**Finding (test coverage, fixed in WP6; not a security defect).** WP5's `projects.time.index` was **missing from `ProjectAuthorizationMatrixTest`**, the matrix INV-P14 names: the matrix is a hand-kept list with no completeness check. The route itself was already authorized and tested (`ProjectTimePageTest`, nine actor shapes, including 403 for a project viewer without a time permission). WP6 adds the row (`MATRIX_VIEW`: every matrix actor but the operator holds the `user` role, whose defaults include `time.log`) and a **completeness guard**: every registered `projects.*` route must have a matrix expectation. Non-vacuity: the committed matrix had 26 keys against 27 registered `projects.*` routes, the one difference being `projects.time.index`, so the guard would have failed before WP6. `ProjectAuthorizationMatrixTest` now passes 292 tests (450 assertions): the actor-by-route matrix, including eight new `projects.time.index` cases, and its other guards. No RBAC rule changed.
+
+### A6.8 Project-time parity
+
+Every consumer uses the WP1 canonical seam: the `/time` filter, the operator report (summary, total, entry list, CSV) and by-project grouping (`ProjectTimeAttributionTest`), the Overview (`ProjectOverviewPresenterTest`: Overview = `totalMinutes` = by-project group = scope), and the Project Time page (`ProjectTimePageTest`: rows and total via `scopeAttributedToProject` and `TimeEntryService::totalMinutes`, equal to the Overview per scope). Malformed rows follow the settled rules on every consumer: a board task in B with `project_id = A` counts under B only; standalone- and ticket-task rows with a `project_id`, and dual-linked tasks, count nowhere; running timers are excluded. The deterministic query-budget harness (session GC lottery off, A5.16) was not changed.
+
+### A6.9 Query and performance
+
+All required budgets hold on the current tree: Overview (four presenter shapes and the page), index (four shapes), Project Tasks (nine shapes), Milestones, plus the optional Board and Time shapes and the canonical report surfaces (`ProjectTimeAttributionTest` QUERY BUDGET). Each grows the relevant fixture from a small to a large seeded shape and compares the query counts; the Overview, index (WP4), Tasks-tab, Board (WP5) and Time (WP5) shapes also explicitly assert the growth, while the older per-surface tests (index, Board, Task page, Milestones, Tasks list) grow the fixture by direct inserts without separately asserting the grown response. **Board 14 vs 13 (A5.7) resolved by measurement:** with the session lottery now off, an out-of-repository probe reproducing the Board growth world (3 → 30 cards with per-card abilities that differ) measured **13 = 13 for both the member and the manager-role viewer, in 3 of 3 runs**. The recorded 14 is consistent with one stray session-GC query in the small measurement (A5.16), which can no longer occur; it was never query growth. `BUDGET_TOLERANCE = 1` was deliberately **not** tightened (a wider change than the evidence requires). No index was added.
+
+### A6.10 Drawer/shell, Board, Milestones, Health and Tasks closeout
+
+- **Drawer/shell.** The final behaviour is as A5.15 records and is now also written into Direction D §5.3 as a forward note: XL surface defaults and XL-only persistence; at L transient overlay use and a workspace-wide authoritative pin that collapsing a docked drawer releases; M/S ignore pin and preference; state resolved before first paint by the server-stamped root attributes and the inlined bootstrap (no post-mount selection). Re-verified in WP6 by the focused Vitest (`use-panel-state`, `bootstrap`, `app-shell`, `blade-shell`) and `projects-drawer.spec.ts`. The Blade/L-pin limit stays unreachable (A6.15).
+- **Board.** Shared frame, drag and drop, Move, quick-add, Complete/Reopen with per-card busy and the board-wide lock, focus after moves, authorization and customer behaviour are covered by `board.test.tsx`, `task-card.test.tsx`, `ProjectBoardInertiaTest` and the `board-*` specs; nothing changed in WP6. TaskPolicy coverage was not duplicated.
+- **Milestones.** Explicit completion is the only completion: "all linked tasks done ≠ milestone completed" is pinned in Pest (`ProjectMilestoneLifecycleTest`), Vitest (`milestone-list-item`, `milestones/index`) and the browser, and the `% complete` wording stays guarded against in all three. `currentId` never follows task progress; `completedBy` is provenance; Complete/Reopen keep focus and use a synchronous in-flight guard (A4.6).
+- **Health.** One authority (`ProjectHealth`), fixed reason order, index count-only, Overview `earliest`, lifecycle and health in separate positions with glyph + text, malformed tasks excluded, no client derivation (`ProjectHealthTest`, `show.test.tsx`).
+- **Tasks.** `/tasks` stays global and milestone-free (A3.6 pins: no `milestone` key, no `project_milestones` query); Project Tasks stays project-scoped; shared actions/focus (`useTaskListActions`), assignment, Complete/Reopen and malformed refusal are unchanged; their budgets pass.
+
+### A6.11 Accessibility and responsive closeout
+
+| Requirement | Evidence |
+|---|---|
+| One `h1`, one Breadcrumb landmark | `projects-workspace` (index, Board, Milestones, Settings, Create), `project-overview`, `project-tasks`, `project-time` specs; page Vitest |
+| Nav accessible name, links, `aria-current="page"`, no ARIA tabs | `project-workspace-nav.test.tsx`, `page-tabs.test.tsx`, the browser specs (`tablist` count 0) |
+| Visible, unclipped focus | Tasks/Time links with inset outlines under forced overflow (`project-tasks`, `project-time`), milestone Complete outline (`projects-workspace`), drawer focus return (`app-shell.test.tsx`) |
+| Keyboard order | header action → Overview tab (A2.10); row shortcuts and focus repair (EPIC-014 tests, unchanged) |
+| Form labels and errors | create/edit tests (labels, error bags, focus on error; behaviour unchanged since WP4) |
+| Progress labels | named `progressbar`s with value text (Overview, index, milestone rows) |
+| Lifecycle and health not colour-only | glyph + text through `Status`; separate labelled positions |
+| Complete/Reopen names and truthful state | "Complete/Reopen {title}"; `aria-disabled` while locked, `aria-busy` only on the request in flight (WP5 R5); milestone buttons the same |
+| StagePath | list semantics, `aria-current="step"`, state in text (`stage-path.test.tsx`) |
+| Project Time scope in text | "All team members" / "Your entries only" (`time/index.test.tsx`) |
+| **390px and the S/M boundary, no document overflow** | Overview, Time, index, Board, Milestones, Settings, Create at 390/768/1440 light and dark. **Gap found and closed in WP6:** the Tasks tab was covered at 390 and 1440 only; `project-tasks.spec.ts`'s responsive test now also runs at **768px** (Tailwind `md`, the shell's S/M boundary), where the shared table is a table row |
+
+Manual screen-reader (NVDA) testing was **not** performed; §19 #15 does not require it.
+
+### A6.12 Test-pin and vacuity sweep
+
+- **Vacuous assertions found and repaired (2).** A parser over every `->not->toContain(` call in `tests/` found seven multi-argument calls. Four were comments describing earlier repairs, and one is the EPIC-013 A13.13 `BrowserAuthContractTest:84` guard, which stays with its existing owner (§21). **Two were live and vacuous in EPIC-015 tests:** `Tasks/ProjectTaskQueryTest` "never surfaces a malformed project+ticket row…" passed a diagnostic message as a second needle (WP3), and `Projects/ProjectTimePageTest` "lists exactly the canonical project time…" negated three needles at once (WP5); Pest's variadic `toContain` makes a negated multi-needle check fail only when **every** needle is present. Both are now one needle per assertion (`assertNotContains` with the message) or an empty intersection. Neither masked a defect (other assertions in each file already pin the exact sets).
+- **Proof and mutation evidence.** Under the real Pest runner (a probe file outside the repository), both old forms **passed** with a forbidden id present, and both new forms failed on it and passed on a clean set. A Pest run also exercised the repaired assertions against a mutated fixture (a valid in-scope task `p1`, and the attributed `directA` entry, placed in the exclusion lists): both **failed with the right diagnostics** ("p1 leaked into project scope"; the intersection named the entry). *Process note:* that mutation came from a command the operator rejected, which had nevertheless partly executed; it was found in the next focused run, and both files were restored and shown byte-identical to their pre-mutation copies before any evidence below was taken.
+- **Other patterns.** Cross-page tests navigate (WP5 A5.15); selectors are exact where a second surface could match (A3.12, A4.12); every query-budget test grows its fixture from a small to a large shape (the newer ones also assert the growth explicitly); focus tests assert the intended target with retrying `toBeFocused`/`toHaveFocus` (A3.12 #8, WP5); the Project nav overflow branch is forced (A3.4). No further finding.
+- **Stale pins.** Wording that assumed a final four-link strip after WP5 added Time was corrected where it was current-tense (`project-tasks.spec.ts` header, the overflow comment and the responsive test title; `show.test.tsx`, `board.test.tsx` and `milestones/index.test.tsx` titles or comments; their assertions were already five-link aware or correctly describe fixtures without a time scope). Dated `FLIPPED IN …` history comments were left as written. The remaining `% complete` matches are deliberate negative guards; the one Board redirect in `ProjectTaskController::destroy` is the explicit P7 action. No old Board-default generic link, stale route or stale budget comment remains.
+
+### A6.13 GitHub Actions infrastructure exception (PR #21 merge)
+
+PR #21, "WP5 follow-up: Stabilize query-budget test harness", was tested at head **`c21fa12de6249737a264be91c121a86735037a29`** (both PR CI jobs green) and merged as **`146313d015fc2709899d15684dd75755afd267e1`**. The merge-triggered `main` workflow **failed before any job executed**: GitHub could not acquire hosted runners and reported an internal service error. The owner verified that `git diff c21fa12 146313d` is empty, that both commits have the tree **`ab4d8eac454a51446d155354d04840a17c8cab02`** and that the PR head is an ancestor of the merge, and **waived** that post-merge run because the exact merged tree had already passed PR CI. WP6 re-verified the tree identity. **This is a narrow historical exception, not a change to the merge policy**: a merge-triggered `main` run remains required, and the WP6 merge needs its own green `main` CI for Done.
+
+### A6.14 Documentation reconciliation
+
+- **Direction D** (`direction-d-design-system.md`): the required §8 forward note (route-changing page tabs use `nav` + links + `aria-current="page"`, not ARIA tabs), and a §5.3 forward note recording the drawer rules as implemented and ruled in WP5, including that they are shared-shell rules. Historical text unchanged; the file's mixed CRLF/LF line endings were preserved (10 lines added, none changed).
+- **`docs/testing/ci.md`:** the A13.13 note now says one guard is still vacuous (`BrowserAuthContractTest:84`), the `ProjectIntegrityTest` one was fixed in WP1 and WP6 repaired two more; new entries for untracked-create fixture leaks, `./dev test:e2e` not rebuilding assets, and the deterministic query-count harness.
+- **`docs/testing/e2e-browser-suite.md`:** the EPIC-015 validated-result entry (hosted CI as the authoritative complete-browser gate; 141/141 on PR #20 and PR #21).
+- **`rbac-design.md`:** a "Project workspace authorization (EPIC-015)" section: no new permission; the Settings-access, project-time-visibility, Q8 and dual-linked seams.
+- **Forward notes:** EPIC-013 §31 (the row is delivered), EPIC-014 A1.3.1 (both follow-ups delivered in WP1, the board-card Complete in WP5), the roadmap's Projects UX entry (In Progress, WP6 in review, lifecycle).
+- **Not changed:** `docs/epics/README.md` (its status column already reads In Progress, which stays correct until Verified; its "planned 2026-10-02" sentence is dated history); the root README (no project feature list to reconcile).
+
+### A6.15 Deferred and inherited findings: final disposition
+
+| Finding | Disposition |
+|---|---|
+| Board 14 vs 13 (A5.7) | **Resolved**: measured 13 = 13 with the lottery off (A6.9) |
+| Blade page cannot release a React-set L pin (A5.15) | **Accepted / non-blocking**: unreachable, as no workspace has both a pin control and a Blade page (Helpdesk, Finance, System are Blade; Projects, Tasks, Time are React). Destination: whichever change first makes a workspace mixed |
+| No-shift navigation probe samples at animation-frame time, not mutation-tested in a browser (A5.15 re-review) | **Accepted / non-blocking**: supporting evidence; first paint is also pinned by the hook/bootstrap parity tests |
+| Old drawer-preference transition (pinned-then-collapsed at L now docks; pre-WP5 Board choice applies to workspace pages) | **Accepted**: intentional one-time transition, owner ruling (A5.15) |
+| Untracked-create fixture leak on local timeouts (A2.12, A4.12, A5.11) | **Deferred with destination**: E2E infrastructure (track the project from the create response, not after the redirect); recorded in `ci.md`; hosted CI is the leak check |
+| `./dev test:e2e` does not rebuild assets | **Accepted / documented** in `ci.md` |
+| `BrowserAuthContractTest:84` vacuous guard (A13.13) | **Deferred with destination**: its existing E2E-infrastructure owner (§21), unchanged |
+| Optional test hygiene: static fixture step in `ProjectQueryBudgetTest`; two extra denied actors in `ProjectMilestoneLifecycleTest` (A1.2) | **Accepted / non-blocking**: the actor shapes are covered by `ProjectSettingsAccessTest`'s ten-actor matrix through the same resolver; the static step affects no assertion |
+| `nextId === currentId` (A1.2) | **Resolved** in WP2 (A2.7) |
+| 100% task-progress milestone copy (A1.2) | **Resolved** in WP4 (A4.5) |
+| Transitional milestone display (A1.2.7 #1) | **Resolved** in WP4 (A4.6) |
+| Dual-linked project+ticket tasks (§8.4) | **Resolved** in WP1 by owner ruling (A1.1.5) |
+| StagePath blocked-stage triangle; exhaustive health-reason typing | **Deferred with destination**: the first real blocked-stage consumer (none in EPIC-015) |
+| Strict `dl` on the Overview task figures; stale `/projects/1/board` strings in `timer-context-link.test.tsx` | **Accepted / non-blocking** test and markup hygiene (no behaviour, no assertion depends on them) |
+| Duplicated minutes formatter (`lib/duration.ts` shared by Overview and Time; task time panel and `/time` keep local copies) | **Accepted / non-blocking**; candidate for the design-token/UI consistency audit's shared-primitive pass |
+| "My open tasks here", days-to-target (§12.1 optional, A1.2.7 #3) | **Accepted**: optional Overview items, not built (§7 forbids fields "for later") |
+| `?page=99` empty-state wording on the projects index (A4.12) | **Accepted / non-blocking** (informational review note) |
+| Helpdesk/Directory/Finance/System blue-accent controls (A2.12) | **Deferred with destination**: the post-EPIC global design-token / UI consistency audit (A6.16) |
+| Customer-product roadmap gap (§22) | **Deferred with destination**: owner roadmap placement |
+| S4 Home "My work" and other EPIC-014 WP6 items | **Deferred** with their existing owner (§21) |
+| `projects.view_org`, `tasks.view_org` inert; `time.view_own` unenforced | Unchanged permission debt (§21, `rbac-design.md`) |
+
+No finding is blocking.
+
+### A6.16 Post-EPIC follow-up: global design-token / UI consistency audit (recorded only)
+
+Out of EPIC-015 scope and **not started**: controls under **Helpdesk, Directory, Finance and System** still use blue or legacy Tailwind styling instead of Direction D's green/teal semantic control language. A dedicated audit should cover direct Tailwind palette use where semantic tokens belong; legacy control classes; shared-primitive adoption; forms, buttons, badges and focus rings; light/dark parity; and which colour differences are intentional semantics versus accidents. It needs its own roadmap placement and contract. **Projects-owned surfaces were checked in the WP6 visual closeout and carry no legacy blue control** (WP4 already normalized the two it found).
+
+**Visual closeout (WP6).** Chromium screenshots of the index, Overview, Board, Tasks, Milestones, Time, Create and Settings at 1440 and 390 (light), plus Overview, Board and Time at 1440 dark, on a seeded project. They were taken by a temporary spec and config in the container's `/tmp`, outside the repository, with cleanup through `cleanup.trackProject`; product counts were unchanged. Observed: one Direction D hierarchy across the workspace (overline, name `h1`, lifecycle, Settings, the strip on the strata); green/teal state colour only; lifecycle and health in separate positions with glyph and text; the five links fit at 390; the drawer follows the surface defaults (open on index, Overview, Milestones, Settings; collapsed on Board, Tasks, Time, where the breadcrumb carries the view menu); the Board scrolls inside its own region at 390; the Time page reads header → scope line → table or empty state. No defect. (The rail and drawer appear to stop at the viewport height in full-page captures because they are `position: sticky` at `100dvh`; that is a screenshot artifact, not layout.)
+
+### A6.17 Local validation evidence
+
+| Gate | Result |
+|---|---|
+| Focused Pest (`tests/Feature/Projects`, `Time`, `Tasks`, `NavigationBuilderTest`, `ShellContractTest`, `BladeShellTest`, `TestHarnessDeterminismTest`, `tests/Unit`) | **1573 passed (9400 assertions)**, 540 s. An earlier run of the same set, 2 failed / 1571 passed, is **void**: it ran against the two partly mutated files described in A6.12, whose failures were those mutations being caught; it is kept here as history, not as evidence |
+| `ProjectAuthorizationMatrixTest` alone (after the WP6 row and guard) | 292 passed (450 assertions) |
+| Repaired files alone (`ProjectTaskQueryTest`, `ProjectTimePageTest`) | 100 passed (494 assertions) |
+| Focused Vitest (`pages/projects`, `components/projects`, `components/tasks`, `pages/tasks`, `components/shell`, `shell`, `use-panel-state`, `stage-path`, `page-tabs`, `entity-header`, `progress`, `data-table`) | **59 files, 1414 tests passed** |
+| Targeted Playwright (`projects-migration`, `project-overview`, `project-tasks`, `projects-workspace`, `board-migration`, `board-drag`, `board-complete`, `milestones-migration`, `project-time`, `projects-drawer`; freshly built assets) | **RED: 54 passed / 1 failed (55), 3 workers, 9.1 min**; product counts `projects=2 tasks=1 time_entries=2` → identical (the pre-existing development baseline, A5.11). The new 768px Tasks case passed (59.6 s). The failure was `board-migration.spec.ts` "index to a board with a persistent timer…" hitting the **30 s test timeout** while a Board visit was still in flight (the `/time` URL in its log is the cleanup teardown after the timeout); load average 4–6 during the run. **Run once alone: passed in 20.5 s**, counts unchanged. Recorded as not reproduced; no `test.slow()`, retry, worker or timeout change (the A3.12 #7 / A4.12 rule: harden a specific test only if hosted CI shows it failing). The red run stays recorded as red |
+| Out-of-repository probes | Pest vacuity probe (A6.12); Board budget probe 13 = 13, 3/3 (A6.9); visual-closeout screenshots (A6.16); none wrote to the repository |
+| `./dev check` | **First run invalid, see below.** CLI self-tests 196 assertions; Pint pass (309 files); frontend `npm run check` pass (typecheck, ESLint, Prettier, **Vitest 99 files / 1684 tests**, `vite build` 424 modules); `git diff --check` **failed** on WP6's own Direction D forward-note lines, which had taken the file's CRLF endings (fixed: only the added lines are LF now, and `git diff --check` passes); Pest was **killed (exit 137)** when the development stack (`portal_app`, `portal_db`, `portal_redis`) was **destroyed from outside this session** at 14:29:32 while the suite ran (Docker events: kill, stop, destroy). Volumes intact. |
+| `./dev check`, second run (owner-authorized `./dev up`; data and migrations confirmed intact, counts 2/1/2) | **RED on one frontend timeout.** CLI self-tests 196 assertions; `git diff --check` pass; Pint pass (309 files); full Pest **1924 passed (10750 assertions)**, 603 s; `npm run check` failed with Vitest 98 of 99 files and 1683 of 1684 tests passing: `pages/projects/tasks/index.test.tsx` "names the project as the one h1…" **timed out at 5 s** (the file took 15 s inside the parallel suite), not an assertion failure. The file and its page are unchanged by WP6; the file passed alone (24/24) and in the focused Vitest run. This is the jsdom load-sensitivity class (`docs/testing/ci.md`; the same shape as A4.12 #7) |
+| `./dev check`, third run (**owner-authorized single rerun**, no code, test or timeout change) | **GREEN, exit 0, "All checks passed".** CLI self-tests **196 assertions**; `git diff --check` pass; Pint pass (**309 files**); frontend `npm run check` pass (typecheck, ESLint, Prettier, **Vitest 99 files / 1684 tests**, `vite build` **424 modules**); full Pest **1924 passed (10750 assertions)**, 691 s. (After PR #21: Vitest 99 / 1684, Pest 1915 / 10739; WP6 adds the 9 matrix tests.) The two earlier runs stay recorded as invalid and red |
+
+### A6.18 Browser and hosted-CI strategy
+
+Per the owner's rulings (A4.12 #7, A5.14), WP6's local browser testing is **targeted** (the ten Projects specs above), and **hosted PR CI is the authoritative complete-browser gate**: its browser job runs `./dev test:e2e`, the complete suite on 3 workers from an empty database with product-count checks. §19 #16 is therefore satisfied only by the WP6 PR's CI (`./dev check` gates and the Playwright job both green on the final package), followed by a green merge-triggered `main` run for Done. No local complete-browser run was made or is required.
+
+### A6.19 Files changed (WP6)
+
+- **Tests:** `tests/Feature/Projects/ProjectAuthorizationMatrixTest.php` (Time row and completeness guard), `tests/Feature/Tasks/ProjectTaskQueryTest.php` and `tests/Feature/Projects/ProjectTimePageTest.php` (vacuity repairs), `tests/Browser/project-tasks.spec.ts` (768px case; stale four-link wording), `resources/js/pages/projects/show.test.tsx`, `board.test.tsx`, `milestones/index.test.tsx` (stale four-link wording only).
+- **Docs:** this amendment and the status lines; `docs/design/direction-d-design-system.md` (two forward notes); `docs/testing/ci.md`; `docs/testing/e2e-browser-suite.md`; `docs/architecture/rbac-design.md`; forward notes in `EPIC-013`, `EPIC-014` and the roadmap.
+- **Not changed:** any production file (PHP, TypeScript, CSS, Blade, routes), migrations, dependencies, CI, config; no Helpdesk, Directory, Finance or System file; no new product feature; the post-EPIC design-token audit not started.
+
+### A6.20 Open for the owner
+
+Nothing. The owner authorized restarting the development stack after its external removal and one `./dev check` rerun after the jsdom timeout; the final local gate is green (A6.17). Every required criterion except #16, which only the WP6 PR's CI can satisfy, is satisfied, and no finding is blocking. The independent closeout review (A6.21) has since returned SAFE TO COMMIT. Criterion #16 was subsequently satisfied by the PR #22 CI (A6.22).
+
+### A6.21 Independent closeout review (2026-10-05)
+
+An independent read-only review of the uncommitted WP6 package against `146313d` returned **WP6 SAFE TO COMMIT — FINAL PR MAY OPEN**, with no blocking finding. It confirmed: §19 has exactly 16 criteria and #1–#15 are satisfied with #16 pending only the WP6 PR's CI; every INV-P1–P16 maps to at least one existing named test; the 27 registered `projects.*` routes against the 26 committed matrix keys (the difference being `projects.time.index`), and that no `/projects` route is unnamed or named otherwise; both repaired assertions fail on a forbidden value (Pest's negated multi-needle `toContain` fails only when every needle is present); the accidental mutation left no artifact; the 768px Tasks case exercises the S/M boundary; the scope is 15 files, tests and docs only, with no production, migration, dependency, CI or product-area change. Its independent runs: **Pest 625 passed (3103 assertions)** and **Vitest 41 files / 1157 tests**; no Playwright run was required. Non-blocking notes: (1) the "asserts it grew" wording in A6.9 and A6.12 was too strong for the older per-surface budget tests and has been corrected (the tests themselves are unchanged); (2) the Tasks responsive test now runs six width/theme passes (59.6 s locally against its tripled `test.slow()` budget), so watch it in hosted CI rather than change it now; (3) the `board-migration` timeout is not attributable to WP6, which changes neither that spec nor any product code. The post-EPIC design-token / UI consistency audit (A6.16) remains **not started**.
+
+### A6.22 Hosted PR CI and verification
+
+PR #22 (`feature/epic-015-projects-ux` → `main`), package head **`78b1aab230dd2d445032bb7627843f127a66d4cc`** (parent `146313d`), GitHub Actions run **37387148106**, both jobs **green**:
+
+| Job | Result | Duration |
+|---|---|---|
+| `./dev check gates` | success | 7 min 04 s (23:12:33–23:19:37 UTC) |
+| Playwright browser suite (`./dev test:e2e`) | success | 8 min 28 s job; suite 5.1 min |
+
+- **Playwright:** 141 tests, **3 workers, 141 passed**, no failed, flaky or skipped line in the log; tracked product-data counts `projects=0 tasks=0 time_entries=0` before and after, "Product-data counts unchanged". This includes the new 768px Tasks case and the `board-migration` test that timed out once locally under load.
+- **Gates (read from the job log):** CLI self-tests 197 assertions passed (the local runs reported 196; the figure is recorded as observed), `git diff --check`, Pint (309 files), Vitest 99 files / 1684 tests, `vite build` 424 modules, Pest **1924 passed (10750 assertions)**. No GitHub warning or annotation was reported on either job.
+- **§19:** all 16 criteria are now satisfied (#1–#15 per A6.3, #16 by this run). No required blocker is open. The status-text-only commit that records this follows the EPIC-014 precedent; CI runs on it too, and PR #22 stays **unmerged**. Done follows the merge with green `main` CI.

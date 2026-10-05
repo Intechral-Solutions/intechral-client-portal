@@ -5,11 +5,13 @@ import { hasHorizontalOverflow } from './support/shell';
 
 /**
  * EPIC-015 WP3 critical flows: a project's Tasks tab (`projects.tasks.index`). The Overview's counts
- * open it already filtered; the four-link project navigation reaches it and leaves it; it lists this
+ * open it already filtered; the project navigation (four tabs, plus Time with a time scope) reaches
+ * it and leaves it; it lists this
  * project's board tasks and nothing else, with the milestone in place of a project column; filters,
  * search and sort live in the URL and survive back/forward; row and bulk actions reuse the Tasks
  * endpoints; a customer member gets the same rows with only their own actions; and the page, its
- * navigation strip and its rows hold together at 390px and on desktop, light and dark.
+ * navigation strip and its rows hold together at 390px, the 768px S/M boundary and on desktop, light
+ * and dark.
  *
  * Every DTO, filter and authorization permutation is covered by Pest (ProjectTaskQueryTest,
  * ProjectTasksPageTest) and Vitest; this proves the real page in a real browser. It runs against the
@@ -282,7 +284,7 @@ test('the Overview counts open the filtered Tasks tab, and the tabs lead everywh
     await crumbs.getByRole('link', { name: 'E2E WP3 navigation project' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}`);
 
-    // Forced overflow (a test fixture, not a breakpoint contract): the four links fit at 390px, so
+    // Forced overflow (a test fixture, not a breakpoint contract): the links fit at 390px, so
     // narrow the strip itself until they cannot, and prove it scrolls instead of clipping. Kept in
     // this (already slow) journey so the responsive test below stays within its own budget.
     await page.setViewportSize({ width: 390, height: 900 });
@@ -501,7 +503,7 @@ test('a customer member sees the same project rows with only their own actions, 
     }
 });
 
-test('the Tasks tab, its four-link strip and its rows hold together at 390px and desktop, light and dark', async ({
+test('the Tasks tab, its project-navigation strip and its rows hold together at 390px, 768px and desktop, light and dark', async ({
     page,
     cleanup,
 }) => {
@@ -515,7 +517,9 @@ test('the Tasks tab, its four-link strip and its rows hold together at 390px and
         'E2E WP3 responsive project with a deliberately long name for phones',
     );
 
-    for (const width of [390, 1440]) {
+    // EPIC-015 WP6: 768px (the S/M boundary, Tailwind `md`) added so this page meets §19 #15 like the
+    // other project pages; at 768 the shared table is already a table row (the `else` branch below).
+    for (const width of [390, 768, 1440]) {
         for (const theme of ['light', 'dark'] as const) {
             await page.setViewportSize({ width, height: 900 });
             await page.goto(`/projects/${projectId}/tasks`);

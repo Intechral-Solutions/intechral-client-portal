@@ -43,7 +43,8 @@ it('renders the project name, status, and board region', () => {
 });
 
 // FLIPPED IN EPIC-015 WP4: Milestones was a header button; it is now the project tab (§14.1), in the
-// shared four-link navigation with Board current, and there is no separate Milestones button.
+// shared project navigation with Board current, and there is no separate Milestones button. (The
+// fixture has no time scope, so the strip shows the four required tabs, not Time; EPIC-015 WP5.)
 it('carries the shared project navigation, Board current, with Milestones as a tab', () => {
     renderPage();
 
