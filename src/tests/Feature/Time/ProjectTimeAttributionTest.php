@@ -332,11 +332,12 @@ it('QUERY BUDGET: the by-project summary, the operator report and the /time page
 
         return count(DB::getQueryLog());
     };
+    // Keyed by surface so a failure names the surface that moved, not just an array position.
     $measure = fn () => [
-        $count(fn () => $this->service->summaryByProject(['project_id' => $this->projectA->id])->count()),
-        $count(fn () => $this->actingAs($this->operator)->get(route('operator.time.index', ['project_id' => $this->projectA->id]))->assertOk()),
-        $count(fn () => $this->actingAs($this->worker)->get(route('time.index', ['project_id' => $this->projectA->id]))->assertOk()),
-        $count(fn () => $this->service->exportCsv(['project_id' => $this->projectA->id])),
+        'summaryByProject' => $count(fn () => $this->service->summaryByProject(['project_id' => $this->projectA->id])->count()),
+        'operator report' => $count(fn () => $this->actingAs($this->operator)->get(route('operator.time.index', ['project_id' => $this->projectA->id]))->assertOk()),
+        '/time page' => $count(fn () => $this->actingAs($this->worker)->get(route('time.index', ['project_id' => $this->projectA->id]))->assertOk()),
+        'exportCsv' => $count(fn () => $this->service->exportCsv(['project_id' => $this->projectA->id])),
     ];
 
     $measure();            // warm-up: the first request also loads permissions and the session
