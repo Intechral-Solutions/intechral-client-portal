@@ -18,6 +18,8 @@ function task(id: number, overrides: Partial<BoardTask> = {}): BoardTask {
         assignee: null,
         milestone: null,
         checklist: { done: 0, total: 0 },
+        done: false,
+        abilities: { complete: false, reopen: false },
         ...overrides,
     };
 }

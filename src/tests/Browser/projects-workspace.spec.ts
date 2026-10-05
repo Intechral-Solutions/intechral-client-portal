@@ -161,15 +161,21 @@ test('a customer member sees every project page without Settings, management con
             [`/projects/${projectId}`, 'Overview'],
             [`/projects/${projectId}/board`, 'Board'],
             [`/projects/${projectId}/tasks`, 'Tasks'],
+            // EPIC-015 WP5: the customer member holds time.log, so the Time tab (own time only)
+            // is offered too, and is itself a workspace page without Settings. Milestones stays
+            // last: the read-only checks below run on it.
+            [`/projects/${projectId}/time`, 'Time'],
             [`/projects/${projectId}/milestones`, 'Milestones'],
         ] as const) {
             await memberPage.goto(path);
             const tabs = memberPage.getByRole('navigation', { name: 'Project', exact: true });
+            // FLIPPED IN EPIC-015 WP5: was the four tabs without Time.
             await expect(tabs.getByRole('link'), path).toHaveText([
                 'Overview',
                 'Board',
                 'Tasks',
                 'Milestones',
+                'Time',
             ]);
             await expect(tabs.locator('[aria-current="page"]'), path).toHaveText(current);
             await expect(
@@ -247,7 +253,7 @@ test('every WP4 page keeps one h1 and one breadcrumb, reachable tabs and actions
 
                 if (tabs) {
                     const nav = page.getByRole('navigation', { name: 'Project', exact: true });
-                    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+                    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones', 'Time']) {
                         const link = nav.getByRole('link', { name: label });
                         await link.scrollIntoViewIfNeeded();
                         await expect(link, `${at} ${label}`).toBeInViewport();

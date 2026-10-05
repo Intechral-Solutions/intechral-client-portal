@@ -236,7 +236,7 @@ test('the board is usable at a phone viewport through the Move menu, with no doc
     // over its own horizontal scrolling: every tab and Settings stay reachable, Board is current,
     // and the board region still scrolls inside itself rather than the document.
     const tabs = page.getByRole('navigation', { name: 'Project', exact: true });
-    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones', 'Time']) {
         const link = tabs.getByRole('link', { name: label });
         await link.scrollIntoViewIfNeeded();
         await expect(link).toBeInViewport();
@@ -286,8 +286,10 @@ test('the board reclaims the wide canvas on its page frame, under an entity head
     // Collapsed drawer at XL: the canvas is the viewport minus the 64px rail, and the canvas frame
     // is the whole of it. Canvas is the one width that sets no max-width, which is what makes the
     // wider shell a real win for the board rather than a wider margin.
-    await page.getByRole('button', { name: 'Collapse workspace views' }).click();
+    // FLIPPED IN EPIC-015 WP5 (Direction D §5.3): the Board's own default is collapsed, so it
+    // arrives that way with no click. Was: the test collapsed the open Projects drawer first.
     await expect(page.getByRole('navigation', { name: 'Projects views' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Show workspace views' })).toBeVisible();
 
     const frameBox = (await frame.boundingBox())!;
     expect(frameBox.width).toBeCloseTo(1440 - 64, 0);
@@ -310,9 +312,16 @@ test('the board reclaims the wide canvas on its page frame, under an entity head
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(1);
 
     // EPIC-015 WP4: the header is the shared project one. Milestones moved from a header button
-    // into the four project tabs (Board current); Settings stays a header action, never a tab.
+    // into the project tabs (Board current); Settings stays a header action, never a tab.
+    // FLIPPED IN EPIC-015 WP5: the operator is offered the optional Time tab as the fifth link.
     const tabs = page.getByRole('navigation', { name: 'Project', exact: true });
-    await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
+    await expect(tabs.getByRole('link')).toHaveText([
+        'Overview',
+        'Board',
+        'Tasks',
+        'Milestones',
+        'Time',
+    ]);
     await expect(tabs.locator('[aria-current="page"]')).toHaveText('Board');
     await expect(page.getByRole('tablist')).toHaveCount(0);
     await expect(page.getByRole('main').getByRole('link', { name: 'Settings' })).toBeVisible();

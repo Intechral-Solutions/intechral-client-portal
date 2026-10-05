@@ -26,6 +26,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\ProjectTaskListController;
+use App\Http\Controllers\ProjectTimeController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
@@ -154,6 +155,9 @@ Route::middleware('auth')->prefix('projects')->name('projects.')->group(function
     Route::put('/{project}/tasks/{task}/checklist/{item}/toggle', [ProjectTaskController::class, 'toggleChecklistItem'])->name('tasks.checklist.toggle');
     Route::post('/{project}/tasks/{task}/checklist', [ProjectTaskController::class, 'storeChecklistItem'])->name('tasks.checklist.store');
     Route::delete('/{project}/tasks/{task}/checklist/{item}', [ProjectTaskController::class, 'destroyChecklistItem'])->name('tasks.checklist.destroy');
+
+    // Project time (EPIC-015 WP5 S3): read only, ProjectPolicy::view plus a time permission.
+    Route::get('/{project}/time', [ProjectTimeController::class, 'index'])->name('time.index');
 
     // Milestones
     Route::get('/{project}/milestones', [ProjectMilestoneController::class, 'index'])->name('milestones.index');

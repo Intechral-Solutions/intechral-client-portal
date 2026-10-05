@@ -46,8 +46,18 @@ export type ContextSection = {
  */
 export type WorkspacePresentation = {
     operational?: {
-        /** The contextual-panel default; null when the workspace has no contextual panel at all. */
+        /**
+         * The contextual-panel default; null when the workspace has no contextual panel at all. On a
+         * surface with its own default (below) it is that surface's default.
+         */
         panel: 'open' | 'collapsed' | null;
+        /**
+         * Direction D §5.3 (EPIC-015 WP5): the stable semantic key of the current page when it is a
+         * surface with its own panel default (`projects.board`), on the active workspace only; null
+         * everywhere else. A choice made there is remembered under this key. Optional so that a
+         * payload without it reads as "no surface".
+         */
+        surface?: string | null;
     };
 };
 

@@ -42,8 +42,11 @@ export function OperatorShell({
     // and the null panel hint agree by contract; neither is inferred from the other.
     const hasPanel = (workspace?.context.length ?? 0) > 0;
     const serverDefault = hasPanel ? (workspace?.presentation.operational?.panel ?? null) : null;
+    // Direction D §5.3: the server names the surface (`projects.board`) when the page declares its
+    // own default; a choice made there is remembered under that key, not the workspace's.
+    const surface = hasPanel ? (workspace?.presentation.operational?.surface ?? null) : null;
 
-    const panel = usePanelState(workspace?.key ?? null, serverDefault);
+    const panel = usePanelState(workspace?.key ?? null, serverDefault, surface);
     const collapsed = !hasPanel || panel.panel === 'collapsed';
     const announcement = usePageAnnouncement();
 

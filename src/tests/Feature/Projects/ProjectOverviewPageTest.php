@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Presenters\ProjectOverviewPresenter;
+use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
 use App\Models\TimeEntry;
 use App\Services\ProjectMilestoneService;
@@ -116,7 +117,9 @@ it('marks the Projects workspace and its All projects view active on the Overvie
 
 // ── One presenter, not a second copy ─────────────────────────────────────────
 
-it('passes the presenter output through unchanged, with no page-level additions', function (string $kind) {
+// FLIPPED IN EPIC-015 WP5: the page adds exactly one key of workspace chrome, `tabs` (the
+// navigation's optional Time tab), to the unchanged presenter output. Was: no page-level additions.
+it('passes the presenter output through unchanged, with only the workspace tabs added', function (string $kind) {
     $milestone = $this->project->milestones()->create(['name' => 'Kickoff', 'due_date' => '2026-06-10']);
     app(ProjectMilestoneService::class)->complete($milestone, $this->owner);
     $this->project->milestones()->create(['name' => 'Missed', 'due_date' => '2026-06-12']);
@@ -128,7 +131,9 @@ it('passes the presenter output through unchanged, with no page-level additions'
     $props = overviewPageProps($this->actingAs($actor)->get(route('projects.show', $this->project))->assertOk());
     $dto = ProjectOverviewPresenter::overview($this->project->fresh(), $actor->fresh());
 
-    expect($props)->toBe(asSerialized($dto));
+    expect($props)->toBe(asSerialized([...$dto, 'tabs' => ProjectPresenter::workspaceTabs($actor->fresh())]))
+        // The Time tab is offered exactly when the Overview carries a `time` key: one seam.
+        ->and($props['tabs']['time'])->toBe(array_key_exists('time', $props));
 })->with(array_keys(array_filter(SETTINGS_ACCESS_ACTORS, fn ($allowed, $kind) => $kind !== 'outsider', ARRAY_FILTER_USE_BOTH)));
 
 // ── Customer-safe props (INV-P8, INV-P16), through HTTP ──────────────────────

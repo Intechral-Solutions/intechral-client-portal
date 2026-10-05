@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { Board } from '@/components/projects/board';
@@ -25,6 +25,8 @@ function task(overrides: Partial<BoardTask> = {}): BoardTask {
         assignee: null,
         milestone: null,
         checklist: { done: 0, total: 0 },
+        done: false,
+        abilities: { complete: false, reopen: false },
         ...overrides,
     };
 }
@@ -444,5 +446,384 @@ describe('quick-add', () => {
 
         expect(screen.queryByLabelText('New task title')).not.toBeInTheDocument();
         expect(toggle).toHaveFocus();
+    });
+});
+
+// ── EPIC-015 WP5 S1: Complete/Reopen from a card ─────────────────────────────
+
+type PutOptions = {
+    only?: string[];
+    preserveScroll?: boolean;
+    preserveState?: boolean;
+    onSuccess?: () => void;
+    onError?: (errors: Record<string, string>) => void;
+    onHttpException?: (response: { status: number }) => boolean | void;
+    onNetworkError?: () => boolean | void;
+    onFinish?: () => void;
+};
+
+function completionColumns(): BoardColumn[] {
+    return [
+        {
+            id: 1,
+            name: 'To Do',
+            isDone: false,
+            tasks: [
+                task({ id: 1, title: 'Fix login', abilities: { complete: true, reopen: true } }),
+            ],
+        },
+        {
+            id: 2,
+            name: 'In Progress',
+            isDone: false,
+            tasks: [task({ id: 2, title: 'Write docs' })],
+        },
+        {
+            id: 3,
+            name: 'Done',
+            isDone: true,
+            tasks: [
+                task({
+                    id: 3,
+                    title: 'Shipped',
+                    done: true,
+                    abilities: { complete: true, reopen: true },
+                }),
+            ],
+        },
+    ];
+}
+
+/** Completion requests only: the optimistic move double records its own `put` too. */
+function puts(): [string, Record<string, unknown>, PutOptions][] {
+    return (
+        inertiaSpies.router.put.mock.calls as [string, Record<string, unknown>, PutOptions][]
+    ).filter(([url]) => /^\/tasks\/\d+\/(complete|reopen)$/.test(url));
+}
+
+it('completes an open card through the shared tasks.complete endpoint, inventing no state', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+
+    expect(puts()).toHaveLength(1);
+    const [url, data, options] = puts()[0]!;
+    expect(url).toBe('/tasks/1/complete');
+    expect(data).toEqual({});
+    expect(options).toMatchObject({
+        only: ['columns', 'flash'],
+        preserveScroll: true,
+        preserveState: true,
+    });
+    // Not optimistic: the board itself never moved the card.
+    expect(inertiaSpies.router.optimistic).not.toHaveBeenCalled();
+    expect(
+        within(
+            screen
+                .getByRole('article', { name: 'Fix login' })
+                .closest('[data-column-id]') as HTMLElement,
+        ).getByText('To Do'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+        'aria-busy',
+        'true',
+    );
+});
+
+it('reopens a done card through tasks.reopen', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+
+    expect(puts()[0]![0]).toBe('/tasks/3/reopen');
+});
+
+it('sends one request for two activations in the same tick, and none while a request is in flight', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    const complete = screen.getByRole('button', { name: 'Complete Fix login' });
+    act(() => {
+        complete.click();
+        complete.click();
+        screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+    });
+
+    expect(puts()).toHaveLength(1);
+
+    // After it settles, the next press goes through.
+    act(() => puts()[0]![2].onFinish?.());
+    screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+    expect(puts()).toHaveLength(2);
+});
+
+it('refuses a completion while a move is in flight (one board-wide single flight)', async () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: true }} />);
+
+    await openMoveMenuAndSelectFirst('Write docs');
+    expect(optimisticSubmitted()).toHaveLength(1);
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+
+    expect(puts()).toHaveLength(0);
+});
+
+it('announces a confirmed completion politely', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+    act(() => {
+        puts()[0]![2].onSuccess?.();
+        puts()[0]![2].onFinish?.();
+    });
+
+    expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent(
+        'Completed "Fix login".',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+it('shows the server refusal in the board alert and re-reads the board before releasing the guard', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+    act(() => {
+        puts()[0]![2].onError?.({ complete: 'This board has no Done column.' });
+        puts()[0]![2].onFinish?.();
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This board has no Done column.');
+    expect(lastReload().only).toEqual(['columns']);
+    // Still single-flight until the re-read lands.
+    screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+    expect(puts()).toHaveLength(1);
+
+    act(() => lastReload().onFinish?.());
+    screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+    expect(puts()).toHaveLength(2);
+});
+
+it('words a 403 or a vanished task in the board alert, never Inertia’s modal', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+    let handled: boolean | void = undefined;
+    act(() => {
+        handled = puts()[0]![2].onHttpException?.({ status: 404 });
+    });
+
+    expect(handled).toBe(false);
+    expect(screen.getByRole('alert')).toHaveTextContent('This task no longer exists.');
+
+    act(() => lastReload().onFinish?.());
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+    act(() => {
+        puts()[1]![2].onHttpException?.({ status: 403 });
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('"Fix login" could not be completed.');
+});
+
+it('moves focus to the task’s control in its new column when the press left focus nowhere', async () => {
+    const { rerender } = render(
+        <Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />,
+    );
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).focus();
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+
+    // The server's answer: the task now sits in Done. The old card unmounts, dropping focus.
+    const moved = completionColumns();
+    const [card] = moved[0]!.tasks.splice(0, 1);
+    moved[2]!.tasks.push({ ...card!, done: true });
+    rerender(<Board projectId={7} columns={moved} abilities={{ manage: false }} />);
+    expect(document.activeElement).toBe(document.body);
+
+    act(() => {
+        puts()[0]![2].onSuccess?.();
+        puts()[0]![2].onFinish?.();
+    });
+
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Reopen Fix login' })).toHaveFocus(),
+    );
+});
+
+it('leaves focus alone when the user has moved it elsewhere meanwhile', () => {
+    render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+    screen.getByRole('button', { name: 'Complete Fix login' }).click();
+    screen.getByRole('link', { name: 'Write docs' }).focus();
+    act(() => puts()[0]![2].onFinish?.());
+
+    expect(screen.getByRole('link', { name: 'Write docs' })).toHaveFocus();
+});
+
+/** The board's server answer after Complete: the task now sits in the Done column. */
+function movedToDone(): BoardColumn[] {
+    const moved = completionColumns();
+    const [card] = moved[0]!.tasks.splice(0, 1);
+    moved[2]!.tasks.push({ ...card!, done: true });
+
+    return moved;
+}
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+// ── WP5 review remediation (R5, R6, concurrency and guard release) ─────────────
+
+describe('busy state names the task, not the board', () => {
+    it('marks only the completing card’s ring busy; every other ring is merely unavailable', () => {
+        render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+
+        const own = screen.getByRole('button', { name: 'Complete Fix login' });
+        const other = screen.getByRole('button', { name: 'Reopen Shipped' });
+
+        expect(own).toHaveAttribute('aria-busy', 'true');
+        expect(own).toHaveAttribute('aria-disabled', 'true');
+        // Single flight still locks the other ring…
+        expect(other).toHaveAttribute('aria-disabled', 'true');
+        // …without claiming it is doing anything.
+        expect(other).not.toHaveAttribute('aria-busy');
+        expect(other).not.toHaveClass('opacity-60');
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'true',
+        );
+
+        act(() => puts()[0]![2].onFinish?.());
+        expect(own).not.toHaveAttribute('aria-busy');
+        expect(other).not.toHaveAttribute('aria-disabled');
+    });
+});
+
+describe('single flight between completion and move', () => {
+    it('dispatches only the completion when a move is attempted before it settles', async () => {
+        render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: true }} />);
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        expect(puts()).toHaveLength(1);
+
+        const trigger = screen.getByRole('button', { name: 'Move "Write docs"' });
+        expect(trigger).toHaveAttribute('aria-disabled', 'true');
+        await userEvent.setup().click(trigger);
+
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        expect(optimisticSubmitted()).toHaveLength(0);
+        expect(puts()).toHaveLength(1);
+
+        // Once the completion settles, a move goes through.
+        act(() => puts()[0]![2].onFinish?.());
+        await openMoveMenuAndSelectFirst('Write docs');
+        expect(optimisticSubmitted()).toHaveLength(1);
+    });
+});
+
+describe('the guard is always released', () => {
+    it('after a synchronous throw from the request seam', () => {
+        render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+        inertiaSpies.router.put.mockImplementationOnce(() => {
+            throw new Error('boom: synchronous failure before any visit started');
+        });
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+
+        // Nothing was sent, so there is nothing to reconcile; the failure is reported and released.
+        expect(inertiaSpies.router.reload).not.toHaveBeenCalled();
+        expect(screen.getByRole('alert')).toHaveTextContent('"Fix login" could not be completed.');
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        expect(puts()).toHaveLength(2);
+    });
+
+    it('after a transport failure, once the re-read lands', () => {
+        render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        let handled: boolean | void = undefined;
+        act(() => {
+            handled = puts()[0]![2].onNetworkError?.();
+            puts()[0]![2].onFinish?.();
+        });
+
+        expect(handled).toBe(false);
+        expect(screen.getByRole('alert')).toHaveTextContent('"Fix login" could not be completed.');
+        // Held through the re-read, never stranded after it.
+        expect(lastReload().only).toEqual(['columns']);
+        screen.getByRole('button', { name: 'Reopen Shipped' }).click();
+        expect(puts()).toHaveLength(1);
+
+        act(() => lastReload().onFinish?.());
+        expect(screen.getByRole('region', { name: 'Kanban board' })).toHaveAttribute(
+            'aria-busy',
+            'false',
+        );
+        act(() => screen.getByRole('button', { name: 'Reopen Shipped' }).click());
+        expect(puts()).toHaveLength(2);
+    });
+
+    it('leaves a 401/419 to a full page reload, as a failed move does', () => {
+        const reload = vi.fn();
+        vi.stubGlobal('location', { ...window.location, reload });
+        render(<Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />);
+
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        let handled: boolean | void = undefined;
+        act(() => {
+            handled = puts()[0]![2].onHttpException?.({ status: 419 });
+        });
+
+        expect(handled).toBe(false);
+        expect(reload).toHaveBeenCalledTimes(1);
+        expect(inertiaSpies.router.reload).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+        vi.unstubAllGlobals();
+    });
+});
+
+describe('focus repair follows meaningful focus only', () => {
+    it('repairs focus the card owned when its title link had it', async () => {
+        const { rerender } = render(
+            <Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />,
+        );
+
+        screen.getByRole('link', { name: 'Fix login' }).focus();
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        rerender(<Board projectId={7} columns={movedToDone()} abilities={{ manage: false }} />);
+        expect(document.activeElement).toBe(document.body);
+
+        act(() => {
+            puts()[0]![2].onSuccess?.();
+            puts()[0]![2].onFinish?.();
+        });
+
+        await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Reopen Fix login' })).toHaveFocus(),
+        );
+    });
+
+    it('does not manufacture focus when the press happened with focus on the page body', async () => {
+        const { rerender } = render(
+            <Board projectId={7} columns={completionColumns()} abilities={{ manage: false }} />,
+        );
+
+        // A pointer press that left focus on the body (Safari does not focus a clicked button).
+        expect(document.activeElement).toBe(document.body);
+        act(() => screen.getByRole('button', { name: 'Complete Fix login' }).click());
+        rerender(<Board projectId={7} columns={movedToDone()} abilities={{ manage: false }} />);
+        act(() => {
+            puts()[0]![2].onSuccess?.();
+            puts()[0]![2].onFinish?.();
+        });
+        await act(nextFrame);
+        await act(nextFrame);
+
+        expect(document.activeElement).toBe(document.body);
+        expect(screen.getByRole('button', { name: 'Reopen Fix login' })).not.toHaveFocus();
     });
 });

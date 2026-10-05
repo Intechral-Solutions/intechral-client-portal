@@ -20,6 +20,8 @@ function makeTask(overrides: Partial<BoardTask> = {}): BoardTask {
         assignee: { id: 9, name: 'Ada Manager' },
         milestone: { id: 3, name: 'Launch' },
         checklist: { done: 1, total: 4 },
+        done: false,
+        abilities: { complete: false, reopen: false },
         ...overrides,
     };
 }
@@ -170,6 +172,7 @@ describe('structural memo', () => {
         expect(taskCardPropsAreEqual(base, propsFor(cardOf(a), { columnSize: 3 }))).toBe(false);
         expect(taskCardPropsAreEqual(base, propsFor(cardOf(a), { canManage: false }))).toBe(false);
         expect(taskCardPropsAreEqual(base, propsFor(cardOf(a), { boardBusy: true }))).toBe(false);
+        expect(taskCardPropsAreEqual(base, propsFor(cardOf(a), { taskBusy: true }))).toBe(false);
     });
 
     it('compares columns and onMove by identity, not by content', () => {
@@ -274,5 +277,183 @@ describe('dragHandle slot (EPIC-011E §9, WP6)', () => {
         expect(taskCardPropsAreEqual(propsFor(), propsFor())).toBe(true);
         expect(taskCardPropsAreEqual(propsFor(), propsFor({ dragHandle: marker() }))).toBe(false);
         expect(taskCardPropsAreEqual(propsFor({ dragHandle: undefined }), propsFor())).toBe(false);
+    });
+});
+
+describe('Complete/Reopen control (EPIC-015 WP5 S1)', () => {
+    it('offers Complete on an open card the server lets the viewer complete', () => {
+        const onToggleComplete = vi.fn();
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete,
+        });
+
+        const control = screen.getByRole('button', { name: 'Complete Fix login' });
+        control.click();
+
+        expect(onToggleComplete).toHaveBeenCalledExactlyOnceWith(1, false, 'Fix login');
+        expect(screen.queryByRole('button', { name: 'Reopen Fix login' })).not.toBeInTheDocument();
+    });
+
+    it('offers Reopen on a done card, and says the state with a checked ring', () => {
+        const onToggleComplete = vi.fn();
+        renderTask({
+            task: makeTask({ done: true, abilities: { complete: false, reopen: true } }),
+            onToggleComplete,
+        });
+
+        const control = screen.getByRole('button', { name: 'Reopen Fix login' });
+        expect(control.querySelector('[data-state="done"]')).not.toBeNull();
+        control.click();
+
+        expect(onToggleComplete).toHaveBeenCalledExactlyOnceWith(1, true, 'Fix login');
+    });
+
+    it('renders no control at all when the ability that applies is false', () => {
+        // Open card: only `complete` matters; a true `reopen` must not surface a control.
+        renderTask({
+            task: makeTask({ abilities: { complete: false, reopen: true } }),
+            onToggleComplete: vi.fn(),
+        });
+        expect(screen.queryByRole('button', { name: /^(Complete|Reopen) / })).toBeNull();
+        expect(document.querySelector('[data-task-complete]')).toBeNull();
+    });
+
+    it('renders no control for a done card the viewer may not reopen', () => {
+        renderTask({
+            task: makeTask({ done: true, abilities: { complete: true, reopen: false } }),
+            onToggleComplete: vi.fn(),
+        });
+        expect(screen.queryByRole('button', { name: /^(Complete|Reopen) / })).toBeNull();
+    });
+
+    it('renders no control without a handler, whatever the abilities say', () => {
+        renderTask({ task: makeTask({ abilities: { complete: true, reopen: true } }) });
+        expect(screen.queryByRole('button', { name: 'Complete Fix login' })).toBeNull();
+    });
+
+    it('is aria-disabled, focusable and inert, but not busy, while another card holds the board', () => {
+        const onToggleComplete = vi.fn();
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete,
+            boardBusy: true,
+            taskBusy: false,
+        });
+
+        const control = screen.getByRole('button', { name: 'Complete Fix login' });
+        expect(control).toHaveAttribute('aria-disabled', 'true');
+        // Unavailable is not busy: this control is doing nothing, so it must not announce itself so.
+        expect(control).not.toHaveAttribute('aria-busy');
+        expect(control).not.toHaveClass('opacity-60');
+        expect(control).not.toBeDisabled();
+        control.focus();
+        expect(control).toHaveFocus();
+
+        control.click();
+        expect(onToggleComplete).not.toHaveBeenCalled();
+    });
+
+    it('is busy only on the card whose own request is in flight', () => {
+        const onToggleComplete = vi.fn();
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete,
+            boardBusy: true,
+            taskBusy: true,
+        });
+
+        const control = screen.getByRole('button', { name: 'Complete Fix login' });
+        expect(control).toHaveAttribute('aria-disabled', 'true');
+        expect(control).toHaveAttribute('aria-busy', 'true');
+        expect(control).toHaveClass('opacity-60');
+
+        control.click();
+        expect(onToggleComplete).not.toHaveBeenCalled();
+    });
+
+    it('is a sibling of the title link and the drag handle, never inside either', () => {
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete: vi.fn(),
+            dragHandle: <span data-testid="handle-marker" />,
+        });
+
+        const control = screen.getByRole('button', { name: 'Complete Fix login' });
+        const link = screen.getByRole('link', { name: 'Fix login' });
+
+        expect(link.contains(control)).toBe(false);
+        expect(control.contains(link)).toBe(false);
+        expect(control.closest('a')).toBeNull();
+        expect(screen.getByTestId('handle-marker').contains(control)).toBe(false);
+    });
+
+    it('does not activate the title link when the ring is pressed', () => {
+        const onToggleComplete = vi.fn();
+        const linkClick = vi.fn();
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete,
+        });
+        screen.getByRole('link', { name: 'Fix login' }).addEventListener('click', linkClick);
+
+        screen.getByRole('button', { name: 'Complete Fix login' }).click();
+
+        expect(onToggleComplete).toHaveBeenCalledOnce();
+        // The link is a sibling, so its own activation never runs; drag listeners live only on
+        // the handle (board-dnd), so nothing on the card starts a drag from the ring.
+        expect(linkClick).not.toHaveBeenCalled();
+    });
+
+    it('puts the control first in the card tab order, before the title link and Move', () => {
+        renderTask({
+            task: makeTask({ abilities: { complete: true, reopen: true } }),
+            onToggleComplete: vi.fn(),
+        });
+
+        const tabbables = Array.from(
+            screen
+                .getByRole('article')
+                .querySelectorAll<HTMLElement>('a[href], button:not([tabindex="-1"])'),
+        );
+        expect(
+            tabbables.map((element) => element.getAttribute('aria-label') ?? element.textContent),
+        ).toEqual(['Complete Fix login', 'Fix login', 'Move "Fix login"']);
+    });
+
+    it('re-renders the memoized card when done or an ability changes, and not otherwise', () => {
+        const base = makeTask({ abilities: { complete: true, reopen: true } });
+        const props = {
+            task: base,
+            projectId: 7,
+            columnId: 1,
+            columnIndex: 0,
+            columnSize: 2,
+            columns,
+            canManage: true,
+            boardBusy: false,
+            onMove: () => {},
+            onToggleComplete: () => {},
+        } as React.ComponentProps<typeof TaskCard>;
+
+        expect(
+            taskCardPropsAreEqual(props, { ...props, task: JSON.parse(JSON.stringify(base)) }),
+        ).toBe(true);
+        expect(taskCardPropsAreEqual(props, { ...props, task: { ...base, done: true } })).toBe(
+            false,
+        );
+        expect(
+            taskCardPropsAreEqual(props, {
+                ...props,
+                task: { ...base, abilities: { complete: false, reopen: true } },
+            }),
+        ).toBe(false);
+        expect(
+            taskCardPropsAreEqual(props, {
+                ...props,
+                task: { ...base, abilities: { complete: true, reopen: false } },
+            }),
+        ).toBe(false);
+        expect(taskCardPropsAreEqual(props, { ...props, onToggleComplete: () => {} })).toBe(false);
     });
 });

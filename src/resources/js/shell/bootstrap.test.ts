@@ -17,16 +17,34 @@ const pinKey = 'shell.operational.pin';
 const root = document.documentElement;
 const originalMatchMedia = window.matchMedia;
 
-type Media = { xl: boolean | 'throws'; dark?: boolean };
+// XL, L, M/S, and a browser that cannot answer either width query (treated as XL).
+const widthClasses = [
+    ['xl', { xl: true }],
+    ['l', { xl: false, large: true }],
+    ['m', { xl: false, large: false }],
+    ['unanswerable', { xl: 'throws', large: 'throws' }],
+] as const satisfies readonly (readonly [string, Media])[];
 
-function setMedia({ xl, dark = false }: Media) {
+type Media = { xl: boolean | 'throws'; large?: boolean | 'throws'; dark?: boolean };
+
+// `large` is the 1024px query; it defaults to "true when XL", as a real viewport does.
+function setMedia({ xl, large = xl === true, dark = false }: Media) {
     window.matchMedia = (query: string) => {
-        if (query.includes('1360px') && xl === 'throws') {
+        if (
+            (query.includes('1360px') && xl === 'throws') ||
+            (query.includes('1024px') && large === 'throws')
+        ) {
             throw new Error('matchMedia unavailable');
         }
 
+        const is1024 = query.includes('1024px');
+
         return {
-            matches: query.includes('1360px') ? xl === true : query.includes('dark') && dark,
+            matches: query.includes('1360px')
+                ? xl === true
+                : is1024
+                  ? large === true
+                  : query.includes('dark') && dark,
             media: query,
         } as MediaQueryList;
     };
@@ -60,6 +78,7 @@ afterEach(() => {
     delete root.dataset.drawer;
     delete root.dataset.workspace;
     delete root.dataset.drawerDefault;
+    delete root.dataset.drawerSurface;
 });
 
 describe('panel parity with the React shell', () => {
@@ -67,22 +86,28 @@ describe('panel parity with the React shell', () => {
     const defaults = ['open', 'collapsed', null] as const;
     const stored = [undefined, 'open', 'collapsed', 'sideways'] as const;
     const pins = [false, true] as const;
-    const widths = [true, false, 'throws'] as const;
 
     const cases = workspaces.flatMap((workspace) =>
         defaults.flatMap((serverDefault) =>
             stored.flatMap((remembered) =>
                 pins.flatMap((pinned) =>
-                    widths.map((xl) => ({ workspace, serverDefault, remembered, pinned, xl })),
+                    widthClasses.map(([width, media]) => ({
+                        workspace,
+                        serverDefault,
+                        remembered,
+                        pinned,
+                        width,
+                        media,
+                    })),
                 ),
             ),
         ),
     );
 
     it.each(cases)(
-        'workspace=$workspace default=$serverDefault stored=$remembered pinned=$pinned xl=$xl',
-        ({ workspace, serverDefault, remembered, pinned, xl }) => {
-            setMedia({ xl });
+        'workspace=$workspace default=$serverDefault stored=$remembered pinned=$pinned width=$width',
+        ({ workspace, serverDefault, remembered, pinned, media }) => {
+            setMedia(media);
 
             if (remembered !== undefined) {
                 localStorage.setItem(panelKey, JSON.stringify({ projects: remembered }));
@@ -106,6 +131,131 @@ describe('panel parity with the React shell', () => {
             expect(root.dataset.drawer).toBe(expected);
         },
     );
+});
+
+/**
+ * EPIC-015 WP5 (Direction D §5.3): on a surface with its own default the server also stamps
+ * `data-drawer-surface`, and the remembered value is read under that key instead of the workspace's.
+ * The same parity rule: the script and `resolvePanel()` must agree for every combination, with a
+ * workspace choice and a surface choice stored side by side so reading the wrong key shows.
+ */
+describe('per-surface parity with the React shell (EPIC-015 WP5)', () => {
+    const surfaces = [null, 'projects.board'] as const;
+    const defaults = ['open', 'collapsed'] as const;
+    const workspaceStored = [undefined, 'open', 'collapsed'] as const;
+    const surfaceStored = [undefined, 'open', 'collapsed', 'sideways'] as const;
+    const pins = [false, true] as const;
+
+    const cases = surfaces.flatMap((surface) =>
+        defaults.flatMap((serverDefault) =>
+            workspaceStored.flatMap((onWorkspace) =>
+                surfaceStored.flatMap((onSurface) =>
+                    pins.flatMap((pinned) =>
+                        widthClasses.map(([width, media]) => ({
+                            surface,
+                            serverDefault,
+                            onWorkspace,
+                            onSurface,
+                            pinned,
+                            width,
+                            media,
+                        })),
+                    ),
+                ),
+            ),
+        ),
+    );
+
+    it.each(cases)(
+        'surface=$surface default=$serverDefault workspace=$onWorkspace surfaceStored=$onSurface pinned=$pinned width=$width',
+        ({ surface, serverDefault, onWorkspace, onSurface, pinned, media }) => {
+            setMedia(media);
+
+            const map: Record<string, string> = {};
+            if (onWorkspace !== undefined) map.projects = onWorkspace;
+            if (onSurface !== undefined) map['projects.board'] = onSurface;
+            localStorage.setItem(panelKey, JSON.stringify(map));
+
+            if (pinned) {
+                localStorage.setItem(pinKey, JSON.stringify({ projects: true }));
+            }
+
+            stamp('projects', serverDefault);
+            if (surface !== null) root.dataset.drawerSurface = surface;
+            runBootstrap();
+
+            expect(root.dataset.drawer).toBe(
+                resolvePanel('projects', serverDefault, pinned, surface),
+            );
+        },
+    );
+
+    it('reads the surface choice, not the workspace one, on a surface', () => {
+        localStorage.setItem(
+            panelKey,
+            JSON.stringify({ projects: 'open', 'projects.board': 'collapsed' }),
+        );
+        stamp('projects', 'collapsed');
+        root.dataset.drawerSurface = 'projects.board';
+
+        runBootstrap();
+        expect(root.dataset.drawer).toBe('collapsed');
+
+        // With no surface choice yet, the surface default wins over the workspace's remembered open.
+        localStorage.setItem(panelKey, JSON.stringify({ projects: 'open' }));
+        runBootstrap();
+        expect(root.dataset.drawer).toBe('collapsed');
+    });
+
+    it('docks a pinned workspace at L on every surface, whatever the surface says', () => {
+        setMedia({ xl: false, large: true });
+        localStorage.setItem(pinKey, JSON.stringify({ projects: true }));
+        // The Board's own default is collapsed and the user once collapsed it at XL.
+        localStorage.setItem(panelKey, JSON.stringify({ 'projects.board': 'collapsed' }));
+        stamp('projects', 'collapsed');
+        root.dataset.drawerSurface = 'projects.board';
+
+        runBootstrap();
+        expect(root.dataset.drawer).toBe('open');
+
+        // Unpinned, the same page starts collapsed at L.
+        localStorage.removeItem(pinKey);
+        runBootstrap();
+        expect(root.dataset.drawer).toBe('collapsed');
+    });
+
+    it('ignores the pin and the remembered state at M and S', () => {
+        setMedia({ xl: false, large: false });
+        localStorage.setItem(pinKey, JSON.stringify({ projects: true }));
+        localStorage.setItem(panelKey, JSON.stringify({ projects: 'open' }));
+        stamp('projects', 'open');
+
+        runBootstrap();
+
+        expect(root.dataset.drawer).toBe('collapsed');
+    });
+
+    it('treats an empty surface stamp as a surface, exactly as the hook does (`??`, not `||`)', () => {
+        localStorage.setItem(panelKey, JSON.stringify({ projects: 'collapsed' }));
+        stamp('projects', 'open');
+        root.dataset.drawerSurface = '';
+
+        runBootstrap();
+
+        // Neither the script nor the hook falls back to the workspace key for an empty surface.
+        expect(root.dataset.drawer).toBe(resolvePanel('projects', 'open', false, ''));
+        expect(root.dataset.drawer).toBe('open');
+    });
+
+    it('ignores a surface stamped without a workspace', () => {
+        localStorage.setItem(panelKey, JSON.stringify({ 'projects.board': 'open' }));
+        stamp(null, 'collapsed');
+        root.dataset.drawerSurface = 'projects.board';
+
+        runBootstrap();
+
+        expect(root.dataset.drawer).toBe('collapsed');
+    });
 });
 
 describe('hostile or missing storage', () => {

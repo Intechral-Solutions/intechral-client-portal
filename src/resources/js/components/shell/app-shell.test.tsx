@@ -524,10 +524,64 @@ it('resolves the presentation family in one place', () => {
 });
 
 it('starts the panel collapsed below XL so an overlay never covers the canvas on load', () => {
-    setWidthClass('below-xl');
+    setWidthClass('l');
     mount(navigation([projects], 'projects'));
 
     // Projects defaults to open, but below XL the panel floats, so it waits to be asked for.
     expect(screen.queryByRole('navigation', { name: 'Projects views' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Show workspace views' })).toBeInTheDocument();
+});
+
+it('leaves the stored XL preference alone when the overlay is opened and closed at L', async () => {
+    const stored = { projects: 'collapsed' };
+    localStorage.setItem('shell.operational.panel', JSON.stringify(stored));
+    setWidthClass('l');
+    mount(navigation([projects], 'projects'));
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Show workspace views' }));
+    expect(screen.getByRole('navigation', { name: 'Projects views' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Collapse workspace views' }));
+    expect(screen.queryByRole('navigation', { name: 'Projects views' })).toBeNull();
+
+    expect(JSON.parse(localStorage.getItem('shell.operational.panel') ?? '{}')).toEqual(stored);
+});
+
+// ── EPIC-015 WP5: per-surface drawer defaults (Direction D §5.3) ─────────────
+
+describe('a Projects surface with its own default', () => {
+    const board = {
+        ...projects,
+        presentation: {
+            operational: { panel: 'collapsed' as const, surface: 'projects.board' },
+        },
+    };
+
+    it('starts collapsed on the Board although the workspace choice is open', () => {
+        localStorage.setItem('shell.operational.panel', JSON.stringify({ projects: 'open' }));
+
+        mount(navigation([board], 'projects'));
+
+        expect(screen.queryByRole('navigation', { name: 'Projects views' })).toBeNull();
+        expect(document.documentElement.dataset.drawer).toBe('collapsed');
+        expect(document.documentElement.dataset.drawerSurface).toBe('projects.board');
+    });
+
+    it('remembers a choice made on the Board under the Board key only', async () => {
+        mount(navigation([board], 'projects'));
+
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Show workspace views' }));
+
+        expect(screen.getByRole('navigation', { name: 'Projects views' })).toBeInTheDocument();
+        expect(JSON.parse(localStorage.getItem('shell.operational.panel') ?? '{}')).toEqual({
+            'projects.board': 'open',
+        });
+    });
+
+    it('leaves a payload without a surface on the workspace default and key', () => {
+        mount(navigation([projects], 'projects'));
+
+        expect(screen.getByRole('navigation', { name: 'Projects views' })).toBeInTheDocument();
+        expect(document.documentElement.dataset.drawerSurface).toBeUndefined();
+    });
 });

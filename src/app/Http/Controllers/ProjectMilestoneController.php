@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Presenters\ProjectMilestonePresenter;
+use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Policies\ProjectSettingsAccess;
@@ -35,6 +36,7 @@ class ProjectMilestoneController extends Controller
                 ->values(),
             // The StagePath's current stage, by the same rule as the Overview (explicit completion).
             'currentId' => ProjectMilestonePresenter::currentId($milestones),
+            'tabs' => ProjectPresenter::workspaceTabs(auth()->user()),
             // What the mutation routes actually admit: they require projects.manage (A9), which
             // ProjectPolicy::manage() alone does not, so a projects.admin-only actor must not be
             // offered New Milestone / Edit / Delete / Complete / Reopen only to have them 403

@@ -114,10 +114,13 @@ it('ignores a view parameter: there is no Mine/All in project scope', function (
 
 // ── Props contract (§13, INV-P8, INV-P15) ───────────────────────────────────
 
+// FLIPPED IN EPIC-015 WP5: the page gains `tabs` (the workspace navigation's optional Time tab,
+// `ProjectPresenter::workspaceTabs`). Was: the same list without `tabs`.
 it('carries exactly the project tab contract', function () {
     $props = projectTasksPageProps($this->actingAs($this->member)->get(route('projects.tasks.index', $this->project)));
 
-    expect(array_keys($props))->toBe(['project', 'tasks', 'filters', 'filterOptions', 'sort', 'projectHasTasks', 'assigneeOptions', 'abilities'])
+    expect(array_keys($props))->toBe(['project', 'tasks', 'filters', 'filterOptions', 'sort', 'projectHasTasks', 'assigneeOptions', 'tabs', 'abilities'])
+        ->and($props['tabs'])->toBe(['time' => true])
         ->and($props['project'])->toBe(['id' => $this->project->id, 'name' => 'Apollo', 'status' => 'active'])
         ->and(array_keys($props['filters']))->toBe(['completion', 'priority', 'due', 'milestone', 'assignee', 'q'])
         ->and(array_keys($props['filterOptions']))->toBe(['completion', 'priorities', 'due', 'sorts', 'milestones', 'assignees'])

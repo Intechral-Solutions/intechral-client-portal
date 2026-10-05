@@ -41,3 +41,38 @@ it.each([
         screen.getByRole('link', { name: label }),
     ]);
 });
+
+// ── EPIC-015 WP5 (optional S3): the Time tab ─────────────────────────────────
+
+it('adds Time last, only when the server offers it', () => {
+    render(<ProjectWorkspaceNav projectId={7} current="overview" tabs={{ time: true }} />);
+
+    expect(links().map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+        ['Overview', '/projects/7'],
+        ['Board', '/projects/7/board'],
+        ['Tasks', '/projects/7/tasks'],
+        ['Milestones', '/projects/7/milestones'],
+        ['Time', '/projects/7/time'],
+    ]);
+});
+
+it('renders no Time tab when the server says no, or says nothing', () => {
+    const { unmount } = render(
+        <ProjectWorkspaceNav projectId={7} current="overview" tabs={{ time: false }} />,
+    );
+    expect(screen.queryByRole('link', { name: 'Time' })).not.toBeInTheDocument();
+    expect(links()).toHaveLength(4);
+    unmount();
+
+    render(<ProjectWorkspaceNav projectId={7} current="overview" />);
+    expect(screen.queryByRole('link', { name: 'Time' })).not.toBeInTheDocument();
+});
+
+it('marks Time as the current page on the Time tab, with link semantics only', () => {
+    render(<ProjectWorkspaceNav projectId={7} current="time" tabs={{ time: true }} />);
+
+    expect(links().filter((link) => link.getAttribute('aria-current') === 'page')).toEqual([
+        screen.getByRole('link', { name: 'Time' }),
+    ]);
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+});

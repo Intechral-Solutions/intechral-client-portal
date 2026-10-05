@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Presenters\ProjectPresenter;
 use App\Http\Presenters\TaskListPresenter;
 use App\Models\Project;
 use App\Models\Task;
@@ -61,6 +62,7 @@ class ProjectTaskListController extends Controller
             // page is empty, of the unfiltered project set.
             'projectHasTasks' => $tasks->total() > 0 || $query->inView()->exists(),
             'assigneeOptions' => $assigneeOptions,
+            'tabs' => ProjectPresenter::workspaceTabs($user),
             // The Settings link: what projects.edit actually admits (A9), through the shared
             // resolver, exactly as the Overview and the Board. Absent, not false, otherwise.
             'abilities' => ProjectSettingsAccess::allows($user, $project) ? ['openSettings' => true] : [],

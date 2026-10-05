@@ -615,6 +615,25 @@ describe('gated fields render only when their key is present', () => {
         expect(within(details).queryByText('Budget')).not.toBeInTheDocument();
     });
 
+    it('links the time summary to the Time tab only when the server offers that tab (WP5)', () => {
+        const { unmount } = renderPage(
+            overview({ time: { scope: 'own', totalMinutes: 45 }, tabs: { time: true } }),
+        );
+        expect(
+            within(section('Details')).getByRole('link', { name: 'View time entries' }),
+        ).toHaveAttribute('href', '/projects/7/time');
+        expect(
+            within(screen.getByRole('navigation', { name: 'Project' })).getByRole('link', {
+                name: 'Time',
+            }),
+        ).toBeInTheDocument();
+        unmount();
+
+        renderPage(overview({ time: { scope: 'all', totalMinutes: 200 } }));
+        expect(screen.queryByRole('link', { name: 'View time entries' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Time' })).not.toBeInTheDocument();
+    });
+
     it('renders the description as plain text', () => {
         renderPage(
             overview({

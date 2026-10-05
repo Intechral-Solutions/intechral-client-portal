@@ -86,6 +86,13 @@ export type BoardTask = {
     assignee: { id: number; name: string } | null;
     milestone: { id: number; name: string } | null;
     checklist: { done: number; total: number };
+    /** Column-authoritative done (`Task::isDone`, INV-P1): the card offers Reopen when true. */
+    done: boolean;
+    /**
+     * TaskPolicy's complete/reopen answers for this card (EPIC-015 WP5 S1), batched for the board by
+     * `TaskRowAbilities`. The card renders a control only for the one that applies and is true.
+     */
+    abilities: { complete: boolean; reopen: boolean };
 };
 
 /** One column of the board, tasks already in board order (ProjectBoardPresenter::column). */
@@ -218,4 +225,9 @@ export type ProjectOverviewProps = {
     budget?: string | null;
     members?: ProjectMemberRef[];
     time?: { scope: 'all' | 'own'; totalMinutes: number };
+    /**
+     * Workspace chrome added by the page controller (WP5), not Overview data: the navigation's
+     * optional tabs. `time` is the same `ProjectTimeAccess` answer that decides the `time` key.
+     */
+    tabs?: { time: boolean };
 };

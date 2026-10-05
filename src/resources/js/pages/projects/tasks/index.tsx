@@ -6,6 +6,7 @@ import type { ReactElement } from 'react';
 import { PageFrame } from '@/components/page-frame';
 import { Pagination } from '@/components/pagination';
 import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
+import type { ProjectWorkspaceTabs } from '@/components/projects/project-workspace-nav';
 import { AppShell } from '@/components/shell/app-shell';
 import { ProjectTaskFilterBar } from '@/components/tasks/project-task-filter-bar';
 import {
@@ -64,6 +65,11 @@ export type ProjectTasksIndexProps = {
     assigneeOptions: TaskAssigneeOptions;
     /** `openSettings` only with effective Settings access (A9); absent otherwise (PHP sends `[]`). */
     abilities: Partial<{ openSettings: true }>;
+    /**
+     * The workspace navigation's optional tabs (`ProjectPresenter::workspaceTabs`, WP5): `time` is
+     * the server's project-time answer. Sent by every workspace page; absent reads as "no Time tab".
+     */
+    tabs?: ProjectWorkspaceTabs;
 };
 
 function isNarrowed(filters: ProjectTaskFilters) {
@@ -86,6 +92,7 @@ export function ProjectTasksIndexPage({
     projectHasTasks,
     assigneeOptions,
     abilities,
+    tabs,
 }: ProjectTasksIndexProps) {
     const tableRef = useRef<DataTableHandle<number>>(null);
     const emptyRegion = useRef<HTMLDivElement>(null);
@@ -114,6 +121,7 @@ export function ProjectTasksIndexPage({
             current="tasks"
             // The server's answer (ProjectSettingsAccess, A9), never a role check here.
             openSettings={abilities.openSettings === true}
+            tabs={tabs}
         />
     );
 

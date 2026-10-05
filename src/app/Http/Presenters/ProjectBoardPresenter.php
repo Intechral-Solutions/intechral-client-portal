@@ -5,6 +5,7 @@ namespace App\Http\Presenters;
 use App\Models\Project;
 use App\Models\ProjectColumn;
 use App\Models\Task;
+use App\Queries\TaskRowAbilities;
 
 /**
  * Page DTOs for the project board (EPIC-011E §5, §7, WP5). Every method returns plain scalars
@@ -29,25 +30,28 @@ final class ProjectBoardPresenter
 
     /**
      * `$column->tasks` must already be loaded (ordered by position, id), with each task's
-     * `assignee`, `milestone`, `column`, and checklist aggregate counts eager loaded.
+     * `assignee`, `milestone`, `column`, and checklist aggregate counts eager loaded. `$abilities`
+     * is the board's batched TaskPolicy projection (`TaskRowAbilities::for` over every card).
      *
      * @return array{id: int, name: string, isDone: bool, tasks: array<int, array<string, mixed>>}
      */
-    public static function column(ProjectColumn $column): array
+    public static function column(ProjectColumn $column, TaskRowAbilities $abilities): array
     {
         return [
             'id' => $column->id,
             'name' => $column->name,
             'isDone' => (bool) $column->is_done_column,
-            'tasks' => $column->tasks->map(fn (Task $task) => self::task($task))->values()->all(),
+            'tasks' => $column->tasks->map(fn (Task $task) => self::task($task, $abilities))->values()->all(),
         ];
     }
 
     /**
-     * @return array{id: int, title: string, priority: string, dueDate: string|null, overdue: bool, assignee: array{id: int, name: string}|null, milestone: array{id: int, name: string}|null, checklist: array{done: int, total: int}}
+     * @return array{id: int, title: string, priority: string, dueDate: string|null, overdue: bool, assignee: array{id: int, name: string}|null, milestone: array{id: int, name: string}|null, checklist: array{done: int, total: int}, done: bool, abilities: array{complete: bool, reopen: bool}}
      */
-    public static function task(Task $task): array
+    public static function task(Task $task, TaskRowAbilities $abilities): array
     {
+        $can = $abilities->of($task);
+
         return [
             'id' => $task->id,
             'title' => $task->title,
@@ -68,6 +72,11 @@ final class ProjectBoardPresenter
                 'done' => (int) $task->done_checklist_items_count,
                 'total' => (int) $task->checklist_items_count,
             ],
+            // EPIC-015 WP5 S1: the card's Complete/Reopen control. `done` is the column-authoritative
+            // rule (Task::isDone, INV-P1), never `tasks.status`; the abilities are TaskPolicy's
+            // complete/reopen answers, so a card offers only what the tasks.* routes will accept.
+            'done' => $task->isDone(),
+            'abilities' => ['complete' => $can['complete'], 'reopen' => $can['reopen']],
         ];
     }
 }
