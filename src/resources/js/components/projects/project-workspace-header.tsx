@@ -6,6 +6,7 @@ import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import {
     ProjectWorkspaceNav,
     type ProjectWorkspaceSection,
+    type ProjectWorkspaceTabs,
 } from '@/components/projects/project-workspace-nav';
 import { buttonVariants } from '@/components/ui/button';
 import { edit } from '@/routes/projects';
@@ -13,7 +14,7 @@ import type { ProjectStatus } from '@/types/projects';
 
 /**
  * EPIC-015 WP4 — the one project header, shared by every workspace page (Overview, Board, Tasks,
- * Milestones; §11.1, §14.1, Direction D §6).
+ * Milestones, and Time from WP5; §11.1, §14.1, Direction D §6).
  *
  * It is the `EntityHeader` grammar the Overview established in WP2, in one place so the four pages
  * cannot drift apart: overline "Project", the name as the page's one `h1`, the **lifecycle** status
@@ -29,9 +30,12 @@ export function ProjectWorkspaceHeader({
     current,
     openSettings = false,
     meta,
+    tabs,
 }: {
     project: { id: number; name: string; status: ProjectStatus };
     current: ProjectWorkspaceSection;
+    /** The server's optional-tab answers (WP5 Time), passed straight to the navigation. */
+    tabs?: ProjectWorkspaceTabs;
     /** The server's Settings-access answer. Absent or false: no Settings action. */
     openSettings?: boolean;
     /** Key facts beside the status (the Overview's dates). */
@@ -53,7 +57,9 @@ export function ProjectWorkspaceHeader({
                     </Link>
                 ) : undefined
             }
-            navigation={<ProjectWorkspaceNav projectId={project.id} current={current} />}
+            navigation={
+                <ProjectWorkspaceNav projectId={project.id} current={current} tabs={tabs} />
+            }
         />
     );
 }

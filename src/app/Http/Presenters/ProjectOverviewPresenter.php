@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
 use App\Policies\ProjectSettingsAccess;
+use App\Policies\ProjectTimeAccess;
 use App\Queries\ProjectHealth;
 use App\Services\TimeEntryService;
 use Illuminate\Support\Collection;
@@ -21,7 +22,7 @@ use Illuminate\Support\Collection;
  *   budget                   effective Settings/Edit access (present, possibly null, when allowed)
  *   members                  effective Settings/Edit access (names and project roles, no email)
  *   abilities.openSettings   effective Settings/Edit access
- *   time                     `time.view_all` (scope all) or `time.log` (scope own)
+ *   time                     `time.view_all` (scope all) or `time.log` (scope own), `ProjectTimeAccess`
  *
  * Effective Settings/Edit access is `ProjectSettingsAccess` (INV-P16), never restated here.
  * Health is `ProjectHealth`, milestone state is `ProjectMilestone`, project time is the PR-A
@@ -39,7 +40,7 @@ final class ProjectOverviewPresenter
     public static function overview(Project $project, User $viewer): array
     {
         $settings = ProjectSettingsAccess::allows($viewer, $project);
-        $time = self::timeScope($viewer);
+        $time = ProjectTimeAccess::scope($viewer);
 
         // Aggregates for progress and health, in one query.
         $stats = ProjectHealth::withFacts(Project::query())->whereKey($project->id)->firstOrFail();
@@ -82,16 +83,6 @@ final class ProjectOverviewPresenter
         }
 
         return $dto;
-    }
-
-    /** `all` with time.view_all, `own` with time.log alone, null (no `time` key) otherwise. */
-    private static function timeScope(User $viewer): ?string
-    {
-        if ($viewer->can('time.view_all')) {
-            return 'all';
-        }
-
-        return $viewer->can('time.log') ? 'own' : null;
     }
 
     /**

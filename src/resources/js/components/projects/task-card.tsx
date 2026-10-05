@@ -1,8 +1,9 @@
 import { Link } from '@inertiajs/react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import type { ReactNode } from 'react';
 
 import { MoveTaskMenu, type MoveTargetColumn } from '@/components/projects/move-task-menu';
+import { TaskCompleteControl } from '@/components/tasks/task-complete-control';
 import { TaskPriorityMark } from '@/components/tasks/task-priority';
 import { Avatar } from '@/components/ui/avatar';
 import { formatDate } from '@/lib/dates';
@@ -22,6 +23,8 @@ export type TaskCardProps = {
     canManage: boolean;
     /** True while any move is in flight (single-flight, EPIC-011E §8): disables every Move menu. */
     boardBusy: boolean;
+    /** True only for the card whose own move or completion is in flight (`boardBusy` is board-wide). */
+    taskBusy?: boolean;
     onMove: (taskId: number, toColumnId: number, toIndex: number, taskTitle: string) => void;
     /**
      * The pointer/touch drag affordance (EPIC-011E §9, WP6), already fully wired by
@@ -31,6 +34,11 @@ export type TaskCardProps = {
      * and for every card before WP6, so this slot changes nothing about the existing render.
      */
     dragHandle?: ReactNode;
+    /**
+     * EPIC-015 WP5 S1 — Complete/Reopen from the card, through the Board's single-flight request
+     * (`board.tsx`). A stable reference, like `onMove`. Absent: the card offers no control.
+     */
+    onToggleComplete?: (taskId: number, done: boolean, taskTitle: string) => void;
 };
 
 function TaskCardImpl({
@@ -42,10 +50,23 @@ function TaskCardImpl({
     columns,
     canManage,
     boardBusy,
+    taskBusy = false,
     onMove,
     dragHandle,
+    onToggleComplete,
 }: TaskCardProps) {
     const titleId = `task-${task.id}-title`;
+
+    // The ring is the Tasks list's own control (Direction D §10.2), fed this card's server state:
+    // done is the column's answer, the abilities TaskPolicy's. It renders only when the one ability
+    // that applies is true, so a viewer is never offered an action the route would refuse.
+    const completable = useMemo(
+        () => ({ title: task.title, status: { done: task.done }, abilities: task.abilities }),
+        [task.title, task.done, task.abilities],
+    );
+    const canToggle =
+        onToggleComplete !== undefined &&
+        (task.done ? task.abilities.reopen : task.abilities.complete);
 
     return (
         <article
@@ -68,16 +89,35 @@ function TaskCardImpl({
                 ) : null}
             </div>
 
-            {/* Task detail is a React page as of WP7 (EPIC-011E §21): an Inertia Link,
-                prefetched since it is the board's most common next destination. */}
-            <Link
-                id={titleId}
-                href={taskShowRoute.url({ project: projectId, task: task.id })}
-                prefetch
-                className="block text-sm leading-snug font-medium hover:underline"
-            >
-                {task.title}
-            </Link>
+            <div className="flex items-start gap-1">
+                {canToggle ? (
+                    // Pulled into the card's padding so the 36px target (44px on coarse pointers)
+                    // costs the title no height. A sibling of the link, never inside it, and the
+                    // drag listeners live on the handle alone, so pressing it neither opens the
+                    // task nor starts a drag.
+                    <span className="-my-2 -ml-2 shrink-0">
+                        <TaskCompleteControl
+                            task={completable}
+                            // The whole board is single-flight: no completion while a move or
+                            // another completion is in flight (aria-disabled, focus kept), but only
+                            // the card actually being mutated announces itself as busy.
+                            pending={taskBusy}
+                            locked={boardBusy}
+                            onToggle={() => onToggleComplete(task.id, task.done, task.title)}
+                        />
+                    </span>
+                ) : null}
+                {/* Task detail is a React page as of WP7 (EPIC-011E §21): an Inertia Link,
+                    prefetched since it is the board's most common next destination. */}
+                <Link
+                    id={titleId}
+                    href={taskShowRoute.url({ project: projectId, task: task.id })}
+                    prefetch
+                    className="block min-w-0 text-sm leading-snug font-medium break-words hover:underline"
+                >
+                    {task.title}
+                </Link>
+            </div>
 
             <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -140,6 +180,9 @@ function tasksEqual(a: BoardTask, b: BoardTask): boolean {
         a.priority === b.priority &&
         a.dueDate === b.dueDate &&
         a.overdue === b.overdue &&
+        a.done === b.done &&
+        a.abilities.complete === b.abilities.complete &&
+        a.abilities.reopen === b.abilities.reopen &&
         a.checklist.done === b.checklist.done &&
         a.checklist.total === b.checklist.total &&
         sameRef(a.assignee, b.assignee) &&
@@ -168,9 +211,11 @@ export function taskCardPropsAreEqual(prev: TaskCardProps, next: TaskCardProps):
         prev.columnSize === next.columnSize &&
         prev.canManage === next.canManage &&
         prev.boardBusy === next.boardBusy &&
+        prev.taskBusy === next.taskBusy &&
         prev.columns === next.columns &&
         prev.onMove === next.onMove &&
         prev.dragHandle === next.dragHandle &&
+        prev.onToggleComplete === next.onToggleComplete &&
         tasksEqual(prev.task, next.task)
     );
 }

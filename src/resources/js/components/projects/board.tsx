@@ -6,6 +6,7 @@ import { BoardColumn } from '@/components/projects/board-column';
 import { BoardDndContext } from '@/components/projects/board-dnd';
 import { applyMove, isNoopMove } from '@/components/projects/board-moves';
 import { move as moveTaskRoute } from '@/routes/projects/tasks';
+import { complete as completeTaskRoute, reopen as reopenTaskRoute } from '@/routes/tasks';
 import type { BoardColumn as BoardColumnData } from '@/types/projects';
 
 type BoardProps = {
@@ -225,6 +226,131 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
         [],
     );
 
+    /**
+     * EPIC-015 WP5 S1 — Complete/Reopen from a card. It calls the same `tasks.complete` /
+     * `tasks.reopen` endpoints as the Tasks list and task detail, so there is no board-specific
+     * completion rule: the server moves the task into the Done column (Reopen: to the tail of the
+     * first open column, EPIC-014 §8) and the redirect's `columns` are rendered as they arrive.
+     * Nothing is presented optimistically (Direction D §15.5: completion with side effects stays
+     * pending until confirmed), and React never moves a card itself.
+     *
+     * It shares the move path's single-flight guard and generation token, so a completion can never
+     * overlap a move or another completion, and a second press in the same tick is refused before
+     * any state flushes. A refusal is shown in the board's own alert, then the board is re-read
+     * (holding the guard through that read, as a failed move does) so it is canonical again.
+     */
+    const requestCompletion = useCallback((taskId: number, done: boolean, taskTitle: string) => {
+        if (pendingRef.current !== null) return;
+
+        const generation = ++moveGenerationRef.current;
+        const isCurrent = () => moveGenerationRef.current === generation;
+
+        pendingRef.current = taskId;
+        setPendingTaskId(taskId);
+        setAlertMessage('');
+
+        let awaitingReconciliation = false;
+
+        const settle = () => {
+            pendingRef.current = null;
+            setPendingTaskId(null);
+        };
+
+        // The card remounts in the column the server put it in, so focus follows the task by id to
+        // its control there (now named for the opposite action). Repairs focus only if it was the
+        // moved card's to lose: it was inside that card when the press happened, and the remount has
+        // left it nowhere. A pointer press that left focus on the page body (Safari does not focus a
+        // clicked button) or on something else never had meaningful focus here, so none is manufactured
+        // (the Tasks list's philosophy). Checked now and again after the next frame, once the new
+        // columns have committed.
+        const focusWasOnCard = !!document.activeElement?.closest(`[data-task-id="${taskId}"]`);
+        const focusIfLost = () => {
+            if (!focusWasOnCard) return;
+
+            const active = document.activeElement;
+
+            if (active && active !== document.body && active.isConnected) return;
+
+            document
+                .querySelector<HTMLElement>(`[data-task-id="${taskId}"] [data-task-complete]`)
+                ?.focus();
+        };
+        const restoreFocus = () => {
+            focusIfLost();
+            requestAnimationFrame(focusIfLost);
+        };
+
+        const fail = (message?: string) => {
+            if (!isCurrent()) return;
+
+            setAlertMessage(
+                message ?? `"${taskTitle}" could not be ${done ? 'reopened' : 'completed'}.`,
+            );
+        };
+
+        const reconcileAfterFailure = () => {
+            awaitingReconciliation = true;
+
+            router.reload({
+                only: ['columns'],
+                onFinish: () => {
+                    settle();
+                    if (isCurrent()) restoreFocus();
+                },
+            });
+        };
+
+        try {
+            router.put(
+                done ? reopenTaskRoute.url(taskId) : completeTaskRoute.url(taskId),
+                {},
+                {
+                    only: ['columns', 'flash'],
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: () => {
+                        if (isCurrent()) {
+                            setPoliteMessage(`${done ? 'Reopened' : 'Completed'} "${taskTitle}".`);
+                        }
+                    },
+                    // A refusal on the operation's key, e.g. a board without exactly one Done
+                    // column (EPIC-014 INV-8): the server's own words.
+                    onError: (errors) => {
+                        fail(errors.complete ?? errors.reopen ?? Object.values(errors)[0]);
+                        reconcileAfterFailure();
+                    },
+                    onHttpException: (response: { status: number }) => {
+                        if (response.status === 401 || response.status === 419) {
+                            window.location.reload();
+
+                            return false;
+                        }
+
+                        fail(response.status === 404 ? 'This task no longer exists.' : undefined);
+                        reconcileAfterFailure();
+
+                        return false;
+                    },
+                    onNetworkError: () => {
+                        fail();
+                        reconcileAfterFailure();
+
+                        return false;
+                    },
+                    onFinish: () => {
+                        if (!awaitingReconciliation) {
+                            settle();
+                            if (isCurrent()) restoreFocus();
+                        }
+                    },
+                },
+            );
+        } catch {
+            settle();
+            fail();
+        }
+    }, []);
+
     function toggleQuickAdd(columnId: number) {
         setQuickAddColumnId((current) => (current === columnId ? null : columnId));
     }
@@ -255,10 +381,12 @@ export function Board({ projectId, columns, abilities }: BoardProps) {
                                 columns={columnSummaries}
                                 canManage={abilities.manage}
                                 boardBusy={boardBusy}
+                                pendingTaskId={pendingTaskId}
                                 quickAddOpen={quickAddColumnId === column.id}
                                 onToggleQuickAdd={toggleQuickAdd}
                                 onCloseQuickAdd={() => setQuickAddColumnId(null)}
                                 onMove={requestMove}
+                                onToggleComplete={requestCompletion}
                             />
                         ))}
                     </div>

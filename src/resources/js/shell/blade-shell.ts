@@ -52,6 +52,15 @@ function writeMap(key: string, map: Record<string, unknown>): void {
     }
 }
 
+/** True at XL (>= 1360px); a browser that cannot answer is treated as XL, as everywhere else. */
+function atExtraLarge(): boolean {
+    try {
+        return window.matchMedia('(min-width: 1360px)').matches;
+    } catch {
+        return true;
+    }
+}
+
 /** True when CSS currently renders the element — the width classes decide, not this file. */
 function rendered(element: Element | null): element is HTMLElement {
     return element instanceof HTMLElement && element.getClientRects().length > 0;
@@ -80,10 +89,16 @@ function initPanel(shell: HTMLElement): void {
     function setPanel(next: PanelState): void {
         root.dataset.drawer = next;
 
+        // The same key the React hook writes (`panelPreferenceKey`): the server-stamped surface on a
+        // surface with its own default, the workspace otherwise (Direction D §5.3, EPIC-015 WP5).
         const workspace = root.dataset.workspace;
+        const preferenceKey = workspace ? (root.dataset.drawerSurface ?? workspace) : null;
 
-        if (workspace) {
-            writeMap(panelKey, { ...readMap(panelKey), [workspace]: next });
+        // Only an interaction at XL is the XL preference (same rule as the React hook): below XL the
+        // pre-paint bootstrap ignores the remembered state, so a write there could only change what
+        // the user finds when they next open the portal wide.
+        if (preferenceKey && atExtraLarge()) {
+            writeMap(panelKey, { ...readMap(panelKey), [preferenceKey]: next });
         }
     }
 

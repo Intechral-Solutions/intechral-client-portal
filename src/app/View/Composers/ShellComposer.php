@@ -45,25 +45,29 @@ final class ShellComposer
     }
 
     /**
-     * The two server-stamped inputs of the shared pre-paint bootstrap (§15.3), used by both roots.
+     * The server-stamped inputs of the shared pre-paint bootstrap (§15.3), used by both roots.
      *
      * `workspace` is the builder's `currentWorkspace`. `drawerDefault` is that workspace's
      * `presentation.operational.panel` — and null when its `context` is empty, because an empty
-     * context means no contextual panel for any presentation (§12.3 rule 6). This is the same
-     * projection `OperatorShell` makes on the React side; it reads the payload and decides nothing.
+     * context means no contextual panel for any presentation (§12.3 rule 6). `drawerSurface` is
+     * `presentation.operational.surface` (Direction D §5.3, EPIC-015 WP5): the key a choice on this
+     * surface is remembered under, null when the workspace key is. This is the same projection
+     * `OperatorShell` makes on the React side; it reads the payload and decides nothing.
      *
      * @param  array{currentWorkspace?: string|null, workspaces?: array<int, array<string, mixed>>}|null  $navigation
-     * @return array{workspace: string|null, drawerDefault: string|null, hasPanel: bool}
+     * @return array{workspace: string|null, drawerDefault: string|null, drawerSurface: string|null, hasPanel: bool}
      */
     public static function rootState(?array $navigation): array
     {
         $workspace = self::currentWorkspace($navigation);
         $hasPanel = $workspace !== null && ($workspace['context'] ?? []) !== [];
         $default = $hasPanel ? ($workspace['presentation']['operational']['panel'] ?? null) : null;
+        $surface = $hasPanel ? ($workspace['presentation']['operational']['surface'] ?? null) : null;
 
         return [
             'workspace' => $workspace['key'] ?? null,
             'drawerDefault' => $default,
+            'drawerSurface' => $surface,
             'hasPanel' => $hasPanel,
         ];
     }

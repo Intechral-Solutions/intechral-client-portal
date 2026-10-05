@@ -16,10 +16,14 @@ type BoardColumnProps = {
     columns: MoveTargetColumn[];
     canManage: boolean;
     boardBusy: boolean;
+    /** The task whose move or completion is in flight, if any (`boardBusy` is true then). */
+    pendingTaskId?: number | null;
     quickAddOpen: boolean;
     onToggleQuickAdd: (columnId: number) => void;
     onCloseQuickAdd: () => void;
     onMove: (taskId: number, toColumnId: number, toIndex: number, taskTitle: string) => void;
+    /** Complete/Reopen from a card (WP5 S1); stable, passed straight to every card. */
+    onToggleComplete?: (taskId: number, done: boolean, taskTitle: string) => void;
 };
 
 export function BoardColumn({
@@ -28,10 +32,12 @@ export function BoardColumn({
     columns,
     canManage,
     boardBusy,
+    pendingTaskId = null,
     quickAddOpen,
     onToggleQuickAdd,
     onCloseQuickAdd,
     onMove,
+    onToggleComplete,
 }: BoardColumnProps) {
     const addButtonRef = useRef<HTMLButtonElement>(null);
     const wasOpen = useRef(quickAddOpen);
@@ -101,8 +107,10 @@ export function BoardColumn({
                             columns={columns}
                             canManage
                             boardBusy={boardBusy}
+                            taskBusy={pendingTaskId === task.id}
                             disabled={boardBusy}
                             onMove={onMove}
+                            onToggleComplete={onToggleComplete}
                         />
                     ))}
                 </SortableColumnBody>
@@ -124,7 +132,9 @@ export function BoardColumn({
                             columns={columns}
                             canManage={false}
                             boardBusy={boardBusy}
+                            taskBusy={pendingTaskId === task.id}
                             onMove={onMove}
+                            onToggleComplete={onToggleComplete}
                         />
                     ))}
                 </div>

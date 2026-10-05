@@ -15,11 +15,13 @@ import { StagePath, stagePathWindow } from '@/components/ui/stage-path';
 import { Status } from '@/components/ui/status';
 import { Tag } from '@/components/ui/tag';
 import { formatDate } from '@/lib/dates';
+import { formatMinutes } from '@/lib/duration';
 import { layoutPageProps } from '@/lib/inertia-layout';
 import { cn } from '@/lib/utils';
 import { board } from '@/routes/projects';
 import { index as milestonesIndex } from '@/routes/projects/milestones';
 import { index as tasksIndex } from '@/routes/projects/tasks';
+import { index as timeIndex } from '@/routes/projects/time';
 import type { MemberRole, MilestoneItem, ProjectOverviewProps } from '@/types/projects';
 
 /**
@@ -51,17 +53,6 @@ const OVERDUE_ROWS = 5;
 
 function plural(count: number, one: string, many: string) {
     return `${count} ${count === 1 ? one : many}`;
-}
-
-/** Whole minutes as "3h 20m": formatting only, never arithmetic over entries. */
-function formatMinutes(totalMinutes: number): string {
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    if (hours === 0) return `${minutes}m`;
-    if (minutes === 0) return `${hours}h`;
-
-    return `${hours}h ${minutes}m`;
 }
 
 /**
@@ -369,9 +360,18 @@ function MilestonesSection({
  * all, not a placeholder. Time says whose time it is, so "your time" never reads as the project total.
  */
 function contextRail(props: ProjectOverviewProps): ReactNode {
-    const { project, budget, members, time } = props;
+    const { project, budget, members, time, tabs } = props;
     const hasBudget = 'budget' in props;
     const sections: ReactNode[] = [];
+    // The summary links to the detailed Time tab only when the server offers that tab (WP5).
+    const timeLink = tabs?.time ? (
+        <Link
+            href={timeIndex.url(project.id)}
+            className="mt-1 inline-block text-xs text-text-secondary underline underline-offset-2 hover:text-text"
+        >
+            View time entries
+        </Link>
+    ) : null;
 
     if (project.description) {
         sections.push(
@@ -396,6 +396,7 @@ function contextRail(props: ProjectOverviewProps): ReactNode {
                                 <span className="block text-xs text-text-muted">
                                     All team members
                                 </span>
+                                {timeLink}
                             </DetailRow>
                         ) : (
                             <DetailRow label="Your time">
@@ -405,6 +406,7 @@ function contextRail(props: ProjectOverviewProps): ReactNode {
                                 <span className="block text-xs text-text-muted">
                                     Your entries only
                                 </span>
+                                {timeLink}
                             </DetailRow>
                         )
                     ) : null}
@@ -455,7 +457,7 @@ function contextRail(props: ProjectOverviewProps): ReactNode {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export function ProjectShowPage(props: ProjectOverviewProps) {
-    const { project, health, tasks, milestones, abilities } = props;
+    const { project, health, tasks, milestones, abilities, tabs } = props;
     const rail = contextRail(props);
 
     const dates = [
@@ -477,6 +479,7 @@ export function ProjectShowPage(props: ProjectOverviewProps) {
             current="overview"
             // The server's answer (ProjectSettingsAccess, A9), never a role check here.
             openSettings={abilities.openSettings === true}
+            tabs={tabs}
             meta={
                 dates.length ? (
                     <span className="flex flex-wrap gap-x-4 gap-y-1">{dates}</span>

@@ -172,12 +172,14 @@ export function navigation(
 /**
  * jsdom has no layout, and `test/setup.ts` stubs `matchMedia` as "no preference matches anything".
  * The panel's initial state depends on the XL width class (Direction D §5.2), so a test that cares
- * has to say which width class it is standing in.
+ * has to say which width class it is standing in: XL (>= 1360), L (1024-1359) or M/S (< 1024).
  */
-export function setWidthClass(widthClass: 'xl' | 'below-xl') {
+export function setWidthClass(widthClass: 'xl' | 'l' | 'm') {
     window.matchMedia = (query: string) =>
         ({
-            matches: widthClass === 'xl' && query.includes('1360px'),
+            matches:
+                (widthClass === 'xl' && query.includes('1360px')) ||
+                (widthClass !== 'm' && query.includes('1024px')),
             media: query,
             onchange: null,
             addListener: () => {},

@@ -8,6 +8,7 @@ import { MilestoneFormDialog } from '@/components/projects/milestone-form-dialog
 import { MilestoneListItem } from '@/components/projects/milestone-list-item';
 import { milestoneStages } from '@/components/projects/milestone-stages';
 import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
+import type { ProjectWorkspaceTabs } from '@/components/projects/project-workspace-nav';
 import { Section } from '@/components/section';
 import { AppShell } from '@/components/shell/app-shell';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,11 @@ export type MilestonesIndexProps = {
     currentId: number | null;
     /** `manage` is `ProjectSettingsAccess` (A9): milestone mutations and the Settings action. */
     abilities: { manage: boolean };
+    /**
+     * The workspace navigation's optional tabs (`ProjectPresenter::workspaceTabs`, WP5): `time` is
+     * the server's project-time answer. Sent by every workspace page; absent reads as "no Time tab".
+     */
+    tabs?: ProjectWorkspaceTabs;
 };
 
 type DialogState = { mode: 'create' } | { mode: 'edit'; milestone: MilestoneItem } | null;
@@ -47,6 +53,7 @@ export function MilestonesIndexPage({
     milestones,
     currentId,
     abilities,
+    tabs,
 }: MilestonesIndexProps) {
     const [dialog, setDialog] = useState<DialogState>(null);
     const openCreate = () => setDialog({ mode: 'create' });
@@ -68,6 +75,7 @@ export function MilestonesIndexPage({
                         current="milestones"
                         // The same resolver as every milestone mutation (ProjectSettingsAccess).
                         openSettings={abilities.manage}
+                        tabs={tabs}
                     />
                 }
             >

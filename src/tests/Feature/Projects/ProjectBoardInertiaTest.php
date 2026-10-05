@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
@@ -53,7 +55,11 @@ it('renders the board as an Inertia page with the minimal DTO shape', function (
         ->and($todoColumn['isDone'])->toBeFalse();
 
     $card = collect($todoColumn['tasks'])->firstWhere('id', $task->id);
-    expect(array_keys($card))->toBe(['id', 'title', 'priority', 'dueDate', 'overdue', 'assignee', 'milestone', 'checklist'])
+    // FLIPPED IN EPIC-015 WP5 (S1): a card gains `done` (column-authoritative) and its TaskPolicy
+    // complete/reopen `abilities`, for the card's Complete/Reopen control. Was: the first eight keys.
+    expect(array_keys($card))->toBe(['id', 'title', 'priority', 'dueDate', 'overdue', 'assignee', 'milestone', 'checklist', 'done', 'abilities'])
+        ->and($card['done'])->toBeFalse()
+        ->and($card['abilities'])->toBe(['complete' => true, 'reopen' => true])
         ->and($card['title'])->toBe('Ship it')
         ->and($card['priority'])->toBe('high')
         ->and($card['assignee'])->toBe(['id' => $manager->id, 'name' => $manager->name])
@@ -195,4 +201,83 @@ it('does not render the board for a project that does not exist', function () {
     $manager = projectActor('project_manager', $this->project);
 
     $this->actingAs($manager)->get('/projects/999999/board')->assertNotFound();
+});
+
+// ── EPIC-015 WP5 (S1): card Complete/Reopen abilities ────────────────────────
+
+/** Every card on the board, flattened, keyed by task id. */
+function boardCards(array $props): array
+{
+    return collect($props['columns'])->flatMap(fn (array $column) => $column['tasks'])->keyBy('id')->all();
+}
+
+it('gives every card exactly TaskPolicy\'s complete/reopen answers, for every actor shape', function (string $kind) {
+    // `member` is the customer shape (the `user` role); `role_less_member` holds no role or
+    // permission at all, so membership is its only standing.
+    $actor = $kind === 'role_less_member'
+        ? tap(User::factory()->create(), fn (User $user) => $this->project->members()->attach($user->id, ['role' => 'member']))
+        : projectActor($kind, $this->project);
+    $other = projectActor('member', $this->project);
+
+    $tasks = [
+        'mine open' => makeTask($this->todo, ['title' => 'Mine open', 'assignee_id' => $actor->id, 'position' => 0]),
+        'mine done' => makeTask($this->done, ['title' => 'Mine done', 'assignee_id' => $actor->id, 'position' => 0]),
+        'theirs open' => makeTask($this->todo, ['title' => 'Theirs open', 'assignee_id' => $other->id, 'position' => 1]),
+        'unassigned done' => makeTask($this->done, ['title' => 'Unassigned done', 'position' => 1]),
+    ];
+
+    $cards = boardCards(boardProps($this->actingAs($actor)->get(route('projects.board', $this->project))->assertOk()));
+
+    foreach ($tasks as $label => $task) {
+        $fresh = $task->fresh();
+
+        expect($cards[$task->id]['abilities'])->toBe([
+            'complete' => Gate::forUser($actor)->allows('complete', $fresh),
+            'reopen' => Gate::forUser($actor)->allows('reopen', $fresh),
+        ], "{$kind}: {$label}")
+            ->and($cards[$task->id]['done'])->toBe($fresh->isDone(), "{$kind}: {$label} done");
+    }
+
+    // The interesting answers, stated, so a parity bug in both places cannot pass silently.
+    $manages = in_array($kind, ['project_manager', 'admin', 'admin_only'], true);
+    expect($cards[$tasks['theirs open']->id]['abilities']['complete'])->toBe($manages, "{$kind} on another's task")
+        ->and($cards[$tasks['mine open']->id]['abilities']['complete'])->toBeTrue("{$kind} on own task")
+        ->and($cards[$tasks['unassigned done']->id]['abilities']['reopen'])->toBe($manages, "{$kind} reopen unassigned");
+})->with(['member', 'role_less_member', 'manager_role', 'project_manager', 'admin', 'admin_only']);
+
+it('gives a viewer with no completion ability no card control at all', function () {
+    $viewer = projectActor('member', $this->project);
+    makeTask($this->todo, ['title' => 'Someone else\'s']);
+    makeTask($this->done, ['title' => 'Done already']);
+
+    foreach (boardCards(boardProps($this->actingAs($viewer)->get(route('projects.board', $this->project)))) as $card) {
+        expect($card['abilities'])->toBe(['complete' => false, 'reopen' => false]);
+    }
+});
+
+it('reads done from the column, never from tasks.status (INV-P1)', function () {
+    $inDone = makeTask($this->done, ['title' => 'Column done', 'status' => 'todo']);
+    $inTodo = makeTask($this->todo, ['title' => 'Status done', 'status' => 'done']);
+
+    $cards = boardCards(boardProps($this->actingAs($this->admin)->get(route('projects.board', $this->project))));
+
+    expect($cards[$inDone->id]['done'])->toBeTrue()
+        ->and($cards[$inTodo->id]['done'])->toBeFalse();
+});
+
+it('completes and reopens through the shared tasks.* endpoints, landing back on the board', function () {
+    $assignee = projectActor('member', $this->project);
+    $task = makeTask($this->todo, ['title' => 'From the card', 'assignee_id' => $assignee->id]);
+    $board = route('projects.board', $this->project);
+
+    $this->actingAs($assignee)->from($board)->put(route('tasks.complete', $task))->assertRedirect($board);
+    expect($task->fresh()->column_id)->toBe($this->done->id);
+    $card = boardCards(boardProps($this->actingAs($assignee)->get($board)))[$task->id];
+    expect($card['done'])->toBeTrue()->and($card['abilities']['reopen'])->toBeTrue();
+
+    $this->actingAs($assignee)->from($board)->put(route('tasks.reopen', $task))->assertRedirect($board);
+    expect($task->fresh()->column->is_done_column)->toBeFalse();
+
+    // A viewer without the ability is refused by the route itself, whatever a card shows.
+    $this->actingAs(projectActor('member', $this->project))->from($board)->put(route('tasks.complete', $task))->assertForbidden();
 });

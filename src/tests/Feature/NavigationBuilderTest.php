@@ -245,13 +245,16 @@ it('gives presentation hints no authority over the authorized model', function (
     }
 });
 
+// FLIPPED IN EPIC-015 WP5: the operational hint gains `surface` (Direction D §5.3), null on every
+// workspace of a non-surface route such as this one. Was: `toBe(['panel'])`.
 it('namespaces presentation hints per family and bounds the panel default', function () {
     $navigation = navigationFor(actor('operator'), 'dashboard');
 
     foreach ($navigation['workspaces'] as $workspace) {
         expect(array_keys($workspace['presentation']))->toBe(['operational'])
-            ->and(array_keys($workspace['presentation']['operational']))->toBe(['panel'])
-            ->and($workspace['presentation']['operational']['panel'])->toBeIn(['open', 'collapsed', null]);
+            ->and(array_keys($workspace['presentation']['operational']))->toBe(['panel', 'surface'])
+            ->and($workspace['presentation']['operational']['panel'])->toBeIn(['open', 'collapsed', null])
+            ->and($workspace['presentation']['operational']['surface'])->toBeNull();
     }
 });
 

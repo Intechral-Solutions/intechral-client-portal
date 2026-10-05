@@ -12,7 +12,8 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light"
       @if ($shellRoot['workspace']) data-workspace="{{ $shellRoot['workspace'] }}" @endif
-      @if ($shellRoot['drawerDefault']) data-drawer-default="{{ $shellRoot['drawerDefault'] }}" @endif>
+      @if ($shellRoot['drawerDefault']) data-drawer-default="{{ $shellRoot['drawerDefault'] }}" @endif
+      @if ($shellRoot['drawerSurface']) data-drawer-surface="{{ $shellRoot['drawerSurface'] }}" @endif>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

@@ -237,9 +237,16 @@ test('the Overview counts open the filtered Tasks tab, and the tabs lead everywh
         page.getByRole('heading', { level: 1, name: 'E2E WP3 navigation project' }),
     ).toBeVisible();
 
-    // The four-link strip, Tasks current, page links rather than ARIA tabs.
+    // The workspace strip, Tasks current, page links rather than ARIA tabs. FLIPPED IN EPIC-015 WP5:
+    // the operator holds a time permission, so the optional Time tab is the fifth link.
     const nav = projectNav(page);
-    await expect(nav.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
+    await expect(nav.getByRole('link')).toHaveText([
+        'Overview',
+        'Board',
+        'Tasks',
+        'Milestones',
+        'Time',
+    ]);
     await expect(nav.getByRole('link', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page');
     await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
     await expect(page.getByRole('tablist')).toHaveCount(0);
@@ -293,10 +300,11 @@ test('the Overview counts open the filtered Tasks tab, and the tabs lead everywh
     expect(await hasHorizontalOverflow(page), 'forced: the document does not overflow').toBe(false);
 
     // The last link starts off-screen inside the strip, and scrolling brings it fully into view.
-    const last = strip.getByRole('link', { name: 'Milestones' });
-    await expect(last, 'forced: Milestones starts clipped').not.toBeInViewport({ ratio: 1 });
+    // EPIC-015 WP5: with the optional Time tab offered, Time is the last of five links.
+    const last = strip.getByRole('link', { name: 'Time' });
+    await expect(last, 'forced: Time starts clipped').not.toBeInViewport({ ratio: 1 });
     await last.scrollIntoViewIfNeeded();
-    await expect(last, 'forced: Milestones scrolled into view').toBeInViewport({ ratio: 1 });
+    await expect(last, 'forced: Time scrolled into view').toBeInViewport({ ratio: 1 });
     expect(
         await strip.evaluate((node) => node.scrollLeft),
         'forced: the strip itself scrolled',
@@ -304,7 +312,7 @@ test('the Overview counts open the filtered Tasks tab, and the tabs lead everywh
 
     // Keyboard focus on the off-screen link is visible, ringed and not clipped.
     await last.focus();
-    await expect(last, 'forced: Milestones focusable').toBeFocused();
+    await expect(last, 'forced: Time focusable').toBeFocused();
     await expect(last, 'forced: focused link in view').toBeInViewport({ ratio: 1 });
     const ring = await last.evaluate((node) => {
         const style = getComputedStyle(node);
@@ -538,14 +546,14 @@ test('the Tasks tab, its four-link strip and its rows hold together at 390px and
                 await nav.getByRole('list').evaluate((node) => getComputedStyle(node).flexWrap),
                 `${at} one line of links`,
             ).toBe('nowrap');
-            for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+            for (const label of ['Overview', 'Board', 'Tasks', 'Milestones', 'Time']) {
                 const link = nav.getByRole('link', { name: label });
                 await link.scrollIntoViewIfNeeded();
                 await expect(link, `${at} ${label} reachable`).toBeInViewport();
             }
             if (scrollWidth > clientWidth) {
                 // Scrolled, not clipped: the strip's last link is reachable inside the strip.
-                const last = nav.getByRole('link', { name: 'Milestones' });
+                const last = nav.getByRole('link', { name: 'Time' });
                 await last.scrollIntoViewIfNeeded();
                 await expect(last, `${at} last link scrolled into view`).toBeInViewport({
                     ratio: 1,

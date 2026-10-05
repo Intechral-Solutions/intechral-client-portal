@@ -63,3 +63,17 @@ it('shows key facts beside the status when given', () => {
 
     expect(screen.getByText('Target Dec 31, 2026')).toBeInTheDocument();
 });
+
+it("passes the server's optional tabs to the navigation (EPIC-015 WP5)", () => {
+    const { unmount } = render(
+        <ProjectWorkspaceHeader project={project} current="time" tabs={{ time: true }} />,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Project' });
+    expect(within(nav).getByRole('link', { name: 'Time' })).toHaveAttribute('aria-current', 'page');
+    // Settings stays a header action, never a sixth tab.
+    expect(within(nav).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    unmount();
+
+    render(<ProjectWorkspaceHeader project={project} current="board" />);
+    expect(screen.queryByRole('link', { name: 'Time' })).not.toBeInTheDocument();
+});

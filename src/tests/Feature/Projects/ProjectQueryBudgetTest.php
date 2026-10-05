@@ -529,3 +529,113 @@ it('keeps the global Tasks list free of milestone data: project scope alone load
             ->and(array_key_exists('milestone', $props['tasks']['data'][0]))->toBeFalse(json_encode($query));
     }
 });
+
+/*
+ * EPIC-015 WP5 (S1): the Board's per-card Complete/Reopen abilities come from ONE batched
+ * membership query (`TaskRowAbilities`), never a policy call per card. Measured for viewers whose
+ * answers differ per card (a member-assignee, a manager-role member), with every card assigned and
+ * about one in five of them done (cards cycle through the project's five columns, one of which is
+ * Done), so a per-card policy or membership lookup would show.
+ */
+it('keeps the Board constant as cards with per-card completion abilities grow (WP5)', function (string $who) {
+    $owner = makeUser('operator');
+    $project = makeProject($owner, 'Board abilities budget');
+    $viewer = projectActor($who, $project);
+    $colleague = projectActor('member', $project);
+    $grow = function (int $n) use ($project, $viewer, $colleague) {
+        static $step = 0;
+        for ($i = 0; $i < $n; $i++, $step++) {
+            makeTask($project->columns[$step % 5], [
+                'position' => 1000 + $step,
+                'assignee_id' => $step % 2 === 0 ? $viewer->id : $colleague->id,
+            ]);
+        }
+    };
+    $request = fn () => $this->actingAs(User::findOrFail($viewer->id))->get(route('projects.board', $project))->assertOk()->viewData('page')['props'];
+
+    $grow(3);
+    $small = warmQueries($request);
+    $grow(27);
+    $large = warmQueries($request);
+    $cards = collect($request()['columns'])->flatMap(fn (array $column) => $column['tasks']);
+
+    expect($cards)->toHaveCount(30)
+        // The answers really differ per card, so the projection is doing work.
+        ->and($cards->pluck('abilities.complete')->unique()->count())->toBe(2)
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "board {$who}: 3 cards={$small}, 30 cards={$large}");
+})->with(['member', 'manager_role']);
+
+/*
+ * EPIC-015 WP5 (S3): the project Time tab costs a constant number of queries per viewer shape as
+ * the project's time grows. Each step adds a new person (a member), a new task with that person's
+ * entry, a colleague's entry on it, a direct project entry, the viewer's own direct and task
+ * entries, another project's entry, a malformed board-task row pointing elsewhere and a running
+ * timer, so a per-entry task, user or project lookup would show.
+ */
+function growProjectTimeWorld(Project $project, Project $elsewhere, User $viewer, int $n): void
+{
+    static $step = 0;
+
+    for ($i = 0; $i < $n; $i++, $step++) {
+        $person = makeUser('user', ['name' => "Logger {$step}"]);
+        $project->members()->attach($person->id, ['role' => 'member']);
+        $task = makeTask($project->columns[$step % 4], ['title' => "Timed {$step}", 'position' => 100 + $step]);
+        $foreign = makeTask($elsewhere->columns[0], ['title' => "Elsewhere {$step}", 'position' => 100 + $step]);
+        $entry = fn (array $attributes) => TimeEntry::factory()->create([
+            'date' => today()->subDays($step % 20)->toDateString(), 'timer_started_at' => null, ...$attributes,
+        ]);
+
+        $entry(['user_id' => $person->id, 'task_id' => $task->id, 'duration_minutes' => 30]);
+        $entry(['user_id' => $person->id, 'project_id' => $project->id, 'duration_minutes' => 15]);
+        $entry(['user_id' => $viewer->id, 'task_id' => $task->id, 'duration_minutes' => 10]);
+        $entry(['user_id' => $viewer->id, 'project_id' => $project->id, 'duration_minutes' => 5]);
+        $entry(['user_id' => $person->id, 'task_id' => $foreign->id, 'duration_minutes' => 60]);
+        $entry(['user_id' => $person->id, 'task_id' => $foreign->id, 'project_id' => $project->id, 'duration_minutes' => 70]);
+        TimeEntry::factory()->running()->create(['user_id' => $person->id, 'project_id' => $project->id]);
+    }
+}
+
+it('keeps the project Time tab constant as entries, tasks and people grow (WP5)', function (string $who, array $query) {
+    $owner = makeUser('operator');
+    $project = makeProject($owner, 'Time tab budget');
+    $elsewhere = makeProject($owner, 'Elsewhere');
+    $viewer = match ($who) {
+        'operator' => $owner,
+        'staff with time.view_all' => tap(projectActor('member', $project))->givePermissionTo('time.view_all'),
+        'customer member (own)' => projectActor('member', $project),
+        'customer member, empty (own)' => projectActor('member', $project),
+    };
+    // The empty shape's viewer logs nothing, while everyone else's time still grows around them.
+    $logger = $who === 'customer member, empty (own)' ? makeUser() : $viewer;
+    $request = fn () => $this->actingAs(User::findOrFail($viewer->id))
+        ->get(route('projects.time.index', $project).($query === [] ? '' : '?'.http_build_query($query)))
+        ->assertOk()
+        ->viewData('page')['props'];
+    $decoded = fn () => json_decode(json_encode($request()), true);
+
+    // Page 2 must already hold rows in the small world (4 attributed entries per step, 25 per
+    // page), or it would compare an empty page (no eager loads at all) with a full one.
+    $initial = ($query['page'] ?? 1) > 1 ? 8 : 3;
+
+    growProjectTimeWorld($project, $elsewhere, $logger, $initial);
+    $small = warmQueries($request);
+    $smallProps = $decoded();
+    growProjectTimeWorld($project, $elsewhere, $logger, 30 - $initial);
+    $large = warmQueries($request);
+    $largeProps = $decoded();
+
+    $grew = $who === 'customer member, empty (own)'
+        ? $largeProps['entries']['total'] === 0
+        : $largeProps['entries']['total'] > $smallProps['entries']['total'];
+
+    expect($grew)->toBeTrue("{$who}: the world grew in the viewer's scope (or stayed empty by design)")
+        ->and(count($largeProps['entries']['data']) > 0)->toBe($who !== 'customer member, empty (own)')
+        ->and(count($smallProps['entries']['data']) > 0)->toBe($who !== 'customer member, empty (own)')
+        ->and($large)->toBeLessThanOrEqual($small + BUDGET_TOLERANCE, "time tab {$who} ".json_encode($query).": small={$small}, large={$large}");
+})->with([
+    'operator, first page' => ['operator', []],
+    'operator, second page' => ['operator', ['page' => 2]],
+    'staff with time.view_all' => ['staff with time.view_all', []],
+    'customer member, own entries' => ['customer member (own)', []],
+    'customer member, own and empty' => ['customer member, empty (own)', []],
+]);

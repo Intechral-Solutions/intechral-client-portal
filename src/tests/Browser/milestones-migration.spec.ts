@@ -130,10 +130,17 @@ test('a manager completes and reopens a milestone explicitly, and focus stays on
     const projectId = await createProject(page, cleanup, 'E2E WP4 completion project');
     await page.goto(`/projects/${projectId}/milestones`);
 
-    // The shared project frame: one h1, the four tabs with Milestones current, the shell's trail.
+    // The shared project frame: one h1, the tabs with Milestones current (FLIPPED IN EPIC-015 WP5:
+    // plus the optional Time tab, which the operator is offered), the shell's trail.
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     const tabs = page.getByRole('navigation', { name: 'Project', exact: true });
-    await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
+    await expect(tabs.getByRole('link')).toHaveText([
+        'Overview',
+        'Board',
+        'Tasks',
+        'Milestones',
+        'Time',
+    ]);
     await expect(tabs.getByRole('link', { name: 'Milestones' })).toHaveAttribute(
         'aria-current',
         'page',
@@ -249,7 +256,7 @@ test('the milestones page is usable at a phone viewport with no document scroll'
     // the document sideways.
     await expect(row.getByRole('button', { name: 'Complete Mobile milestone' })).toBeInViewport();
     await expect(row.getByRole('button', { name: 'Delete Mobile milestone' })).toBeInViewport();
-    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+    for (const label of ['Overview', 'Board', 'Tasks', 'Milestones', 'Time']) {
         await expect(
             page.getByRole('navigation', { name: 'Project', exact: true }).getByRole('link', {
                 name: label,

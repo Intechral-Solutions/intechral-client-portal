@@ -121,7 +121,11 @@ class ProjectController extends Controller
     {
         $this->authorize('view', $project);
 
-        return Inertia::render('projects/show', ProjectOverviewPresenter::overview($project, auth()->user()));
+        return Inertia::render('projects/show', [
+            ...ProjectOverviewPresenter::overview($project, auth()->user()),
+            // Workspace chrome, not Overview data: the shared header's optional tabs (WP5).
+            'tabs' => ProjectPresenter::workspaceTabs(auth()->user()),
+        ]);
     }
 
     public function edit(Project $project): Response

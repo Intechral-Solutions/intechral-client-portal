@@ -21,6 +21,8 @@ function columns(): BoardColumn[] {
                     assignee: null,
                     milestone: null,
                     checklist: { done: 0, total: 0 },
+                    done: false,
+                    abilities: { complete: false, reopen: false },
                 },
             ],
         },
@@ -38,6 +40,8 @@ function columns(): BoardColumn[] {
                     assignee: null,
                     milestone: null,
                     checklist: { done: 0, total: 0 },
+                    done: false,
+                    abilities: { complete: false, reopen: false },
                 },
                 {
                     id: 3,
@@ -48,6 +52,8 @@ function columns(): BoardColumn[] {
                     assignee: null,
                     milestone: null,
                     checklist: { done: 0, total: 0 },
+                    done: false,
+                    abilities: { complete: false, reopen: false },
                 },
             ],
         },
@@ -76,6 +82,8 @@ describe('moveSuccessMessage', () => {
                 assignee: null,
                 milestone: null,
                 checklist: { done: 0, total: 0 },
+                done: false,
+                abilities: { complete: false, reopen: false },
             },
         ];
 

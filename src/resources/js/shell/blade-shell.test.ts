@@ -66,6 +66,7 @@ afterEach(() => {
     document.body.innerHTML = '';
     delete root.dataset.workspace;
     delete root.dataset.drawer;
+    delete root.dataset.drawerSurface;
 });
 
 describe('panel', () => {
@@ -120,6 +121,36 @@ describe('panel', () => {
 
         expect(() => byText('Show workspace views').click()).not.toThrow();
         expect(root.dataset.drawer).toBe('open');
+    });
+
+    it('writes under the stamped surface key, the one the React shell reads (EPIC-015 WP5)', () => {
+        // No Blade page is a declared surface today; the writer still follows the shared contract so
+        // the two renderers can never disagree about where a choice lives.
+        root.dataset.drawerSurface = 'helpdesk.example';
+        mountShell();
+
+        byText('Show workspace views').click();
+
+        expect(JSON.parse(localStorage.getItem(panelKey) ?? '{}')).toEqual({
+            'helpdesk.example': 'open',
+        });
+        expect(resolvePanel('helpdesk', 'collapsed', false, 'helpdesk.example')).toBe('open');
+        expect(resolvePanel('helpdesk', 'collapsed')).toBe('collapsed');
+    });
+
+    it('does not write the XL preference from a toggle below XL', () => {
+        window.matchMedia = (query: string) =>
+            ({ matches: query.includes('1024px'), media: query }) as MediaQueryList;
+        localStorage.setItem(panelKey, JSON.stringify({ helpdesk: 'collapsed' }));
+        mountShell();
+
+        byText('Show workspace views').click();
+
+        // The panel still opens for this page view, but the remembered XL value is untouched.
+        expect(root.dataset.drawer).toBe('open');
+        expect(JSON.parse(localStorage.getItem(panelKey) ?? '{}')).toEqual({
+            helpdesk: 'collapsed',
+        });
     });
 
     it('writes nothing when the server stamped no workspace', () => {

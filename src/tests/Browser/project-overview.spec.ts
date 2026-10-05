@@ -76,8 +76,15 @@ async function expectProjectNavigation(
     current: 'Overview' | 'Board' | 'Tasks' | 'Milestones',
 ) {
     const nav = projectNav(page);
-    // FLIPPED IN EPIC-015 WP3: the final four, Tasks included (§11.3.1).
-    await expect(nav.getByRole('link')).toHaveText(['Overview', 'Board', 'Tasks', 'Milestones']);
+    // FLIPPED IN EPIC-015 WP3: the final four, Tasks included (§11.3.1). FLIPPED IN EPIC-015 WP5:
+    // both personas hold a time permission, so the optional Time tab follows Milestones.
+    await expect(nav.getByRole('link')).toHaveText([
+        'Overview',
+        'Board',
+        'Tasks',
+        'Milestones',
+        'Time',
+    ]);
     await expect(nav.getByRole('link', { name: current })).toHaveAttribute('aria-current', 'page');
     await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
     // Page navigation, never the ARIA tab widget.
@@ -295,7 +302,7 @@ test('the Overview holds together at 390px, the S/M boundary and desktop, light 
             await expectOneBreadcrumbAndHeading(page);
 
             // The navigation and the header action stay reachable at every width.
-            for (const label of ['Overview', 'Board', 'Tasks', 'Milestones']) {
+            for (const label of ['Overview', 'Board', 'Tasks', 'Milestones', 'Time']) {
                 await expect(projectNav(page).getByRole('link', { name: label }), at).toBeVisible();
             }
             await expect(

@@ -6,6 +6,7 @@ use App\Models\CrmCompany;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
+use App\Policies\ProjectTimeAccess;
 use App\Queries\ProjectHealth;
 
 /**
@@ -15,6 +16,20 @@ use App\Queries\ProjectHealth;
  */
 final class ProjectPresenter
 {
+    /**
+     * The optional tabs of the project workspace navigation (EPIC-015 WP5), sent by every workspace
+     * page (Overview, Board, Tasks, Milestones, Time) so the shared header renders one navigation.
+     * Overview, Board, Tasks and Milestones are `ProjectPolicy::view`-gated like the page itself and
+     * are always offered. Time is offered exactly when `ProjectTimeAccess` gives a scope, which is
+     * when `projects.time.index` answers 200 to a viewer of the project: no tab leads to a 403.
+     *
+     * @return array{time: bool}
+     */
+    public static function workspaceTabs(User $viewer): array
+    {
+        return ['time' => ProjectTimeAccess::scope($viewer) !== null];
+    }
+
     /**
      * One projects-index row (EPIC-015 §11.1, WP4). The project must come from a query that used
      * `ProjectHealth::withFacts()`, so health and progress are read from aggregates already loaded.

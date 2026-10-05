@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { PageFrame } from '@/components/page-frame';
 import { Board } from '@/components/projects/board';
 import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
+import type { ProjectWorkspaceTabs } from '@/components/projects/project-workspace-nav';
 import { AppShell } from '@/components/shell/app-shell';
 import { layoutPageProps } from '@/lib/inertia-layout';
 import { show } from '@/routes/projects';
@@ -18,6 +19,11 @@ export type ProjectBoardProps = {
         /** Whether projects.edit will actually admit this actor today (A9); see ProjectBoardController. */
         openSettings: boolean;
     };
+    /**
+     * The workspace navigation's optional tabs (`ProjectPresenter::workspaceTabs`, WP5): `time` is
+     * the server's project-time answer. Sent by every workspace page; absent reads as "no Time tab".
+     */
+    tabs?: ProjectWorkspaceTabs;
 };
 
 /**
@@ -33,7 +39,7 @@ export type ProjectBoardProps = {
  * Milestones header link this page carried became the Milestones tab. The page's section heading is
  * visually hidden, as on the Tasks tab: the current tab and the trail already name it on screen.
  */
-export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardProps) {
+export function ProjectBoardPage({ project, columns, abilities, tabs }: ProjectBoardProps) {
     return (
         <>
             <Head title={`${project.name} — Board`} />
@@ -45,6 +51,7 @@ export function ProjectBoardPage({ project, columns, abilities }: ProjectBoardPr
                     // Still gated on the server's own answer: `openSettings` is whether
                     // projects.edit will actually admit this actor (A9), not a guess.
                     openSettings={abilities.openSettings}
+                    tabs={tabs}
                 />
 
                 <h2 className="sr-only">Board</h2>

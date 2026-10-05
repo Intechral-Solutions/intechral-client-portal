@@ -106,38 +106,41 @@ it('gives the Blade shell the same payload as the Inertia prop, from one builder
         ->and($data['navigation']['currentWorkspace'])->toBe('helpdesk')
         // The current workspace is the payload's own entry, looked up by the server's key.
         ->and($data['shellWorkspace'])->toBe(collect($data['navigation']['workspaces'])->firstWhere('key', 'helpdesk'))
-        ->and($data['shellRoot'])->toBe(['workspace' => 'helpdesk', 'drawerDefault' => 'open', 'hasPanel' => true])
+        ->and($data['shellRoot'])->toBe(['workspace' => 'helpdesk', 'drawerDefault' => 'open', 'drawerSurface' => null, 'hasPanel' => true])
         ->and($data['shellUser']['name'])->toBe($operator->name)
         ->and($data['shellUser']['avatar']['initials'])->toBe(Initials::from($operator->name))
         ->and($data['shellUser']['avatar']['url'])->toBeNull();
 });
 
+// FLIPPED IN EPIC-015 WP5: `rootState` gains `drawerSurface` (Direction D §5.3 per-surface defaults),
+// null everywhere a workspace default applies, as in every case below; the project surfaces are
+// pinned in `Projects/ProjectDrawerSurfaceTest`.
 it('derives the pre-paint inputs from the payload alone, with emptiness semantic', function () {
     $user = shellActor('user');
 
     // Home has no contextual navigation, so no panel and no default, for any presentation.
     bindShellRequest($user, 'dashboard');
     expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
-        ->toBe(['workspace' => 'home', 'drawerDefault' => null, 'hasPanel' => false]);
+        ->toBe(['workspace' => 'home', 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false]);
 
     // The G3 viewer surface is a single surface too.
     bindShellRequest($user, 'cms.index');
     expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
-        ->toBe(['workspace' => 'resources', 'drawerDefault' => null, 'hasPanel' => false]);
+        ->toBe(['workspace' => 'resources', 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false]);
 
     // Tasks has views and a collapsed server default.
     bindShellRequest($user, 'tasks.index');
     expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
-        ->toBe(['workspace' => 'tasks', 'drawerDefault' => 'collapsed', 'hasPanel' => true]);
+        ->toBe(['workspace' => 'tasks', 'drawerDefault' => 'collapsed', 'drawerSurface' => null, 'hasPanel' => true]);
 
     // No workspace at all — a route that belongs to none, a guest, or no payload.
     bindShellRequest($user, 'profile.show');
     expect(ShellComposer::rootState(app(NavigationBuilder::class)->build(request())))
-        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false])
         ->and(ShellComposer::rootState(['currentWorkspace' => null, 'workspaces' => []]))
-        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false])
         ->and(ShellComposer::rootState(null))
-        ->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false]);
+        ->toBe(['workspace' => null, 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false]);
 });
 
 it('composes the Blade shell safely for an unauthenticated render', function () {
@@ -153,7 +156,7 @@ it('composes the Blade shell safely for an unauthenticated render', function () 
     expect($data['navigation'])->toBe(['currentWorkspace' => null, 'workspaces' => []])
         ->and($data['shellUser'])->toBeNull()
         ->and($data['shellWorkspace'])->toBeNull()
-        ->and($data['shellRoot'])->toBe(['workspace' => null, 'drawerDefault' => null, 'hasPanel' => false])
+        ->and($data['shellRoot'])->toBe(['workspace' => null, 'drawerDefault' => null, 'drawerSurface' => null, 'hasPanel' => false])
         ->and($data['shell'])->toBe(['presentation' => 'operational'])
         ->and($data)->not->toHaveKey('navigationLegacy');
 });

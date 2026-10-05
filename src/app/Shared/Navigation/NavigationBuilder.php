@@ -30,7 +30,14 @@ use LogicException;
  *
  *   key, label, icon, href, visit, isActive,
  *   context      => [ { key, label, kind, items: [ { key, label, href, visit, isActive, count } ] } ]
- *   presentation => { operational: { panel: 'open'|'collapsed'|null } }
+ *   presentation => { operational: { panel: 'open'|'collapsed'|null, surface: string|null } }
+ *
+ * `surface` (Direction D §5.3, EPIC-015 WP5) is a stable semantic key such as `projects.board`,
+ * set only on the ACTIVE workspace and only when the current route is a surface that declares its
+ * own panel default. `panel` is then that surface's default, and the shell remembers a choice made
+ * there under the surface key instead of the workspace key. Everywhere else `surface` is null and
+ * `panel` is the workspace default, exactly as before. Keys never carry a URL or a record id, so one
+ * Board preference serves every project.
  *
  * Contract notes that are easy to break:
  *
@@ -121,6 +128,7 @@ final class NavigationBuilder
                     'projects.milestones.index',
                     'projects.tasks.index',
                     'projects.tasks.show',
+                    'projects.time.index',
                 ]),
             ]),
         ];
@@ -140,6 +148,14 @@ final class NavigationBuilder
             patterns: ['projects.*'],
             panel: PanelDefault::Open,
             sections: $sections,
+            // Direction D §5.3: the list, Overview and Milestones keep the workspace default (Open);
+            // the wide canvas surfaces default to Collapsed and remember their own choice. Task
+            // detail, Settings and create are not named by §5.3 and keep the workspace default.
+            surfaces: [
+                $this->surface('projects.board', PanelDefault::Collapsed, ['projects.board']),
+                $this->surface('projects.tasks', PanelDefault::Collapsed, ['projects.tasks.index']),
+                $this->surface('projects.time', PanelDefault::Collapsed, ['projects.time.index']),
+            ],
         );
     }
 
@@ -409,6 +425,7 @@ final class NavigationBuilder
      *                                                            navigation supplies its own single
      *                                                            destination here instead.
      * @param  array<int, array<string, mixed>>  $sections
+     * @param  array<int, array{key: string, panel: PanelDefault, routes: array<int, string>}>  $surfaces  Surfaces with their own panel default (§5.3).
      * @return array<string, mixed>
      */
     private function workspace(
@@ -419,6 +436,7 @@ final class NavigationBuilder
         ?array $surface = null,
         ?PanelDefault $panel = null,
         array $sections = [],
+        array $surfaces = [],
     ): array {
         $sections = array_values(array_filter($sections, fn (array $section) => $section['items'] !== []));
 
@@ -447,7 +465,41 @@ final class NavigationBuilder
             'visit' => $destination['visit'],
             'panel' => $sections === [] ? null : $panel,
             'sections' => $sections,
+            // A workspace with no panel has nothing for a surface to default.
+            'surfaces' => $sections === [] ? [] : $surfaces,
         ];
+    }
+
+    /**
+     * A surface of a workspace that declares its own panel default (Direction D §5.3). `$key` is the
+     * stable semantic key the shell remembers a choice under; `$routes` are explicit route names.
+     *
+     * @param  array<int, string>  $routes
+     * @return array{key: string, panel: PanelDefault, routes: array<int, string>}
+     */
+    private function surface(string $key, PanelDefault $panel, array $routes): array
+    {
+        return ['key' => $key, 'panel' => $panel, 'routes' => $routes];
+    }
+
+    /**
+     * The active workspace's current surface, matched on explicit route names only; null when the
+     * route is not one of its declared surfaces.
+     *
+     * @param  array<string, mixed>  $spec
+     * @return array{key: string, panel: PanelDefault, routes: array<int, string>}|null
+     */
+    private function resolveSurface(Request $request, array $spec): ?array
+    {
+        foreach ($spec['surfaces'] as $surface) {
+            foreach ($surface['routes'] as $route) {
+                if ($request->routeIs($route)) {
+                    return $surface;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -570,6 +622,7 @@ final class NavigationBuilder
     private function serialize(Request $request, array $spec, bool $isActive): array
     {
         $activeItem = $isActive ? $this->resolveActiveItem($request, $spec['sections']) : null;
+        $surface = $isActive ? $this->resolveSurface($request, $spec) : null;
 
         return [
             'key' => $spec['key'],
@@ -595,7 +648,10 @@ final class NavigationBuilder
                 ], $section['items']),
             ], $spec['sections']),
             'presentation' => [
-                'operational' => ['panel' => $spec['panel']?->value],
+                'operational' => [
+                    'panel' => ($surface['panel'] ?? $spec['panel'])?->value,
+                    'surface' => $surface['key'] ?? null,
+                ],
             ],
         ];
     }
