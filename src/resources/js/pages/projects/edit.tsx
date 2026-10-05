@@ -2,6 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
+import { PageFrame } from '@/components/page-frame';
 import { PageHeader } from '@/components/page-header';
 import { CompanySelector } from '@/components/projects/company-selector';
 import {
@@ -17,10 +18,11 @@ import {
     type ProjectDetailsData,
 } from '@/components/projects/project-details-fields';
 import { ProjectMemberList } from '@/components/projects/project-member-list';
-import { SectionPanel } from '@/components/section-panel';
+import { Section } from '@/components/section';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { AppShell } from '@/components/shell/app-shell';
+import { layoutPageProps } from '@/lib/inertia-layout';
 import { destroy, show, update } from '@/routes/projects';
 import { sync as syncCompanies } from '@/routes/projects/companies';
 import { sync as syncMembers } from '@/routes/projects/members';
@@ -69,7 +71,7 @@ function DetailsSection({ project }: { project: ProjectDetail }) {
     }
 
     return (
-        <SectionPanel title="Project details" description="Name, dates, status and budget.">
+        <Section title="Project details" description="Name, dates, status and budget.">
             <form onSubmit={submit} className="space-y-5">
                 <ProjectDetailsFields
                     idPrefix="edit-details"
@@ -85,7 +87,7 @@ function DetailsSection({ project }: { project: ProjectDetail }) {
                     </Button>
                 </div>
             </form>
-        </SectionPanel>
+        </Section>
     );
 }
 
@@ -108,7 +110,7 @@ function CompaniesSection({
     }
 
     return (
-        <SectionPanel title="Linked companies">
+        <Section title="Linked companies">
             <form onSubmit={submit} className="space-y-4">
                 <CompanySelector
                     idPrefix="edit"
@@ -126,7 +128,7 @@ function CompaniesSection({
                     </Button>
                 </div>
             </form>
-        </SectionPanel>
+        </Section>
     );
 }
 
@@ -192,7 +194,7 @@ function DangerZone({ project }: { project: ProjectDetail }) {
     const errors: Record<string, string | undefined> = form.errors;
 
     return (
-        <SectionPanel
+        <Section
             title="Danger zone"
             description="Deleting a project removes its board, tasks and milestones. A project with recorded time cannot be deleted; set its status to Archived instead."
         >
@@ -216,15 +218,11 @@ function DangerZone({ project }: { project: ProjectDetail }) {
                     })
                 }
             >
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="border-[var(--border-danger)] text-[var(--text-danger)]"
-                >
+                <Button type="button" variant="secondary" className="border-danger text-danger">
                     Delete project
                 </Button>
             </ConfirmationDialog>
-        </SectionPanel>
+        </Section>
     );
 }
 
@@ -240,57 +238,79 @@ export function EditProjectPage({
 
     return (
         <>
-            <Head title={`Edit ${project.name}`} />
-            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+            <Head title={`${project.name} — Settings`} />
+            <PageFrame width="reading" measure="forms" className="flex flex-col gap-6">
                 <PageHeader
-                    title="Edit project"
-                    description={project.name}
+                    overline="Project settings"
+                    title={project.name}
+                    description="Each section saves on its own."
                     actions={
                         // Back to the project's own page, its Overview (EPIC-015 Q5, §11.3).
                         <Link
                             href={show.url(project.id)}
-                            className={buttonVariants({ variant: 'outline' })}
+                            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
                         >
                             Back to project
                         </Link>
                     }
                 />
 
-                <DetailsSection project={project} />
+                <div className="flex flex-col gap-8">
+                    <DetailsSection project={project} />
 
-                {companies.length > 0 ? (
-                    <CompaniesSection
-                        projectId={project.id}
-                        companies={companies}
-                        linkedCompanyIds={linkedCompanyIds}
-                    />
-                ) : null}
-
-                <SectionPanel
-                    title="Members"
-                    description={
-                        canEditMembers
-                            ? 'The owner stays a manager. Anyone else can be added, removed, or given a different role.'
-                            : 'Project membership is managed by an administrator.'
-                    }
-                >
-                    {canEditMembers ? (
-                        <MembersForm
+                    {companies.length > 0 ? (
+                        <CompaniesSection
                             projectId={project.id}
-                            members={members}
-                            candidates={memberCandidates}
+                            companies={companies}
+                            linkedCompanyIds={linkedCompanyIds}
                         />
-                    ) : (
-                        <ProjectMemberList members={members} />
-                    )}
-                </SectionPanel>
+                    ) : null}
 
-                {abilities.delete ? <DangerZone project={project} /> : null}
-            </div>
+                    <Section
+                        title="Members"
+                        description={
+                            canEditMembers
+                                ? 'The owner stays a manager. Anyone else can be added, removed, or given a different role.'
+                                : 'Project membership is managed by an administrator.'
+                        }
+                    >
+                        {canEditMembers ? (
+                            <MembersForm
+                                projectId={project.id}
+                                members={members}
+                                candidates={memberCandidates}
+                            />
+                        ) : (
+                            <ProjectMemberList members={members} />
+                        )}
+                    </Section>
+
+                    {abilities.delete ? <DangerZone project={project} /> : null}
+                </div>
+            </PageFrame>
         </>
     );
 }
 
-EditProjectPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
+/**
+ * The shell's one breadcrumb: `Projects › All projects › {project} › Settings`, the project segment
+ * opening its Overview (§11.3). Settings is a header action on the project pages, not a tab.
+ */
+EditProjectPage.layout = (page: ReactElement) => {
+    const props = layoutPageProps<EditProjectProps>(page);
+
+    return (
+        <AppShell
+            trail={
+                props && [
+                    { label: props.project.name, href: show.url(props.project.id) },
+                    { label: 'Settings' },
+                ]
+            }
+        >
+            {page}
+        </AppShell>
+    );
+};
 
 export default EditProjectPage;

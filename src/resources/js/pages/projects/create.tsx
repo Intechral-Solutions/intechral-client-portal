@@ -1,6 +1,7 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import type { FormEvent, ReactElement } from 'react';
 
+import { PageFrame } from '@/components/page-frame';
 import { PageHeader } from '@/components/page-header';
 import { CompanySelector } from '@/components/projects/company-selector';
 import {
@@ -14,7 +15,7 @@ import {
     ProjectDetailsFields,
     type ProjectDetailsData,
 } from '@/components/projects/project-details-fields';
-import { SectionPanel } from '@/components/section-panel';
+import { Section } from '@/components/section';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { AppShell } from '@/components/shell/app-shell';
 import { index, store } from '@/routes/projects';
@@ -80,23 +81,16 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
 
     return (
         <>
-            <Head title="New Project" />
-            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+            <Head title="New project" />
+            <PageFrame width="reading" measure="forms" className="flex flex-col gap-6">
                 <PageHeader
+                    overline="Projects"
                     title="New project"
-                    description="Set up the project. Its board is created with default columns."
-                    actions={
-                        <Link href={index.url()} className={buttonVariants({ variant: 'outline' })}>
-                            Back to projects
-                        </Link>
-                    }
+                    description="Set up the project. Its board is created with default columns, and you are its manager."
                 />
 
-                <form onSubmit={submit}>
-                    <SectionPanel
-                        title="Project details"
-                        description="Name, dates, status and budget."
-                    >
+                <form onSubmit={submit} className="flex flex-col gap-8">
+                    <Section title="Project details" description="Name, dates, status and budget.">
                         <ProjectDetailsFields
                             idPrefix="create"
                             data={form.data}
@@ -105,10 +99,10 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
                                 form.setData((current) => ({ ...current, [key]: value }))
                             }
                         />
-                    </SectionPanel>
+                    </Section>
 
                     {companies.length > 0 ? (
-                        <SectionPanel title="Linked companies">
+                        <Section title="Linked companies">
                             <CompanySelector
                                 idPrefix="create"
                                 companies={companies}
@@ -121,10 +115,10 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
                                     )?.[1]
                                 }
                             />
-                        </SectionPanel>
+                        </Section>
                     ) : null}
 
-                    <SectionPanel
+                    <Section
                         title="Members"
                         description="You are added as the project's manager automatically."
                     >
@@ -138,15 +132,18 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
                                 errors={errors}
                             />
                         ) : (
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-text-secondary">
                                 Adding other members is done by an administrator after the project
                                 is created.
                             </p>
                         )}
-                    </SectionPanel>
+                    </Section>
 
-                    <div className="flex justify-end gap-3 pt-6">
-                        <Link href={index.url()} className={buttonVariants({ variant: 'outline' })}>
+                    <div className="flex flex-wrap justify-end gap-3 border-t border-rule pt-6">
+                        <Link
+                            href={index.url()}
+                            className={buttonVariants({ variant: 'secondary' })}
+                        >
                             Cancel
                         </Link>
                         <Button type="submit" disabled={form.processing}>
@@ -154,11 +151,14 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageFrame>
         </>
     );
 }
 
-CreateProjectPage.layout = (page: ReactElement) => <AppShell>{page}</AppShell>;
+/** The shell's one breadcrumb: `Projects › All projects › New project`. No page-owned trail. */
+CreateProjectPage.layout = (page: ReactElement) => (
+    <AppShell trail={[{ label: 'New project' }]}>{page}</AppShell>
+);
 
 export default CreateProjectPage;

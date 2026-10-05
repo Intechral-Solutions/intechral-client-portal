@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Models\ProjectMilestone;
 use App\Services\ProjectMilestoneService;
 use Carbon\Carbon;
@@ -48,7 +49,10 @@ it('renders the milestones page as the projects/milestones/index component with 
     $response = $this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project))
         ->assertInertia(fn (Assert $page) => $page
             ->component('projects/milestones/index')
-            ->where('project', ['id' => $this->project->id, 'name' => 'Alpha'])
+            // FLIPPED IN EPIC-015 WP4: the project gains its lifecycle status for the shared header,
+            // and the page gains the StagePath's `currentId` (was `{id, name}` and no currentId).
+            ->where('project', ['id' => $this->project->id, 'name' => 'Alpha', 'status' => 'active'])
+            ->where('currentId', $milestone->id)
             ->where('abilities.manage', true)
             ->has('milestones', 1));
 
@@ -256,4 +260,46 @@ it('never counts a task from another project toward a milestone (A2 scoping hold
     $item = milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)))['milestones'][0];
 
     expect($item['taskCount'])->toBe(1);
+});
+
+// ── EPIC-015 WP4: order and the current milestone (§14.2) ───────────────────────
+
+it('orders milestones by due date then id, and names the first incomplete one current, never by task progress', function () {
+    Carbon::setTestNow('2026-06-15 12:00:00');
+    $done = $this->project->milestones()->create(['name' => 'Kickoff', 'due_date' => '2026-06-01']);
+    $done->forceFill(['completed_at' => now(), 'completed_by' => $this->admin->id])->save();
+    // Every linked task done, but nobody completed it: still the current milestone, and overdue.
+    $allTasksDone = $this->project->milestones()->create(['name' => 'Design', 'due_date' => '2026-06-10']);
+    makeTask($this->project->columns[4], ['milestone_id' => $allTasksDone->id, 'position' => 0]);
+    $later = $this->project->milestones()->create(['name' => 'Launch', 'due_date' => '2026-06-10']);
+
+    $props = milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)));
+
+    expect(array_column($props['milestones'], 'name'))->toBe(['Kickoff', 'Design', 'Launch'])
+        ->and($props['currentId'])->toBe($allTasksDone->id)
+        ->and($props['milestones'][1])->toMatchArray(['completion' => 100, 'completedAt' => null, 'overdue' => true])
+        ->and($props['milestones'][2]['id'])->toBe($later->id);
+});
+
+it('has no current milestone when every milestone is complete, or there are none', function () {
+    $empty = milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)));
+    $only = $this->project->milestones()->create(['name' => 'Only', 'due_date' => '2026-06-01']);
+    $only->forceFill(['completed_at' => now()])->save();
+    $complete = milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)));
+
+    expect($empty['currentId'])->toBeNull()
+        ->and($complete['currentId'])->toBeNull();
+});
+
+it('agrees with the Overview on the current milestone', function () {
+    Carbon::setTestNow('2026-06-15 12:00:00');
+    foreach (['2026-06-20', '2026-06-05', '2026-07-01'] as $i => $due) {
+        $this->project->milestones()->create(['name' => "M{$i}", 'due_date' => $due]);
+    }
+
+    $page = milestonePageProps($this->actingAs($this->admin)->get(route('projects.milestones.index', $this->project)));
+    $overview = ProjectOverviewPresenter::overview($this->project->fresh(), $this->admin);
+
+    expect($page['currentId'])->toBe($overview['milestones']['currentId'])
+        ->and(array_column($page['milestones'], 'id'))->toBe(array_column($overview['milestones']['items'], 'id'));
 });

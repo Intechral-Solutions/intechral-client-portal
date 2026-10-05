@@ -20,17 +20,21 @@ class ProjectMilestoneController extends Controller
     {
         $this->authorize('view', $project);
 
+        // The relation orders by due date; id breaks ties (EPIC-015 §14.2, the StagePath order).
         $milestones = $project->milestones()
             ->orderBy('id')
             ->withTaskCounts()
             ->with('completer:id,name')
-            ->get()
-            ->map(fn (ProjectMilestone $milestone) => ProjectMilestonePresenter::item($milestone))
-            ->values();
+            ->get();
 
         return Inertia::render('projects/milestones/index', [
-            'project' => ['id' => $project->id, 'name' => $project->name],
-            'milestones' => $milestones,
+            // The shared project header's identity: name and lifecycle, as on the other tabs.
+            'project' => ['id' => $project->id, 'name' => $project->name, 'status' => $project->status],
+            'milestones' => $milestones
+                ->map(fn (ProjectMilestone $milestone) => ProjectMilestonePresenter::item($milestone))
+                ->values(),
+            // The StagePath's current stage, by the same rule as the Overview (explicit completion).
+            'currentId' => ProjectMilestonePresenter::currentId($milestones),
             // What the mutation routes actually admit: they require projects.manage (A9), which
             // ProjectPolicy::manage() alone does not, so a projects.admin-only actor must not be
             // offered New Milestone / Edit / Delete / Complete / Reopen only to have them 403

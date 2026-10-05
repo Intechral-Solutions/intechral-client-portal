@@ -320,6 +320,9 @@ test('only this project’s board tasks, with the milestone and no project colum
     page,
     cleanup,
 }) => {
+    // Measured 30.8-35.8 s under the focused 3-worker set in EPIC-015 WP4 (a 30 s timeout hit): the
+    // cost is `seed()` through the real UI, so this one test gets the tripled timeout (A3.12 #7).
+    test.slow();
     const { projectId, milestones } = await seed(page, cleanup, 'E2E WP3 filter project');
 
     await page.goto(`/projects/${projectId}/tasks?completion=any&sort=title`);
@@ -399,6 +402,9 @@ test('row and bulk actions reuse the Tasks endpoints and come back to this tab',
     page,
     cleanup,
 }) => {
+    // Measured 28.2-36.7 s under the focused 3-worker set in EPIC-015 WP4 (a 30 s timeout hit): the
+    // cost is `seed()` through the real UI, so this one test gets the tripled timeout (A3.12 #7).
+    test.slow();
     const { projectId } = await seed(page, cleanup, 'E2E WP3 actions project');
     await page.goto(`/projects/${projectId}/tasks`);
     await expectRows(page, [T.overdue, T.soon, T.docs]);
@@ -445,6 +451,10 @@ test('a customer member sees the same project rows with only their own actions, 
     contextFor,
     cleanup,
 }) => {
+    // Reported 30-33 s in EPIC-015 WP4, and timed out at 30 s in the independent review (system-wide
+    // 0.6-2 s request latency): the cost is `seed()` through the real UI, so this one test gets the
+    // tripled timeout (A3.12 #7).
+    test.slow();
     const { projectId } = await seed(page, cleanup, 'E2E WP3 customer project');
 
     const memberContext = await contextFor('member');
@@ -487,6 +497,10 @@ test('the Tasks tab, its four-link strip and its rows hold together at 390px and
     page,
     cleanup,
 }) => {
+    // Reported 30-33 s in EPIC-015 WP4, and timed out at 30 s in the independent review (system-wide
+    // 0.6-2 s request latency): 4 widths/themes after a UI-seeded project, so this one test gets the
+    // tripled timeout (A3.12 #7).
+    test.slow();
     const { projectId } = await seed(
         page,
         cleanup,

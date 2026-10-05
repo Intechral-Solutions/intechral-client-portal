@@ -2,7 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 
 import { FormFieldError } from '@/components/forms/form-field-error';
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/tag';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -90,17 +90,17 @@ export function MemberRowsEditor({
     return (
         <div className="space-y-4">
             {owner ? (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm">
+                <div className="flex items-center justify-between gap-3 rounded-control border border-rule bg-surface-sunken px-3 py-2.5 text-sm">
                     <span className="min-w-0 truncate font-medium">{owner.name}</span>
-                    <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-text-secondary">
                         Manager
-                        <Badge variant="info">Owner</Badge>
+                        <Tag>Owner</Tag>
                     </span>
                 </div>
             ) : null}
 
             {rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No other members yet.</p>
+                <p className="text-sm text-text-secondary">No other members yet.</p>
             ) : (
                 <ul className="space-y-4">
                     {rows.map((row, index) => {
@@ -183,7 +183,7 @@ export function MemberRowsEditor({
                                 <div className="flex items-end">
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="secondary"
                                         onClick={() => remove(row.key)}
                                         aria-label={`Remove ${chosen ? chosen.name : `member ${number}`}`}
                                     >
@@ -202,7 +202,7 @@ export function MemberRowsEditor({
             <Button
                 ref={addButton}
                 type="button"
-                variant="outline"
+                variant="secondary"
                 onClick={add}
                 disabled={remaining.length === 0}
             >

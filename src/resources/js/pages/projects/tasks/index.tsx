@@ -3,11 +3,9 @@ import { ListChecks } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import type { ReactElement } from 'react';
 
-import { EntityHeader } from '@/components/entity-header';
 import { PageFrame } from '@/components/page-frame';
 import { Pagination } from '@/components/pagination';
-import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
-import { ProjectWorkspaceNav } from '@/components/projects/project-workspace-nav';
+import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
 import { AppShell } from '@/components/shell/app-shell';
 import { ProjectTaskFilterBar } from '@/components/tasks/project-task-filter-bar';
 import {
@@ -28,7 +26,7 @@ import { focusRing } from '@/components/ui/control-metrics';
 import { EmptyState } from '@/components/ui/empty-state';
 import { layoutPageProps } from '@/lib/inertia-layout';
 import { cn } from '@/lib/utils';
-import { board, edit, show } from '@/routes/projects';
+import { board, show } from '@/routes/projects';
 import { index } from '@/routes/projects/tasks';
 import type { Paginated } from '@/types/pagination';
 import type { ProjectStatus, TaskPriority } from '@/types/projects';
@@ -111,22 +109,11 @@ export function ProjectTasksIndexPage({
     const clearFilters = () => visit(projectTaskListClearedQuery(state));
 
     const header = (
-        <EntityHeader
-            overline="Project"
-            title={project.name}
-            status={<ProjectStatusBadge status={project.status} />}
-            actions={
-                // The server's answer (ProjectSettingsAccess, A9), never a role check here.
-                abilities.openSettings ? (
-                    <Link
-                        href={edit.url(project.id)}
-                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                    >
-                        Settings
-                    </Link>
-                ) : undefined
-            }
-            navigation={<ProjectWorkspaceNav projectId={project.id} current="tasks" />}
+        <ProjectWorkspaceHeader
+            project={project}
+            current="tasks"
+            // The server's answer (ProjectSettingsAccess, A9), never a role check here.
+            openSettings={abilities.openSettings === true}
         />
     );
 

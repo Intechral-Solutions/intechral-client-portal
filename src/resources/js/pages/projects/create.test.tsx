@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { navigation, projects, shellUser } from '@/components/shell/shell-fixtures';
 import { CreateProjectPage, type CreateProjectProps } from '@/pages/projects/create';
 import {
     inertiaSpies,
@@ -12,6 +13,11 @@ import {
 } from '@/test/inertia';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
+vi.mock('@/routes', () => ({ logout: { url: () => '/logout' } }));
+vi.mock('@/routes/profile', () => ({ show: { url: () => '/profile' } }));
+vi.mock('@/components/time/timer-pill', () => ({
+    TimerPill: () => <span data-testid="timer-pill" />,
+}));
 
 const HOSTILE = '</select><img src=x onerror="window.__xss=1">';
 
@@ -205,13 +211,47 @@ it('disables the submit button while the request is in flight', () => {
     expect(screen.getByRole('button', { name: 'Creating...' })).toBeDisabled();
 });
 
-it('links Cancel and Back to the projects index', () => {
+// FLIPPED IN EPIC-015 WP4: the header's "Back to projects" button is gone; the shell's trail
+// (`Projects › All projects › New project`) is the way back, and Cancel still leads to the index.
+it('links Cancel to the projects index, with no second back button in the page', () => {
     render(<CreateProjectPage {...managerProps} />);
 
     expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/projects');
-    expect(screen.getByRole('link', { name: 'Back to projects' })).toHaveAttribute(
-        'href',
-        '/projects',
-    );
+    expect(screen.queryByRole('link', { name: 'Back to projects' })).not.toBeInTheDocument();
     expect(inertiaSpies.router.visit).not.toHaveBeenCalled();
+});
+
+it('is a Direction D form page: the forms reading measure, one h1 and stacked sections', () => {
+    const { container } = render(<CreateProjectPage {...managerProps} />);
+
+    expect(container.querySelector('[data-page-frame]')).toHaveAttribute(
+        'data-page-frame',
+        'reading',
+    );
+    expect(container.querySelector('[data-page-frame]')).toHaveAttribute(
+        'data-page-measure',
+        'forms',
+    );
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([
+        'New project',
+    ]);
+    expect(
+        screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Project details', 'Linked companies', 'Members']);
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+});
+
+it("names the page in the shell's one breadcrumb", () => {
+    setPageProps({
+        auth: { user: shellUser, permissions: [] },
+        shell: { presentation: 'operational' },
+        navigation: navigation([projects], 'projects'),
+    });
+    const layout = CreateProjectPage.layout as (page: React.ReactElement) => React.ReactElement;
+
+    render(layout(<CreateProjectPage {...managerProps} />));
+
+    const crumbs = screen.getAllByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveLength(1);
+    expect(within(crumbs[0]!).getByText('New project')).toHaveAttribute('aria-current', 'page');
 });

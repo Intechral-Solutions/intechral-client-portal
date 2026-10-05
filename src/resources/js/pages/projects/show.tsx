@@ -2,23 +2,22 @@ import { Head, Link } from '@inertiajs/react';
 import { CalendarClock, Clock, ListChecks } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { EntityHeader } from '@/components/entity-header';
 import { PageFrame } from '@/components/page-frame';
+import { milestoneStages, milestoneTaskText } from '@/components/projects/milestone-stages';
 import { ProjectHealthSummary } from '@/components/projects/project-health';
-import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
-import { ProjectWorkspaceNav } from '@/components/projects/project-workspace-nav';
+import { ProjectWorkspaceHeader } from '@/components/projects/project-workspace-header';
 import { Section } from '@/components/section';
 import { AppShell } from '@/components/shell/app-shell';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Progress } from '@/components/ui/progress';
-import { StagePath, stagePathWindow, type Stage } from '@/components/ui/stage-path';
+import { StagePath, stagePathWindow } from '@/components/ui/stage-path';
 import { Status } from '@/components/ui/status';
 import { Tag } from '@/components/ui/tag';
 import { formatDate } from '@/lib/dates';
 import { layoutPageProps } from '@/lib/inertia-layout';
 import { cn } from '@/lib/utils';
-import { board, edit } from '@/routes/projects';
+import { board } from '@/routes/projects';
 import { index as milestonesIndex } from '@/routes/projects/milestones';
 import { index as tasksIndex } from '@/routes/projects/tasks';
 import type { MemberRole, MilestoneItem, ProjectOverviewProps } from '@/types/projects';
@@ -232,28 +231,6 @@ export function keyMilestones(milestones: ProjectOverviewProps['milestones']) {
     return rows;
 }
 
-/** Milestones as stages: explicit completion is done, the server's current is current (§14.2). */
-function milestoneStages(milestones: ProjectOverviewProps['milestones']): Stage[] {
-    return milestones.items.map((item) => ({
-        key: String(item.id),
-        label: item.name,
-        state: item.completedAt ? 'done' : item.id === milestones.currentId ? 'current' : 'planned',
-        meta: item.overdue
-            ? `Overdue · due ${formatDate(item.dueDate)}`
-            : `Due ${formatDate(item.dueDate)}`,
-    }));
-}
-
-/**
- * Task progress for one milestone, worded as task progress. A milestone is complete only when
- * someone completed it (`completedAt`), so "4 of 4 tasks done" never reads as "milestone complete".
- */
-function milestoneTaskText(item: MilestoneItem): string {
-    if (item.taskCount === 0) return 'No linked tasks';
-
-    return `${item.doneCount} of ${plural(item.taskCount, 'linked task', 'linked tasks')} done`;
-}
-
 function MilestoneRow({ item, role }: { item: MilestoneItem; role: MilestoneRole }) {
     return (
         <li
@@ -312,7 +289,7 @@ function MilestonesSection({
         );
     }
 
-    const stages = milestoneStages(milestones);
+    const stages = milestoneStages(milestones.items, milestones.currentId);
     const { start, end } = stagePathWindow(stages);
     const rows = keyMilestones(milestones);
     const overdueRows = rows.filter((row) => row.role === 'overdue');
@@ -495,27 +472,16 @@ export function ProjectShowPage(props: ProjectOverviewProps) {
     ].filter(Boolean);
 
     const header = (
-        <EntityHeader
-            overline="Project"
-            title={project.name}
-            status={<ProjectStatusBadge status={project.status} />}
+        <ProjectWorkspaceHeader
+            project={project}
+            current="overview"
+            // The server's answer (ProjectSettingsAccess, A9), never a role check here.
+            openSettings={abilities.openSettings === true}
             meta={
                 dates.length ? (
                     <span className="flex flex-wrap gap-x-4 gap-y-1">{dates}</span>
                 ) : undefined
             }
-            actions={
-                // The server's answer (ProjectSettingsAccess, A9), never a role check here.
-                abilities.openSettings ? (
-                    <Link
-                        href={edit.url(project.id)}
-                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                    >
-                        Settings
-                    </Link>
-                ) : undefined
-            }
-            navigation={<ProjectWorkspaceNav projectId={project.id} current="overview" />}
         />
     );
 

@@ -138,6 +138,8 @@ test('the Overview reaches the Board and Milestones, and each leads back to the 
     await expect(page).toHaveURL(`/projects/${projectId}/board`);
     await expect(page.getByRole('region', { name: 'Kanban board' })).toBeVisible();
     await expectOneBreadcrumbAndHeading(page);
+    // EPIC-015 WP4: the Board carries the same project tabs, Board current.
+    await expectProjectNavigation(page, 'Board');
 
     // A task on the board shows up in the Overview's summary, whose counts open the project's Tasks
     // tab (WP3; WP2 sent them to the board).
@@ -162,11 +164,15 @@ test('the Overview reaches the Board and Milestones, and each leads back to the 
     await expect(page).toHaveURL(`/projects/${projectId}/tasks?completion=open`);
     await expect(page.getByRole('link', { name: 'E2E WP2 task' })).toBeVisible();
 
-    // Overview -> Milestones, and back through the page's own (generic) back link.
+    // Overview -> Milestones, and back through the shared project tabs. FLIPPED IN EPIC-015 WP4: the
+    // Milestones page's own "Back to project" link is gone; it now carries the four tabs (and the
+    // shell trail), with Milestones current.
     await page.goto(`/projects/${projectId}`);
     await projectNav(page).getByRole('link', { name: 'Milestones' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}/milestones`);
-    await page.getByRole('link', { name: 'Back to project' }).click();
+    await expectProjectNavigation(page, 'Milestones');
+    await expectOneBreadcrumbAndHeading(page);
+    await projectNav(page).getByRole('link', { name: 'Overview' }).click();
     await expect(page).toHaveURL(`/projects/${projectId}`);
     await expectProjectNavigation(page, 'Overview');
 });
@@ -253,6 +259,10 @@ test('the Overview holds together at 390px, the S/M boundary and desktop, light 
     page,
     cleanup,
 }) => {
+    // Reported 30-33 s in EPIC-015 WP4 and timed out at 30 s on its last (1440 dark) iteration in the
+    // post-remediation run (elevated request latency, concurrent load on the Docker VM): 12 width/theme
+    // iterations after a UI-seeded project, so this one test gets the tripled timeout (A3.12 #7).
+    test.slow();
     await signedIn(page);
     const projectId = await createProject(
         page,

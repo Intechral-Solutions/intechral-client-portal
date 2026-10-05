@@ -1,8 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { navigation, projects, shellUser } from '@/components/shell/shell-fixtures';
 import { EditProjectPage, type EditProjectProps } from '@/pages/projects/edit';
 import {
+    setPageProps,
     inertiaSpies,
     resetInertiaMock,
     setFormErrors,
@@ -11,6 +13,11 @@ import {
 } from '@/test/inertia';
 
 vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertiaReactMock());
+vi.mock('@/routes', () => ({ logout: { url: () => '/logout' } }));
+vi.mock('@/routes/profile', () => ({ show: { url: () => '/profile' } }));
+vi.mock('@/components/time/timer-pill', () => ({
+    TimerPill: () => <span data-testid="timer-pill" />,
+}));
 
 afterEach(resetInertiaMock);
 
@@ -391,4 +398,52 @@ it('never nests one form inside another', () => {
 
     expect(document.querySelectorAll('form form')).toHaveLength(0);
     expect(document.querySelectorAll('form')).toHaveLength(3); // details, companies, members
+});
+
+// ── EPIC-015 WP4: Direction D Settings page ───────────────────────────────────
+
+it('is a Direction D form page: the forms reading measure, the project name as the one h1, stacked sections', () => {
+    const { container } = render(<EditProjectPage {...managerProps} />);
+
+    expect(container.querySelector('[data-page-frame]')).toHaveAttribute(
+        'data-page-frame',
+        'reading',
+    );
+    expect(container.querySelector('[data-page-frame]')).toHaveAttribute(
+        'data-page-measure',
+        'forms',
+    );
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual([
+        project.name,
+    ]);
+    expect(screen.getByText('Project settings')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(
+        expect.arrayContaining(['Project details', 'Members']),
+    );
+    // Settings is a header action on the project pages, never a fifth tab: no project tabs here.
+    expect(screen.queryByRole('navigation', { name: 'Project' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute(
+        'href',
+        `/projects/${project.id}`,
+    );
+});
+
+it("names the project, linking to its Overview, then Settings, in the shell's one breadcrumb", () => {
+    setPageProps({
+        auth: { user: shellUser, permissions: [] },
+        shell: { presentation: 'operational' },
+        navigation: navigation([projects], 'projects'),
+        ...managerProps,
+    });
+    const layout = EditProjectPage.layout as (page: React.ReactElement) => React.ReactElement;
+
+    render(layout(<EditProjectPage {...managerProps} />));
+
+    const crumbs = screen.getAllByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveLength(1);
+    expect(within(crumbs[0]!).getByRole('link', { name: project.name })).toHaveAttribute(
+        'href',
+        `/projects/${project.id}`,
+    );
+    expect(within(crumbs[0]!).getByText('Settings')).toHaveAttribute('aria-current', 'page');
 });
