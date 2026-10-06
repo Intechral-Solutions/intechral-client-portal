@@ -10,23 +10,11 @@
     </p>
 
     <div class="flex gap-3">
-        <a href="{{ url()->previous('/') }}"
-           class="rounded-lg border px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-           style="border-color: var(--border-base); color: var(--text-secondary);">
-            Go back
-        </a>
+        <x-ui.button :href="url()->previous('/')" variant="secondary">Go back</x-ui.button>
         @auth
-        <a href="{{ route('dashboard') }}"
-           class="rounded-lg px-5 py-2 text-sm font-medium transition-colors"
-           style="background-color: var(--accent); color: #fff;">
-            Dashboard
-        </a>
+        <x-ui.button :href="route('dashboard')">Dashboard</x-ui.button>
         @else
-        <a href="{{ route('login') }}"
-           class="rounded-lg px-5 py-2 text-sm font-medium transition-colors"
-           style="background-color: var(--accent); color: #fff;">
-            Sign in
-        </a>
+        <x-ui.button :href="route('login')">Sign in</x-ui.button>
         @endauth
     </div>
 

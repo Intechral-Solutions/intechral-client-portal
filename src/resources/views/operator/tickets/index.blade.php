@@ -9,9 +9,7 @@
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Triage, assign, and manage all support requests.</p>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('operator.tickets.reports') }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-               style="border-color: var(--border-base); color: var(--text-secondary);">Reports</a>
+            <x-ui.button :href="route('operator.tickets.reports')" variant="secondary">Reports</x-ui.button>
         </div>
     </div>
 
@@ -29,43 +27,29 @@
 
     {{-- Filters --}}
     <form method="GET" action="{{ route('operator.tickets.index') }}" class="mb-6 flex flex-wrap gap-2">
-        <input type="search" name="search" value="{{ request('search') }}"
-               placeholder="Search&hellip;"
-               class="rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary); min-width:180px;">
+        <x-ui.input type="search" name="search" :value="request('search')"
+                    placeholder="Search&hellip;" class="min-w-45" />
         @foreach (['status' => ['open', 'in_progress', 'pending_user', 'resolved', 'closed'], 'priority' => ['low', 'medium', 'high', 'critical']] as $field => $opts)
-        <select name="{{ $field }}"
-                class="rounded-lg border px-3 py-2 text-sm outline-none"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <x-ui.select :name="$field" :aria-label="ucfirst($field)">
             <option value="">All {{ ucfirst($field) }}s</option>
             @foreach ($opts as $opt)
             <option value="{{ $opt }}" {{ request($field) === $opt ? 'selected' : '' }}>
                 {{ str_replace('_', ' ', ucfirst($opt)) }}
             </option>
             @endforeach
-        </select>
+        </x-ui.select>
         @endforeach
-        <select name="assignee"
-                class="rounded-lg border px-3 py-2 text-sm outline-none"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <x-ui.select name="assignee" aria-label="Assignee">
             <option value="">All Assignees</option>
             @foreach ($operators as $op)
             <option value="{{ $op->id }}" {{ request('assignee') == $op->id ? 'selected' : '' }}>{{ $op->name }}</option>
             @endforeach
-        </select>
-        <input type="date" name="date_from" value="{{ request('date_from') }}"
-               class="rounded-lg border px-3 py-2 text-sm outline-none"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-        <input type="date" name="date_to" value="{{ request('date_to') }}"
-               class="rounded-lg border px-3 py-2 text-sm outline-none"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-        <button type="submit"
-                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-                style="border-color: var(--border-base); color: var(--text-secondary);">Filter</button>
+        </x-ui.select>
+        <x-ui.input type="date" name="date_from" :value="request('date_from')" aria-label="Submitted from" />
+        <x-ui.input type="date" name="date_to" :value="request('date_to')" aria-label="Submitted to" />
+        <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
         @if (request()->hasAny(['search', 'status', 'priority', 'assignee', 'date_from', 'date_to']))
-        <a href="{{ route('operator.tickets.index') }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-           style="border-color: var(--border-base); color: var(--text-secondary);">Clear</a>
+        <x-ui.button :href="route('operator.tickets.index')" variant="secondary">Clear</x-ui.button>
         @endif
     </form>
 
@@ -79,7 +63,7 @@
             <thead>
                 <tr style="background-color: var(--surface-elevated);">
                     <th class="px-4 py-3">
-                        <input type="checkbox" id="select-all" class="h-4 w-4 rounded accent-legacy-accent">
+                        <x-ui.checkbox id="select-all" aria-label="Select all tickets on this page" />
                     </th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Ticket</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Priority</th>
@@ -94,7 +78,8 @@
                 @forelse ($tickets as $ticket)
                 <tr class="transition-colors hover:legacy-bg-surface {{ $ticket->isOverdue() ? 'bg-red-50' : '' }}">
                     <td class="px-4 py-3">
-                        <input type="checkbox" name="ticket_ids[]" value="{{ $ticket->id }}" class="h-4 w-4 rounded accent-legacy-accent ticket-cb">
+                        <x-ui.checkbox name="ticket_ids[]" id="ticket-cb-{{ $ticket->id }}" value="{{ $ticket->id }}"
+                                       aria-label="Select ticket {{ $ticket->ticket_number }}" class="ticket-cb" />
                     </td>
                     <td class="px-4 py-3">
                         <p class="font-medium text-sm" style="color: var(--text-primary);">{{ $ticket->title }}</p>
@@ -114,9 +99,7 @@
                     </td>
                     <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">{{ $ticket->created_at->diffForHumans() }}</td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{{ route('operator.tickets.show', $ticket) }}"
-                           class="text-sm font-medium transition-colors hover:underline"
-                           style="color: var(--accent);">View</a>
+                        <x-ui.link :href="route('operator.tickets.show', $ticket)" class="text-sm font-medium">View</x-ui.link>
                     </td>
                 </tr>
                 @empty
@@ -134,27 +117,21 @@
     <div id="bulk-bar" class="hidden mt-4 flex items-center gap-3 rounded-lg border px-4 py-3"
          style="border-color: var(--border-base); background-color: var(--surface-elevated);">
         <span class="text-sm" style="color: var(--text-secondary);"><span id="selected-count">0</span> selected</span>
-        <select name="action" required
-                class="rounded-lg border px-3 py-1.5 text-sm"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <x-ui.select name="action" required aria-label="Bulk action">
             <option value="">Choose action&hellip;</option>
             <option value="assign">Assign to&hellip;</option>
             <option value="resolve">Mark Resolved</option>
             <option value="close">Close</option>
-        </select>
-        <select name="assignee_id"
-                class="rounded-lg border px-3 py-1.5 text-sm"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        </x-ui.select>
+        <x-ui.field-error for="action" />
+        <x-ui.select name="assignee_id" aria-label="Assign to">
             <option value="">Select assignee&hellip;</option>
             @foreach ($operators as $op)
             <option value="{{ $op->id }}">{{ $op->name }}</option>
             @endforeach
-        </select>
-        <button type="submit"
-                class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
-                style="background-color: var(--accent); color: #fff;">
-            Apply
-        </button>
+        </x-ui.select>
+        <x-ui.field-error for="assignee_id" />
+        <x-ui.button type="submit" variant="secondary">Apply</x-ui.button>
     </div>
 
     </form>

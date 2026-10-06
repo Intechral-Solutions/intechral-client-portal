@@ -5,14 +5,12 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <a href="{{ route('organizations.index') }}" class="text-sm hover:underline" style="color: var(--text-secondary);">&larr; Organizations</a>
+            <x-ui.link variant="quiet" :href="route('organizations.index')" class="text-sm">&larr; Organizations</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $organization->name }}</h1>
             <p class="mt-0.5 text-xs font-mono" style="color: var(--text-muted);">{{ $organization->slug }}</p>
         </div>
         @if ($organization->company)
-        <a href="{{ route('crm.companies.show', $organization->company) }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium"
-           style="border-color: var(--border-base); color: var(--text-secondary);">View CRM Record</a>
+        <x-ui.button :href="route('crm.companies.show', $organization->company)" variant="secondary">View CRM Record</x-ui.button>
         @endif
     </div>
 
@@ -68,15 +66,15 @@
                                 <form method="POST" action="{{ route('organizations.members.role', [$organization, $member]) }}">
                                     @csrf @method('PUT')
                                     <input type="hidden" name="role" value="{{ $member->pivot->role === 'admin' ? 'member' : 'admin' }}">
-                                    <button type="submit" class="text-xs hover:underline" style="color: var(--text-secondary);">
+                                    <x-ui.button type="submit" variant="ghost" size="sm">
                                         Make {{ $member->pivot->role === 'admin' ? 'Member' : 'Admin' }}
-                                    </button>
+                                    </x-ui.button>
                                 </form>
                                 {{-- Remove --}}
                                 <form method="POST" action="{{ route('organizations.members.destroy', [$organization, $member]) }}"
                                       onsubmit="return confirm('Remove {{ addslashes($member->name) }}?')">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="text-xs hover:underline" style="color: var(--text-danger);">Remove</button>
+                                    <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Remove</x-ui.button>
                                 </form>
                             </div>
                         </td>
@@ -92,22 +90,19 @@
             <div class="border-t px-5 py-4" style="border-color: var(--border-base);">
                 <form method="POST" action="{{ route('organizations.members.store', $organization) }}" class="flex gap-2">
                     @csrf
-                    <select name="user_id"
-                            class="flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    <x-ui.select name="user_id" aria-label="Person to add" class="min-w-0 flex-1">
                         @foreach ($availableUsers as $user)
                         <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
                         @endforeach
-                    </select>
-                    <select name="role"
-                            class="rounded-lg border px-3 py-2 text-sm outline-none"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    </x-ui.select>
+                    <x-ui.select name="role" aria-label="Organization role">
                         <option value="member">Member</option>
                         <option value="admin">Admin</option>
-                    </select>
-                    <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium"
-                            style="background-color: var(--accent); color: #fff;">Add</button>
+                    </x-ui.select>
+                    <x-ui.button type="submit">Add</x-ui.button>
                 </form>
+                <x-ui.field-error for="user_id" class="mt-2" />
+                <x-ui.field-error for="role" class="mt-2" />
             </div>
             @endif
         </div>

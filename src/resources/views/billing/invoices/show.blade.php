@@ -6,30 +6,24 @@
     {{-- Breadcrumb + Actions --}}
     <div class="mb-6 flex items-start justify-between">
         <div>
-            <a href="{{ route('billing.invoices.index') }}" class="text-sm" style="color: var(--text-secondary);">Invoices</a>
+            <x-ui.link variant="quiet" :href="route('billing.invoices.index')" class="text-sm">Invoices</x-ui.link>
             <h1 class="mt-1 text-2xl font-semibold font-mono" style="color: var(--text-primary);">{{ $invoice->invoice_number }}</h1>
         </div>
         <div class="flex items-center gap-2 shrink-0 ml-4">
             @can('update', $invoice)
-            <a href="{{ route('billing.invoices.edit', $invoice) }}"
-               class="rounded-lg border px-3 py-1.5 text-sm font-medium"
-               style="border-color: var(--border-base); color: var(--text-secondary);">Edit</a>
+            <x-ui.button :href="route('billing.invoices.edit', $invoice)" variant="secondary">Edit</x-ui.button>
             @endcan
             @can('send', $invoice)
             <form method="POST" action="{{ route('billing.invoices.send', $invoice) }}">
                 @csrf
-                <button type="submit"
-                        class="rounded-lg px-3 py-1.5 text-sm font-medium"
-                        style="background-color: var(--accent); color: #fff;">Mark as Sent</button>
+                <x-ui.button type="submit">Mark as Sent</x-ui.button>
             </form>
             @endcan
             @can('delete', $invoice)
             <form method="POST" action="{{ route('billing.invoices.destroy', $invoice) }}"
                   onsubmit="return confirm('Delete this invoice?')">
                 @csrf @method('DELETE')
-                <button type="submit"
-                        class="rounded-lg border px-3 py-1.5 text-sm font-medium"
-                        style="border-color: var(--border-danger); color: var(--text-danger);">Delete</button>
+                <x-ui.button type="submit" variant="secondary" tone="danger">Delete</x-ui.button>
             </form>
             @endcan
         </div>
@@ -157,9 +151,7 @@
                     Amount due: <span class="font-semibold" style="color: var(--text-primary);">{{ $invoice->currency }} {{ number_format((float)$invoice->total, 2) }}</span>
                 </p>
                 @can('pay', $invoice)
-                <a href="{{ route('billing.invoices.pay', $invoice) }}"
-                   class="block w-full rounded-lg py-2 text-center text-sm font-medium"
-                   style="background-color: var(--accent); color: #fff;">Pay Now</a>
+                <x-ui.button :href="route('billing.invoices.pay', $invoice)" variant="secondary" class="w-full">Pay Now</x-ui.button>
                 @endcan
                 @else
                 <p class="text-sm" style="color: var(--text-muted);">No payment due.</p>
@@ -188,22 +180,18 @@
                 <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-muted);">Record Manual Payment</p>
                 <form method="POST" action="{{ route('billing.invoices.payment.record', $invoice) }}" class="space-y-3">
                     @csrf
-                    <div>
-                        <label class="block text-xs font-medium mb-1" style="color: var(--text-muted);">Amount</label>
-                        <input type="number" name="amount" min="0.01" step="0.01" required
-                               value="{{ number_format((float)$invoice->total, 2) }}"
-                               class="block w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    <div class="space-y-2">
+                        <x-ui.label for="amount">Amount</x-ui.label>
+                        <x-ui.input type="number" name="amount" min="0.01" step="0.01" required
+                                    :value="number_format((float)$invoice->total, 2)" class="w-full" />
+                        <x-ui.field-error for="amount" />
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium mb-1" style="color: var(--text-muted);">Notes</label>
-                        <input type="text" name="notes" placeholder="e.g. Bank transfer"
-                               class="block w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    <div class="space-y-2">
+                        <x-ui.label for="notes">Notes</x-ui.label>
+                        <x-ui.input type="text" name="notes" placeholder="e.g. Bank transfer" class="w-full" />
+                        <x-ui.field-error for="notes" />
                     </div>
-                    <button type="submit"
-                            class="w-full rounded-lg px-3 py-1.5 text-sm font-medium"
-                            style="background-color: var(--accent); color: #fff;">Record Payment</button>
+                    <x-ui.button type="submit" class="w-full">Record Payment</x-ui.button>
                 </form>
             </div>
             @endif

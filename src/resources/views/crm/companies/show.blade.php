@@ -5,34 +5,27 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <a href="{{ route('crm.companies.index') }}" class="text-sm hover:underline" style="color: var(--text-secondary);">&larr; Companies</a>
+            <x-ui.link variant="quiet" :href="route('crm.companies.index')" class="text-sm">&larr; Companies</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $company->name }}</h1>
             @if ($company->website)
-            <a href="{{ $company->website }}" target="_blank" rel="noopener"
-               class="mt-0.5 text-sm hover:underline" style="color: var(--accent);">
+            <x-ui.link :href="$company->website" target="_blank" rel="noopener" class="mt-0.5 text-sm">
                 {{ parse_url($company->website, PHP_URL_HOST) }} ↗
-            </a>
+            </x-ui.link>
             @endif
         </div>
         <div class="flex gap-2">
             @if (! $company->isPromoted())
             <form method="POST" action="{{ route('crm.companies.promote', $company) }}">
                 @csrf
-                <button type="submit"
-                        onclick="return confirm('Promote {{ addslashes($company->name) }} to an Organization?')"
-                        class="rounded-lg border px-4 py-2 text-sm font-medium"
-                        style="border-color: var(--border-base); color: var(--text-secondary);">
+                <x-ui.button type="submit" variant="secondary"
+                             onclick="return confirm('Promote {{ addslashes($company->name) }} to an Organization?')">
                     Promote to Org
-                </button>
+                </x-ui.button>
             </form>
             @else
-            <a href="{{ route('organizations.show', $company->organization) }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium"
-               style="border-color: var(--border-success); color: var(--text-success);">View Organization ↗</a>
+            <x-ui.button :href="route('organizations.show', $company->organization)" variant="secondary">View Organization ↗</x-ui.button>
             @endif
-            <a href="{{ route('crm.companies.edit', $company) }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium"
-               style="border-color: var(--border-base); color: var(--text-secondary);">Edit</a>
+            <x-ui.button :href="route('crm.companies.edit', $company)" variant="secondary">Edit</x-ui.button>
         </div>
     </div>
 
@@ -61,17 +54,16 @@
         <div class="lg:col-span-2 rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
             <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-base);">
                 <h2 class="text-sm font-semibold" style="color: var(--text-primary);">Contacts</h2>
-                <a href="{{ route('crm.contacts.create', ['company_id' => $company->id]) }}"
-                   class="text-xs font-medium hover:underline" style="color: var(--accent);">+ Add Contact</a>
+                <x-ui.link :href="route('crm.contacts.create', ['company_id' => $company->id])" class="text-xs font-medium">+ Add Contact</x-ui.link>
             </div>
             <table class="w-full text-sm">
                 <tbody class="divide-y" style="divide-color: var(--border-base);">
                     @forelse ($company->contacts as $contact)
                     <tr>
                         <td class="px-5 py-3">
-                            <a href="{{ route('crm.contacts.show', $contact) }}" class="font-medium hover:underline" style="color: var(--accent);">
+                            <x-ui.link variant="row" :href="route('crm.contacts.show', $contact)">
                                 {{ $contact->fullName() }}
-                            </a>
+                            </x-ui.link>
                             @if ($contact->job_title)
                             <span class="text-xs ml-1" style="color: var(--text-muted);">— {{ $contact->job_title }}</span>
                             @endif

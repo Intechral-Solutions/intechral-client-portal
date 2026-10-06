@@ -10,15 +10,14 @@
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage platform users and their roles.</p>
         </div>
         @can('users.invite')
-        <button type="button"
-                onclick="document.getElementById('invite-modal').removeAttribute('hidden')"
-                class="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                style="background-color: var(--accent); color: #fff;">
+        <x-ui.button type="button"
+                     onclick="document.getElementById('invite-modal').removeAttribute('hidden')"
+                     class="shrink-0">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
             </svg>
             Invite User
-        </button>
+        </x-ui.button>
         @endcan
     </div>
 
@@ -34,21 +33,11 @@
     {{-- Search --}}
     <form method="GET" action="{{ route('users.index') }}" class="mb-6">
         <div class="flex gap-2">
-            <input type="search" name="search" value="{{ request('search') }}"
-                   placeholder="Search by name or email&hellip;"
-                   class="block w-full max-w-sm rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
-                   style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-            <button type="submit"
-                    class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-                    style="border-color: var(--border-base); color: var(--text-secondary);">
-                Search
-            </button>
+            <x-ui.input type="search" name="search" :value="request('search')"
+                        placeholder="Search by name or email&hellip;" class="w-full max-w-sm" />
+            <x-ui.button type="submit" variant="secondary">Search</x-ui.button>
             @if (request('search'))
-            <a href="{{ route('users.index') }}"
-               class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-               style="border-color: var(--border-base); color: var(--text-secondary);">
-                Clear
-            </a>
+            <x-ui.button :href="route('users.index')" variant="secondary">Clear</x-ui.button>
             @endif
         </div>
     </form>
@@ -84,11 +73,7 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 text-right text-sm">
-                        <a href="{{ route('users.show', $user) }}"
-                           class="font-medium transition-colors hover:underline"
-                           style="color: var(--accent);">
-                            View
-                        </a>
+                        <x-ui.link :href="route('users.show', $user)" class="font-medium">View</x-ui.link>
                     </td>
                 </tr>
                 @empty
@@ -121,25 +106,16 @@
         <h2 class="mb-4 text-lg font-semibold" style="color: var(--text-primary);">Invite User</h2>
         <form method="POST" action="{{ route('invitations.store') }}">
             @csrf
-            <label for="invite-email" class="block text-sm font-medium mb-1.5" style="color: var(--text-primary);">
-                Email address
-            </label>
-            <input type="email" id="invite-email" name="email" required autocomplete="off"
-                   class="block w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 mb-4"
-                   style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);"
-                   placeholder="user@example.com">
+            <div class="mb-4 space-y-2">
+                <x-ui.label for="invite-email">Email address</x-ui.label>
+                <x-ui.input type="email" name="email" id="invite-email" required autocomplete="off"
+                            placeholder="user@example.com" class="w-full" />
+                <x-ui.field-error for="invite-email" error-key="email" />
+            </div>
             <div class="flex gap-3">
-                <button type="submit"
-                        class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                        style="background-color: var(--accent); color: #fff;">
-                    Send Invitation
-                </button>
-                <button type="button"
-                        onclick="document.getElementById('invite-modal').setAttribute('hidden', '')"
-                        class="rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-                        style="color: var(--text-secondary);">
-                    Cancel
-                </button>
+                <x-ui.button type="submit">Send Invitation</x-ui.button>
+                <x-ui.button type="button" variant="ghost"
+                             onclick="document.getElementById('invite-modal').setAttribute('hidden', '')">Cancel</x-ui.button>
             </div>
         </form>
     </div>

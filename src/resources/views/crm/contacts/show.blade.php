@@ -5,15 +5,13 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <a href="{{ route('crm.contacts.index') }}" class="text-sm hover:underline" style="color: var(--text-secondary);">&larr; Contacts</a>
+            <x-ui.link variant="quiet" :href="route('crm.contacts.index')" class="text-sm">&larr; Contacts</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $contact->fullName() }}</h1>
             @if ($contact->job_title)
             <p class="text-sm mt-0.5" style="color: var(--text-secondary);">{{ $contact->job_title }}</p>
             @endif
         </div>
-        <a href="{{ route('crm.contacts.edit', $contact) }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium"
-           style="border-color: var(--border-base); color: var(--text-secondary);">Edit</a>
+        <x-ui.button :href="route('crm.contacts.edit', $contact)" variant="secondary">Edit</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -26,16 +24,16 @@
         @if ($contact->company)
         <div>
             <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Company</p>
-            <a href="{{ route('crm.companies.show', $contact->company) }}" class="text-sm font-medium hover:underline" style="color: var(--accent);">
+            <x-ui.link :href="route('crm.companies.show', $contact->company)" class="text-sm font-medium">
                 {{ $contact->company->name }}
-            </a>
+            </x-ui.link>
         </div>
         @endif
 
         @if ($contact->email)
         <div>
             <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Email</p>
-            <a href="mailto:{{ $contact->email }}" class="text-sm hover:underline" style="color: var(--text-primary);">{{ $contact->email }}</a>
+            <x-ui.link variant="row" href="mailto:{{ $contact->email }}" class="text-sm">{{ $contact->email }}</x-ui.link>
         </div>
         @endif
 

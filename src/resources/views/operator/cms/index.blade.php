@@ -8,9 +8,7 @@
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">CMS Pages</h1>
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage portal content pages.</p>
         </div>
-        <a href="{{ route('operator.cms.create') }}"
-           class="rounded-lg px-4 py-2 text-sm font-medium"
-           style="background-color: var(--accent); color: #fff;">+ New Page</a>
+        <x-ui.button :href="route('operator.cms.create')">+ New Page</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -34,9 +32,9 @@
                 @forelse ($pages as $page)
                 <tr>
                     <td class="px-4 py-3 font-medium">
-                        <a href="{{ route('operator.cms.edit', $page) }}" class="hover:underline" style="color: var(--accent);">
+                        <x-ui.link variant="row" :href="route('operator.cms.edit', $page)">
                             {{ $page->title }}
-                        </a>
+                        </x-ui.link>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs" style="color: var(--text-muted);">{{ $page->slug }}</td>
                     <td class="px-4 py-3 text-center">
@@ -50,11 +48,9 @@
                     <td class="px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-3">
                             @if ($page->isPublished())
-                            <a href="{{ route('cms.show', $page->slug) }}" target="_blank"
-                               class="text-xs hover:underline" style="color: var(--text-secondary);">View ↗</a>
+                            <x-ui.link variant="quiet" :href="route('cms.show', $page->slug)" target="_blank" class="text-xs">View ↗</x-ui.link>
                             @endif
-                            <a href="{{ route('operator.cms.edit', $page) }}"
-                               class="text-xs hover:underline" style="color: var(--text-secondary);">Edit</a>
+                            <x-ui.link variant="quiet" :href="route('operator.cms.edit', $page)" class="text-xs">Edit</x-ui.link>
                         </div>
                     </td>
                 </tr>

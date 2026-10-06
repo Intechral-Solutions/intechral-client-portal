@@ -12,6 +12,7 @@ use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
 use App\Support\TestDatabaseSafety;
 use App\View\Composers\ShellComposer;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -45,5 +46,11 @@ class AppServiceProvider extends ServiceProvider
         // once per request and every `layouts.partials.shell.*` include inherits the payload; the
         // root <html> needs it too, for the pre-paint bootstrap's inputs (§15.3).
         View::composer('layouts.app', ShellComposer::class);
+
+        // EPIC-016 WP1 §7.4: every Blade `->links()` renders through the Direction D pagination view
+        // instead of the vendor Tailwind one. Laravel still builds every URL, so query strings and
+        // numbered/prev/next behaviour are unchanged.
+        Paginator::defaultView('pagination.direction-d');
+        Paginator::defaultSimpleView('pagination.simple-direction-d');
     }
 }

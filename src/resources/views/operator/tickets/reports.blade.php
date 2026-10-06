@@ -5,37 +5,26 @@
 
     <div class="flex items-start justify-between gap-4">
         <div>
-            <a href="{{ route('operator.tickets.index') }}"
-               class="mb-2 inline-flex items-center gap-1 text-sm hover:underline"
-               style="color: var(--text-secondary);">
+            <x-ui.link variant="quiet" :href="route('operator.tickets.index')" class="mb-2 inline-flex items-center gap-1 text-sm">
                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" /></svg>
                 Back to queue
-            </a>
+            </x-ui.link>
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Reports</h1>
         </div>
-        <a href="{{ route('operator.tickets.export', request()->query()) }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-           style="border-color: var(--border-base); color: var(--text-secondary);">
-            Export CSV
-        </a>
+        <x-ui.button :href="route('operator.tickets.export', request()->query())" variant="secondary">Export CSV</x-ui.button>
     </div>
 
     {{-- Date range filter --}}
     <form method="GET" action="{{ route('operator.tickets.reports') }}" class="flex flex-wrap gap-3 items-end">
-        <div>
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">From</label>
-            <input type="date" name="date_from" value="{{ request('date_from', $from->toDateString()) }}"
-                   class="rounded-lg border px-3 py-2 text-sm"
-                   style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <div class="space-y-2">
+            <x-ui.label for="date_from">From</x-ui.label>
+            <x-ui.input type="date" name="date_from" :value="request('date_from', $from->toDateString())" />
         </div>
-        <div>
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">To</label>
-            <input type="date" name="date_to" value="{{ request('date_to', $to->toDateString()) }}"
-                   class="rounded-lg border px-3 py-2 text-sm"
-                   style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <div class="space-y-2">
+            <x-ui.label for="date_to">To</x-ui.label>
+            <x-ui.input type="date" name="date_to" :value="request('date_to', $to->toDateString())" />
         </div>
-        <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium hover:legacy-bg-surface"
-                style="border-color: var(--border-base); color: var(--text-secondary);">Apply</button>
+        <x-ui.button type="submit" variant="secondary">Apply</x-ui.button>
     </form>
 
     <div class="grid gap-6 sm:grid-cols-2">

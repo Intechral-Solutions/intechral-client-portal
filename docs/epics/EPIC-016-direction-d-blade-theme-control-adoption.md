@@ -1,6 +1,6 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** Planned (2026-10-05). WP0 (this document) is the design gate; no implementation has started.
+**Status:** Planned (2026-10-05). WP0 (this document) is the design gate. WP1 is implemented on the implementation branch and awaiting review ([Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1)); the status stays **Planned** until PR 1 merges (§20).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
@@ -1110,3 +1110,222 @@ None blocks WP1. Each is the plan's default, derived from the locked decisions a
 - **CI:** the PR gate is the merge gate for every package.
 - **Lifecycle:** Planned → In Progress (PR 1 merges) → Verified (§20) → Done (PR 4 merges with green `main` CI).
 - **Record:** each package's results are recorded as an amendment to this document in the same PR.
+
+---
+
+## Amendment 1: WP1 Controls and Accessibility (PR 1)
+
+> **Status (2026-10-06): WP1 implemented on `feature/epic-016-blade-theme-control-adoption`; uncommitted and unpushed at the time of writing. The independent review (A1.18) approved the architecture and asked for a small remediation, which is applied here.** EPIC-016 stays **Planned** until PR 1 merges (§20). The historical design-gate body text above this amendment is preserved except where an amendment ruling explicitly supersedes it (as for §13.1's time-tracker cell, A1.15 #2); the header lifecycle and status line may be updated as the epic progresses (it now notes WP1 under review; the status remains **Planned**).
+
+### A1.1 Starting point and method
+
+- **Starting SHA:** `d07384d79c67829f3bfbe07a62d59389d328f3d8` (`docs: establish EPIC-016 Blade theme and control adoption`), equal to `main` and `origin/main`; branch `feature/epic-016-blade-theme-control-adoption`; working tree clean, no stash. WP0 committed, WP1 not started.
+- **Method.** The component seam first, then the target views by workspace, then the tests, then the browser and visual checks. Every migration was held to "same information, same behaviour": no route, payload, validation rule, permission, workflow transition, redirect, pagination query semantics or product copy changed, and no existing assertion was flipped (A1.11).
+- **No new theme token** (§7.2 rule 6, §11.4). Every contract below is expressed in the existing `--ds-*` layer; `app.css` is untouched. No dependency, CI, migration, route, React or `tests/Browser/support` change.
+
+### A1.2 Scope delivered
+
+Delivered (§19 WP1): the eight Blade components, the Direction D pagination view and its `Paginator` default, the §13 PR 1 columns for Helpdesk, Directory, Finance and System plus the `errors/403` buttons, the action hierarchy (§8), the field identity contract (§7.5), every §10.2 name, the three approved Finance name changes, the invoice line-item repair (P8), Pest component, identity, line-item, pagination and target-form tests, and the Playwright control, focus and name checks.
+
+Not in WP1, left for later packages (A1.16): status, priority, alert and tag components and every status pill; the time tracker's markup and script; page-body colour and geometry; alias retirement, the vendor pagination `@source` line and the permanent guard.
+
+### A1.3 The component seam
+
+Anonymous components under `resources/views/components/ui/` (P1), used as `<x-ui.*>`:
+
+| Component | Contract implemented |
+|---|---|
+| `button` | `variant` `primary` (default; `bg-ink text-on-ink`), `secondary` (`bg-surface border-control-edge text-text`), `ghost`, `destructive` (`bg-destructive text-destructive-foreground`, no Blade consumer); `tone="danger"` on `secondary` / `ghost` only (the destructive **trigger**: `border-danger text-danger`), anything else throws `InvalidArgumentException`; `size` `sm` / `md` / `lg` / `icon` on the shared `controlHeight` scale with `pointer-coarse:` one step up, `icon` requires `aria-label`; `href` renders an `<a>` with the same classes; `disabled` is the `disabled` attribute on a `<button>`, and `aria-disabled="true"` with no `href` on a link, drawn `bg-surface-sunken text-text-muted`; `type` defaults to `button`; every other attribute (`name`, `value`, `form`, `data-*`, `aria-*`, `onclick`, `rel`, `target`) is forwarded |
+| `link` | `accent` (default), `quiet` (underlined `text-text-secondary`), `row` (`text-text font-medium hover:underline`, the Projects/Tasks reference grammar); the exact focus ring with `rounded-control` |
+| `input`, `select`, `textarea` | `control-edge` boundary on `bg-surface`, `hover:border-text-muted`, `aria-invalid:border-danger`, disabled `bg-surface-sunken text-text-muted border-rule-control`, placeholder `text-text-muted`, `h-9 pointer-coarse:h-11` (textarea `min-h-24 resize-y`), the exact focus ring; `input` covers `search`, `date`, `number`, `email`, `url` and `file` (picker styled with `file:` utilities). No width class is baked in: callers add `w-full` (layout) |
+| `checkbox` | native, `size-4 accent-accent`, focus ring, disabled state; with slot content it wraps itself in the naming `<label>` (`has-[:disabled]:text-text-muted`), without it only the `<input>` renders; a wrapped checkbox with a non-simple name (`permissions[]`) needs no `id` |
+| `label` | `for` = the DOM id, `text-sm font-medium text-text`, `required` renders the existing `*` in `text-danger`, `class="sr-only"` allowed |
+| `field-error` | `for` = the DOM id, `error-key` = the field's key(s) (default: `for`); renders `<p id="{for}-error" role="alert" class="text-sm text-danger">` with the **first** message in key order, nothing when no key has an error |
+
+**Focus.** Every interactive component carries the exact `focusRing` string (`focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`). None uses `outline-none` or `focus:ring-*`, and none uses `transition-colors` / `transition-all`: Tailwind's colour transition includes `outline-color`, which makes the ring fade in from `currentColor`. The first browser run caught exactly that on `x-ui.link`; it now uses `transition-[color,background-color,border-color]` like the button (pinned by Pest and by the browser walk, which now runs with real transitions).
+
+**Identity helper.** The §7.5 rules live in one place, `App\Support\FieldState` (resolve id and error keys from `name`; throw on a non-simple name without an explicit `id`; an explicit `id` wins; `aria-describedby` = the caller's tokens in order, then `{id}-error` when invalid, de-duplicated; `firstError` over an ordered key list with wildcards). It reads only what it is handed (a name, an id, keys, the shared `$errors` bag). Components never touch the database or the request (Pest asserts zero queries and scans the sources). The epic planned no PHP beyond attribute handling; a 150-line static helper beside `Support\BrandMark` and `Support\Initials` avoids copying these rules into five components (A1.15 #1).
+
+### A1.4 Action hierarchy applied (§8)
+
+- **Primary (ink), one per region:** `New Ticket`, `Submit Ticket`, `Post Reply`, `+ New Contact`, `Create Contact`, `+ New Company`, `Create Company`, `Save Changes`, `Add` (organization member), `New Invoice`, `Create Invoice`, `Mark as Sent`, `Record Payment`, `Pay Now` (client invoice page, payment-page submit), `Invite User`, `Send Invitation`, `New Role`, `Create Role`, `Update Roles`, `+ New Page`, `Create Page`, `Publish`, `Save`, and the two `errors/403` buttons (`Dashboard` / `Sign in`).
+- **Search and Filter submits are secondary** on `tickets/index`, `operator/tickets/index`, `crm/*/index`, `billing/invoices/index` and `admin/users/index`; `Clear`, `Reports`, `Export CSV`, `Edit`, `Cancel` (beside a primary), `View Companies`, `View CRM Record`, `Unpublish`, `Promote to Org`, `View Organization` and the attachment download chips are secondary or ghost, never teal and never green.
+- **Region-local updates are secondary:** `Update Status`, `Update Assignee`, the queue bulk-bar `Apply`, the report `Apply`; the per-row `Pay Now` on `billing/client/index` is `secondary sm`; `Pay Now` on the operator `billing/invoices/show` is secondary because `Mark as Sent` / `Record Payment` hold that page's primaries (§8.3).
+- **Destructive triggers** are `secondary tone="danger"` (`Delete Contact`, `Delete Company`, `Delete Page`, `Delete Role`, invoice `Delete`) and row-level text actions are `ghost tone="danger"` (`Remove` on `organizations/show`, `Delete` on `roles/index`, the line-item `×`). The three danger-zone containers take `border-danger`. **Every native `confirm()` is byte-for-byte unchanged** (the `onsubmit` / `onclick` attributes pass through the component).
+
+### A1.5 Names, labels and errors
+
+- **Labels (§10.2 case a).** Every previously unassociated visible label is now `<x-ui.label for="{id}">`: `crm/contacts/_form` (7), `crm/companies/_form` (5), `operator/cms/_form` (3), the invoice form (header fields and all three columns on every row), `tickets/create` attachments, the report date range (2), the payment form (2). Visible wording is unchanged; the `*` markers are `x-ui.label required`.
+- **Names from visible text (case b).** `operator/tickets/show`'s `status` and `assignee_id` selects use `aria-labelledby` on the existing "Status" / "Assignee" headings (`ticket-status-heading`, `ticket-assignee-heading`).
+- **Explicit `aria-label` (case c, only where nothing visible names the control):** queue select-all "Select all tickets on this page", row checkbox "Select ticket {number}" (id `ticket-cb-{id}`), queue filters "Status", "Priority", "Assignee", "Submitted from", "Submitted to", bulk bar "Bulk action" and "Assign to", the status filters on `tickets/index` and `billing/invoices/index` "Status", reply `attachments[]` "Attachments" (hint associated through `attachments-hint`), `organizations/show` "Person to add" and "Organization role", the line-item `×` "Remove line item".
+- **Unchanged names.** Search fields and reply textareas keep their placeholder-derived names; wrapped checkboxes keep their label text; every button and link in the target views keeps its text. The one exception is the pagination seam, whose two intentional name corrections are recorded in A1.7. `time-migration.spec.ts` (including `/Start Timer/`) is green without edits.
+- **The three approved Finance changes** (§7.2 rule 4), placeholders kept as hints: line-item description "Service or product description" becomes **"Description"**; the unit price on JavaScript-added rows "0.00" becomes **"Unit Price"**; payment notes "e.g. Bank transfer" becomes **"Notes"**.
+- **Errors.** A field whose key has a server error gets `aria-invalid="true"`, the `border-danger` edge, and `{id}-error` merged after the caller's own `aria-describedby` tokens; the matching `x-ui.field-error` renders `id="{id}-error"` with `role="alert"`. Existing hints (`Up to 10 files, 20 MB each.`, `Use lowercase letters, numbers, and hyphens only.`) gained ids and are referenced. The invite modal keeps `id="invite-email"` with name `email` and `error-key="email"`; `select-all` and `bulk-bar` ids are untouched.
+
+### A1.6 Checkboxes
+
+Seven sites (select-all, queue row, `is_internal` on both ticket pages, the `permissions[]` pair, `roles[]`): `accent-legacy-accent` is gone from every target view; the selection accent is `accent-accent` (not the primary-action ink). The permission and role lists are `role="group"` containers (`permissions-group`, `user-roles-group`) with `aria-labelledby` on the existing heading, one group `x-ui.field-error` after the group (`['permissions', 'permissions.*']` / `['roles', 'roles.*']`) and `aria-describedby` on the container when invalid. Each box stays wrapped in its existing `<label>`.
+
+### A1.7 Pagination
+
+`resources/views/pagination/direction-d.blade.php` and `simple-direction-d.blade.php`, registered in `AppServiceProvider::boot` through `Paginator::defaultView` and `defaultSimpleView`; the nine `->links()` call sites are unchanged. `nav aria-label="Pagination"`; links are `x-ui.button secondary sm`; the current page is `<span aria-current="page">` drawn `bg-ink text-on-ink`; an unavailable direction is omitted; the summary is `text-text-secondary tabular-nums`; previous / next, numbered pages with the ellipsis, the "Showing x to y of z results" summary and the compact mobile previous / next are all kept; the wide layout's prev / next arrow `aria-label`s decode the framework's entities (the vendor view double-escaped them into the name). Only semantic utilities are used, so both themes follow `data-theme` (the vendor view's `dark:` followed the OS). URLs are Laravel's own: a Pest test compares the set of hrefs to the vendor view's for five pages of the same paginator, query string included. **The vendor `@source` line in `app.css` stays; its removal is WP4's** (§19 WP4).
+
+**Accessible-name history.** Two pagination names changed on purpose; neither is "unchanged":
+
+1. The nav landmark was **"Pagination Navigation"** (the vendor view's `aria-label="{{ __('Pagination Navigation') }}"`) and is now **"Pagination"**, as §7.4 requires.
+2. The wide layout's previous / next arrow controls (icon-only links, named by `aria-label`) were the literal double-escaped strings **"&laquo; Previous"** and **"Next &raquo;"**: `lang/en/pagination.php` holds `'previous' => '&laquo; Previous'` and `'next' => 'Next &raquo;'`, and the vendor view puts `__('pagination.previous')` / `__('pagination.next')` into the attribute through `{{ }}`, which escapes the ampersand, so the accessible name was the text `&laquo; Previous` / `Next &raquo;`. They are now the rendered **"« Previous"** and **"Next »"** (`html_entity_decode` of the same language strings). The next arrow is therefore "Next »", not "Next &raquo;".
+
+The compact (narrow) previous / next links render the same language strings with `{!! !!}` in both the vendor view and this one, so their visible text and name were already "« Previous" / "Next »" and did not change. Numbered pages keep "Go to page N" and `aria-current="page"`.
+
+### A1.8 Invoice line items (P8)
+
+- One markup source: `billing/invoices/_line_item.blade.php`, included for every server-rendered row and for the `<template id="line-item-template">` the "+ Add line item" button clones (`template.innerHTML.replaceAll('__INDEX__', idx)`); no HTML or colour lives in a JavaScript string any more.
+- Per field: name `items[{i}][field]`, id `items-{i}-field`, error key `items.{i}.field`, label `for` the id, error element `{id}-error`. Quantity and unit price gain field errors with the same keys.
+- Labels: the first rendered row keeps the visible column labels; every other row, and the template, carries the same text as `sr-only` labels.
+- **The index fix.** The next index is `max(integer keys of old('items')) + 1` (computed server-side; `0` for none), never the row count. After a failed submit that removed a middle row (keys `0`, `2`) the count is 2 and would have reused key 2 for both the DOM id and the submitted `items[2][...]` name; the script now starts at 3. Submission names, validation and invoice math are unchanged.
+- The remove control is `x-ui.button variant="ghost" tone="danger" size="icon" aria-label="Remove line item"`, found by a `data-remove-line-item` hook instead of a utility class.
+
+### A1.9 Target-area inventory (per file)
+
+| Area | File | Change |
+|---|---|---|
+| Helpdesk | `tickets/index` | `New Ticket` primary; search, status filter (named), `Filter`/`Clear` secondary; `View` link; paginator |
+| | `tickets/create` | 5 fields + file input with labels, `required` markers, field errors, attachments hint; `Submit Ticket` primary, `Cancel` ghost |
+| | `tickets/show` | reply textarea, `is_internal` checkbox, named file input with hint and error, `Post Reply` primary; attachment chips secondary; back link quiet |
+| | `operator/tickets/index` | search, 3 selects and 2 dates (named), select-all and row checkboxes (named), bulk selects (named) with field errors, `Apply` and `Filter` secondary, `Reports`/`Clear` secondary, `View` links |
+| | `operator/tickets/show` | reply, checkbox, file input, `Post Reply` primary, `Update Status` / `Update Assignee` secondary, selects named by their headings |
+| | `operator/tickets/reports` | From / To labelled, `Apply` and `Export CSV` secondary |
+| | `components/time-tracker`, `tickets/_status_badge`, `tickets/_priority_badge` | **not touched** (WP2; for the tracker, the WP1 review ruling in A1.15 #2 supersedes §13.1's PR 1 cell) |
+| Directory | `crm/contacts/*`, `crm/companies/*` | forms (7 and 5 labelled fields, `required`, field errors), index search/`Search`/`Clear`, row links (`row`/`quiet`), `Org ↗` and `View Organization ↗` as link / secondary button, `Promote` secondary with its `confirm()`, delete triggers and danger zone |
+| | `organizations/index`, `organizations/show` | links; member selects named "Person to add" / "Organization role" with field errors; `Add` primary; `Make Member/Admin` ghost; `Remove` ghost danger |
+| Finance | `billing/invoices/index` | `New Invoice` primary, search, status (named), `Filter` secondary, number links `row` |
+| | `billing/invoices/_form`, `_line_item`, `create`, `edit` | see A1.8; header fields labelled with field errors; `Create Invoice` / `Save Changes` primary, `Cancel` secondary |
+| | `billing/invoices/show` | `Edit` secondary, `Mark as Sent` primary, `Delete` danger trigger, `Pay Now` secondary, payment fields labelled ("Amount", "Notes"), `Record Payment` primary |
+| | `billing/client/index`, `billing/client/show`, `billing/payment/show` | `row` links, `Pay Now` (secondary per row, primary on the invoice page), the Stripe submit as `x-ui.button size="lg"` keeping `id="submit-btn"`; the Stripe iframe and `#payment-message` are untouched |
+| System | `admin/users/index` | `Invite User` primary, search, `Search`/`Clear`, `View` links, the invite modal's labelled field and buttons (hand-built modal behaviour unchanged) |
+| | `admin/users/show` | role group, `Update Roles` primary |
+| | `admin/roles/index`, `create`, `edit` | `New Role` primary, `Edit` link, `Delete` ghost danger; name field (hint, error), permission groups, `Create Role` / `Save Changes` primary, `Delete Role` danger trigger |
+| | `operator/cms/index`, `_form`, `create`, `edit` | `+ New Page`, row links, 3 labelled fields, `Publish` / `Save` primary, `Unpublish` secondary, `Delete Page` danger trigger and danger zone |
+| Consumer | `errors/403` | `Go back` secondary, `Dashboard` / `Sign in` primary; the accent `403` numeral stays for WP3 |
+
+### A1.10 Static census after WP1 (target views, `errors/403` included)
+
+| Measure | Baseline (`d87b5b1`) | After WP1 |
+|---|---:|---:|
+| `var(--accent)` primary fills (`#fff` on accent) | 36 (+2) | **0** |
+| `accent-legacy-accent` checkboxes | 7 sites | **0** (7 `x-ui.checkbox`) |
+| `outline-none` fields with no replacement focus | 44 | **0** |
+| `focus:ring-2` fields | 9 | **0** |
+| `<a>`, `<button>`, `<select>`, `<textarea>`, visible `<input>` hand-built in a target view | all | **0** (enforced by `BladeControlAdoptionTest`) |
+| `var(--accent)` text (figures, status pills, tags, the 403 numeral) | 25 (+1) | 8, all WP2/WP3 sites |
+| `$paginator->links()` on the vendor view | 9 | **0** (9 call sites on the Direction D view) |
+| Raw `var(--…)` references / inline `style=` in target views | 1,081 / 737 | 639 / 465 (controls only; the rest is WP3) |
+| `x-ui` invocations | 0 | button 84, link 46, input 35, select 17, textarea 8, checkbox 7, label 40, field-error 49 |
+
+### A1.11 Tests
+
+| Suite | Tests (assertions) | Covers |
+|---|---:|---|
+| `Unit/Ui/ButtonAndLinkComponentTest` | 22 (106) | button variants, danger trigger, rejected combinations, icon `aria-label`, sizes, disabled `<button>` and link, `href`, attribute and class passthrough, link variants, transition and focus ring, zero queries |
+| `Unit/Ui/FieldComponentsTest` | 37 (160) | input / select / textarea classes and focus ring, identity (simple name, explicit id wins, non-simple name throws), `old()` value, `aria-invalid`, `aria-describedby` merge and de-duplication, `error-key` lookup, ordered list with wildcard, forced `invalid`, disabled, `file`, label `for` / `required` / `sr-only`, field-error id, role, first-message order and absence, checkbox accent / checked / disabled / wrapped / group / invalid, zero queries |
+| `Unit/Ui/PaginationViewTest` | 15 (155) | application default for both views, `nav` name, prev / next URLs with the query string, numbered URLs, exactly one `aria-current`, URL parity with the vendor view on 5 pages, ellipsis and summary, compact and wide layouts, omitted unavailable direction, single page renders nothing, simple paginator, no `dark:` / palette / inline style, clean arrow names |
+| `Unit/Ui/AccessibilityContractDetectorTest` | 15 (19) | the contract detector catches an unlabeled input / select / textarea / checkbox / file, a duplicate id, a dangling `label[for]`, an error not associated with its field, a missing `aria-invalid`, a dangling `aria-describedby`, an orphan group error, and accepts the four name sources and the placeholder fallback |
+| `Unit/Configuration/BladeControlAdoptionTest` | 88 (444) | the PR 1 exit check: 39 target views each with no hand-built control and no legacy accent / checkbox / obsolete focus; the component seam has no hex, variable, inline style, palette, `dark:` or `transition-colors`; the exact focus ring on all six interactive components; no component reads the database or request |
+| `Feature/Ui/TargetFormAccessibilityTest` | 44 (175) | the contract on 30 real target pages (with a minimum labelable-control count each), `errors/403`, and 13 failed submissions (ticket create and replies, status, contact, company, invoice with row 2 invalid, payment, role create / edit, user roles, CMS page, organization member) |
+| `Feature/Ui/TargetAccessibleNamesTest` | 12 (211) | every §10.2 name, the preserved names, the three approved Finance changes, groups, and that the ticket time tracker markup is untouched |
+| `Feature/Billing/InvoiceLineItemFormTest` | 12 (95) | deterministic ids and names, first-row visible labels, remove name, `__INDEX__` template, errors lined up by key and old values kept, the **removed-middle-row regression** (next index 3, nine unique names, the pre-fix seed really collides), next index for four key shapes, unchanged submission, script has no inline style or row count |
+| **New total** | **245 (1,365)** | |
+
+Existing suites, unedited: Helpdesk (`tests/Feature/Tickets`), invoices (`Billing`), CRM, admin, CMS, `BladeShellTest`, `ShellContractTest`, `NavigationBuilderTest` and `InvitationTest`: with the new line-item suite, **387 passed (2,412 assertions)**, 96 s. **No existing assertion was flipped**: none pinned legacy style (§3.6), and no product or security assertion was touched. The theme contract tests (`DirectionDThemeContractTest`) are unchanged: no alias is retired.
+
+**`./dev check`** (run alone, after the focused evidence was stable): **All checks passed, exit 0.** CLI self-tests **196 assertions**; `git diff --check` pass (the untracked files, which it does not read, were scanned separately: no trailing whitespace); Pint pass (**319 files**, the new tests were reformatted once); frontend `npm run check` pass (`wayfinder:generate`, `tsc --noEmit`, ESLint, Prettier, **Vitest 99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,169 passed (12,116 assertions)**, 559 s, which includes the 245 new tests above; no existing test changed.
+
+### A1.12 Mutation checks
+
+Each defect was introduced on its own, the matching tests were run and confirmed to fail, and the file was restored (verified byte-identical with `cmp` against a scratchpad copy; no scratch artifact is left in the tree):
+
+| Mutation | Result |
+|---|---|
+| Removed `for="title"` from the `Subject` label in `tickets/create` | 3 tests fail: the target-page contract (`unnamed <input> name="title"`), the failed-submission contract, and the new-ticket name test |
+| Removed `focus-visible:outline-focus` from `x-ui.input` | 3 tests fail: the exact-focus-ring test, the field class contract, and the seam rule scan |
+| Made `x-ui.input` drop `{id}-error` from `aria-describedby` | 13 tests fail: the identity and merge tests, the error-key and wildcard tests, the detector's truthful-form test, and all 7 failed-submission contract cases |
+
+Separately, the first browser run proved the focus walk has teeth: it found the `x-ui.link` outline fade (A1.3).
+
+### A1.13 Browser evidence
+
+`tests/Browser/blade-theme-controls.spec.ts` (new, 15 tests): every route in **light and dark at 1440 and 390**; **no document-level horizontal overflow**; Tab through `main` with every focus stop required to show the 2px solid `focus` outline in the current theme's token (real transitions on); every visible field resting on `control-edge` over `surface`; primary actions computing to `ink` / `on-ink`; secondary to `surface` with `control-edge`; destructive triggers to `danger` and not `ink`; checkbox `accent-color` equal to the `accent` token and not `ink`. Colours are compared against the live `--ds-*` values per theme. Every target-control lookup is scoped to `#main-content` (the shell's utility bar has controls of its own, such as the timer pill, and a parallel spec can leave one running), and every page-header action (`New Ticket`, `+ New Contact`, `+ New Company`, `New Invoice`, `New Role`, `+ New Page`) is checked in every mode to be inside the viewport, on one line inside its own box, and reachable at its centre (A1.18). Routes:
+
+| Area | Routes |
+|---|---|
+| Helpdesk | `/operator/tickets` (filters, select-all and bulk bar), `/operator/tickets/reports`, an existing operator ticket page (reply, status, assignee), member `/tickets`, `/tickets/create` |
+| Directory | `/crm/contacts`, `/crm/contacts/create`, `/crm/companies`, `/crm/companies/create`, `/organizations`, a created company's edit page (danger trigger, danger-zone border, **the native `confirm()` text** and dismissal), a created contact's edit page |
+| Finance | `/billing/invoices`, `/billing/invoices/create` (the approved name "Description"), the line-item add / remove / add flow (unique ids, names `0, 2, 3`, "Unit Price", "Remove line item", focus on an added row), a created invoice's page (`Mark as Sent` ink, `Delete` danger, `Record Payment` ink, the approved name "Notes"), member `/my/invoices` |
+| System | `/admin/users` and the invite modal (id `invite-email` kept), `/admin/roles`, `/admin/roles/create` (the permission group and the selection accent), `/operator/cms`, `/operator/cms/create`, a created page's edit page |
+| Pagination | 26 companies created through the form: numbered pages, `aria-current` as the ink segment, summary, query string preserved on page 2, focus ring on a pagination link; the compact previous / next at 390 |
+| Required consumer | `errors/403`: the member requesting `/admin/users` (HTTP 403, `Go back` secondary, `Dashboard` ink) |
+
+**Recorded run** (`./dev test:e2e` with the default 3 workers): `blade-theme-controls.spec.ts` (15), `time-migration.spec.ts` and `blade-shell.spec.ts`: **3 specs, 39 tests, 39 passed, 3 workers, 3.4 minutes**. `time-migration.spec.ts` was **not edited** and its `/Start Timer/` names resolve (the ticket page that hosts the tracker changed; the tracker did not). **Product-data counts, before and after: projects 2 / 2, tasks 1 / 1, time entries 2 / 2 (unchanged)**; the spec's own records (companies, contacts, invoices, CMS pages, 26 pagination companies) are deleted through the application's DELETE routes in `afterEach` and the development database holds 0 companies, 0 contacts, 0 invoices, 0 CMS pages and 0 `e2e-wp1` roles afterwards. HTTP over the whole working window (iterations, screenshots and the recorded run): **0 `5xx`, 0 `429`, 0 `419`**; 15 expected `403`s (the 403 case and `blade-shell`'s); 54 `499`s, which are navigations aborted by the next `goto`. Earlier iterations of this spec failed for test reasons only (a shell link sharing a name, the date input's native calendar stop, a regex against un-normalised text) plus the real `x-ui.link` focus-fade defect fixed in A1.3.
+
+### A1.14 Visual evidence
+
+Screenshots (light and dark, 390 and 1440; the scratchpad, **not** in the repository) of: Helpdesk new-ticket form, member list and operator queue; Directory contact form, list and company edit with its danger zone; Finance invoice form, list and invoice page; System users list and role form (44 images). The author initially inspected 10 of the 44 images; the independent reviewer (A1.18) inspected all 44 (11 surfaces x light / dark x 1440 / 390). Reviewer findings: `New Ticket` and `New Invoice` overflowed their fixed-height button at 390 (fixed in the remediation, A1.18 R1); every other reviewed surface passed; field edges are visible in both themes; no generic blue or indigo control remains. The screenshots remain outside the repository. Reviewed: ink primary and semantic secondary buttons, `control-edge` field boundaries, the 2px focus ring (cyan in dark, teal in light), the danger trigger, no indigo or blue on any generic action, layout preserved. Not reviewed, by design: page-body colour (the legacy gray cards and text remain in both themes until WP3), status pills (WP2).
+
+### A1.15 Findings and deviations
+
+Deviations (recorded, not defects):
+
+1. **`App\Support\FieldState`.** A small static helper holds the §7.5 rules for five components (A1.3); the epic expected "no PHP beyond attribute handling".
+2. **The ticket time tracker is untouched.** §13.1's PR 1 column lists its start/stop buttons, but §9.9, §19 WP2 and R12 assign the script rework (`data-*` hooks, server-rendered states) to WP2, and migrating the buttons alone would rebuild markup through the script's inline-colour `innerHTML`. `time-migration.spec.ts` is green unedited.
+   **WP1 review ruling: the embedded ticket time tracker is WP2 scope. The earlier §13.1 PR 1 cell is superseded by this ruling.** Reasons: (a) its buttons were not among the 44 missing-focus sites that WP1's focus exit criterion counts; (b) they did not use the generic accent fill that WP1 retires (the `var(--accent)` primary-fill census excludes them); (c) partially migrating the Blade button markup in WP1 would leave the JavaScript-created tracker markup (the `innerHTML` strings) inconsistent with it; (d) leaving the tracker untouched does not prevent any WP1 exit criterion. The tracker code and `time-migration.spec.ts` are unchanged.
+3. **Field errors where a page had none.** Where an `x-ui` field is invalid-aware, its `{id}-error` must exist, so a `field-error` was added next to fields whose page never showed an inline error: `body`, `attachments`, `status`, `assignee_id` on the two ticket detail pages, the bulk bar's `action` / `assignee_id`, `user_id` / `role` on `organizations/show`, `amount` / `notes` on `billing/invoices/show`, and the header, quantity and unit-price fields of the invoice form. The message text is Laravel's own and unchanged, but a validation message that was previously swallowed on the member ticket page and `organizations/show` is now visible. Owner awareness, not a rule change.
+4. **A wrapped checkbox with a non-simple name needs no `id`** (the §7.3 checkbox row), so `checkbox` alone passes `requireId: false`; `input`, `select` and `textarea` still throw.
+5. **Visible column labels follow the first rendered row** (`$loop->first`), not `$i === 0`: after row 0 is removed and the submit fails, the old rule rendered no visible labels at all.
+6. **`min-w-45` on the operator queue search** (§12.3 assigns it to PR 3) because the inline `min-width:180px` style left with the field's inline styles.
+7. **The `<template>` row carries `__INDEX__` in `name`, `id` and `label[for]` but no `aria-describedby`**: a template row never has an error or a hint, so there is nothing to describe (the script replaces every `__INDEX__`, so a future hint would be covered).
+8. **`Pay Now` on the operator invoice page is secondary** (the literal reading of §8.3); it is primary where it is the page's own action (`billing/client/show`).
+9. **A WP1-scoped residue test**, `BladeControlAdoptionTest`, checks controls only (the PR 1 exit). It is not the §17 guard, which stays PR 4.
+
+Pre-existing defects found and **deliberately preserved** (each would be a behaviour change):
+
+- **`admin/roles/edit`: the `Delete Role` form is nested inside the update form (PRE-EXISTING, HIGH SEVERITY, OUT OF EPIC-016 WP1 SCOPE).** The earlier WP1 description of this defect ("the Delete Role button's form is the update form, so that button submits the update, not the delete") was inaccurate and is replaced by the following. Mechanism: Chromium parses one effective form; the nested form's boundary, and with it its `onsubmit` `confirm()`, are lost. The submitted payload contains both `_method=PUT` (the outer form's, first) and `_method=DELETE` (the inner form's, later), and PHP resolves the duplicate `_method` to the **last** value, `DELETE`. Because update and delete share `/admin/roles/{role}`, for a `roles.admin` user on a custom role **both "Save Changes" and "Delete Role" issue `DELETE`, with no confirmation**: an unassigned custom role can be deleted unexpectedly, and an assigned role refuses deletion ("Cannot delete ... assigned to N user(s)") instead of saving. Evidence: the independent review reproduced the parse and the payload in Chromium with a static fixture (no application submission, no database) and confirmed PHP's last-wins `parse_str` behaviour. WP1 did not introduce the nesting and did not change behaviour (the migration kept the structure and the `confirm()` exactly); it only makes `Delete Role` visually more prominent (the danger trigger). **Destination:** a dedicated System / admin behavioural hotfix **before WP2 starts**. Expected fix: move the delete form outside the update form, or use a valid external form through the `form=` attribute, with browser regression evidence for Save versus Delete and for the confirmation.
+- The queue filter placeholders read "All Statuss" / "All Prioritys" (copy; unchanged). Destination: a Helpdesk copy follow-up.
+- At 390 the invoice line-item quantity and unit-price columns are narrow (`col-span-2` / `col-span-3`); the geometry is as before. Destination: Finance product work.
+
+Non-blocking observations from the independent review (recorded, **not fixed** in WP1):
+
+| Observation | Destination |
+|---|---|
+| The "Choose Files" text sits high in the `h-9` file input (cosmetic) | WP3 geometry / field polish |
+| Bulk-bar field errors (`action`, `assignee_id`) render inside the bulk bar, which stays hidden after the redirect; the page-level error banner already shows `$errors->first()` | Helpdesk product work |
+| On `organizations/show` the `role` field-error could also surface a member role-update error (a hidden-input value; practically unreachable) | Directory product work |
+| The `mailto:` link on `crm/contacts/show` uses the `row` link variant, which adds `font-medium` | WP3 review |
+
+### A1.16 Left for the next packages
+
+- **WP2:** `x-ui.status` / `priority` / `alert` / `tag` and every status, priority, overdue, internal-note, role-type, flash and `#payment-message` presentation; the time tracker (`data-*` hooks, live semantics, `Start Timer` / `Stop` as `x-ui.button`); report figures; the MFA "Enabled" status.
+- **WP3:** every remaining raw colour variable and inline style in the target views (639 / 465 after WP1), the dead `hover:legacy-bg-surface` classes, the 403 numeral, the invite-modal scrim, the 12px to 8px card radius, `errors/403` colour, the `--ds-*` value pin and the palette-conformance and reference-comparison browser checks.
+- **WP4:** alias retirement and the contract-test absence pins, the vendor pagination `@source` line, the permanent two-level guard and the final census.
+
+### A1.17 Files changed
+
+**New:** `app/Support/FieldState.php`; `resources/views/components/ui/{button,link,input,select,textarea,checkbox,label,field-error}.blade.php`; `resources/views/pagination/{direction-d,simple-direction-d}.blade.php`; `resources/views/billing/invoices/_line_item.blade.php`; tests `tests/Unit/Ui/{ButtonAndLinkComponentTest,FieldComponentsTest,PaginationViewTest,AccessibilityContractDetectorTest}.php`, `tests/Unit/Configuration/BladeControlAdoptionTest.php`, `tests/Feature/Ui/{TargetFormAccessibilityTest,TargetAccessibleNamesTest}.php`, `tests/Feature/Billing/InvoiceLineItemFormTest.php`, `tests/Support/UiHtmlHelpers.php`, `tests/Browser/blade-theme-controls.spec.ts`.
+**Changed:** `app/Providers/AppServiceProvider.php` (pagination defaults); 36 existing target views (A1.9, the §13 PR 1 inventory).
+**Docs:** this amendment (including A1.18). EPIC-016 stays **Planned**. The review remediation changed two of the 36 views (`tickets/index`, `billing/invoices/index`: `class="shrink-0"`) and the Playwright spec; the path count is unchanged.
+**Scope check against `d07384d`:** 60 paths (47 views, 10 test files, `FieldState`, `AppServiceProvider`, this document); nothing under `resources/js`, `resources/css`, `routes`, `database`, `config`, `.github` or any manifest, and neither the time tracker nor the status badge partials.
+**Not changed:** `app.css`, any token, any file under `resources/js`, routes, controllers, policies, validation, models, migrations, dependencies, CI, `docs/epics/README.md`, the roadmap, the time tracker, the status badge partials.
+
+### A1.18 Independent review and remediation
+
+**Verdict: needs small remediation.** The review approved the architecture (the `x-ui` components, `App\Support\FieldState`, the names, errors and focus contracts, the action hierarchy, checkboxes, pagination, the invoice line-item index fix), upheld the ruling that `Pay Now` is secondary on the operator invoice page (A1.15 #8) and approved `min-w-45` on the queue search (A1.15 #6). Its screenshot findings are in A1.14, its Delete Role finding in A1.15, its pagination-name finding in A1.7, its non-blocking observations in A1.15, and the time-tracker ruling in A1.15 #2.
+
+**Independent evidence.** The reviewer's Pest run: **236 passed (954 assertions)**. The reviewer's Playwright run: **27 passed, 1 failed**; the failure was `getByLabel('Description')` resolving to 3 elements, including the shell timer pill "Stop timer: First paint regression with a long description" created by `time-migration.spec.ts` running in parallel (a test-locator defect, not a product defect).
+
+**Remediation applied.**
+
+- **R1, 390px header actions (production).** `New Ticket` (`tickets/index`) and `New Invoice` (`billing/invoices/index`) wrapped to two lines inside the fixed `h-9` button at 390. Each now passes `class="shrink-0"` (a layout class only), the pattern `Invite User` already used. `New Role`, `+ New Page`, `+ New Contact` and `+ New Company` were measured with the new assertion first, on the unfixed markup, in all four modes (light / dark x 1440 / 390): they do not wrap, so they are unchanged. The new assertion failed on the unfixed `New Ticket` and `New Invoice` (label on 2 lines, expected 1) and passes after the fix.
+- **Browser assertion.** `expectHeaderActionIntact` in `blade-theme-controls.spec.ts`, called for all six header actions in every mode: the control is visible, its left edge is at or after 0 and its right edge at or before the viewport width, the label occupies exactly one line box, the label lies inside the control's top and bottom edges, and `elementFromPoint` at the control's centre is the control.
+- **R2, locator interference (test).** Every `page.getBy*` lookup of a target control in the spec (96) is now `inMain(page).getBy*`, with `inMain = page.locator('#main-content')`, so shell controls (timer pill, `Start timer`, navigation, user menu) cannot collide; the shell-level assertions the spec makes (`#main-content` visibility, the theme attribute, `hasHorizontalOverflow`) stay on `page`. The new-ticket description lookup also asserts the field is the `textarea` named `description` with id `description`. No `.first()` / `.nth()` was added, and no retry, sleep or worker change.
+- **R3 to R7, documentation only:** A1.5, A1.7, A1.14, A1.15 (time tracker, Delete Role, observations) and the status block above, as recorded in those sections.
+
+**Validation after remediation.** `git diff --check` clean. Focused Pest (`tests/Unit/Ui`, `BladeControlAdoptionTest`, `tests/Feature/Ui`, `tests/Feature/Billing`): **264 passed (1,409 assertions)**, the 245 new tests (1,365 assertions) plus the 19 existing Billing tests; with `tests/Feature/Tickets` added, 425 passed (2,009 assertions). Focused Playwright (`blade-theme-controls.spec.ts`, `time-migration.spec.ts`, default workers, which was 2): **28 passed, 0 failed, 0 skipped, 3.1 minutes**; product-data counts before and after: projects 2 / 2, tasks 1 / 1, time entries 2 / 2 (unchanged). `./dev check` (alone): **All checks passed, exit 0**; CLI self-tests 196 assertions; `git diff --check` pass; Pint pass (319 files, no changes); frontend `npm run check` pass (Vitest 99 files / 1,684 tests, `vite build` 424 modules); full Pest **2,169 passed (12,116 assertions)**. The test counts in A1.11 are unchanged: the remediation added assertions to the existing Playwright spec (still 15 tests) and no Pest test.
