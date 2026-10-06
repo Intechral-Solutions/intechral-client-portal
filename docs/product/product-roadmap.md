@@ -56,7 +56,7 @@ Each item becomes one or more implementation epics before work begins, consisten
 | Bucket | Items | Class |
 |--------|-------|-------|
 | **NOW** | Critical Helpdesk hardening · Product/UX rebase (this) · Claude Design brief and exploration | Security/integrity · Direction · UX foundation |
-| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) | UX foundation · Platform capability |
+| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) · Blade workspace theme and control adoption (EPIC-016, Planned) | UX foundation · Platform capability · Hardening |
 | **NEXT** | Tasks overhaul · Timer UX improvement · Projects UX expansion | Product functionality |
 | **LATER** | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS evolution | Product functionality (+ first platform-capability consumers) |
 | **FUTURE** | Reusable approvals, notifications, global search, integrations, external API, observability, audit/history, automation · Deployment/release engineering (trigger-based) | Platform capability |
@@ -131,6 +131,28 @@ LATER items are listed in their recommended order but are separable; see [Depend
 
 Semantic tokens; typography; spacing; surfaces and elevation; tables (compact and comfortable); dialogs and drawers; forms; alerts and toasts; status language; motion; Light/Dark; responsive rules; empty/loading/error states. Built on the existing shadcn/ui + Tailwind 4 foundation ([ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)), restyled, not replaced wholesale. Existing React pages (dashboard, profile, time, projects, tasks) are migrated onto the new system as their redesign slices land.
 
+### Blade workspace theme and control adoption
+
+**Class:** Hardening / design-system adoption.
+
+**Vehicle:** [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (**Planned** 2026-10-05).
+
+The Blade page bodies of Helpdesk, Directory, Finance and System style themselves inline: the legacy indigo `--accent` on actions, legacy gray variables for text, borders and surfaces, and hex status pills. They use no Direction D semantic utilities, 44 of their field sites have no visible keyboard focus, and their statuses ignore the theme.
+
+EPIC-016 makes these workspaces theme-first, as a presentation-system migration. It establishes:
+- **shared Blade semantic controls** that mirror the Direction D React primitives (ink primary actions, `control-edge` fields, the `focus` outline);
+- the **accessibility fixes** (focus, labels, errors, names);
+- **semantic statuses** (glyph + label);
+- **theme-driven colour normalization**: every application colour in those workspaces becomes a semantic Tailwind utility or a documented exception;
+- **retirement** of the legacy accent aliases;
+- a permanent **architecture guard**.
+
+It is delivered in four PRs: controls and accessibility; status; theme normalization; retirement and guard.
+
+It does **not** migrate renderers, change routes or redesign the modules: that stays with [Helpdesk MVP](#later--helpdesk-mvp), [Directory](#later--directory) and [Finance](#later--finance) (roadmap principle 4).
+
+**Depends on:** shell and design system (EPIC-013, Done); uses Projects/Tasks (EPIC-014, EPIC-015) as the visual reference.
+
 ### Lightweight CI baseline
 
 **Class:** Platform capability.
@@ -178,6 +200,8 @@ These are the first product slices on the new shell. They exercise the design sy
 **Vehicle:** [EPIC-015: Projects UX Expansion](../epics/EPIC-015-projects-ux-expansion.md) (**Planned** 2026-10-02). It locks derived project health, explicit milestone completion, budget metadata visible only with effective Settings/Edit access, the Overview as the canonical project landing, a project-scoped Tasks list on the canonical task query, one project-time definition, and the stale board-assignee time fix. Dedicated stakeholder/customer presentation is deferred (EPIC-015 §22 records the missing customer-product roadmap item).
 
 > **Forward note (2026-10-05).** EPIC-015 is **Done** (2026-10-05; Planned 2026-10-02, In Progress 2026-10-04, Verified 2026-10-05): WP1–WP6 are merged (the optional WP5 Board Complete/Reopen, per-surface drawer defaults and Project Time tab included), all 16 §19 criteria are satisfied, and WP6 merged as PR #22 (merge commit `76be9cd`) with green PR CI and green `main` CI. The customer-product gap (EPIC-015 §22) and a post-EPIC global design-token / UI consistency audit (Helpdesk, Directory, Finance, System; EPIC-015 A6.16) are still unplaced and not started.
+>
+> **Forward note (2026-10-05, later).** The consistency audit has run (on `d87b5b1`) and is placed: its remediation is [Blade workspace theme and control adoption](#blade-workspace-theme-and-control-adoption), vehicle [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned). The customer-product gap remains unplaced.
 
 ---
 

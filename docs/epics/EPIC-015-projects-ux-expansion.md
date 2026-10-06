@@ -1901,6 +1901,14 @@ No finding is blocking.
 
 Out of EPIC-015 scope and **not started**: controls under **Helpdesk, Directory, Finance and System** still use blue or legacy Tailwind styling instead of Direction D's green/teal semantic control language. A dedicated audit should cover direct Tailwind palette use where semantic tokens belong; legacy control classes; shared-primitive adoption; forms, buttons, badges and focus rings; light/dark parity; and which colour differences are intentional semantics versus accidents. It needs its own roadmap placement and contract. **Projects-owned surfaces were checked in the WP6 visual closeout and carry no legacy blue control** (WP4 already normalized the two it found).
 
+> **Forward note (2026-10-05).** The audit has run, read-only on `d87b5b1`, and its destination is [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned).
+> - The "blue" is the legacy indigo `--accent` (`#4F46E5` / `#6366F1`), hand-written into Blade page bodies that have no shared control layer and use no Direction D semantic utilities.
+> - The audit also found 44 Blade field sites with no visible keyboard focus.
+> - EPIC-016 adds the shared Blade controls and normalizes those workspaces' colours to the semantic Tailwind theme, in four PRs.
+> - The owner has since ruled that Direction D **primary actions are ink**. Teal is for links, focus, selection and informational accent, and green only for success. The phrase "green/teal semantic control language" above is therefore superseded.
+>
+> The paragraph above is unchanged.
+
 **Visual closeout (WP6).** Chromium screenshots of the index, Overview, Board, Tasks, Milestones, Time, Create and Settings at 1440 and 390 (light), plus Overview, Board and Time at 1440 dark, on a seeded project. They were taken by a temporary spec and config in the container's `/tmp`, outside the repository, with cleanup through `cleanup.trackProject`; product counts were unchanged. Observed: one Direction D hierarchy across the workspace (overline, name `h1`, lifecycle, Settings, the strip on the strata); green/teal state colour only; lifecycle and health in separate positions with glyph and text; the five links fit at 390; the drawer follows the surface defaults (open on index, Overview, Milestones, Settings; collapsed on Board, Tasks, Time, where the breadcrumb carries the view menu); the Board scrolls inside its own region at 390; the Time page reads header → scope line → table or empty state. No defect. (The rail and drawer appear to stop at the viewport height in full-page captures because they are `position: sticky` at `100dvh`; that is a screenshot artifact, not layout.)
 
 ### A6.17 Local validation evidence
