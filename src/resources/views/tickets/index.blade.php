@@ -9,14 +9,12 @@
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Track the status of your support requests.</p>
         </div>
         @can('tickets.create')
-        <a href="{{ route('tickets.create') }}"
-           class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-           style="background-color: var(--accent); color: #fff;">
+        <x-ui.button :href="route('tickets.create')" class="shrink-0">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
             </svg>
             New Ticket
-        </a>
+        </x-ui.button>
         @endcan
     </div>
 
@@ -29,27 +27,17 @@
 
     {{-- Filters --}}
     <form method="GET" action="{{ route('tickets.index') }}" class="mb-6 flex flex-wrap gap-2">
-        <input type="search" name="search" value="{{ request('search') }}"
-               placeholder="Search tickets&hellip;"
-               class="block rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-        <select name="status"
-                class="rounded-lg border px-3 py-2 text-sm outline-none"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <x-ui.input type="search" name="search" :value="request('search')"
+                    placeholder="Search tickets&hellip;" />
+        <x-ui.select name="status" aria-label="Status">
             <option value="">All statuses</option>
             @foreach (['open', 'in_progress', 'pending_user', 'resolved', 'closed'] as $s)
             <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ str_replace('_', ' ', ucfirst($s)) }}</option>
             @endforeach
-        </select>
-        <button type="submit"
-                class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-                style="border-color: var(--border-base); color: var(--text-secondary);">
-            Filter
-        </button>
+        </x-ui.select>
+        <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
         @if (request()->hasAny(['search', 'status']))
-        <a href="{{ route('tickets.index') }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-           style="border-color: var(--border-base); color: var(--text-secondary);">Clear</a>
+        <x-ui.button :href="route('tickets.index')" variant="secondary">Clear</x-ui.button>
         @endif
     </form>
 
@@ -82,9 +70,7 @@
                         {{ $ticket->created_at->diffForHumans() }}
                     </td>
                     <td class="px-6 py-4 text-right">
-                        <a href="{{ route('tickets.show', $ticket) }}"
-                           class="text-sm font-medium transition-colors hover:underline"
-                           style="color: var(--accent);">View</a>
+                        <x-ui.link :href="route('tickets.show', $ticket)" class="text-sm font-medium">View</x-ui.link>
                     </td>
                 </tr>
                 @empty

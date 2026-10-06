@@ -8,9 +8,7 @@
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Organizations</h1>
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Client organizations promoted from the CRM.</p>
         </div>
-        <a href="{{ route('crm.companies.index') }}"
-           class="rounded-lg border px-4 py-2 text-sm font-medium"
-           style="border-color: var(--border-base); color: var(--text-secondary);">View Companies</a>
+        <x-ui.button :href="route('crm.companies.index')" variant="secondary">View Companies</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -34,23 +32,22 @@
                 @forelse ($organizations as $org)
                 <tr>
                     <td class="px-4 py-3 font-medium">
-                        <a href="{{ route('organizations.show', $org) }}" class="hover:underline" style="color: var(--accent);">
+                        <x-ui.link variant="row" :href="route('organizations.show', $org)">
                             {{ $org->name }}
-                        </a>
+                        </x-ui.link>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs" style="color: var(--text-muted);">{{ $org->slug }}</td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $org->owner->name }}</td>
                     <td class="px-4 py-3 text-right" style="color: var(--text-secondary);">{{ $org->members_count }}</td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{{ route('organizations.show', $org) }}"
-                           class="text-xs hover:underline" style="color: var(--text-secondary);">Manage</a>
+                        <x-ui.link variant="quiet" :href="route('organizations.show', $org)" class="text-xs">Manage</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
                     <td colspan="5" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">
                         No organizations yet.
-                        <a href="{{ route('crm.companies.index') }}" class="hover:underline" style="color: var(--accent);">Promote a company</a>
+                        <x-ui.link :href="route('crm.companies.index')">Promote a company</x-ui.link>
                         to get started.
                     </td>
                 </tr>

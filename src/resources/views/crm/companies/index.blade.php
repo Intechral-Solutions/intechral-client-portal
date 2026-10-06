@@ -8,9 +8,7 @@
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Companies</h1>
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">CRM company records.</p>
         </div>
-        <a href="{{ route('crm.companies.create') }}"
-           class="rounded-lg px-4 py-2 text-sm font-medium"
-           style="background-color: var(--accent); color: #fff;">+ New Company</a>
+        <x-ui.button :href="route('crm.companies.create')">+ New Company</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -21,14 +19,10 @@
 
     {{-- Search --}}
     <form method="GET" class="mb-6 flex gap-2">
-        <input type="text" name="search" value="{{ $search }}" placeholder="Search by name…"
-               class="w-64 rounded-lg border px-3 py-2 text-sm outline-none"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium"
-                style="background-color: var(--accent); color: #fff;">Search</button>
+        <x-ui.input type="text" name="search" :value="$search" placeholder="Search by name…" class="w-64" />
+        <x-ui.button type="submit" variant="secondary">Search</x-ui.button>
         @if ($search)
-        <a href="{{ route('crm.companies.index') }}" class="rounded-lg border px-4 py-2 text-sm"
-           style="border-color: var(--border-base); color: var(--text-secondary);">Clear</a>
+        <x-ui.button :href="route('crm.companies.index')" variant="secondary">Clear</x-ui.button>
         @endif
     </form>
 
@@ -47,9 +41,9 @@
                 @forelse ($companies as $company)
                 <tr>
                     <td class="px-4 py-3 font-medium">
-                        <a href="{{ route('crm.companies.show', $company) }}" class="hover:underline" style="color: var(--accent);">
+                        <x-ui.link variant="row" :href="route('crm.companies.show', $company)">
                             {{ $company->name }}
-                        </a>
+                        </x-ui.link>
                     </td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">
                         {{ $company->website ? parse_url($company->website, PHP_URL_HOST) : '—' }}
@@ -57,15 +51,13 @@
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $company->phone ?? '—' }}</td>
                     <td class="px-4 py-3 text-center">
                         @if ($company->isPromoted())
-                        <a href="{{ route('organizations.show', $company->organization) }}"
-                           class="text-xs font-medium hover:underline" style="color: var(--text-success);">Org ↗</a>
+                        <x-ui.link :href="route('organizations.show', $company->organization)" class="text-xs font-medium">Org ↗</x-ui.link>
                         @else
                         <span class="text-xs" style="color: var(--text-muted);">—</span>
                         @endif
                     </td>
                     <td class="px-4 py-3 text-right">
-                        <a href="{{ route('crm.companies.edit', $company) }}"
-                           class="text-xs hover:underline" style="color: var(--text-secondary);">Edit</a>
+                        <x-ui.link variant="quiet" :href="route('crm.companies.edit', $company)" class="text-xs">Edit</x-ui.link>
                     </td>
                 </tr>
                 @empty

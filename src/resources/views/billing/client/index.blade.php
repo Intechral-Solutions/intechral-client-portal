@@ -40,10 +40,9 @@
                 @endphp
                 <tr>
                     <td class="px-4 py-3">
-                        <a href="{{ route('billing.client.invoices.show', $invoice) }}"
-                           class="font-mono font-medium hover:underline" style="color: var(--accent);">
+                        <x-ui.link variant="row" :href="route('billing.client.invoices.show', $invoice)" class="font-mono">
                             {{ $invoice->invoice_number }}
-                        </a>
+                        </x-ui.link>
                     </td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $invoice->issued_at->format('M j, Y') }}</td>
                     <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium' : '' }}"
@@ -61,9 +60,7 @@
                     </td>
                     <td class="px-4 py-3 text-right">
                         @if ($invoice->isPayable())
-                        <a href="{{ route('billing.invoices.pay', $invoice) }}"
-                           class="rounded-lg px-3 py-1 text-xs font-medium"
-                           style="background-color: var(--accent); color: #fff;">Pay Now</a>
+                        <x-ui.button :href="route('billing.invoices.pay', $invoice)" variant="secondary" size="sm">Pay Now</x-ui.button>
                         @endif
                     </td>
                 </tr>

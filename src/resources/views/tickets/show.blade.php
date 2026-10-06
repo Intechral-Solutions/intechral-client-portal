@@ -4,14 +4,12 @@
 <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 space-y-6">
 
     {{-- Back --}}
-    <a href="{{ route('tickets.index') }}"
-       class="inline-flex items-center gap-1 text-sm transition-colors hover:underline"
-       style="color: var(--text-secondary);">
+    <x-ui.link variant="quiet" :href="route('tickets.index')" class="inline-flex items-center gap-1 text-sm">
         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
         </svg>
         Back to tickets
-    </a>
+    </x-ui.link>
 
     {{-- Flash --}}
     @if (session('status'))
@@ -46,15 +44,13 @@
                     <p class="text-xs font-semibold mb-2" style="color: var(--text-secondary);">Attachments</p>
                     <div class="flex flex-wrap gap-2">
                         @foreach ($ticket->attachments as $att)
-                        <a href="{{ route('tickets.attachment.download', $att) }}"
-                           class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors hover:legacy-bg-surface"
-                           style="border-color: var(--border-base); color: var(--text-secondary);">
+                        <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
                             <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
                             </svg>
                             {{ $att->filename }}
-                            <span style="color: var(--text-secondary);">({{ $att->formattedSize() }})</span>
-                        </a>
+                            <span class="font-normal text-text-secondary">({{ $att->formattedSize() }})</span>
+                        </x-ui.button>
                         @endforeach
                     </div>
                 </div>
@@ -83,11 +79,9 @@
                 @if ($reply->attachments->isNotEmpty())
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($reply->attachments as $att)
-                    <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:legacy-bg-surface"
-                       style="border-color: var(--border-base); color: var(--text-secondary);">
+                    <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
-                    </a>
+                    </x-ui.button>
                     @endforeach
                 </div>
                 @endif
@@ -100,24 +94,19 @@
                 <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">Add Reply</h2>
                 <form method="POST" action="{{ route('tickets.replies.store', $ticket) }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
-                    <textarea name="body" rows="4" required placeholder="Your reply&hellip;"
-                              class="block w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 resize-y"
-                              style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);"></textarea>
+                    <x-ui.textarea name="body" rows="4" required placeholder="Your reply&hellip;" class="w-full"></x-ui.textarea>
+                    <x-ui.field-error for="body" />
                     @can('tickets.assign')
-                    <label class="flex cursor-pointer items-center gap-2 text-sm" style="color: var(--text-secondary);">
-                        <input type="checkbox" name="is_internal" value="1" class="h-4 w-4 rounded accent-legacy-accent">
-                        Internal note (not visible to submitter)
-                    </label>
+                    <x-ui.checkbox name="is_internal" value="1">Internal note (not visible to submitter)</x-ui.checkbox>
                     @endcan
-                    <div>
-                        <input type="file" name="attachments[]" multiple class="text-sm" style="color: var(--text-secondary);">
-                        <p class="mt-1 text-xs" style="color: var(--text-secondary);">Up to 10 files, 20 MB each.</p>
+                    <div class="space-y-2">
+                        <x-ui.input type="file" name="attachments[]" id="attachments" multiple
+                                    aria-label="Attachments" aria-describedby="attachments-hint"
+                                    :error-key="['attachments', 'attachments.*']" />
+                        <p id="attachments-hint" class="text-xs" style="color: var(--text-secondary);">Up to 10 files, 20 MB each.</p>
+                        <x-ui.field-error for="attachments" :error-key="['attachments', 'attachments.*']" />
                     </div>
-                    <button type="submit"
-                            class="rounded-lg px-5 py-2 text-sm font-medium transition-colors"
-                            style="background-color: var(--accent); color: #fff;">
-                        Post Reply
-                    </button>
+                    <x-ui.button type="submit">Post Reply</x-ui.button>
                 </form>
             </div>
             @endif

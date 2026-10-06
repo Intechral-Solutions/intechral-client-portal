@@ -5,14 +5,12 @@
 
     {{-- Header --}}
     <div>
-        <a href="{{ route('users.index') }}"
-           class="mb-4 inline-flex items-center gap-1 text-sm transition-colors hover:underline"
-           style="color: var(--text-secondary);">
+        <x-ui.link variant="quiet" :href="route('users.index')" class="mb-4 inline-flex items-center gap-1 text-sm">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
             </svg>
             Back to Users
-        </a>
+        </x-ui.link>
         <div class="flex items-start justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $user->name }}</h1>
@@ -117,26 +115,24 @@
         @can('users.manage')
         <aside>
             <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Roles</h2>
+                <h2 id="user-roles-heading" class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Roles</h2>
                 <form method="POST" action="{{ route('users.roles.update', $user) }}">
                     @csrf
                     @method('PUT')
-                    <div class="space-y-2 mb-4">
+                    <div id="user-roles-group" role="group" aria-labelledby="user-roles-heading"
+                         @if ($errors->has('roles') || $errors->has('roles.*')) aria-describedby="user-roles-group-error" @endif
+                         class="space-y-2 mb-4">
                         @foreach ($allRoles as $role)
                         <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
                                style="border-color: var(--border-base);">
-                            <input type="checkbox" name="roles[]" value="{{ $role->name }}"
-                                   {{ $user->hasRole($role->name) ? 'checked' : '' }}
-                                   class="h-4 w-4 rounded accent-legacy-accent">
+                            <x-ui.checkbox name="roles[]" value="{{ $role->name }}"
+                                           :checked="$user->hasRole($role->name)" />
                             <span style="color: var(--text-primary);">{{ $role->name }}</span>
                         </label>
                         @endforeach
                     </div>
-                    <button type="submit"
-                            class="w-full rounded-lg py-2 text-sm font-medium transition-colors"
-                            style="background-color: var(--accent); color: #fff;">
-                        Update Roles
-                    </button>
+                    <x-ui.field-error for="user-roles-group" :error-key="['roles', 'roles.*']" class="mb-4" />
+                    <x-ui.button type="submit" class="w-full">Update Roles</x-ui.button>
                 </form>
             </section>
         </aside>

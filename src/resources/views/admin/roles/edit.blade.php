@@ -5,14 +5,12 @@
 
     {{-- Header --}}
     <div class="mb-8">
-        <a href="{{ route('roles.index') }}"
-           class="mb-4 inline-flex items-center gap-1 text-sm transition-colors hover:underline"
-           style="color: var(--text-secondary);">
+        <x-ui.link variant="quiet" :href="route('roles.index')" class="mb-4 inline-flex items-center gap-1 text-sm">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
             </svg>
             Back to Roles
-        </a>
+        </x-ui.link>
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $role->name }}</h1>
             @if ($isBuiltIn)
@@ -43,8 +41,9 @@
         @method('PUT')
 
         {{-- Permissions --}}
-        <div>
-            <p class="text-sm font-medium mb-3" style="color: var(--text-primary);">Permissions</p>
+        <div id="permissions-group" role="group" aria-labelledby="permissions-heading"
+             @if ($errors->has('permissions') || $errors->has('permissions.*')) aria-describedby="permissions-group-error" @endif>
+            <p id="permissions-heading" class="text-sm font-medium mb-3" style="color: var(--text-primary);">Permissions</p>
             @foreach ($grouped as $module => $permissions)
             <div class="mb-6">
                 <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">
@@ -55,9 +54,7 @@
                     @php $checked = in_array($permission, old('permissions', $assigned)); @endphp
                     <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
                            style="border-color: var(--border-base);">
-                        <input type="checkbox" name="permissions[]" value="{{ $permission }}"
-                               {{ $checked ? 'checked' : '' }}
-                               class="h-4 w-4 rounded accent-legacy-accent">
+                        <x-ui.checkbox name="permissions[]" value="{{ $permission }}" :checked="$checked" />
                         <span style="color: var(--text-primary);">{{ Str::after($permission, '.') }}</span>
                     </label>
                     @endforeach
@@ -65,19 +62,12 @@
             </div>
             @endforeach
         </div>
+        <x-ui.field-error for="permissions-group" :error-key="['permissions', 'permissions.*']" />
 
         {{-- Submit --}}
         <div class="flex items-center gap-3 pt-2">
-            <button type="submit"
-                    class="rounded-lg px-5 py-2 text-sm font-medium transition-colors"
-                    style="background-color: var(--accent); color: #fff;">
-                Save Changes
-            </button>
-            <a href="{{ route('roles.index') }}"
-               class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-               style="color: var(--text-secondary);">
-                Cancel
-            </a>
+            <x-ui.button type="submit">Save Changes</x-ui.button>
+            <x-ui.button :href="route('roles.index')" variant="ghost">Cancel</x-ui.button>
 
             @can('roles.admin')
             @if (! $isBuiltIn)
@@ -85,11 +75,7 @@
                   onsubmit="return confirm('Delete role \'{{ addslashes($role->name) }}\'?')">
                 @csrf
                 @method('DELETE')
-                <button type="submit"
-                        class="rounded-lg px-5 py-2 text-sm font-medium transition-colors hover:legacy-bg-surface"
-                        style="color: var(--text-danger);">
-                    Delete Role
-                </button>
+                <x-ui.button type="submit" variant="secondary" tone="danger">Delete Role</x-ui.button>
             </form>
             @endif
             @endcan

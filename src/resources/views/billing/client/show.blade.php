@@ -5,18 +5,16 @@
 
     <div class="mb-6 flex items-start justify-between">
         <div>
-            <a href="{{ route('billing.client.invoices.index') }}" class="inline-flex items-center gap-1 text-sm" style="color: var(--text-secondary);">
+            <x-ui.link variant="quiet" :href="route('billing.client.invoices.index')" class="inline-flex items-center gap-1 text-sm">
                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
                 </svg>
                 My Invoices
-            </a>
+            </x-ui.link>
             <h1 class="mt-1 text-2xl font-semibold font-mono" style="color: var(--text-primary);">{{ $invoice->invoice_number }}</h1>
         </div>
         @if ($invoice->isPayable())
-        <a href="{{ route('billing.invoices.pay', $invoice) }}"
-           class="shrink-0 rounded-lg px-4 py-2 text-sm font-medium mt-6"
-           style="background-color: var(--accent); color: #fff;">Pay Now</a>
+        <x-ui.button :href="route('billing.invoices.pay', $invoice)" class="mt-6 shrink-0">Pay Now</x-ui.button>
         @endif
     </div>
 

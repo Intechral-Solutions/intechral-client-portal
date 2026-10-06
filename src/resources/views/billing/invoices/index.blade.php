@@ -9,14 +9,12 @@
             <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage client invoices and payments.</p>
         </div>
         @can('create', \App\Models\Invoice::class)
-        <a href="{{ route('billing.invoices.create') }}"
-           class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
-           style="background-color: var(--accent); color: #fff;">
+        <x-ui.button :href="route('billing.invoices.create')" class="shrink-0">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
             </svg>
             New Invoice
-        </a>
+        </x-ui.button>
         @endcan
     </div>
 
@@ -28,18 +26,15 @@
 
     {{-- Filters --}}
     <form method="GET" class="mb-6 flex flex-wrap gap-3">
-        <input type="search" name="search" value="{{ request('search') }}" placeholder="Search invoices or clients…"
-               class="rounded-lg border px-3 py-2 text-sm outline-none flex-1 min-w-48"
-               style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-        <select name="status" class="rounded-lg border px-3 py-2 text-sm outline-none"
-                style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+        <x-ui.input type="search" name="search" :value="request('search')" placeholder="Search invoices or clients…"
+                    class="min-w-48 flex-1" />
+        <x-ui.select name="status" aria-label="Status">
             <option value="">All statuses</option>
             @foreach (['draft', 'sent', 'paid', 'overdue', 'cancelled'] as $s)
             <option value="{{ $s }}" @selected(request('status') === $s)>{{ ucfirst($s) }}</option>
             @endforeach
-        </select>
-        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium"
-                style="background-color: var(--accent); color: #fff;">Filter</button>
+        </x-ui.select>
+        <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
     </form>
 
     <div class="rounded-xl border overflow-hidden"
@@ -69,9 +64,7 @@
                 @endphp
                 <tr class="hover:opacity-90 transition-opacity">
                     <td class="px-4 py-3">
-                        <a href="{{ route('billing.invoices.show', $invoice) }}"
-                           class="font-mono font-medium hover:underline"
-                           style="color: var(--accent);">{{ $invoice->invoice_number }}</a>
+                        <x-ui.link variant="row" :href="route('billing.invoices.show', $invoice)" class="font-mono">{{ $invoice->invoice_number }}</x-ui.link>
                     </td>
                     <td class="px-4 py-3" style="color: var(--text-primary);">{{ $invoice->client->name }}</td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $invoice->issued_at->format('M j, Y') }}</td>

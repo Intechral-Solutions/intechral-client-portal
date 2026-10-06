@@ -5,7 +5,7 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <a href="{{ route('operator.cms.index') }}" class="text-sm hover:underline" style="color: var(--text-secondary);">&larr; Pages</a>
+            <x-ui.link variant="quiet" :href="route('operator.cms.index')" class="text-sm">&larr; Pages</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $page->title }}</h1>
             <div class="mt-1 flex items-center gap-3">
                 <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
@@ -14,8 +14,7 @@
                     {{ $page->isPublished() ? 'Published' : 'Draft' }}
                 </span>
                 @if ($page->isPublished())
-                <a href="{{ route('cms.show', $page->slug) }}" target="_blank"
-                   class="text-xs hover:underline" style="color: var(--accent);">View live ↗</a>
+                <x-ui.link :href="route('cms.show', $page->slug)" target="_blank" class="text-xs">View live ↗</x-ui.link>
                 @endif
             </div>
         </div>
@@ -23,14 +22,12 @@
             @if ($page->isPublished())
             <form method="POST" action="{{ route('operator.cms.unpublish', $page) }}">
                 @csrf
-                <button type="submit" class="rounded-lg border px-4 py-2 text-sm font-medium"
-                        style="border-color: var(--border-base); color: var(--text-secondary);">Unpublish</button>
+                <x-ui.button type="submit" variant="secondary">Unpublish</x-ui.button>
             </form>
             @else
             <form method="POST" action="{{ route('operator.cms.publish', $page) }}">
                 @csrf
-                <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium"
-                        style="background-color: var(--accent); color: #fff;">Publish</button>
+                <x-ui.button type="submit">Publish</x-ui.button>
             </form>
             @endif
         </div>
@@ -47,22 +44,19 @@
             @csrf @method('PUT')
             @include('operator.cms._form')
             <div class="flex gap-3 pt-2">
-                <button type="submit" class="rounded-lg px-5 py-2 text-sm font-medium"
-                        style="background-color: var(--accent); color: #fff;">Save</button>
-                <a href="{{ route('operator.cms.index') }}" class="rounded-lg border px-5 py-2 text-sm font-medium"
-                   style="border-color: var(--border-base); color: var(--text-secondary);">Cancel</a>
+                <x-ui.button type="submit">Save</x-ui.button>
+                <x-ui.button :href="route('operator.cms.index')" variant="secondary">Cancel</x-ui.button>
             </div>
         </form>
     </div>
 
-    <div class="mt-8 rounded-xl border p-5" style="border-color: var(--border-danger); background-color: var(--surface-card);">
+    <div class="mt-8 rounded-xl border border-danger p-5" style="background-color: var(--surface-card);">
         <h2 class="mb-2 text-sm font-semibold" style="color: var(--text-danger);">Delete Page</h2>
         <p class="mb-4 text-xs" style="color: var(--text-muted);">Permanently delete this page. This cannot be undone.</p>
         <form method="POST" action="{{ route('operator.cms.destroy', $page) }}"
               onsubmit="return confirm('Delete \'{{ addslashes($page->title) }}\'?')">
             @csrf @method('DELETE')
-            <button type="submit" class="rounded-lg px-4 py-2 text-xs font-medium"
-                    style="background-color: var(--surface-danger); color: var(--text-danger);">Delete Page</button>
+            <x-ui.button type="submit" variant="secondary" tone="danger" size="sm">Delete Page</x-ui.button>
         </form>
     </div>
 </div>

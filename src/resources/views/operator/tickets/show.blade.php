@@ -4,14 +4,12 @@
 <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 space-y-6">
 
     {{-- Back --}}
-    <a href="{{ route('operator.tickets.index') }}"
-       class="inline-flex items-center gap-1 text-sm transition-colors hover:underline"
-       style="color: var(--text-secondary);">
+    <x-ui.link variant="quiet" :href="route('operator.tickets.index')" class="inline-flex items-center gap-1 text-sm">
         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
         </svg>
         Back to queue
-    </a>
+    </x-ui.link>
 
     {{-- Flash / errors --}}
     @if (session('status'))
@@ -54,11 +52,9 @@
                 @if ($ticket->attachments->isNotEmpty())
                 <div class="mt-4 pt-4 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($ticket->attachments as $att)
-                    <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:legacy-bg-surface"
-                       style="border-color: var(--border-base); color: var(--text-secondary);">
+                    <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
-                    </a>
+                    </x-ui.button>
                     @endforeach
                 </div>
                 @endif
@@ -81,11 +77,9 @@
                 @if ($reply->attachments->isNotEmpty())
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2" style="border-color: var(--border-subtle);">
                     @foreach ($reply->attachments as $att)
-                    <a href="{{ route('tickets.attachment.download', $att) }}"
-                       class="inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs hover:legacy-bg-surface"
-                       style="border-color: var(--border-base); color: var(--text-secondary);">
+                    <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
-                    </a>
+                    </x-ui.button>
                     @endforeach
                 </div>
                 @endif
@@ -97,22 +91,17 @@
                 <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">Add Reply / Note</h2>
                 <form method="POST" action="{{ route('operator.tickets.replies.store', $ticket) }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
-                    <textarea name="body" rows="5" required placeholder="Write your reply&hellip;"
-                              class="block w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 resize-y"
-                              style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);"></textarea>
-                    <label class="flex cursor-pointer items-center gap-2 text-sm" style="color: var(--text-secondary);">
-                        <input type="checkbox" name="is_internal" value="1" class="h-4 w-4 rounded accent-legacy-accent">
-                        Internal note (not visible to submitter)
-                    </label>
-                    <div>
-                        <input type="file" name="attachments[]" multiple class="text-sm" style="color: var(--text-secondary);">
-                        <p class="mt-1 text-xs" style="color: var(--text-secondary);">Up to 10 files, 20 MB each.</p>
+                    <x-ui.textarea name="body" rows="5" required placeholder="Write your reply&hellip;" class="w-full"></x-ui.textarea>
+                    <x-ui.field-error for="body" />
+                    <x-ui.checkbox name="is_internal" value="1">Internal note (not visible to submitter)</x-ui.checkbox>
+                    <div class="space-y-2">
+                        <x-ui.input type="file" name="attachments[]" id="attachments" multiple
+                                    aria-label="Attachments" aria-describedby="attachments-hint"
+                                    :error-key="['attachments', 'attachments.*']" />
+                        <p id="attachments-hint" class="text-xs" style="color: var(--text-secondary);">Up to 10 files, 20 MB each.</p>
+                        <x-ui.field-error for="attachments" :error-key="['attachments', 'attachments.*']" />
                     </div>
-                    <button type="submit"
-                            class="rounded-lg px-5 py-2 text-sm font-medium transition-colors"
-                            style="background-color: var(--accent); color: #fff;">
-                        Post Reply
-                    </button>
+                    <x-ui.button type="submit">Post Reply</x-ui.button>
                 </form>
             </div>
 
@@ -123,11 +112,10 @@
 
             {{-- Status --}}
             <div class="rounded-xl border p-5" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Status</h2>
-                <form method="POST" action="{{ route('operator.tickets.status', $ticket) }}">
+                <h2 id="ticket-status-heading" class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Status</h2>
+                <form method="POST" action="{{ route('operator.tickets.status', $ticket) }}" class="space-y-3">
                     @csrf @method('PUT')
-                    <select name="status" class="block w-full rounded-lg border px-3 py-2 text-sm mb-3"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    <x-ui.select name="status" aria-labelledby="ticket-status-heading" class="w-full">
                         @foreach (['open', 'in_progress', 'pending_user', 'resolved', 'closed'] as $s)
                         <option value="{{ $s }}"
                                 {{ $ticket->status === $s ? 'selected' : '' }}
@@ -135,32 +123,27 @@
                             {{ str_replace('_', ' ', ucfirst($s)) }}
                         </option>
                         @endforeach
-                    </select>
-                    <button type="submit" class="w-full rounded-lg py-2 text-sm font-medium transition-colors"
-                            style="background-color: var(--accent); color: #fff;">
-                        Update Status
-                    </button>
+                    </x-ui.select>
+                    <x-ui.field-error for="status" />
+                    <x-ui.button type="submit" variant="secondary" class="w-full">Update Status</x-ui.button>
                 </form>
             </div>
 
             {{-- Assign --}}
             <div class="rounded-xl border p-5" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Assignee</h2>
-                <form method="POST" action="{{ route('operator.tickets.assign', $ticket) }}">
+                <h2 id="ticket-assignee-heading" class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Assignee</h2>
+                <form method="POST" action="{{ route('operator.tickets.assign', $ticket) }}" class="space-y-3">
                     @csrf @method('PUT')
-                    <select name="assignee_id" class="block w-full rounded-lg border px-3 py-2 text-sm mb-3"
-                            style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
+                    <x-ui.select name="assignee_id" aria-labelledby="ticket-assignee-heading" class="w-full">
                         <option value="">Unassigned</option>
                         @foreach ($operators as $op)
                         <option value="{{ $op->id }}" {{ $ticket->assignee_id == $op->id ? 'selected' : '' }}>
                             {{ $op->name }}
                         </option>
                         @endforeach
-                    </select>
-                    <button type="submit" class="w-full rounded-lg py-2 text-sm font-medium transition-colors"
-                            style="background-color: var(--accent); color: #fff;">
-                        Update Assignee
-                    </button>
+                    </x-ui.select>
+                    <x-ui.field-error for="assignee_id" />
+                    <x-ui.button type="submit" variant="secondary" class="w-full">Update Assignee</x-ui.button>
                 </form>
             </div>
 

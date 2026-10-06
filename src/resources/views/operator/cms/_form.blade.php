@@ -1,29 +1,23 @@
 {{-- Shared form fields for CMS page create / edit --}}
 
-<div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--text-muted);">Title *</label>
-    <input type="text" name="title" value="{{ old('title', $page->title ?? '') }}" required
-           class="block w-full rounded-lg border px-3 py-2 text-sm outline-none"
-           style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-    @error('title')<p class="text-xs mt-0.5" style="color: var(--text-danger);">{{ $message }}</p>@enderror
+<div class="space-y-2">
+    <x-ui.label for="title" required>Title</x-ui.label>
+    <x-ui.input type="text" name="title" :value="old('title', $page->title ?? '')" required class="w-full" />
+    <x-ui.field-error for="title" />
 </div>
 
-<div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--text-muted);">
+<div class="space-y-2">
+    <x-ui.label for="slug">
         Slug
         <span class="font-normal" style="color: var(--text-muted);">(leave blank to auto-generate)</span>
-    </label>
-    <input type="text" name="slug" value="{{ old('slug', $page->slug ?? '') }}"
-           placeholder="my-page-slug"
-           class="block w-full rounded-lg border px-3 py-2 text-sm font-mono outline-none"
-           style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">
-    @error('slug')<p class="text-xs mt-0.5" style="color: var(--text-danger);">{{ $message }}</p>@enderror
+    </x-ui.label>
+    <x-ui.input type="text" name="slug" :value="old('slug', $page->slug ?? '')"
+                placeholder="my-page-slug" class="w-full font-mono" />
+    <x-ui.field-error for="slug" />
 </div>
 
-<div>
-    <label class="block text-xs font-medium mb-1" style="color: var(--text-muted);">Content (HTML)</label>
-    <textarea name="body" rows="20"
-              class="block w-full rounded-lg border px-3 py-2 text-sm font-mono outline-none"
-              style="background-color: var(--surface-input); border-color: var(--border-base); color: var(--text-primary);">{{ old('body', $page->body ?? '') }}</textarea>
-    @error('body')<p class="text-xs mt-0.5" style="color: var(--text-danger);">{{ $message }}</p>@enderror
+<div class="space-y-2">
+    <x-ui.label for="body">Content (HTML)</x-ui.label>
+    <x-ui.textarea name="body" rows="20" class="w-full font-mono">{{ old('body', $page->body ?? '') }}</x-ui.textarea>
+    <x-ui.field-error for="body" />
 </div>
