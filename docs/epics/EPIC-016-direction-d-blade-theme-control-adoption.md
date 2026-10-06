@@ -7,6 +7,12 @@
 **Inherits:** EPIC-013 [A13.4](./EPIC-013-direction-d-shell-design-system.md#a134-contrast-debt-disposition) (legacy Blade page-body contrast debt) and the matching [§31](./EPIC-013-direction-d-shell-design-system.md#31-deferred-follow-on-work) row · EPIC-015 [A6.16](./EPIC-015-projects-ux-expansion.md#a616-post-epic-follow-up-global-design-token--ui-consistency-audit-recorded-only) (post-EPIC design-token / UI consistency audit)
 **Planning baseline:** `main` @ `d87b5b1` (`docs: close EPIC-015`), equal to `origin/main`, working tree clean, verified 2026-10-05. The read-only consistency audit that precedes this document was run on the same commit.
 
+> **Forward note (2026-10-06, Release 1 re-orientation).** The Delete Role hotfix (A1.19) merged as PR #24 (`88e15d7`), with `main` CI green.
+> - **Next unstarted package: WP2** (Status and Semantic State). Then WP3 and WP4. No WP2–WP4 work exists on any branch.
+> - EPIC-016 is Phase 1 of the [Release 1 sequence](../product/product-roadmap.md#release-1-sequence). The §22.1 `@shadcn/lint` evaluation is placed right after it, before the Helpdesk MVP's React work.
+> - Development may pause here by owner choice. No product or technical blocker is implied, and EPIC-016 stays **In Progress**.
+> - On return, follow the roadmap's [restart checkpoint](../product/product-roadmap.md#development-pause-and-restart-checkpoint). In particular, sync the implementation branch to `main` (§25) and re-run each package's census before relying on the counts recorded here.
+
 ---
 
 ## Contents

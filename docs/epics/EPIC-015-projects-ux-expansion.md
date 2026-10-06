@@ -772,6 +772,8 @@ Direction D [§19](../design/direction-d-design-system.md#19-implementation-orde
 
 EPIC-015 does not solve this and does not absorb it (Q4). It is flagged here for later roadmap placement by the owner. Until then, customers keep using the capability-filtered Operational shell, and EPIC-015 keeps every project surface safe for them (§7).
 
+> **Forward note (2026-10-06).** The gap is **resolved** by owner ruling D1: Release 1 includes the dedicated customer shell. The first package of Helpdesk MVP builds it, and Finance and Projects adopt it for their customer surfaces. See the Product Roadmap's [Customer product and customer shell](../product/product-roadmap.md#customer-product-and-customer-shell). The text above is kept as the historical record.
+
 ## 23. Risks and rollback
 
 | # | Risk | Likelihood | Impact | Mitigation | Rollback |

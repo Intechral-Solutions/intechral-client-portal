@@ -4,6 +4,16 @@
 **Architecture decision:** Pending  
 **Depends on:** Existing billing/domain data as needed; independent of [EPIC-011](./EPIC-011-react-frontend-migration.md) frontend migration
 
+> **Forward note (2026-10-06, Release 1 placement).** Under the [Release 1 boundary](../product/product-roadmap.md#release-1-boundary):
+> - **Discovery, the ADR and the invoice PDF are Release 1 Required.** SOW and other documents are Post-v1: under owner ruling D2, SOW linkage is later by default.
+> - **Sequencing** ([Release 1 sequence](../product/product-roadmap.md#release-1-sequence)):
+>   - the discovery spike shares host evidence, where practical, with release-engineering package RE-0 (production host and environment discovery, which produces the deployment ADR). The "Namecheap / Production Host Spike" below is then gathered once. Under owner ruling D4, the production host is not preselected, so the spike evaluates RE-0's candidate hosts;
+>   - the ADR is settled before Finance implementation depends on it;
+>   - the invoice PDF capability exists before any Release 1 invoice is issued, implemented alongside Directory or inside Finance's invoice-issuance package;
+>   - EPIC-012 does not block unrelated Helpdesk work.
+>
+> The SOW sample remains a renderer stress test, as originally intended.
+
 ---
 
 ## Goal
