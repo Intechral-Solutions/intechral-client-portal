@@ -177,7 +177,7 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Vehicle:** [EPIC-015: Projects UX Expansion](../epics/EPIC-015-projects-ux-expansion.md) (**Planned** 2026-10-02). It locks derived project health, explicit milestone completion, budget metadata visible only with effective Settings/Edit access, the Overview as the canonical project landing, a project-scoped Tasks list on the canonical task query, one project-time definition, and the stale board-assignee time fix. Dedicated stakeholder/customer presentation is deferred (EPIC-015 §22 records the missing customer-product roadmap item).
 
-> **Forward note (2026-10-05).** EPIC-015 is **Verified** (2026-10-05): WP1–WP5 are merged (the optional WP5 Board Complete/Reopen, per-surface drawer defaults and Project Time tab included), every §19 criterion is satisfied, and the WP6 closeout PR #22 is green on both hosted jobs (head `78b1aab`) but not yet merged. It moves to Done when that package merges with green `main` CI. The customer-product gap (EPIC-015 §22) and a post-EPIC global design-token / UI consistency audit (EPIC-015 Amendment 6) are still unplaced.
+> **Forward note (2026-10-05).** EPIC-015 is **Done** (2026-10-05; Planned 2026-10-02, In Progress 2026-10-04, Verified 2026-10-05): WP1–WP6 are merged (the optional WP5 Board Complete/Reopen, per-surface drawer defaults and Project Time tab included), all 16 §19 criteria are satisfied, and WP6 merged as PR #22 (merge commit `76be9cd`) with green PR CI and green `main` CI. The customer-product gap (EPIC-015 §22) and a post-EPIC global design-token / UI consistency audit (Helpdesk, Directory, Finance, System; EPIC-015 A6.16) are still unplaced and not started.
 
 ---
 
