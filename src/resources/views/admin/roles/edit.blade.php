@@ -69,19 +69,27 @@
             <x-ui.button type="submit">Save Changes</x-ui.button>
             <x-ui.button :href="route('roles.index')" variant="ghost">Cancel</x-ui.button>
 
+            {{-- The delete form lives OUTSIDE this form (forms cannot nest: the parser would merge both into
+                 this one, and its PUT and DELETE `_method` fields would collide). The button stays in this row
+                 and is bound to that form through `form=`. --}}
             @can('roles.admin')
             @if (! $isBuiltIn)
-            <form method="POST" action="{{ route('roles.destroy', $role) }}" class="ml-auto"
-                  onsubmit="return confirm('Delete role \'{{ addslashes($role->name) }}\'?')">
-                @csrf
-                @method('DELETE')
-                <x-ui.button type="submit" variant="secondary" tone="danger">Delete Role</x-ui.button>
-            </form>
+            <x-ui.button type="submit" form="role-delete-form" variant="secondary" tone="danger" class="ml-auto">Delete Role</x-ui.button>
             @endif
             @endcan
         </div>
 
     </form>
+
+    @can('roles.admin')
+    @if (! $isBuiltIn)
+    <form id="role-delete-form" method="POST" action="{{ route('roles.destroy', $role) }}"
+          onsubmit="return confirm('Delete role \'{{ addslashes($role->name) }}\'?')">
+        @csrf
+        @method('DELETE')
+    </form>
+    @endif
+    @endcan
 
 </div>
 @endsection

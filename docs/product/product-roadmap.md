@@ -56,7 +56,7 @@ Each item becomes one or more implementation epics before work begins, consisten
 | Bucket | Items | Class |
 |--------|-------|-------|
 | **NOW** | Critical Helpdesk hardening · Product/UX rebase (this) · Claude Design brief and exploration | Security/integrity · Direction · UX foundation |
-| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) · Blade workspace theme and control adoption (EPIC-016, Planned) | UX foundation · Platform capability · Hardening |
+| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) · Blade workspace theme and control adoption (EPIC-016, In Progress) | UX foundation · Platform capability · Hardening |
 | **NEXT** | Tasks overhaul · Timer UX improvement · Projects UX expansion | Product functionality |
 | **LATER** | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS evolution | Product functionality (+ first platform-capability consumers) |
 | **FUTURE** | Reusable approvals, notifications, global search, integrations, external API, observability, audit/history, automation · Deployment/release engineering (trigger-based) | Platform capability |
@@ -135,7 +135,7 @@ Semantic tokens; typography; spacing; surfaces and elevation; tables (compact an
 
 **Class:** Hardening / design-system adoption.
 
-**Vehicle:** [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (**Planned** 2026-10-05).
+**Vehicle:** [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (**Planned** 2026-10-05; **In Progress** 2026-10-06, WP1 merged).
 
 The Blade page bodies of Helpdesk, Directory, Finance and System style themselves inline: the legacy indigo `--accent` on actions, legacy gray variables for text, borders and surfaces, and hex status pills. They use no Direction D semantic utilities, 44 of their field sites have no visible keyboard focus, and their statuses ignore the theme.
 
