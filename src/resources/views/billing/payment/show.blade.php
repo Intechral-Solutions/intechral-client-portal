@@ -37,9 +37,7 @@
             {{-- Stripe.js injects the Payment Element here --}}
         </div>
 
-        <div id="payment-message" class="hidden rounded-lg px-4 py-3 text-sm"
-             style="background-color: var(--surface-danger); color: var(--text-danger);"
-             role="alert"></div>
+        <x-ui.alert id="payment-message" variant="danger" class="hidden"></x-ui.alert>
 
         <x-ui.button id="submit-btn" size="lg" class="w-full">
             <span id="btn-text">Pay {{ $invoice->currency }} {{ number_format((float)$invoice->total, 2) }}</span>
@@ -80,7 +78,7 @@
         });
 
         if (error) {
-            msg.textContent = error.message;
+            msg.querySelector('[data-alert-body]').textContent = error.message;
             msg.classList.remove('hidden');
             form.disabled = false;
             btnText.classList.remove('hidden');

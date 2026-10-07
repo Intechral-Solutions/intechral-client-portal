@@ -21,20 +21,12 @@
 
     {{-- Flash status --}}
     @if (session('status'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">
-        {{ session('status') }}
-    </div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('status') }}</x-ui.alert>
     @endif
 
     {{-- Errors --}}
     @if ($errors->any())
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
-         role="alert">
-        {{ $errors->first() }}
-    </div>
+    <x-ui.alert variant="danger" class="mb-6">{{ $errors->first() }}</x-ui.alert>
     @endif
 
     {{-- Table --}}
@@ -59,17 +51,7 @@
                         {{ $role->users_count }}
                     </td>
                     <td class="px-6 py-4">
-                        @if ($builtIn)
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                              style="background-color: var(--surface-accent); color: var(--accent);">
-                            Built-in
-                        </span>
-                        @else
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                              style="background-color: var(--surface-elevated); color: var(--text-secondary);">
-                            Custom
-                        </span>
-                        @endif
+                        <x-ui.tag>{{ $builtIn ? 'Built-in' : 'Custom' }}</x-ui.tag>
                     </td>
                     <td class="px-6 py-4 text-right text-sm">
                         <div class="flex items-center justify-end gap-3">

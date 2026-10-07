@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import type { Locator, Page } from '@playwright/test';
 
 import { signedIn } from './support/auth';
@@ -15,6 +17,10 @@ import { hasHorizontalOverflow } from './support/shell';
  *
  * Colours are compared against the LIVE `--ds-*` values of the current theme, resolved in the browser, so
  * a legacy indigo or a hard-coded hex fails by value, not by source text.
+ *
+ * EPIC-016 WP2 (Status and Semantic State) extends this spec at the foot ("Semantic state", below): the
+ * status, priority, overdue, internal-note, tag, alert and live-tracker presentation in light and dark at
+ * 1440 and 390, measured as computed colour and contrast against the REAL effective background.
  *
  * Authentication comes from the per-worker persona sessions (support/auth.ts); nothing here logs in. Every
  * record the spec creates (a company, a contact, an invoice, a CMS page, 26 companies for pagination) is
@@ -773,6 +779,654 @@ test.describe('Pagination', () => {
                 await expect(nav.getByRole('link', { name: 'Go to page 2' })).toBeHidden();
                 await expectSecondary(next, tokens);
             }
+        }
+    });
+});
+
+
+// ═══ Semantic state (EPIC-016 WP2) ════════════════════════════════════════════════
+//
+// Status, priority, overdue, internal-note, tag, alert and live presentation, in light and dark at 1440 and
+// 390. Every mark is measured as computed colour against the REAL effective background (the first opaque
+// ancestors composited, resolved through a canvas so oklch / color-mix legacy surfaces are read as sRGB), so
+// a legacy pastel pill, hex or indigo fails by value, and the 4.5:1 (text) and 3:1 (glyph) bars are the
+// WCAG numbers on what a user sees. The claim is scoped to WP2's surfaces.
+//
+// Two kinds of evidence. REAL pages and records, where the application's supported routes can create the
+// state and delete it again (the seeded ticket TKT-E2E1, a draft invoice, a custom role, CMS pages). And a
+// GALLERY of every state rendered by the PRODUCTION partials (tests/Support/semantic_state_gallery.php) and
+// injected into a real page, for the states no supported route can create without leaving records (tickets
+// have no delete route and cannot be made overdue; only a draft invoice can be deleted; nothing cancels
+// one). The gallery is not a re-typed copy of the markup: it is the same Blade the pages include.
+
+type Rgb = [number, number, number];
+
+/** sRGB luminance and WCAG contrast of two colours. */
+const relativeLuminance = ([r, g, b]: Rgb) => {
+    const [x, y, z] = [r, g, b].map((channel) => {
+        const c = channel / 255;
+
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+
+    return 0.2126 * x + 0.7152 * y + 0.0722 * z;
+};
+const contrastOf = (a: Rgb, b: Rgb) => {
+    const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((m, n) => n - m);
+
+    return (hi + 0.05) / (lo + 0.05);
+};
+
+/**
+ * An element's colour (`color`, or `fill` for an SVG shape) and the background it really sits on, both as
+ * sRGB. The background is the stack of translucent and opaque layers from the nearest opaque ancestor inward,
+ * composited over white; every colour is parsed by a canvas so any CSS colour syntax resolves.
+ */
+async function pairOf(locator: Locator, property: 'color' | 'fill' = 'color') {
+    return locator.evaluate((element, prop) => {
+        const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+        const parse = (css: string): [number, number, number, number] => {
+            context.clearRect(0, 0, 1, 1);
+            context.fillStyle = '#000';
+            context.fillStyle = css;
+            context.fillRect(0, 0, 1, 1);
+            const data = context.getImageData(0, 0, 1, 1).data;
+
+            return [data[0], data[1], data[2], data[3] / 255];
+        };
+
+        const layers: [number, number, number, number][] = [];
+        for (let node: Element | null = element; node; node = node.parentElement) {
+            const layer = parse(getComputedStyle(node).backgroundColor);
+            if (layer[3] > 0) {
+                layers.push(layer);
+            }
+            if (layer[3] === 1) {
+                break;
+            }
+        }
+
+        let background: [number, number, number] = [255, 255, 255];
+        for (const layer of layers.reverse()) {
+            background = background.map((channel, index) => layer[index] * layer[3] + channel * (1 - layer[3])) as [
+                number,
+                number,
+                number,
+            ];
+        }
+
+        const foreground = parse(getComputedStyle(element).getPropertyValue(prop));
+        const composited = foreground
+            .slice(0, 3)
+            .map((channel, index) => channel * foreground[3] + background[index] * (1 - foreground[3])) as Rgb;
+
+        return { foreground: composited, background, css: getComputedStyle(element).getPropertyValue(prop) };
+    }, property);
+}
+
+/**
+ * A bordered element's boundary colour against what is INSIDE it (its own surface) and what is OUTSIDE it
+ * (the parent's effective background): the two sides a non-text boundary must stand out from (WCAG 1.4.11).
+ */
+async function boundaryPair(locator: Locator) {
+    return locator.evaluate((element) => {
+        const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+        const parse = (css: string): [number, number, number, number] => {
+            context.clearRect(0, 0, 1, 1);
+            context.fillStyle = '#000';
+            context.fillStyle = css;
+            context.fillRect(0, 0, 1, 1);
+            const data = context.getImageData(0, 0, 1, 1).data;
+
+            return [data[0], data[1], data[2], data[3] / 255];
+        };
+        const effective = (start: Element | null): [number, number, number] => {
+            const layers: [number, number, number, number][] = [];
+            for (let node = start; node; node = node.parentElement) {
+                const layer = parse(getComputedStyle(node).backgroundColor);
+                if (layer[3] > 0) {
+                    layers.push(layer);
+                }
+                if (layer[3] === 1) {
+                    break;
+                }
+            }
+            let background: [number, number, number] = [255, 255, 255];
+            for (const layer of layers.reverse()) {
+                background = background.map((c, i) => layer[i] * layer[3] + c * (1 - layer[3])) as [number, number, number];
+            }
+
+            return background;
+        };
+
+        const edge = parse(getComputedStyle(element).borderTopColor).slice(0, 3) as [number, number, number];
+
+        return { edge, inside: effective(element), outside: effective(element.parentElement) };
+    });
+}
+
+/** Resolved `--ds-*` token colours of the current theme, as the `rgb(...)` strings the browser reports. */
+function readDs(page: Page, names: string[]): Promise<Record<string, string>> {
+    return page.evaluate((list) => {
+        const probe = document.createElement('i');
+        document.body.appendChild(probe);
+        const out: Record<string, string> = {};
+        for (const name of list) {
+            probe.style.color = `var(--ds-${name})`;
+            out[name] = getComputedStyle(probe).color;
+        }
+        probe.remove();
+
+        return out;
+    }, names);
+}
+
+const DS = [
+    'accent', 'text', 'text-muted', 'text-secondary', 'success', 'success-glyph', 'danger', 'warning', 'warning-glyph',
+    'warning-soft', 'live', 'live-text', 'rule-control', 'surface', 'control-edge', 'accent-soft', 'danger-soft',
+];
+
+/** The label and glyph tokens of a status tone (status.tsx: text-safe label token, shape-only glyph token). */
+const TONE_TOKENS: Record<string, { label: string; glyph: string }> = {
+    neutral: { label: 'text-muted', glyph: 'text-muted' },
+    info: { label: 'accent', glyph: 'accent' },
+    success: { label: 'success', glyph: 'success-glyph' },
+    warning: { label: 'warning', glyph: 'warning-glyph' },
+    danger: { label: 'danger', glyph: 'danger' },
+    live: { label: 'live-text', glyph: 'live' },
+};
+
+/** The hard-coded colours the retired pills used (EPIC-016 §3.5, §9). None may appear at a migrated site. */
+const RETIRED_PILL_COLOURS = [
+    'rgb(37, 99, 235)', 'rgb(124, 58, 237)', 'rgb(22, 163, 74)', 'rgb(220, 38, 38)', 'rgb(234, 88, 12)',
+    'rgb(202, 138, 4)', 'rgb(146, 64, 14)', 'rgb(217, 119, 6)',
+];
+
+/**
+ * The hue of a saturated colour, in degrees, or null for a neutral. The retired status presentation was
+ * saturated blue/indigo/violet (hue 220-290); Direction D's own muted greys carry a faint blue cast (hue
+ * about 222, saturation about 5%), which is neutral, not a status colour.
+ */
+function hueOf([r, g, b]: Rgb) {
+    const [x, y, z] = [r / 255, g / 255, b / 255];
+    const max = Math.max(x, y, z);
+    const min = Math.min(x, y, z);
+    const lightness = (max + min) / 2;
+    const delta = max - min;
+    const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+    if (saturation < 0.25) {
+        return null;
+    }
+    const hue = max === x ? ((y - z) / delta) % 6 : max === y ? (z - x) / delta + 2 : (x - y) / delta + 4;
+
+    return (hue * 60 + 360) % 360;
+}
+
+/** A mark's label text and glyph are visible, its colours are the tone's tokens, and both clear their contrast bar. */
+async function expectMark(
+    mark: Locator,
+    label: string,
+    tone: keyof typeof TONE_TOKENS,
+    glyph: string,
+    ds: Record<string, string>,
+    where: string,
+) {
+    await expect(mark, `${where}: mark is visible`).toBeVisible();
+    await expect(mark.locator(':scope > span'), `${where}: visible text label`).toHaveText(label);
+
+    const svg = mark.locator(':scope > svg');
+    await expect(svg, `${where}: glyph is present`).toHaveAttribute('data-glyph', glyph);
+    await expect(svg).toBeVisible();
+
+    const text = await pairOf(mark.locator(':scope > span'));
+    const shape = await pairOf(svg);
+    const tokens = TONE_TOKENS[tone];
+
+    expect(text.css, `${where}: label is the ${tone} text token`).toBe(ds[tokens.label]);
+    expect(shape.css, `${where}: glyph is the ${tone} glyph token`).toBe(ds[tokens.glyph]);
+    expect(contrastOf(text.foreground, text.background), `${where}: label contrast`).toBeGreaterThanOrEqual(4.5);
+    expect(contrastOf(shape.foreground, shape.background), `${where}: glyph contrast`).toBeGreaterThanOrEqual(3);
+
+    // No legacy pill: the retired hex colours and the blue/indigo hues never appear on a migrated mark.
+    expect(RETIRED_PILL_COLOURS, `${where}: no retired pill colour`).not.toContain(text.css);
+    const hue = hueOf(text.foreground);
+    expect(hue === null || hue < 200 || hue > 300, `${where}: no blue or indigo hue (${hue})`).toBe(true);
+    // A mark is inline glyph + label, never a filled pill.
+    expect(await style(mark, 'background-color'), `${where}: no pill fill`).toBe('rgba(0, 0, 0, 0)');
+}
+
+let galleryCache: string | null = null;
+
+/** The production partials for every state, rendered by PHP (read-only; no database). */
+function galleryHtml(): string {
+    galleryCache ??= (
+        JSON.parse(
+            execFileSync('php', ['tests/Support/semantic_state_gallery.php'], { cwd: process.cwd(), encoding: 'utf8' }),
+        ) as { html: string }
+    ).html;
+
+    return galleryCache;
+}
+
+/**
+ * Inject the gallery into the real page's own card (the queue's table card, a legacy `surface` today), so the
+ * effective background every mark is measured against is the one a user really sees there, not the canvas.
+ * Fails loudly if the page has no card to host it.
+ */
+async function injectGallery(page: Page) {
+    const hosted = await page.evaluate((html) => {
+        const host = document.querySelector('#main-content .rounded-xl.border');
+        if (!host) {
+            return false;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.id = 'wp2-gallery';
+        wrapper.innerHTML = html;
+        host.appendChild(wrapper);
+
+        return true;
+    }, galleryHtml());
+    expect(hosted, 'the page has a card to host the state gallery').toBe(true);
+
+    return page.locator('#wp2-gallery');
+}
+
+test.describe('Semantic state: every state, rendered by the production partials', () => {
+    test('status, priority, overdue, internal note, tags, alerts and the live tracker, in both themes at both widths', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            const tokens = await visit(page, '/operator/tickets', theme, viewport);
+            const gallery = await injectGallery(page);
+            const ds = await readDs(page, DS);
+            const at = (name: string) => gallery.locator(`[data-case="${name}"]`);
+
+            // Ticket lifecycle (§9.1): label, tone, glyph. Pending uses the recorded P6 substitute.
+            const tickets: [string, string, string, string][] = [
+                ['open', 'Open', 'info', 'circle'],
+                ['in_progress', 'In Progress', 'info', 'half'],
+                ['pending_user', 'Pending', 'neutral', 'dashed'],
+                ['resolved', 'Resolved', 'success', 'check'],
+                ['closed', 'Closed', 'neutral', 'check'],
+            ];
+            for (const [status, label, tone, glyph] of tickets) {
+                await expectMark(at(`ticket-status:${status}`).locator('> span'), label, tone, glyph, ds, `${where} ticket ${status}`);
+            }
+
+            // Invoice lifecycle (§9.3): Sent and Overdue use the recorded P11 substitutes.
+            const invoices: [string, string, string, string][] = [
+                ['draft', 'Draft', 'neutral', 'dashed'],
+                ['sent', 'Sent', 'info', 'half'],
+                ['paid', 'Paid', 'success', 'check'],
+                ['overdue', 'Overdue', 'danger', 'square'],
+                ['cancelled', 'Cancelled', 'neutral', 'circle'],
+            ];
+            for (const [status, label, tone, glyph] of invoices) {
+                await expectMark(at(`invoice-status:${status}`).locator('> span'), label, tone, glyph, ds, `${where} invoice ${status}`);
+            }
+
+            // CMS state (§9.6) and MFA Enabled / Disabled (§9.7; Disabled by owner ruling A2.12 #7).
+            await expectMark(at('cms:published').locator('> span'), 'Published', 'success', 'check', ds, `${where} cms published`);
+            await expectMark(at('cms:draft').locator('> span'), 'Draft', 'neutral', 'dashed', ds, `${where} cms draft`);
+            await expectMark(at('mfa:enabled').locator('> span'), 'Enabled', 'success', 'check', ds, `${where} mfa`);
+            await expectMark(at('mfa:disabled').locator('> span'), 'Disabled', 'neutral', 'dashed', ds, `${where} mfa disabled`);
+
+            // Priority (§9.2): bars + label. Only critical is danger; unfilled bars sit on rule-control.
+            const priorities: [string, string, number][] = [['low', 'Low', 1], ['medium', 'Medium', 2], ['high', 'High', 3], ['critical', 'Critical', 3]];
+            for (const [priority, label, bars] of priorities) {
+                const mark = at(`ticket-priority:${priority}`).locator('> span');
+                const expected = priority === 'critical' ? 'danger' : 'text-secondary';
+
+                await expect(mark.locator(':scope > span'), `${where} ${priority} label`).toHaveText(label);
+                await expect(mark.locator('svg rect[data-bar="filled"]')).toHaveCount(bars);
+                await expect(mark.locator('svg rect[data-bar="empty"]')).toHaveCount(3 - bars);
+
+                const text = await pairOf(mark.locator(':scope > span'));
+                const filled = await pairOf(mark.locator('svg rect[data-bar="filled"]').first(), 'fill');
+                expect(text.css, `${where} ${priority} label colour`).toBe(ds[expected]);
+                expect(filled.css, `${where} ${priority} bar colour follows the label`).toBe(ds[expected]);
+                expect(contrastOf(text.foreground, text.background), `${where} ${priority} label contrast`).toBeGreaterThanOrEqual(4.5);
+                expect(contrastOf(filled.foreground, filled.background), `${where} ${priority} bar contrast`).toBeGreaterThanOrEqual(3);
+                expect(RETIRED_PILL_COLOURS).not.toContain(text.css);
+                expect(await style(mark, 'background-color'), `${where} ${priority}: no pastel pill`).toBe('rgba(0, 0, 0, 0)');
+
+                if (bars < 3) {
+                    const empty = await style(mark.locator('svg rect[data-bar="empty"]').first(), 'fill');
+                    expect(empty, `${where} ${priority} unfilled bars use rule-control`).toBe(ds['rule-control']);
+                }
+            }
+
+            // Overdue SLA cell (§9.4): due date in danger + the Overdue status, legible on the real dark card.
+            const sla = at('overdue-sla');
+            const due = await pairOf(sla);
+            expect(due.css).toBe(ds['danger']);
+            expect(await style(sla, 'font-weight')).toBe('500');
+            expect(contrastOf(due.foreground, due.background), `${where} overdue date contrast`).toBeGreaterThanOrEqual(4.5);
+            await expectMark(sla.locator('> span'), 'Overdue', 'danger', 'square', ds, `${where} overdue status`);
+
+            // Internal note (§9.5): dashed warning boundary, warning-soft surface, lock glyph, "Internal Note".
+            const note = at('internal-note');
+            expect(await style(note, 'border-top-style'), `${where} note boundary is dashed`).toBe('dashed');
+            expect(await style(note, 'border-top-color'), `${where} note boundary is warning-glyph`).toBe(ds['warning-glyph']);
+            expect(await style(note, 'background-color'), `${where} note surface is warning-soft`).toBe(ds['warning-soft']);
+            const marker = note.locator('[data-internal-note]');
+            await expect(marker.locator('> span')).toHaveText('Internal Note');
+            await expect(marker.locator('> svg')).toBeVisible();
+            const markerText = await pairOf(marker.locator('> span'));
+            expect(markerText.css).toBe(ds['warning']);
+            expect(contrastOf(markerText.foreground, markerText.background), `${where} note label contrast`).toBeGreaterThanOrEqual(4.5);
+            const body = await pairOf(note.locator('> div').last());
+            expect(contrastOf(body.foreground, body.background), `${where} note body contrast`).toBeGreaterThanOrEqual(4.5);
+            // The dashed boundary is a non-text mark: 3:1 against the card inside it and the page behind it.
+            const { edge, inside, outside } = await boundaryPair(note);
+            expect(contrastOf(edge, inside), `${where} note boundary vs the card`).toBeGreaterThanOrEqual(3);
+            expect(contrastOf(edge, outside), `${where} note boundary vs the page`).toBeGreaterThanOrEqual(3);
+
+            // Tags (§9.7): mono uppercase kind markers on the rule-control edge; never accent, never a status.
+            const tags = at('tags').locator('> span');
+            await expect(tags).toHaveCount(4);
+            for (const tag of await tags.all()) {
+                const text = await pairOf(tag);
+                const name = (await tag.textContent()) ?? '';
+
+                expect(text.css, `${where} tag ${name} colour`).toBe(ds['text-muted']);
+                expect(await style(tag, 'border-top-color'), `${where} tag ${name} edge`).toBe(ds['rule-control']);
+                expect(await style(tag, 'text-transform')).toBe('uppercase');
+                expect(await style(tag, 'font-family')).toMatch(/mono/i);
+                expect(await style(tag, 'background-color')).toBe('rgba(0, 0, 0, 0)');
+                expect(contrastOf(text.foreground, text.background), `${where} tag ${name} contrast`).toBeGreaterThanOrEqual(4.5);
+            }
+
+            // Alerts (§9.7): the right role per meaning, a glyph, an sr-only kind, and legible text on the tint.
+            const roles: Record<string, string | null> = { neutral: null, info: 'status', success: 'status', warning: 'status', danger: 'alert' };
+            const kinds: Record<string, string> = { info: 'Notice', success: 'Success', warning: 'Warning', danger: 'Error' };
+            const glyphToken: Record<string, string> = { info: 'accent', success: 'success', warning: 'warning', danger: 'danger' };
+            for (const [variant, role] of Object.entries(roles)) {
+                const alert = at(`alert:${variant}`);
+
+                await expect(alert, `${where} alert ${variant} is visible`).toBeVisible();
+                if (role === null) {
+                    await expect(alert).not.toHaveAttribute('role', /.+/);
+                } else {
+                    await expect(alert).toHaveAttribute('role', role);
+                }
+
+                const text = await pairOf(variant === 'neutral' ? alert : alert.locator('[data-alert-body]'));
+                expect(text.css, `${where} alert ${variant} text is ink`).toBe(ds['text']);
+                expect(contrastOf(text.foreground, text.background), `${where} alert ${variant} text contrast`).toBeGreaterThanOrEqual(4.5);
+
+                if (variant !== 'neutral') {
+                    await expect(alert.locator('> svg')).toBeVisible();
+                    const glyph = await pairOf(alert.locator('> svg'));
+                    expect(glyph.css, `${where} alert ${variant} glyph colour`).toBe(ds[glyphToken[variant]]);
+                    expect(contrastOf(glyph.foreground, glyph.background), `${where} alert ${variant} glyph contrast`).toBeGreaterThanOrEqual(3);
+                    // The kind is announced to assistive technology, and not drawn.
+                    expect(await alert.textContent()).toContain(`${kinds[variant]}:`);
+                    expect((await alert.locator('.sr-only').boundingBox())?.width ?? 0).toBeLessThanOrEqual(1);
+                }
+            }
+
+            // The tracker's RUNNING state (§9.9): a live dot and label, and Stop as a NON-destructive secondary control.
+            const tracker = at('tracker-running');
+            await expectMark(tracker.locator('[data-time-tracker-running]'), 'Timer running', 'live', 'dot', ds, `${where} tracker running`);
+            const stop = tracker.getByRole('button', { name: 'Stop', exact: true });
+            await expectSecondary(stop, tokens);
+            expect(await style(stop, 'color'), `${where} Stop is not danger`).not.toBe(tokens.danger);
+            expect(await style(stop, 'border-top-color'), `${where} Stop edge is not danger`).not.toBe(tokens.danger);
+
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+    });
+});
+
+// ── Real pages and records ──────────────────────────────────────────────────────────
+
+test.describe('Semantic state on real Helpdesk pages (operator)', () => {
+    test('the queue and a ticket page draw the seeded ticket with the shared marks and no red or pastel treatment', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+
+        let ticketPath = '';
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            await visit(page, '/operator/tickets', theme, viewport);
+            const ds = await readDs(page, DS);
+
+            const row = inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' });
+            await expectMark(row.locator('[data-ticket-status]'), 'Open', 'info', 'circle', ds, `${where} queue status`);
+
+            const priority = row.locator('[data-ticket-priority]');
+            await expect(priority.locator(':scope > span')).toHaveText('Low');
+            await expect(priority.locator('svg rect[data-bar="filled"]')).toHaveCount(1);
+            expect((await pairOf(priority.locator(':scope > span'))).css).toBe(ds['text-secondary']);
+
+            // No legacy red row, in either theme: no row of the queue is drawn on a light tint.
+            for (const queueRow of await inMain(page).locator('tbody tr').all()) {
+                const { background } = await pairOf(queueRow);
+                if (theme === 'dark') {
+                    expect(relativeLuminance(background), `${where} queue row stays dark in the dark theme`).toBeLessThan(0.2);
+                }
+            }
+
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+
+            ticketPath ||= new URL((await row.getByRole('link', { name: 'View' }).getAttribute('href')) ?? '', 'http://localhost').pathname;
+        }
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            await visit(page, ticketPath, theme, viewport);
+            const ds = await readDs(page, DS);
+
+            const header = inMain(page).locator('[data-ticket-status]').first();
+            await expectMark(header, 'Open', 'info', 'circle', ds, `${where} ticket detail status`);
+            await expect(inMain(page).locator('[data-ticket-priority] > span').first()).toHaveText('Low');
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+    });
+});
+
+// The seeded ticket TKT-E2E1 belongs to the operator persona, so its own request page (`/tickets/{id}`, the
+// only host of the embedded tracker) is reached as the operator, exactly as time-migration.spec.ts does.
+test.describe('Semantic state on the operator\'s own request page: the embedded time tracker', () => {
+    test('the tracker is server-rendered with data hooks; the running state it clones is live and Stop is not destructive', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+
+        // The request page's path, found once through the list as a user reaches it. Each mode then loads that
+        // path directly: following the link would reload the document and drop the theme `visit` applied.
+        await visit(page, '/tickets', 'light', XL);
+        const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
+        const requestPath = new URL(href ?? '', 'http://localhost').pathname;
+        expect(requestPath).toMatch(/^\/tickets\/\d+$/);
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            const tokens = await visit(page, requestPath, theme, viewport);
+            expect(await page.locator('html').getAttribute('data-theme'), `${where}: the theme is applied`).toBe(theme);
+            const ds = await readDs(page, DS);
+
+            // The request page shows the same shared marks.
+            await expectMark(inMain(page).locator('[data-ticket-status]').first(), 'Open', 'info', 'circle', ds, `${where} request page status`);
+
+            // The tracker's own markup: one control row, one server-rendered template, no script-built markup.
+            const controls = inMain(page).locator('[data-time-tracker-controls]');
+            await expect(controls).toHaveCount(1);
+            await expect(inMain(page).locator('template[data-time-tracker-running-template]')).toHaveCount(1);
+
+            // Stopped state (when no other spec has left a timer running on this ticket): `Start Timer` is a
+            // secondary small button under its stable accessible name, which time-migration.spec.ts depends on.
+            const start = controls.getByRole('button', { name: /Start Timer/ });
+            if ((await start.count()) > 0) {
+                await expectSecondary(start, tokens);
+                expect(await style(start, 'height')).toBe('32px'); // size sm (the browser's pointer is fine, so no touch step)
+            }
+
+            // The running state, cloned from the template exactly as the script does it but without starting a
+            // timer (a started timer would race time-migration.spec.ts, the single owner of timers).
+            await page.evaluate(() => {
+                const template = document.querySelector('[data-time-tracker-running-template]') as HTMLTemplateElement;
+                const probe = document.createElement('div');
+                probe.id = 'wp2-tracker-probe';
+                probe.className = 'flex items-center gap-2';
+                probe.appendChild(template.content.cloneNode(true));
+                document.querySelector('[data-time-tracker-controls]')!.after(probe);
+            });
+            const probe = page.locator('#wp2-tracker-probe');
+            await expectMark(probe.locator('[data-time-tracker-running]'), 'Timer running', 'live', 'dot', ds, `${where} tracker running`);
+
+            const stop = probe.getByRole('button', { name: 'Stop', exact: true });
+            await expectSecondary(stop, tokens);
+            expect(await style(stop, 'color'), `${where} Stop text is not danger`).not.toBe(tokens.danger);
+            expect(await style(stop, 'border-top-color'), `${where} Stop edge is not danger`).not.toBe(tokens.danger);
+            expect(await style(stop, 'height')).toBe('32px');
+
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+    });
+});
+
+test.describe('Semantic state on real Finance pages', () => {
+    test('a draft invoice is Draft (neutral, dashed) on the list and on its page', async ({ page }) => {
+        test.setTimeout(240_000);
+
+        await visit(page, '/billing/invoices/create', 'light', XL);
+        await inMain(page).getByLabel('Client').selectOption({ index: 1 });
+        await page.locator('#items-0-description').fill('E2E WP2 line');
+        await page.locator('#items-0-unit_price').fill('12.50');
+        await inMain(page).getByRole('button', { name: 'Create Invoice' }).click();
+        await expect(page).toHaveURL(/\/billing\/invoices\/\d+$/);
+        const invoicePath = new URL(page.url()).pathname;
+        created.push(invoicePath);
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+
+            await visit(page, '/billing/invoices', theme, viewport);
+            let ds = await readDs(page, DS);
+            const row = inMain(page).getByRole('row').filter({ has: page.locator(`a[href$="${invoicePath}"]`) });
+            await expectMark(row.locator('[data-invoice-status]'), 'Draft', 'neutral', 'dashed', ds, `${where} invoice list`);
+            expect(await style(row.locator('td').nth(4), 'text-decoration-line'), `${where}: a draft amount is not struck through`).toBe('none');
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+
+            await visit(page, invoicePath, theme, viewport);
+            ds = await readDs(page, DS);
+            await expectMark(inMain(page).locator('[data-invoice-status]'), 'Draft', 'neutral', 'dashed', ds, `${where} invoice page`);
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+    });
+});
+
+test.describe('Semantic state on real System pages', () => {
+    test('role types are tags, and a created role flashes a polite status alert; a failed one an assertive alert', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+
+        const roleName = `e2e-wp2-role-${Date.now().toString(36)}`;
+        const token = await csrf(page);
+
+        // Create a custom role through the application's own route. The flash it writes is rendered by the
+        // next /admin/roles request, which the first mode below makes: that is the REAL success alert.
+        const response = await page.request.post('/admin/roles', {
+            form: { _token: token, name: roleName, 'permissions[]': 'tickets.view' },
+            headers: { 'X-CSRF-TOKEN': token },
+            maxRedirects: 0,
+        });
+        expect(response.status(), 'POST /admin/roles').toBe(302);
+
+        let first = true;
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            await visit(page, '/admin/roles', theme, viewport);
+            const ds = await readDs(page, DS);
+
+            if (first) {
+                const flash = inMain(page).locator('[data-variant="success"]');
+                await expect(flash, 'the created-role flash is a success alert').toBeVisible();
+                await expect(flash).toHaveAttribute('role', 'status');
+                await expect(flash.locator('[data-alert-body]')).not.toHaveText('');
+                expect((await pairOf(flash.locator('[data-alert-body]'))).css).toBe(ds['text']);
+                expect((await pairOf(flash.locator('> svg'))).css).toBe(ds['success']);
+
+                const edit = inMain(page).getByRole('row').filter({ hasText: roleName }).getByRole('link', { name: 'Edit' });
+                created.push(new URL((await edit.getAttribute('href')) ?? '', 'http://localhost').pathname.replace(/\/edit$/, ''));
+                first = false;
+            }
+
+            const custom = inMain(page).getByRole('row').filter({ hasText: roleName }).locator('.rounded-tag');
+            await expect(custom).toHaveText('Custom');
+
+            for (const tag of [custom, inMain(page).locator('.rounded-tag', { hasText: 'Built-in' }).first()]) {
+                const text = await pairOf(tag);
+                expect(text.css, `${where}: a role type is muted mono text, not accent`).toBe(ds['text-muted']);
+                expect(await style(tag, 'border-top-color')).toBe(ds['rule-control']);
+                expect(contrastOf(text.foreground, text.background), `${where}: tag contrast`).toBeGreaterThanOrEqual(4.5);
+            }
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+
+        // A failed submission is a real validation error: the banner is an assertive danger alert.
+        const failed = await page.request.post('/admin/roles', {
+            form: { _token: token, name: '' },
+            headers: { 'X-CSRF-TOKEN': token, Referer: new URL('/admin/roles', page.url()).toString() },
+            maxRedirects: 0,
+        });
+        expect(failed.status()).toBe(302);
+
+        for (const { theme, viewport } of MODES) {
+            await visit(page, '/admin/roles', theme, viewport);
+            const ds = await readDs(page, DS);
+            const banner = inMain(page).locator('[data-variant="danger"]');
+
+            if (theme === 'light' && viewport.width === XL.width) {
+                await expect(banner, 'the validation banner is a danger alert').toBeVisible();
+                await expect(banner).toHaveAttribute('role', 'alert');
+                expect((await pairOf(banner.locator('> svg'))).css).toBe(ds['danger']);
+                expect((await pairOf(banner.locator('[data-alert-body]'))).css).toBe(ds['text']);
+            }
+        }
+    });
+
+    test('a page is Draft, then Published, with the shared state mark in both themes', async ({ page }) => {
+        test.setTimeout(240_000);
+
+        const token = await csrf(page);
+        const location = await createViaForm(page, '/operator/cms', token, { title: 'E2E WP2 Page' });
+        const editPath = pathOf(location);
+        created.push(editPath.replace(/\/edit$/, ''));
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            await visit(page, '/operator/cms', theme, viewport);
+            const ds = await readDs(page, DS);
+            const row = inMain(page).getByRole('row').filter({ hasText: 'E2E WP2 Page' });
+
+            await expectMark(row.locator('[data-page-state]'), 'Draft', 'neutral', 'dashed', ds, `${where} list`);
+
+            await visit(page, editPath, theme, viewport);
+            await expectMark(inMain(page).locator('[data-page-state]'), 'Draft', 'neutral', 'dashed', ds, `${where} edit`);
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+
+        await visit(page, editPath, 'light', XL);
+        await inMain(page).getByRole('button', { name: 'Publish' }).click();
+        await expect(inMain(page).locator('[data-page-state="published"]')).toBeVisible();
+
+        for (const { theme, viewport } of MODES) {
+            const where = `${theme} ${viewport.width}`;
+            await visit(page, '/operator/cms', theme, viewport);
+            const ds = await readDs(page, DS);
+            const row = inMain(page).getByRole('row').filter({ hasText: 'E2E WP2 Page' });
+
+            await expectMark(row.locator('[data-page-state]'), 'Published', 'success', 'check', ds, `${where} list`);
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
         }
     });
 });

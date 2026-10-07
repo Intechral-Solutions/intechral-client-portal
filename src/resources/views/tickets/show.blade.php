@@ -13,10 +13,7 @@
 
     {{-- Flash --}}
     @if (session('status'))
-    <div class="rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);">
-        {{ session('status') }}
-    </div>
+    <x-ui.alert variant="success">{{ session('status') }}</x-ui.alert>
     @endif
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -59,14 +56,13 @@
 
             {{-- Replies --}}
             @foreach ($ticket->replies as $reply)
-            <div class="rounded-xl border p-5 @if($reply->is_internal) border-dashed @endif"
-                 style="border-color: {{ $reply->is_internal ? 'var(--border-warning, #d97706)' : 'var(--border-base)' }}; background-color: {{ $reply->is_internal ? 'var(--surface-warning, #fffbeb)' : 'var(--surface-base)' }};">
+            <div class="rounded-xl border p-5 {{ $reply->is_internal ? 'border-dashed border-warning-glyph bg-warning-soft' : '' }}"
+                 @unless ($reply->is_internal) style="border-color: var(--border-base); background-color: var(--surface-base);" @endunless>
                 <div class="flex items-center justify-between mb-3">
                     <span class="text-sm font-medium" style="color: var(--text-primary);">{{ $reply->user->name }}</span>
                     <div class="flex items-center gap-2">
                         @if ($reply->is_internal)
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full"
-                              style="background-color: #fef3c7; color: #92400e;">Internal Note</span>
+                        @include('tickets._internal_note_label')
                         @endif
                         <time class="text-xs" style="color: var(--text-secondary);" datetime="{{ $reply->created_at->toIso8601String() }}">
                             {{ $reply->created_at->diffForHumans() }}
@@ -131,10 +127,10 @@
                     @if ($ticket->sla_due_at)
                     <div>
                         <dt class="text-xs" style="color: var(--text-secondary);">SLA Due</dt>
-                        <dd style="color: {{ $ticket->isOverdue() ? 'var(--text-danger)' : 'var(--text-primary)' }};">
+                        <dd class="{{ $ticket->isOverdue() ? 'text-danger' : '' }}" @unless ($ticket->isOverdue()) style="color: var(--text-primary);" @endunless>
                             {{ $ticket->sla_due_at->format('d M Y H:i') }}
                             @if ($ticket->isOverdue())
-                            <span class="text-xs font-medium ml-1" style="color: var(--text-danger);">Overdue</span>
+                            @include('tickets._overdue_status', ['class' => 'ml-1'])
                             @endif
                         </dd>
                     </div>

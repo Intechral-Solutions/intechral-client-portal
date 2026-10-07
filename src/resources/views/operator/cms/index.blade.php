@@ -12,9 +12,7 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
@@ -38,11 +36,7 @@
                     </td>
                     <td class="px-4 py-3 font-mono text-xs" style="color: var(--text-muted);">{{ $page->slug }}</td>
                     <td class="px-4 py-3 text-center">
-                        <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                              style="background-color: {{ $page->isPublished() ? 'var(--surface-success)' : 'var(--surface-input)' }};
-                                     color: {{ $page->isPublished() ? 'var(--text-success)' : 'var(--text-muted)' }};">
-                            {{ $page->isPublished() ? 'Published' : 'Draft' }}
-                        </span>
+                        @include('operator.cms._state', ['published' => $page->isPublished()])
                     </td>
                     <td class="px-4 py-3 text-xs" style="color: var(--text-muted);">{{ $page->updated_at->diffForHumans() }}</td>
                     <td class="px-4 py-3 text-right">

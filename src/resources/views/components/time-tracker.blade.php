@@ -68,26 +68,18 @@
     @endif
 
     @can('time.log')
-    <div class="flex items-center gap-2">
+    {{-- The script finds the controls through data-* hooks, never utility classes. --}}
+    <div class="flex items-center gap-2" data-time-tracker-controls>
         @if ($runningEntry)
-        <span class="inline-flex items-center gap-1.5 text-xs" style="color: var(--text-success);">
-            <span class="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style="background-color: var(--text-success);"></span>
-            Timer running
-        </span>
-        <button type="button"
-                class="time-tracker-stop-btn text-xs font-medium hover:underline ml-auto"
-                style="color: var(--text-danger);"
-                data-entry-id="{{ $runningEntry->id }}">
-            Stop
-        </button>
+        <x-time-tracker.running :entry-id="$runningEntry->id" />
         @else
-        <button type="button"
-                class="time-tracker-start-btn text-xs font-medium rounded-lg border px-3 py-1.5 transition-colors hover:opacity-90"
-                style="border-color: var(--border-base); color: var(--text-secondary); background-color: var(--surface-input);">
-            &#9654; Start Timer
-        </button>
+        <x-ui.button variant="secondary" size="sm" data-time-tracker-start>&#9654; Start Timer</x-ui.button>
         @endif
     </div>
+    {{-- The running state the script clones when a timer starts here: same component, no JavaScript markup. --}}
+    <template data-time-tracker-running-template>
+        <x-time-tracker.running />
+    </template>
     @endcan
 </div>
 
@@ -100,7 +92,7 @@
     var CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
     // ── Start timer buttons ───────────────────────────────────────────────
-    document.querySelectorAll('.time-tracker-start-btn').forEach(function(btn) {
+    document.querySelectorAll('[data-time-tracker-start]').forEach(function(btn) {
         btn.addEventListener('click', async function() {
             var card = btn.closest('[data-time-tracker]');
             if (!card) return;
@@ -115,6 +107,7 @@
             if (contextType === 'task')    payload.task_id    = contextId;
             if (contextType === 'ticket')  payload.ticket_id  = contextId;
 
+            var label = btn.textContent;
             btn.disabled = true;
             btn.textContent = '\u2026';
 
@@ -130,34 +123,32 @@
 
                 if (!res.ok) {
                     btn.disabled = false;
-                    btn.innerHTML = '&#9654; Start Timer';
+                    btn.textContent = label;
                     return;
                 }
 
                 var data = await res.json();
                 window.dispatchEvent(new CustomEvent('timerStarted', { detail: data }));
 
-                // Replace button with "running" indicator — a full page reload
-                // would also work, but this gives immediate feedback.
-                card.querySelector('.flex.items-center.gap-2').innerHTML =
-                    '<span class="inline-flex items-center gap-1.5 text-xs" style="color: var(--text-success);">' +
-                    '<span class="inline-block h-1.5 w-1.5 rounded-full animate-pulse" style="background-color: var(--text-success);"></span>' +
-                    'Timer running</span>' +
-                    '<button type="button" class="time-tracker-stop-btn text-xs font-medium hover:underline ml-auto"' +
-                    ' style="color: var(--text-danger);" data-entry-id="' + data.id + '">Stop</button>';
+                // Replace the button with the server-rendered running state (a <template> holding the same
+                // component markup), so no markup or colour is built here.
+                var controls = card.querySelector('[data-time-tracker-controls]');
+                var template = card.querySelector('[data-time-tracker-running-template]');
+                controls.replaceChildren(template.content.cloneNode(true));
+                controls.querySelector('[data-time-tracker-stop]').dataset.entryId = data.id;
 
                 // Re-wire the new stop button
                 wireStopButtons();
             } catch (e) {
                 btn.disabled = false;
-                btn.innerHTML = '&#9654; Start Timer';
+                btn.textContent = label;
             }
         });
     });
 
     // ── Stop timer buttons ────────────────────────────────────────────────
     function wireStopButtons() {
-        document.querySelectorAll('.time-tracker-stop-btn').forEach(function(btn) {
+        document.querySelectorAll('[data-time-tracker-stop]').forEach(function(btn) {
             if (btn._wired) return;
             btn._wired = true;
             btn.addEventListener('click', async function() {

@@ -13,16 +13,10 @@
 
     {{-- Flash / errors --}}
     @if (session('status'))
-    <div class="rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);">
-        {{ session('status') }}
-    </div>
+    <x-ui.alert variant="success">{{ session('status') }}</x-ui.alert>
     @endif
     @if ($errors->any())
-    <div class="rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);">
-        {{ $errors->first() }}
-    </div>
+    <x-ui.alert variant="danger">{{ $errors->first() }}</x-ui.alert>
     @endif
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -43,8 +37,7 @@
                         @include('tickets._priority_badge', ['priority' => $ticket->priority])
                         @include('tickets._status_badge', ['status' => $ticket->status])
                         @if ($ticket->isOverdue())
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                              style="background-color: #fef2f2; color: #dc2626;">Overdue</span>
+                        @include('tickets._overdue_status')
                         @endif
                     </div>
                 </div>
@@ -62,13 +55,13 @@
 
             {{-- Replies --}}
             @foreach ($ticket->replies as $reply)
-            <div class="rounded-xl border p-5 {{ $reply->is_internal ? 'border-dashed' : '' }}"
-                 style="border-color: {{ $reply->is_internal ? '#d97706' : 'var(--border-base)' }}; background-color: {{ $reply->is_internal ? '#fffbeb' : 'var(--surface-base)' }};">
+            <div class="rounded-xl border p-5 {{ $reply->is_internal ? 'border-dashed border-warning-glyph bg-warning-soft' : '' }}"
+                 @unless ($reply->is_internal) style="border-color: var(--border-base); background-color: var(--surface-base);" @endunless>
                 <div class="flex items-center justify-between mb-3">
                     <span class="text-sm font-medium" style="color: var(--text-primary);">{{ $reply->user->name }}</span>
                     <div class="flex items-center gap-2">
                         @if ($reply->is_internal)
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full" style="background-color: #fef3c7; color: #92400e;">Internal Note</span>
+                        @include('tickets._internal_note_label')
                         @endif
                         <time class="text-xs" style="color: var(--text-secondary);">{{ $reply->created_at->diffForHumans() }}</time>
                     </div>
@@ -156,7 +149,7 @@
                     @if ($ticket->sla_due_at)
                     <div>
                         <dt class="text-xs" style="color: var(--text-secondary);">SLA Due</dt>
-                        <dd style="color: {{ $ticket->isOverdue() ? 'var(--text-danger)' : 'var(--text-primary)' }};">{{ $ticket->sla_due_at->format('d M Y H:i') }}</dd>
+                        <dd class="{{ $ticket->isOverdue() ? 'font-medium text-danger' : '' }}" @unless ($ticket->isOverdue()) style="color: var(--text-primary);" @endunless>{{ $ticket->sla_due_at->format('d M Y H:i') }}</dd>
                     </div>
                     @endif
                     @if ($ticket->resolved_at)

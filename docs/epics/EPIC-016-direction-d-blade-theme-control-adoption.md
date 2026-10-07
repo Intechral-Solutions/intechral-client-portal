@@ -1,6 +1,6 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2, WP3 and WP4 are not started. The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
+**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is implemented and independently reviewed, and is submitted as a pull request with hosted CI pending at the time of writing ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 and WP4 are not started. The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
@@ -1351,3 +1351,211 @@ Non-blocking observations from the independent review (recorded, **not fixed** i
 - **Behavioural evidence (Playwright), `tests/Browser/role-delete-form.spec.ts`** (new), the authoritative proof. It drives the real controls in Chromium on a throwaway role: Save Changes sends `PUT` only (the collision, `_method=PUT` plus `_method=DELETE` from Chromium's collapse of the nested form, is what it caught on the old markup), raises no dialog, and the change persists; `Delete Role` raises the native `confirm()`, dismissing it by pointer and by keyboard (`Enter`) deletes nothing, and accepting it sends `DELETE` and removes the role; the role is removed afterwards through the application's own route. **It fails on the previous markup** (`['PUT', 'DELETE']` received where `['PUT']` is expected).
 - Not covered in the browser: the assigned-role refusal (it needs a second account; the Pest suite pins it).
 - Maintainability note (accepted, non-blocking): the `@can('roles.admin')` and `@if (! $isBuiltIn)` conditions appear twice in `edit.blade.php` (around the button and around the separate delete form), so editing one without the other could leave the button pointing at a missing form. Left as is to keep the hotfix diff minimal.
+
+---
+
+## Amendment 2: WP2 Status and Semantic State (PR 2)
+
+> **Status (2026-10-06): WP2 implemented on `feature/epic-016-blade-theme-control-adoption` and independently reviewed (A2.18); submitted as a pull request, hosted CI pending at the time of writing.** EPIC-016 stays **In Progress**. The independent review (A2.18) found no blocking production or test defect, and its documentation corrections are applied. WP3 and WP4 are not started, and nothing in this amendment changes a routing, permission, workflow, status value, transition, business rule or React file. The historical design-gate text above is unchanged.
+
+### A2.1 Starting point and restart orientation
+
+- **Starting SHA:** `8a6454a850dec8267a9ba550184cfe50d464b723` (`docs: orient roadmap to Release 1`), the pause marker. `main`, `origin/main` and the local feature branch were all at that commit, the working tree was clean, and there was no stash. The remote feature branch (`278dbe6`, the WP1 head) is an ancestor of `main`, i.e. behind; it was **not** merged back (the branch was brought forward by `git merge --ff-only main`, which was a no-op).
+- **Open PRs:** none. **`main` CI:** the latest run (`docs: orient roadmap to Release 1`) and the four before it are `success`.
+- **Lifecycle at the start:** EPIC-016 In Progress; WP0 complete; WP1 and the Delete Role hotfix merged and verified; WP2, WP3, WP4 not started (no WP2 file existed on any branch). `main` had not moved since the pause, so no intervening commit needed inspection.
+- **Method.** The four semantic primitives first; then the domain mapping partials; then every §9 site (tickets, invoices, tags, flash, report figures, CMS, MFA, the Stripe error region); then the time tracker; then Pest, the contrast evidence, mutation checks, the browser spec and the visual matrix. Held to the epic's rule: same information, same behaviour; only the **presentation of state** changes.
+- **No new theme token** (§7.2 rule 6, §11.4): every contract below is expressed in the existing `--ds-*` layer. `app.css`, every token, `resources/js`, routes, controllers, policies, models, migrations, dependencies and CI are untouched.
+
+### A2.2 Scope delivered (§19 WP2)
+
+`x-ui.status`, `x-ui.priority`, `x-ui.alert`, `x-ui.tag`; the rewritten `tickets/_status_badge` and `tickets/_priority_badge`; the new `billing/_invoice_status` (replacing four duplicated colour maps); the overdue SLA presentation (queue cell and both ticket detail views); the internal-note card; role and organization-member tags; every flash and error banner (24 sites) and the Stripe `#payment-message`; report figures; MFA "Enabled"; the payment ledger `+amount` and `✓ Paid`; CMS Published / Draft; and the embedded ticket time tracker (A2.9). Out, by instruction: WP3's body-colour sweep and WP4's retirement, guard and census.
+
+### A2.3 The semantic component seam
+
+Anonymous components under `resources/views/components/ui/`, the twins of the React primitives named in §6. Domain knowledge stays **out** of them: a component draws a tone, a glyph and a label, and never learns what a ticket or an invoice is. None reads the database or the request (Pest renders each with the query log on and scans the sources).
+
+| Component | Contract implemented |
+|---|---|
+| `x-ui.status` | `tone` `neutral` (default), `info`, `success`, `warning`, `danger`, `live`; `glyph` `circle`, `half`, `dot`, `check`, `triangle`, `square`, `dashed` (the shared vocabulary, path-for-path the same SVG as `status.tsx`), defaulting to the tone's own shape. An inline glyph (`aria-hidden`, `data-glyph`) and a visible label; never a filled pill. Label uses the text-safe token (`text-text-muted`, `text-accent`, `text-success`, `text-warning`, `text-danger`, `text-live-text`), glyph the shape-only token (`text-success-glyph`, `text-warning-glyph`, `text-live`), exactly as React does. An unknown tone or glyph throws `InvalidArgumentException` rather than draw something misleading. |
+| `x-ui.priority` | `bars` 1-3 and `tone` `neutral` / `danger`. Three ascending bars (`aria-hidden`; filled `fill-current`, unfilled `fill-rule-control`) plus the visible label; `danger` is `font-medium text-danger`. Out-of-range input throws. |
+| `x-ui.alert` | `variant` `neutral`, `info`, `success`, `warning`, `danger`; each semantic variant has a glyph (lucide's own path data, as `icon.blade.php` does), an `sr-only` kind label ("Notice: ", "Success: ", "Warning: ", "Error: ") and its tint (`success` and `neutral` on `surface` with a `rule-control` edge: Direction D has no success-soft). **`danger` is `role="alert"`; `info`, `success` and `warning` are `role="status"`; `neutral` has no role** (`role` is overridable). The message sits in `[data-alert-body]`, so a script can fill an alert at runtime without touching the glyph. An `action` slot renders outside the body. |
+| `x-ui.tag` | mono, uppercase, `rounded-tag`, `border-rule-control`, `text-text-muted`: a kind or category, never state and never accent. |
+
+Callers add layout classes only (§7.2 rule 1); every other attribute passes through (`id`, `data-*`, `role`, `class`).
+
+### A2.4 Domain mappings (§9), each in one place
+
+| Domain | Mapping | Where |
+|---|---|---|
+| Ticket lifecycle (§9.1) | `open` info / circle; `in_progress` info / half; **`pending_user` neutral / dashed (P6 substitute for the hourglass)**; `resolved` success / check; `closed` neutral / check. Labels (Open, In Progress, Pending, Resolved, Closed) and values unchanged. Unknown: neutral / circle with `ucfirst`. | `tickets/_status_badge` |
+| Ticket priority (§9.2) | `low` 1 bar, `medium` 2, `high` 3, all neutral; `critical` 3 bars in danger. Unknown: one neutral bar. | `tickets/_priority_badge` |
+| Invoice lifecycle (§9.3) | `draft` neutral / dashed; **`sent` info / half (P11 substitute for the arrow)**; `paid` success / check; **`overdue` danger / square (P11 substitute for the clock)**; `cancelled` neutral / circle. A cancelled invoice's **amount is struck through** (P7) on the operator list and detail and the client list and detail. | **one** partial, `billing/_invoice_status`, included by all four views |
+| SLA overdue (§9.4) | danger status, `square` glyph (P11) + the existing "Overdue" label | `tickets/_overdue_status` |
+| Internal note (§9.5) | marker: lock glyph (lucide `lock`, an icon, not a Status glyph, so no substitution) + the existing "Internal Note" in `text-warning`; card: `border-dashed border-warning-glyph bg-warning-soft` | `tickets/_internal_note_label` + the card classes in both ticket detail views |
+| CMS state (§9.6) | Published success / check; Draft neutral / dashed | `operator/cms/_state` |
+| MFA state (§9.7; Disabled by owner ruling, A2.12 #7) | Enabled success / check; Disabled neutral / dashed | `admin/users/show` |
+
+**Temporary glyph substitutions (P6 / P11), unchanged and recorded here.** The shared cross-renderer glyph vocabulary has no hourglass, arrow or clock, so Pending, invoice Sent and the two Overdue marks use `dashed`, `half` and `square`. No Blade-only glyph was added; the real glyphs join the shared vocabulary (React `status.tsx` and `x-ui.status` together) in the future Finance / React slice (§22).
+
+### A2.5 Sites migrated (per file)
+
+| Area | File | Change |
+|---|---|---|
+| Helpdesk | `tickets/_status_badge`, `tickets/_priority_badge` | rewritten as the mapping partials (the hex pills are gone) |
+| | `tickets/_overdue_status`, `tickets/_internal_note_label` (new) | the shared Overdue mark and internal-note marker |
+| | `tickets/index` | flash alert |
+| | `tickets/show` | flash alert; SLA due date `text-danger` + the Overdue mark; internal-note card and marker (the `#fef3c7` / `#92400e` / `#d97706` / `#fffbeb` styling is gone) |
+| | `operator/tickets/index` | flash and error alerts; **`bg-red-50` removed**; SLA cell `font-medium text-danger` + the Overdue mark |
+| | `operator/tickets/show` | alerts; the hex Overdue pill replaced by the shared mark; SLA due date in danger; internal-note card and marker |
+| | `operator/tickets/reports` | figures are `font-mono tabular-nums text-text` (4 sites; none is a link) |
+| | `components/time-tracker`, `components/time-tracker/running` (new) | A2.9 |
+| Directory | `crm/contacts/{index,show}`, `crm/companies/{index,show}`, `organizations/{index,show}` | success flash alerts; the organization member role pill is `x-ui.tag` |
+| Finance | `billing/invoices/{index,show}`, `billing/client/{index,show}` | the one shared status partial; overdue due dates `text-danger` (`font-medium` kept); cancelled amounts struck through |
+| | `billing/invoices/{show,edit}`, `billing/client/show` | alerts; `✓ Paid` and the ledger `+amount` in `text-success` |
+| | `billing/payment/show` | `#payment-message` is `x-ui.alert variant="danger" class="hidden"`, **id kept**; the script now sets the text on `[data-alert-body]` |
+| System | `admin/roles/{index,edit}` | `Built-in` / `Custom` are `x-ui.tag`; alerts |
+| | `admin/users/{index,show}` | alerts; MFA "Enabled" is `x-ui.status tone="success"`; MFA "Disabled" is a neutral / `dashed` status (owner ruling, A2.12 #7) |
+| | `operator/cms/{index,edit}` | alerts; Published / Draft through `operator/cms/_state` |
+
+Flash text, triggers and session semantics are unchanged: only the wrapper changed. 20 success banners are now `role="status"` (18 were `role="alert"`, 2 had no role) and 4 error banners are `role="alert"` (3 already were; 1 had no role).
+
+### A2.6 Overdue, notes, tags, alerts, figures
+
+- **Overdue.** The queue row has no tint in either theme; the SLA cell shows the due date in `text-danger font-medium` plus the "Overdue" status (glyph + text). The operator and member ticket pages use the same mark. Invoice due dates use `text-danger`. **No new definition of "overdue"**: `Ticket::isOverdue()` and `Invoice::isOverdue()` are consumed as they are (note `Invoice::isOverdue()` is `sent` and past due; the `overdue` status is the stored value).
+- **Internal note.** Presentation only: who may write or see a note, and attachments, are untouched.
+- **Tags.** `Built-in` / `Custom` and the organization member role are kinds. They are muted mono text on a `rule-control` edge, no longer accent-coloured, and `admin` is no longer drawn as a warning.
+- **Alerts and figures.** Success is a polite status alert, errors are assertive; report counts are plain mono tabular text; `✓ Paid` and `+amount` are `text-success`.
+- **CMS.** Only the Published / Draft mark changed; the publish rules and the CMS renderer are untouched.
+
+### A2.7 Static census after WP2 (target views and `components/`, both columns re-taken by `grep` at `8a6454a` and at the working tree)
+
+| Measure | Before WP2 | After WP2 |
+|---|---:|---:|
+| hex literals (status, priority, overdue, internal note) | 12 | **0** |
+| `bg-red-50` | 1 | **0** |
+| duplicated invoice status colour maps | 4 | **0** (one partial) |
+| legacy status colour variables (`--surface-*` / `--border-*` / `--text-*` of success, danger, warning, info; `--surface-accent`) | 134 | **3**, all `--text-danger` danger-zone *headings* (WP3, A2.12 #6); none at a semantic-state site |
+| `var(--accent)` | 8 | **1** (the `errors/403` numeral, WP3) |
+| flash banners as hand-built `div`s | 24 | **0** (24 `x-ui.alert`) |
+| `x-ui` invocations | button 84, link 46, input 35, select 17, textarea 8, checkbox 7, label 40, field-error 49 | + status 9 (8 before the MFA "Disabled" ruling), priority 2, alert 27, tag 4 (and the partials they sit behind) |
+| raw `var(--…)` references / inline `style=` (re-taken by the same `grep` over the target views and `components/` at both commits; WP3's debt) | 654 / 474 | 479 / 421 |
+
+### A2.8 The embedded ticket time tracker (WP1 review ruling A1.15 #2)
+
+The ruling that the tracker belongs to WP2 is treated as authoritative.
+
+- **Running is `live`, not `success`:** a live dot (`x-ui.status tone="live"`) and the unchanged "Timer running" text in `text-live-text`.
+- **Start and Stop are non-destructive timer controls:** `x-ui.button variant="secondary" size="sm"`. Stop lost its danger colour. The visible names are unchanged: **`▶ Start Timer`** (the `time-migration.spec.ts` `/Start Timer/` lookup) and **`Stop`**.
+- **No markup in JavaScript.** The running state is one anonymous component, `x-time-tracker.running`. The server renders it directly when the viewer already has a running entry, and **once more inside a `<template data-time-tracker-running-template>`** that the script clones when a timer starts (`controls.replaceChildren(template.content.cloneNode(true))`, then `dataset.entryId = data.id`). Every `innerHTML` string, every inline colour and the utility-class selector `.flex.items-center.gap-2` are gone; the script finds `[data-time-tracker-controls]`, `[data-time-tracker-start]`, `[data-time-tracker-stop]` and the template through `data-*` hooks only. The start button's label is restored from the text it had, not re-typed.
+- **Unchanged:** the endpoints (`/time/timer/start`, `/time/timer/{id}/stop`), the `timerStarted` / `timerStopped` events, `location.reload()` after stop, `Retry stop`, the guard `can('time.log')`, and the EPIC-011D reconciliation. The `animate-pulse` on the old dot is gone, an accepted implementation choice (independent review, A2.18): Direction D requires the running state to use the semantic `live` treatment, and it does (a `live` dot and `text-live-text` label); the visible "Timer running" label carries the state independently of motion; and the shared Blade `x-ui.status` primitive is static in this implementation. React's running-timer indicators (`timer-control.tsx`, `timer-pill.tsx`) do pulse, through `animate-live-pulse`, which the stylesheet switches off under reduced motion, but that pulse is an additional motion affordance and not a locked WP2 parity requirement. Removing it removes no semantic signal, and no animation was added.
+- **`time-migration.spec.ts` is unedited and green** (13 / 13), including the embedded-tracker case that clicks `Start Timer` on `/tickets/{id}` and expects `Timer running`.
+
+### A2.9 Tests
+
+| Suite | Tests (assertions) | Covers |
+|---|---:|---|
+| `Unit/Ui/SemanticComponentsTest` (new) | 37 (252) | status: every tone's label and glyph tokens and default glyph, seven distinct glyph drawings, glyph override, escaped label, attribute and class passthrough, no pill / hex / inline style, unknown tone and glyph rejected; priority: 1-3 bars, danger, decoration-only bars, rejected input; alert: every variant's glyph, sr-only kind, tint and role, danger-only `role="alert"`, neutral without role or glyph, role override, action slot, escaped message; tag: mono / uppercase / `rule-control`, never accent; zero queries and a source scan |
+| `Feature/Ui/SemanticStateMappingTest` (new) | 51 (420) | every ticket status (tone, glyph, label), every priority (bars, tone, label), every `Invoice::STATUSES` value, CMS state, internal note, Overdue; unknown-value fallbacks; Open vs In Progress differ by glyph and label; **the single invoice mapping** (all four views include the partial, none keeps a colour map); the glyph really draws geometry; the pages: queue with every status and priority, the overdue row (no `bg-red-50`, danger cell, glyph + label), operator and member Overdue marks, internal-note card on a real page, invoice list and detail for every status, strikethrough only on a cancelled amount, overdue due dates on all four invoice views, `✓ Paid` and `+amount`, role and organization tags, MFA, CMS list and edit, report figures, success flash is `role="status"` on eight pages, validation banner is `role="alert"`, the Stripe region, the tracker (stopped, running, template, script contains no markup or colour, endpoints and events kept), and a source scan of the migrated views for hex, legacy status variables and palette utilities |
+| `Unit/Ui/SemanticStateContrastTest` (new) | 10 (325) | A2.10, both themes |
+| `Feature/Ui/TargetAccessibleNamesTest` (**one test flipped in place, marked "EPIC-016 WP2 FLIP"**) | 12 (211) | the WP1 pin `time-tracker-start-btn` (a utility hook WP2 replaces by design) became: the button is found by `data-time-tracker-start`, its name is still `▶ Start Timer`, and the old class is gone. No behavioural or security assertion was deleted |
+| **New total** | **98 (997)** (97 (987) before the MFA "Disabled" owner ruling added one mapping test, A2.12 #7) | |
+
+`tests/Support/UiHtmlHelpers.php` gained `uiThemeBlock`, `uiTokenHex`, `uiLuminance` and `uiContrast`. Domain transition, workflow, invoice-rule, role-management and Delete Role behaviour keep their existing suites, unedited.
+
+### A2.10 Contrast evidence (WP2 surfaces, both themes)
+
+Measured two ways. **Pest** reads the `[data-theme]` blocks of `app.css` and checks every semantic pair against the Direction D surfaces and the legacy Blade page and card backgrounds the pages still sit on. **Playwright** measures each rendered mark against its real effective background (A2.13), in light and dark at 1440 and 390. Required: text at least 4.5:1, non-text marks at least 3:1.
+
+| Pair | Light | Dark | Replaces (§3.5) |
+|---|---:|---:|---|
+| status / tag label `text-muted` on canvas, surface | 5.86, 6.40 | 8.00, 7.17 | `draft` pill 2.49 / 2.35; `Custom` |
+| `accent` label (Open, In Progress, Sent) | 5.79, 6.32 | 11.77, 10.54 | `open` / `Built-in` 5.78 / 3.28 |
+| `success` label (Resolved, Paid, Published, Enabled, `✓ Paid`) | 4.83, 5.27 | 10.15, 9.09 | green-600 pill 3.15 |
+| `danger` label (Overdue, due dates, Critical) | 6.03, 6.57 | 8.12, 7.27 | critical 4.41; **dark overdue row 1.05** |
+| `text-secondary` priority label | 9.24, 10.08 | 11.85, 10.61 | medium / high / low 2.84 / 3.35 / 3.15 |
+| `live-text` label (Timer running) | 5.79, 6.32 | 12.18, 10.91 | |
+| `warning` "Internal Note" on `warning-soft` | 5.23 | 8.71 | hex `#92400e` on `#fef3c7` |
+| body `text` on `warning-soft` | 15.22 | 13.57 | |
+| every alert variant: body `text` on its tint; kind glyph on it | at least 4.5 | at least 4.5 | |
+| glyph / bar marks (`success-glyph`, `warning-glyph`, `live`, `accent`, `danger`, `text-muted`, `text-secondary`) on page surfaces; the lowest is `warning-glyph` on `warning-soft` | 3.22 and up | 6.31 and up | |
+| dashed `warning-glyph` boundary vs its card and vs the page (lowest page surface) | 3.22 / 3.34 | 8.71 / 8.00 | |
+
+On the legacy dark card (`gray-800`) the lowest label pair is `text-muted` at 6.31. The same Pest test proves the bars can fail: the retired pill hexes score 2.58 to 4.41 and theme text on the old light row scores 1.05.
+
+**Recorded limits (not defects):** the soft tints (`accent-soft`, `warning-soft`, `danger-soft`) sit under 1.5:1 from the page by Direction D design and are never the signal (every alert has a glyph and an `sr-only` kind; the note has a lock, its text and a dashed boundary), which a test pins. Unfilled priority bars on `rule-control` are 1.3 to 1.8:1: decoration only, since the label is the signal (`priority.tsx` draws them the same way). This evidence is scoped to WP2's surfaces and claims no product-wide WCAG conformance.
+
+### A2.11 Mutation checks
+
+Each defect was introduced alone, the matching tests were run and shown to fail, and the file was restored (verified byte-identical with `cmp` against a scratchpad copy; nothing is left in the tree).
+
+| Mutation | Result |
+|---|---|
+| `resolved` given the `info` tone | 1 test fails (the ticket lifecycle mapping) |
+| the status glyph geometry removed from `x-ui.status` | first run: only the distinct-shape test failed, because the mapping tests read the `data-glyph` name, not the drawing. The mapping helper now also requires drawn geometry; re-run: **25 tests fail** |
+| `critical` mapped to `neutral` | 2 tests fail (the priority mapping, and "only critical is danger") |
+| invoice `paid` mapped to `info` | 1 test fails (the invoice mapping) |
+| the tracker's `live` changed to `success` | 2 tests fail (the running tracker and the template) |
+| browser: the `success` label token changed to `text-accent` | the gallery test fails at "light 1440 ticket resolved: label is the success text token" |
+
+### A2.12 Findings and deviations
+
+1. **A gallery for states no supported route can create.** Tickets have no delete route and cannot be made overdue; only a draft invoice can be deleted and nothing cancels one. So `tests/Support/semantic_state_gallery.php` renders every state through the **production partials and components** (read-only, no database) and the browser spec injects that HTML into a real signed-in page's own card, measuring the real compiled CSS. It is not a re-typed copy. The internal-note **card** class string is repeated in the gallery (the card lives in two views); a Pest test pins that the views and the gallery carry the same string. Real records are used where the app can create and delete them: the seeded `TKT-E2E1`, a draft invoice, a custom role, CMS pages.
+2. **Status labels are `text-sm`** (Direction D `st`), not the pills' `text-xs`, so a mark is slightly larger in a table row.
+3. **Visible text is unchanged, DOM text case is not.** The pills lowercased the stored value and drew it with `capitalize`; the partials print the label (`ucfirst`). `Open`, `Low`, `Paid` and so on look identical.
+4. **Success alerts lose their green tint** (Direction D deliberately has no success-soft; React `Alert` draws success on `surface`), keeping the glyph, edge and `sr-only` kind. This is the most visible change of the package, and it is the specified one.
+5. **Screen-reader text gained a prefix**: "Success: ", "Error: ", "Notice: ", "Warning: ". Flash text itself is exact.
+6. **Left for WP3, not in WP2's inventory:** three danger-zone headings (`crm/contacts/edit`, `crm/companies/edit`, `operator/cms/edit`) still use `style="color: var(--text-danger)"`; the `errors/403` numeral still uses `var(--accent)`; the cancelled amount is struck through but its `--text-primary` colour is not muted (it sits in a cell with an inline style, WP3's).
+7. **MFA "Disabled": owner ruling, applied before the independent review.** The first implementation kept "Disabled" as plain text because §9.7 lists only "Enabled". **Owner ruling (2026-10-06): MFA "Disabled" = neutral / dashed status.** "Enabled" and "Disabled" are opposite values of the same visible state, so drawing one as a semantic status and the other as plain text was inconsistent. `admin/users/show` now renders `x-ui.status glyph="dashed"` (neutral tone) with the visible text exactly "Disabled". Presentation only: no MFA behaviour, permission, route, controller or service change. Coverage: a `SemanticStateMappingTest` case (label, neutral tone, `dashed` glyph with drawn geometry, no inline style) and an `mfa:disabled` gallery case measured by the browser spec. This bounded addition extends §9.7 by owner ruling; it does not widen WP2 otherwise.
+8. **The Stripe error region** is verified by Pest (hidden danger alert, `id` and `[data-alert-body]` hook, the script line) and by the built CSS (`.hidden` is emitted after `.flex`, so the region hides); it is not driven in a browser because that needs Stripe.
+9. **The tracker's Start Timer measure is conditional.** Another spec may leave a timer running on the seeded ticket, in which case the server renders the running state and there is no Start button; the browser spec then measures only the cloned running state. `time-migration.spec.ts`, the single owner of timers, covers the real Start-to-running path. The browser spec never starts a timer, so it cannot race that owner.
+10. **Environment.** The dev stack was down and was started with `./dev up` (no database touched). Six root-owned compiled-view cache files in the gitignored `storage/framework/views` blocked Blade from re-touching them and were removed (they are regenerated). The `./dev doctor` repair it prints was not needed.
+11. **Not changed:** `app.css`, any token, `resources/js`, routes, controllers, policies, validation, models, migrations, dependencies, CI, the React `Badge`, `docs/epics/README.md` and the roadmap.
+
+### A2.13 Browser evidence
+
+`tests/Browser/blade-theme-controls.spec.ts` was **extended, not duplicated**: six new tests ("Semantic state") join the 15 from WP1. Each runs light and dark at 1440 and 390 and asserts: no document-level horizontal overflow; the label text visible; the glyph present and visible; label and glyph computed colours equal the tone's tokens; **label contrast at least 4.5:1 and glyph at least 3:1 against the real effective background** (the stacked backgrounds composited and parsed through a canvas, so `oklch` legacy surfaces resolve); no retired pill colour; no saturated blue or indigo hue; no pill fill. Covered: all five ticket statuses, all four priorities (bars, label, danger only on critical, unfilled bars on `rule-control`), all five invoice statuses, CMS state, MFA, the overdue cell, the internal note (dashed, `warning-glyph`, `warning-soft`, lock, label, body contrast and the boundary at 3:1 against the card and the page), the four tags, all five alert variants (role, glyph, `sr-only` kind), and the tracker's live state with a non-danger secondary Stop; plus the real pages (queue and ticket page for the seeded ticket with no light row in dark, the request page's tracker, a draft invoice on the list and page, a custom role's tag and the real success and error alerts, CMS Draft then Published).
+
+**Recorded run** (`./dev test:e2e` with the default 3 workers): `blade-theme-controls.spec.ts` (21), `time-migration.spec.ts` (13, **unedited**), `blade-shell.spec.ts` and `role-delete-form.spec.ts`: **46 tests, 4 specs, 46 passed, 3 workers, 3.8 minutes**. **Product-data counts, before and after: projects 2 / 2, tasks 1 / 1, time entries 2 / 2 (unchanged)**; the spec's own records (a draft invoice, a custom role, CMS pages, companies) are deleted through the application's own DELETE routes; the development database held 0 companies, 0 contacts, 0 invoices, 0 CMS pages and only the `operator` and `user` roles afterwards. **HTTP** over the whole working window (iterations, screenshots, mutation runs and the recorded run, from the nginx log): 1,397 `200`, 151 `302`, 8 `303`, **0 `5xx`, 0 `429`, 0 `419`**; 5 expected `403`s (`blade-shell`'s deterministic case and the 403 checks), 2 `404`s (cleanup of already-removed records), 32 `499`s (navigations aborted by the next `goto`). Hosted PR CI remains the authoritative complete-browser gate.
+
+### A2.14 Visual evidence
+
+Screenshots (light and dark, 1440 and 390; the scratchpad, **not** in the repository; the temporary spec that took them was deleted) of the queue with the full state gallery, the real queue, the ticket request page with the tracker's running state, the invoice list and a draft invoice, the CMS list, the roles list, and a Directory list with its real success alert (30 images). Reviewed: statuses read as glyph + label in a muted, teal, green or red tone with no pastel pill; priority bars with their labels (Critical red, the rest neutral); Overdue in red with a square; the internal note as a dashed amber card with a lock in both themes; tags as quiet mono boxes; the five alert variants; "Timer running" with a teal dot and a neutral Stop; no blue or indigo on any status. **A reviewed defect, fixed:** a click-through to the ticket page reloads the document and drops the applied theme, so the first version of the tracker test measured the light theme in its "dark" iterations; it now loads the ticket path directly and asserts `data-theme`. Not reviewed, by design: page-body colour and geometry (WP3).
+
+**Correction after independent review (A2.18), to the evidence record only; the product implementation is unchanged.** The reviewer re-inspected the original screenshot set. `request-tracker-dark-390` and `request-tracker-dark-1440` are byte-identical to their light counterparts: they were captured before the theme-navigation fix above, so they show the light theme. **The original set is useful visual evidence for the other views, but it is not valid dark-mode evidence for the running tracker.** The other dark screenshots do show dark mode, and no pastel status pill, blue or indigo status treatment, or split glyph/label was found in the valid views. The dark running-tracker evidence after the fix is (a) the browser assertions, which explicitly check `data-theme` for each mode and measure the live label, dot and Stop control in the dark theme, and (b) a temporary tracker probe with light and dark screenshots that the independent review ran and then deleted. That probe is not part of the repository.
+
+### A2.15 Left for the next packages
+
+- **WP3:** the user-role chips on `admin/users/index` and the SSO-provider chips on `admin/users/show`, which still use the legacy pill presentation. They are categorical kinds, not lifecycle state, so the owner disposition is to carry them to WP3 and migrate them to `x-ui.tag` during the broader Blade normalization sweep (not changed in WP2). Also: every remaining raw colour variable and inline style in the target views (479 / 421 after WP2), the dead `hover:legacy-bg-surface` classes, the `errors/403` numeral and colours, the three danger-zone headings, the muted colour for a struck-through cancelled amount, the invite-modal scrim, the 12px to 8px card radius, the `--ds-*` value pin, and the palette-conformance and reference-comparison browser checks. WP3's palette check can reuse this spec's `pairOf` helper.
+- **WP4:** alias retirement (`--accent` now has one consumer, the `errors/403` numeral; `--surface-accent` has none in the views) and the absence pins, the vendor pagination `@source` line, the permanent two-level guard (rule B7's `x-ui` override check now has four more components to cover) and the final census.
+
+### A2.16 Files changed
+
+**New (views):** `components/ui/{status,priority,alert,tag}.blade.php`, `components/time-tracker/running.blade.php`, `billing/_invoice_status.blade.php`, `tickets/_overdue_status.blade.php`, `tickets/_internal_note_label.blade.php`, `operator/cms/_state.blade.php`. **New (tests):** `tests/Unit/Ui/{SemanticComponentsTest,SemanticStateContrastTest}.php`, `tests/Feature/Ui/SemanticStateMappingTest.php`, `tests/Support/semantic_state_gallery.php`.
+**Changed:** 26 existing views (A2.5): the two ticket partials, `components/time-tracker`, and the Helpdesk, Directory, Finance and System pages; `tests/Browser/blade-theme-controls.spec.ts` (six tests, helpers and the docblock); `tests/Feature/Ui/TargetAccessibleNamesTest.php` (the one flipped test); `tests/Support/UiHtmlHelpers.php` (contrast helpers). **Docs:** this amendment and the status line. EPIC-016 stays **In Progress**.
+**Scope check against `8a6454a`:** only `resources/views`, `tests` and this document; nothing under `resources/js`, `resources/css`, `routes`, `app`, `database`, `config`, `.github` or any manifest.
+
+### A2.17 Validation
+
+- **Focused Pest, author's original run** (`tests/Unit/Ui`, `tests/Unit/Configuration`, `tests/Feature/Ui`, `tests/Feature/Tickets`, `tests/Feature/Billing`, `tests/Feature/Admin`, `tests/Feature/Cms`, `tests/Feature/Crm`): **710 passed (4,387 assertions)**, 93 s, which includes the 97 new tests. This is the historical run, taken before the MFA "Disabled" owner ruling (A2.12 #7); it did not include that test.
+- **MFA "Disabled" follow-up (author, after the owner ruling):** one mapping test was added and passes (`SemanticStateMappingTest`: MFA tests 2 passed, 18 assertions; the new test also fails on the previous plain-text markup). It brings the new-test total to 98 (997 assertions), and the mapping test file to 51 tests (420 assertions).
+- **Focused Playwright, author's run** (A2.13): 46 tests, 4 specs, 3 workers, 3.8 minutes, all passed; `time-migration.spec.ts` alone, unedited: 13 / 13.
+- **`./dev check`** (run alone, after the focused evidence was stable): **All checks passed, exit 0.** CLI self-tests **196 assertions**; `git diff --check` pass (the untracked files, which it does not read, were scanned separately: no trailing whitespace); Pint pass (**324 files**); frontend `npm run check` pass (`wayfinder:generate`, `tsc --noEmit`, ESLint, Prettier, **Vitest 99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,282 passed (13,236 assertions)**, 592 s. **The first run was not green:** it failed one new test (2,281 passed, 1 failed), a flaky fixture of this package's own: the invoice factory's random `issued_at` could print the same date as the test's `due_at`, so the due-date cell lookup matched two cells. The fixture now pins the issue dates; the test was repeated five times green and `./dev check` was re-run in full. No product code changed. That green full gate preceded the MFA "Disabled" ruling, which changed one view line (`admin/users/show`) and added one test, a gallery case and one browser assertion; the ruling was covered by the focused MFA run above and by the independent review's runs (A2.18), and the full gate was not re-run for it.
+
+### A2.18 Independent review
+
+**Initial verdict: WP2 NEEDS SMALL REMEDIATION. Classification: documentation only.** No blocking production-code defect and no blocking test defect was found. After the corrections below, the verdict is **WP2 SAFE TO COMMIT**. Hosted CI is not claimed here.
+
+- **Production and tests.** The four semantic components are presentation-only, and every domain mapping (tickets, priority, invoices, CMS, MFA Enabled and Disabled) matches §9 with the P6 / P11 substitutes recorded. The old pastel pills, hex colours, `bg-red-50` and the four duplicated invoice maps are gone. Scope is `resources/views`, `tests` and this document only.
+- **Time tracker.** Reviewed in depth and independently probed beyond the committed browser suite, with the timer endpoints mocked so no data was written: a failed start restores the label; a successful start swaps in the cloned running state with the entry id on Stop; a failed stop offers "Retry stop"; the retry posts to the cloned entry's stop endpoint with CSRF; `timerStarted` then `timerStopped` fire; the page reloads to the Start state. There were no duplicate ids, the template stayed free of an entry id, and product data was unchanged (projects 2 / 2, tasks 1 / 1, time entries 2 / 2). `time-migration.spec.ts` is byte-identical to the base.
+- **Gallery.** Accepted: it invokes the real production partials and components with the real domain values, reproduces no mapping logic, adds no route or backdoor and persists nothing. It is presentation and contrast evidence only.
+- **Contrast.** Accepted: the browser test measures the real computed foreground against the effective, composited background. The dark-theme loss on navigation was identified and corrected in the test logic (A2.14).
+- **Independent runs (reviewer's, not the author's).** Pest, five WP2 files: **118 passed (1,264 assertions)**. Playwright, `time-migration.spec.ts` and `blade-theme-controls.spec.ts`: **34 passed, 0 failed, 0 skipped, 2 workers, 3.6 minutes**, product counts unchanged.
+- **Visual-change rulings.** Success tint removed: required (A). Status labels at `text-sm`: required (A). Live-dot pulse removed: acceptable implementation choice (B), with the rationale corrected in A2.8.
+
+**Documentation corrections applied:** A2.14 (the original dark-tracker screenshots are not valid dark evidence), A2.8 (the pulse rationale), A2.10 (the cross-reference now points to A2.13), A2.17 (author and reviewer evidence separated, and the MFA follow-up recorded).
+
+**Carried forward, not implemented in WP2:**
+- **WP3:** the user-role and SSO-provider chips move to `x-ui.tag` (A2.15).
+- **Optional test hardening (not a WP2 blocker):** pin the gallery's SLA wrapper the way the note-card wrapper is pinned; make the shared `visit()` helper assert `data-theme` directly.
+- **Visual watch item:** the dashed Pending and Draft glyphs look relatively faint in dark mode; their measured non-text contrast passes 3:1 and no WP2 change is required.
+- **Pre-existing or out of scope, destinations unchanged:** 390px table and card clipping on the queue, roles and invoice list; "All Statuss" / "All Prioritys"; the invoice number wrapping at 390px; slate dark-surface debt and heavy table dividers (WP3); the danger-zone raw text variables, the `errors/403` numeral and the cancelled-amount muting (WP3).
