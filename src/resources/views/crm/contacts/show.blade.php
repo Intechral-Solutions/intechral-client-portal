@@ -6,9 +6,9 @@
     <div class="mb-8 flex items-start justify-between">
         <div>
             <x-ui.link variant="quiet" :href="route('crm.contacts.index')" class="text-sm">&larr; Contacts</x-ui.link>
-            <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $contact->fullName() }}</h1>
+            <h1 class="mt-2 text-2xl font-semibold text-text">{{ $contact->fullName() }}</h1>
             @if ($contact->job_title)
-            <p class="text-sm mt-0.5" style="color: var(--text-secondary);">{{ $contact->job_title }}</p>
+            <p class="text-sm mt-0.5 text-text-secondary">{{ $contact->job_title }}</p>
             @endif
         </div>
         <x-ui.button :href="route('crm.contacts.edit', $contact)" variant="secondary">Edit</x-ui.button>
@@ -18,10 +18,10 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="rounded-xl border p-5 space-y-4" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
         @if ($contact->company)
         <div>
-            <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Company</p>
+            <p class="text-xs font-medium mb-0.5 text-text-muted">Company</p>
             <x-ui.link :href="route('crm.companies.show', $contact->company)" class="text-sm font-medium">
                 {{ $contact->company->name }}
             </x-ui.link>
@@ -30,22 +30,22 @@
 
         @if ($contact->email)
         <div>
-            <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Email</p>
-            <x-ui.link variant="row" href="mailto:{{ $contact->email }}" class="text-sm">{{ $contact->email }}</x-ui.link>
+            <p class="text-xs font-medium mb-0.5 text-text-muted">Email</p>
+            <x-ui.link href="mailto:{{ $contact->email }}" class="text-sm">{{ $contact->email }}</x-ui.link>
         </div>
         @endif
 
         @if ($contact->phone)
         <div>
-            <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Phone</p>
-            <p class="text-sm" style="color: var(--text-primary);">{{ $contact->phone }}</p>
+            <p class="text-xs font-medium mb-0.5 text-text-muted">Phone</p>
+            <p class="text-sm text-text">{{ $contact->phone }}</p>
         </div>
         @endif
 
         @if ($contact->notes)
         <div>
-            <p class="text-xs font-medium mb-0.5" style="color: var(--text-muted);">Notes</p>
-            <p class="text-sm whitespace-pre-line" style="color: var(--text-secondary);">{{ $contact->notes }}</p>
+            <p class="text-xs font-medium mb-0.5 text-text-muted">Notes</p>
+            <p class="text-sm whitespace-pre-line text-text-secondary">{{ $contact->notes }}</p>
         </div>
         @endif
     </div>

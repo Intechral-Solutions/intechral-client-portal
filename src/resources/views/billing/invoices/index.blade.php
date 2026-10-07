@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Invoices</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage client invoices and payments.</p>
+            <h1 class="text-2xl font-semibold text-text">Invoices</h1>
+            <p class="mt-1 text-sm text-text-secondary">Manage client invoices and payments.</p>
         </div>
         @can('create', \App\Models\Invoice::class)
         <x-ui.button :href="route('billing.invoices.create')" class="shrink-0">
@@ -35,32 +35,30 @@
         <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
     </form>
 
-    <div class="rounded-xl border overflow-hidden"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Invoice #</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Client</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Issued</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Due</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Total</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Status</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Invoice #</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Client</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Issued</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Due</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">Total</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-text-muted">Status</th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($invoices as $invoice)
                 <tr class="hover:opacity-90 transition-opacity">
                     <td class="px-4 py-3">
                         <x-ui.link variant="row" :href="route('billing.invoices.show', $invoice)" class="font-mono">{{ $invoice->invoice_number }}</x-ui.link>
                     </td>
-                    <td class="px-4 py-3" style="color: var(--text-primary);">{{ $invoice->client->name }}</td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $invoice->issued_at->format('M j, Y') }}</td>
-                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
-                        @unless ($invoice->isOverdue()) style="color: var(--text-secondary);" @endunless>
+                    <td class="px-4 py-3 text-text">{{ $invoice->client->name }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $invoice->issued_at->format('M j, Y') }}</td>
+                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium text-danger' : 'text-text-secondary' }}">
                         {{ $invoice->due_at->format('M j, Y') }}
                     </td>
-                    <td class="px-4 py-3 text-right font-medium {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">
+                    <td class="px-4 py-3 text-right font-medium {{ $invoice->status === 'cancelled' ? 'text-text-muted line-through' : 'text-text' }}">
                         {{ $invoice->currency }} {{ number_format((float) $invoice->total, 2) }}
                     </td>
                     <td class="px-4 py-3 text-center">
@@ -69,7 +67,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">No invoices found.</td>
+                    <td colspan="6" class="px-4 py-12 text-center text-sm text-text-muted">No invoices found.</td>
                 </tr>
                 @endforelse
             </tbody>

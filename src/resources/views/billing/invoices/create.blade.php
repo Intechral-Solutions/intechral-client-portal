@@ -10,7 +10,7 @@
             </svg>
             Invoices
         </x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">New Invoice</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">New Invoice</h1>
     </div>
 
     <form method="POST" action="{{ route('billing.invoices.store') }}" class="space-y-6">

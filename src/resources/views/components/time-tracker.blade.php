@@ -43,8 +43,7 @@
         : '0h';
 @endphp
 
-<div class="rounded-xl border p-4 mt-4"
-     style="background-color: var(--surface-card); border-color: var(--border-base);"
+<div class="rounded-lg border p-4 mt-4 bg-surface border-rule"
      data-time-tracker
      data-context-type="{{ $contextType }}"
      data-context-id="{{ $contextId }}"
@@ -52,16 +51,16 @@
      data-context-url="{{ $contextUrl }}">
 
     <div class="flex items-center justify-between mb-3">
-        <h3 class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Time Tracked</h3>
-        <span class="text-sm font-semibold font-mono" style="color: var(--text-primary);">{{ trim($totalHuman) }}</span>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Time Tracked</h3>
+        <span class="text-sm font-semibold font-mono text-text">{{ trim($totalHuman) }}</span>
     </div>
 
     @if ($recentEntries->isNotEmpty())
     <ul class="mb-3 space-y-1">
         @foreach ($recentEntries as $entry)
-        <li class="flex items-center justify-between text-xs" style="color: var(--text-secondary);">
+        <li class="flex items-center justify-between text-xs text-text-secondary">
             <span>{{ $entry->date->format('M j') }} · {{ $entry->user->name ?? '—' }}</span>
-            <span class="font-mono" style="color: var(--text-primary);">{{ $entry->durationForHumans() }}</span>
+            <span class="font-mono text-text">{{ $entry->durationForHumans() }}</span>
         </li>
         @endforeach
     </ul>

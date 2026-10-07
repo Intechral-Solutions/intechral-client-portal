@@ -10,7 +10,7 @@
             </svg>
             {{ $invoice->invoice_number }}
         </x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">Edit Invoice</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">Edit Invoice</h1>
     </div>
 
     @if (session('success'))

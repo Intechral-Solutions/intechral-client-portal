@@ -9,7 +9,7 @@
                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" /></svg>
                 Back to queue
             </x-ui.link>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Reports</h1>
+            <h1 class="text-2xl font-semibold text-text">Reports</h1>
         </div>
         <x-ui.button :href="route('operator.tickets.export', request()->query())" variant="secondary">Export CSV</x-ui.button>
     </div>
@@ -30,15 +30,15 @@
     <div class="grid gap-6 sm:grid-cols-2">
 
         {{-- By Category --}}
-        <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-            <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">By Category</h2>
+        <section class="rounded-lg border p-6 border-rule bg-surface">
+            <h2 class="text-sm font-semibold mb-4 text-text">By Category</h2>
             @if ($byCategory->isEmpty())
-            <p class="text-sm" style="color: var(--text-secondary);">No data.</p>
+            <p class="text-sm text-text-secondary">No data.</p>
             @else
             <ul class="space-y-2">
                 @foreach ($byCategory as $category => $count)
                 <li class="flex items-center justify-between text-sm">
-                    <span style="color: var(--text-primary);">{{ $category }}</span>
+                    <span class="text-text">{{ $category }}</span>
                     <span class="font-mono font-semibold tabular-nums text-text">{{ $count }}</span>
                 </li>
                 @endforeach
@@ -47,10 +47,10 @@
         </section>
 
         {{-- By Priority --}}
-        <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-            <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">By Priority</h2>
+        <section class="rounded-lg border p-6 border-rule bg-surface">
+            <h2 class="text-sm font-semibold mb-4 text-text">By Priority</h2>
             @if ($byPriority->isEmpty())
-            <p class="text-sm" style="color: var(--text-secondary);">No data.</p>
+            <p class="text-sm text-text-secondary">No data.</p>
             @else
             <ul class="space-y-2">
                 @foreach ($byPriority as $priority => $count)
@@ -64,23 +64,23 @@
         </section>
 
         {{-- Volume by day --}}
-        <section class="rounded-xl border p-6 sm:col-span-2" style="border-color: var(--border-base); background-color: var(--surface-base);">
-            <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">Volume by Day</h2>
+        <section class="rounded-lg border p-6 sm:col-span-2 border-rule bg-surface">
+            <h2 class="text-sm font-semibold mb-4 text-text">Volume by Day</h2>
             @if ($volumeByDay->isEmpty())
-            <p class="text-sm" style="color: var(--text-secondary);">No data.</p>
+            <p class="text-sm text-text-secondary">No data.</p>
             @else
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead>
                         <tr>
-                            <th class="text-left py-2 pr-6 font-semibold" style="color: var(--text-secondary);">Date</th>
-                            <th class="text-right py-2 font-semibold" style="color: var(--text-secondary);">Tickets</th>
+                            <th class="text-left py-2 pr-6 font-semibold text-text-secondary">Date</th>
+                            <th class="text-right py-2 font-semibold text-text-secondary">Tickets</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y" style="border-color: var(--border-subtle);">
+                    <tbody class="divide-y divide-rule">
                         @foreach ($volumeByDay as $date => $count)
                         <tr>
-                            <td class="py-2 pr-6" style="color: var(--text-primary);">{{ $date }}</td>
+                            <td class="py-2 pr-6 text-text">{{ $date }}</td>
                             <td class="py-2 text-right font-mono tabular-nums font-medium text-text">{{ $count }}</td>
                         </tr>
                         @endforeach
@@ -92,21 +92,21 @@
 
         {{-- Avg resolution time --}}
         @if ($avgResolutionByAssignee->isNotEmpty())
-        <section class="rounded-xl border p-6 sm:col-span-2" style="border-color: var(--border-base); background-color: var(--surface-base);">
-            <h2 class="text-sm font-semibold mb-4" style="color: var(--text-primary);">Avg Resolution Time by Assignee</h2>
+        <section class="rounded-lg border p-6 sm:col-span-2 border-rule bg-surface">
+            <h2 class="text-sm font-semibold mb-4 text-text">Avg Resolution Time by Assignee</h2>
             <table class="min-w-full text-sm">
                 <thead>
                     <tr>
-                        <th class="text-left py-2 pr-6 font-semibold" style="color: var(--text-secondary);">Assignee</th>
-                        <th class="text-right py-2 pr-6 font-semibold" style="color: var(--text-secondary);">Tickets</th>
-                        <th class="text-right py-2 font-semibold" style="color: var(--text-secondary);">Avg Hours</th>
+                        <th class="text-left py-2 pr-6 font-semibold text-text-secondary">Assignee</th>
+                        <th class="text-right py-2 pr-6 font-semibold text-text-secondary">Tickets</th>
+                        <th class="text-right py-2 font-semibold text-text-secondary">Avg Hours</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y" style="border-color: var(--border-subtle);">
+                <tbody class="divide-y divide-rule">
                     @foreach ($avgResolutionByAssignee as $row)
                     <tr>
-                        <td class="py-2 pr-6" style="color: var(--text-primary);">{{ $row->name }}</td>
-                        <td class="py-2 pr-6 text-right tabular-nums" style="color: var(--text-secondary);">{{ $row->count }}</td>
+                        <td class="py-2 pr-6 text-text">{{ $row->name }}</td>
+                        <td class="py-2 pr-6 text-right tabular-nums text-text-secondary">{{ $row->count }}</td>
                         <td class="py-2 text-right font-mono tabular-nums font-medium text-text">{{ number_format($row->avg_hours, 1) }}h</td>
                     </tr>
                     @endforeach

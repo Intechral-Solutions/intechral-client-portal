@@ -10,7 +10,7 @@
             </svg>
             Back to tickets
         </x-ui.link>
-        <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Submit a Ticket</h1>
+        <h1 class="text-2xl font-semibold text-text">Submit a Ticket</h1>
     </div>
 
     <form method="POST" action="{{ route('tickets.store') }}" enctype="multipart/form-data" class="space-y-6">
@@ -75,7 +75,7 @@
             <x-ui.input type="file" name="attachments[]" id="attachments" multiple
                         :error-key="['attachments', 'attachments.*']"
                         aria-describedby="attachments-hint" class="w-full" />
-            <p id="attachments-hint" class="text-xs" style="color: var(--text-secondary);">Up to 10 files, 20 MB each.</p>
+            <p id="attachments-hint" class="text-xs text-text-secondary">Up to 10 files, 20 MB each.</p>
             <x-ui.field-error for="attachments" :error-key="['attachments', 'attachments.*']" />
         </div>
 

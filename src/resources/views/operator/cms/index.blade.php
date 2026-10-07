@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">CMS Pages</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage portal content pages.</p>
+            <h1 class="text-2xl font-semibold text-text">CMS Pages</h1>
+            <p class="mt-1 text-sm text-text-secondary">Manage portal content pages.</p>
         </div>
         <x-ui.button :href="route('operator.cms.create')">+ New Page</x-ui.button>
     </div>
@@ -15,18 +15,18 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Title</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Slug</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Updated</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Title</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Slug</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-text-muted">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Updated</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($pages as $page)
                 <tr>
                     <td class="px-4 py-3 font-medium">
@@ -34,11 +34,11 @@
                             {{ $page->title }}
                         </x-ui.link>
                     </td>
-                    <td class="px-4 py-3 font-mono text-xs" style="color: var(--text-muted);">{{ $page->slug }}</td>
+                    <td class="px-4 py-3 font-mono text-xs text-text-muted">{{ $page->slug }}</td>
                     <td class="px-4 py-3 text-center">
                         @include('operator.cms._state', ['published' => $page->isPublished()])
                     </td>
-                    <td class="px-4 py-3 text-xs" style="color: var(--text-muted);">{{ $page->updated_at->diffForHumans() }}</td>
+                    <td class="px-4 py-3 text-xs text-text-muted">{{ $page->updated_at->diffForHumans() }}</td>
                     <td class="px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-3">
                             @if ($page->isPublished())
@@ -50,7 +50,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">No pages yet.</td>
+                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No pages yet.</td>
                 </tr>
                 @endforelse
             </tbody>

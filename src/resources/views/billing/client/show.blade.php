@@ -11,7 +11,7 @@
                 </svg>
                 My Invoices
             </x-ui.link>
-            <h1 class="mt-1 text-2xl font-semibold font-mono" style="color: var(--text-primary);">{{ $invoice->invoice_number }}</h1>
+            <h1 class="mt-1 text-2xl font-semibold font-mono text-text">{{ $invoice->invoice_number }}</h1>
         </div>
         @if ($invoice->isPayable())
         <x-ui.button :href="route('billing.invoices.pay', $invoice)" class="mt-6 shrink-0">Pay Now</x-ui.button>
@@ -23,23 +23,21 @@
     @endif
 
     {{-- Status & dates --}}
-    <div class="mb-6 rounded-xl border p-5"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="mb-6 rounded-lg border p-5 bg-surface border-rule">
         <div class="flex items-center justify-between mb-4">
             @include('billing._invoice_status', ['status' => $invoice->status])
             @if ($invoice->project)
-            <span class="text-sm" style="color: var(--text-secondary);">{{ $invoice->project->name }}</span>
+            <span class="text-sm text-text-secondary">{{ $invoice->project->name }}</span>
             @endif
         </div>
         <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
-                <p class="text-xs" style="color: var(--text-muted);">Issued</p>
-                <p style="color: var(--text-primary);">{{ $invoice->issued_at->format('M j, Y') }}</p>
+                <p class="text-xs text-text-muted">Issued</p>
+                <p class="text-text">{{ $invoice->issued_at->format('M j, Y') }}</p>
             </div>
             <div>
-                <p class="text-xs" style="color: var(--text-muted);">Due</p>
-                <p class="{{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
-                   @unless ($invoice->isOverdue()) style="color: var(--text-primary);" @endunless>
+                <p class="text-xs text-text-muted">Due</p>
+                <p class="{{ $invoice->isOverdue() ? 'font-medium text-danger' : 'text-text' }}">
                     {{ $invoice->due_at->format('M j, Y') }}
                 </p>
             </div>
@@ -47,51 +45,49 @@
     </div>
 
     {{-- Line items --}}
-    <div class="mb-6 rounded-xl border overflow-hidden"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="mb-6 rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Description</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-20" style="color: var(--text-muted);">Qty</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-28" style="color: var(--text-muted);">Unit Price</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-28" style="color: var(--text-muted);">Amount</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Description</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-20 text-text-muted">Qty</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-28 text-text-muted">Unit Price</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide w-28 text-text-muted">Amount</th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @foreach ($invoice->items as $item)
                 <tr>
-                    <td class="px-4 py-3" style="color: var(--text-primary);">{{ $item->description }}</td>
-                    <td class="px-4 py-3 text-right" style="color: var(--text-secondary);">{{ rtrim(rtrim(number_format((float)$item->quantity, 2), '0'), '.') }}</td>
-                    <td class="px-4 py-3 text-right" style="color: var(--text-secondary);">{{ number_format((float)$item->unit_price, 2) }}</td>
-                    <td class="px-4 py-3 text-right font-medium" style="color: var(--text-primary);">{{ number_format((float)$item->amount, 2) }}</td>
+                    <td class="px-4 py-3 text-text">{{ $item->description }}</td>
+                    <td class="px-4 py-3 text-right text-text-secondary">{{ rtrim(rtrim(number_format((float)$item->quantity, 2), '0'), '.') }}</td>
+                    <td class="px-4 py-3 text-right text-text-secondary">{{ number_format((float)$item->unit_price, 2) }}</td>
+                    <td class="px-4 py-3 text-right font-medium text-text">{{ number_format((float)$item->amount, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
-            <tfoot class="border-t" style="border-color: var(--border-base);">
+            <tfoot class="border-t border-rule">
                 <tr>
-                    <td colspan="3" class="px-4 py-2 text-right text-sm" style="color: var(--text-muted);">Subtotal</td>
-                    <td class="px-4 py-2 text-right text-sm" style="color: var(--text-primary);">{{ number_format((float)$invoice->subtotal, 2) }}</td>
+                    <td colspan="3" class="px-4 py-2 text-right text-sm text-text-muted">Subtotal</td>
+                    <td class="px-4 py-2 text-right text-sm text-text">{{ number_format((float)$invoice->subtotal, 2) }}</td>
                 </tr>
                 @if ((float) $invoice->tax_rate > 0)
                 <tr>
-                    <td colspan="3" class="px-4 py-2 text-right text-sm" style="color: var(--text-muted);">Tax ({{ $invoice->tax_rate }}%)</td>
-                    <td class="px-4 py-2 text-right text-sm" style="color: var(--text-primary);">{{ number_format((float)$invoice->tax_amount, 2) }}</td>
+                    <td colspan="3" class="px-4 py-2 text-right text-sm text-text-muted">Tax ({{ $invoice->tax_rate }}%)</td>
+                    <td class="px-4 py-2 text-right text-sm text-text">{{ number_format((float)$invoice->tax_amount, 2) }}</td>
                 </tr>
                 @endif
                 <tr class="font-semibold">
-                    <td colspan="3" class="px-4 py-3 text-right" style="color: var(--text-primary);">Total ({{ $invoice->currency }})</td>
-                    <td class="px-4 py-3 text-right text-base {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</td>
+                    <td colspan="3" class="px-4 py-3 text-right text-text">Total ({{ $invoice->currency }})</td>
+                    <td class="px-4 py-3 text-right text-base {{ $invoice->status === 'cancelled' ? 'text-text-muted line-through' : 'text-text' }}">{{ number_format((float)$invoice->total, 2) }}</td>
                 </tr>
             </tfoot>
         </table>
     </div>
 
     @if ($invoice->notes)
-    <div class="rounded-xl border p-5"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
-        <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--text-muted);">Notes</p>
-        <p class="text-sm whitespace-pre-line" style="color: var(--text-secondary);">{{ $invoice->notes }}</p>
+    <div class="rounded-lg border p-5 bg-surface border-rule">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-2 text-text-muted">Notes</p>
+        <p class="text-sm whitespace-pre-line text-text-secondary">{{ $invoice->notes }}</p>
     </div>
     @endif
 </div>

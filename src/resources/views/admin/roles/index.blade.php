@@ -6,8 +6,8 @@
     {{-- Header --}}
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Roles</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage roles and their permissions.</p>
+            <h1 class="text-2xl font-semibold text-text">Roles</h1>
+            <p class="mt-1 text-sm text-text-secondary">Manage roles and their permissions.</p>
         </div>
         @can('roles.manage')
         <x-ui.button :href="route('roles.create')">
@@ -30,24 +30,24 @@
     @endif
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-xl border" style="border-color: var(--border-base); background-color: var(--surface-base);">
-        <table class="min-w-full divide-y" style="border-color: var(--border-subtle);">
+    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
+        <table class="min-w-full divide-y divide-rule">
             <thead>
-                <tr style="background-color: var(--surface-elevated);">
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Role</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Users</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Type</th>
+                <tr class="bg-surface-sunken">
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Role</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Users</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Type</th>
                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="border-color: var(--border-subtle);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($roles as $role)
                 @php $builtIn = in_array($role->name, ['operator', 'user']); @endphp
-                <tr class="transition-colors hover:legacy-bg-surface">
+                <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-6 py-4">
-                        <span class="font-medium" style="color: var(--text-primary);">{{ $role->name }}</span>
+                        <span class="font-medium text-text">{{ $role->name }}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm" style="color: var(--text-secondary);">
+                    <td class="px-6 py-4 text-sm text-text-secondary">
                         {{ $role->users_count }}
                     </td>
                     <td class="px-6 py-4">
@@ -73,7 +73,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="4" class="px-6 py-10 text-center text-sm" style="color: var(--text-secondary);">
+                    <td colspan="4" class="px-6 py-10 text-center text-sm text-text-secondary">
                         No roles found.
                     </td>
                 </tr>

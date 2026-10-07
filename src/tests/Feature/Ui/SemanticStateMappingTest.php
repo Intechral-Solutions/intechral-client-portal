@@ -286,8 +286,10 @@ it('draws an internal note as a dashed warning card with a lock marker, and a pu
 
     $html = $this->actingAs($operator)->get(route('operator.tickets.show', $ticket))->assertOk()->getContent();
     $xpath = uiDom($html);
-    $note = uiOne($xpath, '//div[contains(@class,"rounded-xl")][.//*[contains(normalize-space(),"Secret thought")]][not(.//*[contains(normalize-space(),"Public words")])]');
-    $public = uiOne($xpath, '//div[contains(@class,"rounded-xl")][.//*[contains(normalize-space(),"Public words")]][not(.//*[contains(normalize-space(),"Secret thought")])]');
+    // EPIC-016 WP3 FLIP: the card radius moved from 12px (`rounded-xl`) to the 8px convention (`rounded-lg`); the note and the
+    // public reply are still found as the two reply cards, and the assertions below on their treatment are unchanged.
+    $note = uiOne($xpath, '//div[contains(@class,"rounded-lg")][.//*[contains(normalize-space(),"Secret thought")]][not(.//*[contains(normalize-space(),"Public words")])]');
+    $public = uiOne($xpath, '//div[contains(@class,"rounded-lg")][.//*[contains(normalize-space(),"Public words")]][not(.//*[contains(normalize-space(),"Secret thought")])]');
 
     expect(uiClasses($note))->toContain('border-dashed', 'border-warning-glyph', 'bg-warning-soft')
         ->and($note->getAttribute('style'))->toBe('')
@@ -309,6 +311,14 @@ it('draws the internal-note card with the same class string in both ticket views
     }
 
     expect(file_get_contents(base_path('tests/Support/semantic_state_gallery.php')))->toContain($card);
+});
+
+it('draws the SLA cell with the same classes in the queue and in the browser gallery (WP3: the WP2 review hardening)', function () {
+    // The gallery's `overdue-sla` wrapper repeats the queue cell's overdue classes; pin both so the gallery cannot go stale.
+    $cell = 'font-medium text-danger';
+
+    expect(file_get_contents(resource_path('views/operator/tickets/index.blade.php')))->toContain($cell)
+        ->and(file_get_contents(base_path('tests/Support/semantic_state_gallery.php')))->toContain('class="text-sm '.$cell.'"');
 });
 
 it('draws a list of invoices with every status through the shared partial, striking only a cancelled amount', function () {

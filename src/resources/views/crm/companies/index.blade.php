@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Companies</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">CRM company records.</p>
+            <h1 class="text-2xl font-semibold text-text">Companies</h1>
+            <p class="mt-1 text-sm text-text-secondary">CRM company records.</p>
         </div>
         <x-ui.button :href="route('crm.companies.create')">+ New Company</x-ui.button>
     </div>
@@ -24,18 +24,18 @@
         @endif
     </form>
 
-    <div class="rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Website</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Phone</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Org</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Website</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Phone</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-text-muted">Org</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($companies as $company)
                 <tr>
                     <td class="px-4 py-3 font-medium">
@@ -43,15 +43,15 @@
                             {{ $company->name }}
                         </x-ui.link>
                     </td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">
+                    <td class="px-4 py-3 text-text-secondary">
                         {{ $company->website ? parse_url($company->website, PHP_URL_HOST) : '—' }}
                     </td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $company->phone ?? '—' }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $company->phone ?? '—' }}</td>
                     <td class="px-4 py-3 text-center">
                         @if ($company->isPromoted())
                         <x-ui.link :href="route('organizations.show', $company->organization)" class="text-xs font-medium">Org ↗</x-ui.link>
                         @else
-                        <span class="text-xs" style="color: var(--text-muted);">—</span>
+                        <span class="text-xs text-text-muted">—</span>
                         @endif
                     </td>
                     <td class="px-4 py-3 text-right">
@@ -60,7 +60,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">No companies found.</td>
+                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No companies found.</td>
                 </tr>
                 @endforelse
             </tbody>

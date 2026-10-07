@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Contacts</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">CRM contact records.</p>
+            <h1 class="text-2xl font-semibold text-text">Contacts</h1>
+            <p class="mt-1 text-sm text-text-secondary">CRM contact records.</p>
         </div>
         <x-ui.button :href="route('crm.contacts.create')">+ New Contact</x-ui.button>
     </div>
@@ -24,18 +24,18 @@
         @endif
     </form>
 
-    <div class="rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Company</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Email</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Phone</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Company</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Email</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Phone</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($contacts as $contact)
                 <tr>
                     <td class="px-4 py-3 font-medium">
@@ -43,10 +43,10 @@
                             {{ $contact->fullName() }}
                         </x-ui.link>
                         @if ($contact->job_title)
-                        <span class="text-xs block" style="color: var(--text-muted);">{{ $contact->job_title }}</span>
+                        <span class="text-xs block text-text-muted">{{ $contact->job_title }}</span>
                         @endif
                     </td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">
+                    <td class="px-4 py-3 text-text-secondary">
                         @if ($contact->company)
                         <x-ui.link variant="quiet" :href="route('crm.companies.show', $contact->company)">
                             {{ $contact->company->name }}
@@ -54,15 +54,15 @@
                         @else —
                         @endif
                     </td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $contact->email ?? '—' }}</td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $contact->phone ?? '—' }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $contact->email ?? '—' }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $contact->phone ?? '—' }}</td>
                     <td class="px-4 py-3 text-right">
                         <x-ui.link variant="quiet" :href="route('crm.contacts.edit', $contact)" class="text-xs">Edit</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">No contacts found.</td>
+                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No contacts found.</td>
                 </tr>
                 @endforelse
             </tbody>

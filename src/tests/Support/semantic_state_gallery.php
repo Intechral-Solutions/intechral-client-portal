@@ -47,15 +47,15 @@ $template = <<<'BLADE'
     <div data-case="overdue-sla" class="text-sm font-medium text-danger">06 Oct 14:00 @include('tickets._overdue_status', ['class' => 'ml-1'])</div>
 
     {{-- The internal-note card exactly as both ticket detail views draw it (class string pinned by Pest). --}}
-    <div data-case="internal-note" class="rounded-xl border p-5 border-dashed border-warning-glyph bg-warning-soft">
+    <div data-case="internal-note" class="rounded-lg border p-5 border-dashed border-warning-glyph bg-warning-soft">
         <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium" style="color: var(--text-primary);">Operator</span>
+            <span class="text-sm font-medium text-text">Operator</span>
             <div class="flex items-center gap-2">
                 @include('tickets._internal_note_label')
-                <time class="text-xs" style="color: var(--text-secondary);">2 minutes ago</time>
+                <time class="text-xs text-text-secondary">2 minutes ago</time>
             </div>
         </div>
-        <div style="color: var(--text-primary);">Customer is on the legacy plan.</div>
+        <div class="text-text">Customer is on the legacy plan.</div>
     </div>
 
     <div data-case="tags" class="flex gap-2">
