@@ -59,6 +59,34 @@ the app and building the image would only add minutes. The environment follows t
   (The tree as a whole is not whitespace-clean — some older docs and one Blade view — so a whole-tree
   check would fail for reasons unrelated to the change.)
 
+### React design-system lint (`@shadcn/lint`)
+
+The frontend gate's ESLint step also runs [`@shadcn/lint`](https://github.com/shadcn-ui/lint), adopted after EPIC-016 (the roadmap's
+`@shadcn/lint` evaluation note). It checks React source for misuse of the Direction D system; it does not replace the behavioural,
+token-value or browser tests, and it does not read Blade (that is `BladeThemeGuardTest`).
+
+- **Version and upgrades.** Pinned exactly to `0.2.0` (no range): the package is young and its rules change between releases. An upgrade is a
+  deliberate change that re-runs the lint and re-baselines. Installing or upgrading it never happens as a side effect of another change.
+- **Integration.** The existing `npm run lint` (ESLint 10, flat config in `src/eslint.config.js`); no Oxlint, no second script, and no
+  `--cache` (upstream warns that cached results go stale when a component or the theme changes). The theme and the `@/components/ui`
+  primitives are discovered from `src/components.json`; `cn`, `clsx`, `cva` and `twMerge` are recognised by default.
+- **Six rules, all `error`**, for `resources/js` without `*.test.*` and `test/`: `no-raw-colors`, `no-unknown-classes`, `no-restyle`,
+  `no-arbitrary-values`, `no-inline-styles`, `require-static-classes`. In `components/ui/**` (the primitives style themselves) only
+  `no-restyle`, `no-arbitrary-values` and `require-static-classes` are off. `no-restyle` allows layout and denies caller `h-*`, `min-h-*`,
+  `max-h-*`, `size-*` (callers do not own typography or geometry); a contract exempts only the five bare Radix re-exports in
+  `ui/dropdown-menu.tsx`. `no-inline-styles` allows `transform`, `transition` and `touchAction` in the two dnd-kit adapter files only.
+  Composite components outside `ui/` (`page-frame`, `page-header`, `section`, `pagination`) are not governed yet.
+- **Baseline.** Existing accepted or deferred findings live in `src/eslint-suppressions.json` (ESLint bulk suppressions, per file and rule
+  with a count), so a **new** violation fails immediately and warnings are never used (`--max-warnings=0`). `no-raw-colors`,
+  `no-unknown-classes` and `no-inline-styles` have no entries. The baseline is legacy React debt (the raw `var(--text-danger)` family,
+  deferred by EPIC-016 §22), a few hand-styled Buttons, four unreadable class expressions (the imported `focusRing` constant and a row-class function) and a technical `transition-[…]` list. It
+  only shrinks: fix a finding, then run ESLint with `--prune-suppressions` (a stale entry also fails lint, so the file cannot rot).
+- **Baseline limitation.** ESLint bulk suppressions are counted per file and rule, not tied to individual lines. The baseline therefore
+  stops a count from growing, and a count that shrinks is detected as stale. If one suppressed violation is removed and a different violation
+  of the same rule is added in the same file, the count is unchanged and lint passes. The baseline does not replace code review: reviewers
+  should still inspect changes in baselined files for one-for-one substitution.
+- **Intentional exception.** The rail label is 10px by specification (Direction D §5.1); it carries one `eslint-disable-next-line` with that reason.
+
 ### `browser` — the Playwright suite
 
 `./dev test:e2e` itself, on the dev stack from `docker-compose.yml`: the image is built, `app`,

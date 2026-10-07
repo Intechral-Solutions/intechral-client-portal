@@ -113,7 +113,7 @@ export function DrawerSection({ section }: { section: ContextSection }) {
             {section.label ? (
                 <p
                     id={labelId}
-                    className="px-2 pb-1.5 text-[11px] font-semibold tracking-wide text-text-muted uppercase"
+                    className="px-2 pb-1.5 text-xs font-semibold tracking-wide text-text-muted uppercase"
                 >
                     {section.label}
                 </p>

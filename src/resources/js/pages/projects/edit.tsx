@@ -218,7 +218,7 @@ function DangerZone({ project }: { project: ProjectDetail }) {
                     })
                 }
             >
-                <Button type="button" variant="secondary" className="border-danger text-danger">
+                <Button type="button" variant="danger-secondary">
                     Delete project
                 </Button>
             </ConfirmationDialog>

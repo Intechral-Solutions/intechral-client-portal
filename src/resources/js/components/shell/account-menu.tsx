@@ -101,7 +101,7 @@ function AccountTrigger({ user }: { user: AuthUser }) {
             data-shell-account
             aria-label={`Account menu: ${user.name}`}
             className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-surface ring-1 ring-control-edge transition-colors duration-motion-fast hover:bg-surface-hover',
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface ring-1 ring-control-edge transition-colors duration-motion-fast hover:bg-surface-hover',
                 focusRing,
             )}
         >
@@ -137,7 +137,7 @@ function AppearanceControl() {
                         value={option}
                         onSelect={(event) => event.preventDefault()}
                         className={cn(
-                            'flex-1 cursor-pointer rounded-[3px] px-2 py-1 text-center text-xs font-medium capitalize transition-colors duration-motion-fast',
+                            'flex-1 cursor-pointer rounded-tag px-2 py-1 text-center text-xs font-medium capitalize transition-colors duration-motion-fast',
                             'text-text-secondary hover:text-text data-[highlighted]:text-text',
                             'data-[state=checked]:bg-ink data-[state=checked]:text-on-ink',
                             focusRing,

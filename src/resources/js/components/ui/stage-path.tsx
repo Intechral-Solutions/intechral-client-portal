@@ -118,9 +118,11 @@ export function StagePath({
                     'min-w-0 flex-1',
                     // Compact segments always sit side by side. A full path does from S/M up; at
                     // phone widths seven labelled columns cannot fit, so it stacks in the same order.
-                    compact ? 'grid items-end gap-1' : 'flex flex-col gap-2 sm:grid sm:items-start sm:gap-1',
+                    compact
+                        ? 'grid grid-cols-[repeat(var(--stage-count),minmax(0,1fr))] items-end gap-1'
+                        : 'flex flex-col gap-2 sm:grid sm:grid-cols-[repeat(var(--stage-count),minmax(0,1fr))] sm:items-start sm:gap-1',
                 )}
-                style={{ gridTemplateColumns: `repeat(${visible.length}, minmax(0, 1fr))` }}
+                style={{ '--stage-count': visible.length } as CSSProperties}
             >
                 {visible.map((stage, position) => (
                     <li
@@ -146,16 +148,10 @@ export function StagePath({
                                 className={cn(
                                     'block w-full rounded-[2px]',
                                     // Phone-width full path: a short marker beside the text.
-                                    !compact && 'h-1.5 sm:h-[var(--stage-height)]',
+                                    compact ? 'h-(--stage-height)' : 'h-1.5 sm:h-(--stage-height)',
                                     segmentClass[stage.state],
                                 )}
-                                style={
-                                    compact
-                                        ? { height: segmentHeight(position, cap) }
-                                        : ({
-                                              '--stage-height': `${segmentHeight(position, cap)}px`,
-                                          } as CSSProperties)
-                                }
+                                style={{ '--stage-height': `${segmentHeight(position, cap)}px` } as CSSProperties}
                             />
                         </span>
 

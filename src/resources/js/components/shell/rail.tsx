@@ -93,6 +93,7 @@ export function RailItem({ workspace }: { workspace: Workspace }) {
             // centred flex column moved it 7px), and a full-width label with centred text keeps the
             // label box put while its text is missing (a shrink-wrapped label re-centred ~20px).
             className={cn(
+                // eslint-disable-next-line shadcn/no-arbitrary-values -- Direction D §5.1 specifies the rail label at 10px (an 18px icon over a 10px label); it is a spec value, not debt, and below the 12px scale on purpose.
                 'grid h-[46px] w-[52px] grid-rows-[18px_10px] content-center justify-items-center gap-1 rounded-control text-[10px] leading-none transition-colors duration-motion-fast',
                 workspace.isActive
                     ? 'bg-surface-selected font-semibold text-text ring-1 ring-rule'

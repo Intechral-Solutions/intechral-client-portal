@@ -17,7 +17,7 @@ it('exposes a named progressbar with its value, range, and fill', () => {
     expect(bar()).toHaveAttribute('aria-valuemin', '0');
     expect(bar()).toHaveAttribute('aria-valuemax', '100');
     expect(bar()).toHaveAttribute('aria-valuenow', '40');
-    expect(fill().style.width).toBe('40%');
+    expect(fill().style.getPropertyValue('--progress-value')).toBe('40%');
 });
 
 it('supports count-based progress with spoken text', () => {
@@ -26,7 +26,7 @@ it('supports count-based progress with spoken text', () => {
     expect(bar()).toHaveAttribute('aria-valuemax', '5');
     expect(bar()).toHaveAttribute('aria-valuenow', '3');
     expect(bar()).toHaveAttribute('aria-valuetext', '3 of 5 items');
-    expect(fill().style.width).toBe('60%');
+    expect(fill().style.getPropertyValue('--progress-value')).toBe('60%');
 });
 
 it.each([
@@ -39,7 +39,7 @@ it.each([
     render(<Progress value={value} max={max} label="Anything" />);
 
     expect(bar()).toHaveAttribute('aria-valuenow', String(now));
-    expect(fill().style.width).toBe(width);
+    expect(fill().style.getPropertyValue('--progress-value')).toBe(width);
 });
 
 it('merges class names onto the track', () => {

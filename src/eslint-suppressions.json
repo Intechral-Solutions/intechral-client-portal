@@ -1,0 +1,86 @@
+{
+  "resources/js/components/forms/form-field-error.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/projects/board-column.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/projects/board.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 3
+    }
+  },
+  "resources/js/components/projects/milestone-list-item.tsx": {
+    "shadcn/no-restyle": {
+      "count": 1
+    }
+  },
+  "resources/js/components/projects/quick-add-task.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/projects/task-card.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/projects/task-checklist.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/shell/account-menu.tsx": {
+    "shadcn/require-static-classes": {
+      "count": 2
+    }
+  },
+  "resources/js/components/shell/view-switcher.tsx": {
+    "shadcn/require-static-classes": {
+      "count": 1
+    }
+  },
+  "resources/js/components/tasks/task-delete-button.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 2
+    },
+    "shadcn/no-restyle": {
+      "count": 2
+    }
+  },
+  "resources/js/components/tasks/task-table.tsx": {
+    "shadcn/no-restyle": {
+      "count": 1
+    },
+    "shadcn/require-static-classes": {
+      "count": 1
+    }
+  },
+  "resources/js/components/time/timer-pill.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 1
+    }
+  },
+  "resources/js/components/time/timer-tray.tsx": {
+    "shadcn/no-restyle": {
+      "count": 2
+    }
+  },
+  "resources/js/pages/profile/show.tsx": {
+    "shadcn/no-arbitrary-values": {
+      "count": 6
+    },
+    "shadcn/no-restyle": {
+      "count": 2
+    }
+  },
+  "resources/js/pages/projects/show.tsx": {
+    "shadcn/no-restyle": {
+      "count": 2
+    }
+  }
+}

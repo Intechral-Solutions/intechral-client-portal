@@ -121,7 +121,7 @@ export function NavSheet({
                                     {section.label ? (
                                         <p
                                             id={`shell-sheet-${section.key}`}
-                                            className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-text-muted uppercase"
+                                            className="px-2.5 pb-1 text-xs font-semibold tracking-wide text-text-muted uppercase"
                                         >
                                             {section.label}
                                         </p>

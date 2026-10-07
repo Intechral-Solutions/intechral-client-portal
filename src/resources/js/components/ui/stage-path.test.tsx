@@ -90,7 +90,7 @@ describe('geometry', () => {
         const compact = render(<StagePath variant="compact" label="Compact" stages={stages(states)} />);
         expect(
             [...compact.container.querySelectorAll<HTMLElement>('[data-stage-segment]')].map(
-                (segment) => segment.style.height,
+                (segment) => segment.style.getPropertyValue('--stage-height'),
             ),
         ).toEqual(['6px', '9px', '12px', '14px', '14px', '14px', '14px']);
     });
@@ -120,7 +120,8 @@ describe('geometry', () => {
         const list = screen.getByRole('list', { name: 'Release' });
         expect(list).toHaveClass('grid');
         expect(list).not.toHaveClass('flex-col');
-        expect(list.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+        expect(list.style.getPropertyValue('--stage-count')).toBe('2');
+        expect(list).toHaveClass('grid-cols-[repeat(var(--stage-count),minmax(0,1fr))]');
     });
 });
 

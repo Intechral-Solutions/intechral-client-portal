@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
  * - `secondary` (alias `outline`): `surface` fill with a `control-edge` border (its
  *   only non-text affordance, so it must reach 3:1; `rule-control` is too faint for it).
  * - `ghost`: toolbar and icon actions, no resting chrome.
+ * - `danger-secondary`: a destructive TRIGGER (P4): the `secondary` surface with `danger` text and edge. It never
+ *   fills, so opening a confirmation does not look like confirming.
  * - `destructive`: `danger`; fills solid, so it is used for the confirming action only.
  *
  * `default` and `outline` are the pre-Direction D names; they stay so the roughly 100 existing
@@ -27,6 +29,9 @@ const primary =
 const secondary =
     'border-control-edge bg-surface text-text hover:bg-surface-hover active:bg-surface-sunken disabled:border-rule disabled:bg-surface-sunken disabled:text-text-muted';
 
+const dangerSecondary =
+    'border-danger bg-surface text-danger hover:bg-surface-hover active:bg-surface-sunken disabled:border-rule disabled:bg-surface-sunken disabled:text-text-muted';
+
 const buttonVariants = cva(
     [
         'inline-flex items-center justify-center gap-2 border font-medium transition-[color,background-color,border-color] duration-motion-fast ease-motion disabled:pointer-events-none',
@@ -39,6 +44,7 @@ const buttonVariants = cva(
                 default: primary,
                 secondary,
                 outline: secondary,
+                'danger-secondary': dangerSecondary,
                 ghost: 'border-transparent text-text hover:bg-surface-hover active:bg-surface-sunken disabled:text-text-muted',
                 destructive:
                     'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80 disabled:border-rule disabled:bg-surface-sunken disabled:text-text-muted',
