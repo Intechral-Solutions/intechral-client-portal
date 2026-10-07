@@ -1,11 +1,13 @@
 @import 'tailwindcss';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
 @source '../**/*.ts';
 @source '../**/*.tsx';
+/* The permanent guard's fixtures are forbidden class names on purpose (`bg-red-500`, `accent-white` …); they must
+   never become utilities in the production bundle. (EPIC-016 WP4) */
+@source not '../../tests/Unit/Configuration/BladeThemeGuardTest.php';
 
 /* ── Direction D fonts (EPIC-013 WP1d, gate G1 / Amendment 1 A1.4) ──
    Self-hosted WOFF2, fingerprinted and emitted by Vite; no third-party
@@ -170,25 +172,13 @@
         50% { opacity: 0.45; }
     }
 
-    /* Brand palette */
-    --color-brand-50:  #eef2ff;
-    --color-brand-100: #e0e7ff;
-    --color-brand-200: #c7d2fe;
-    --color-brand-300: #a5b4fc;
-    --color-brand-400: #818cf8;
-    --color-brand-500: #6366f1;
-    --color-brand-600: #4f46e5;
-    --color-brand-700: #4338ca;
-    --color-brand-800: #3730a3;
-    --color-brand-900: #312e81;
-    --color-brand-950: #1e1b4b;
 }
 
 /* ── Direction D semantic tokens → Tailwind (EPIC-013 WP1c) ──────
    Canonical names from docs/design/direction-d-design-system.md §2.2,
    §2.2 Shadows and §16. Values live only in the theme blocks below as
    --ds-* custom properties; the --ds- namespace exists because several
-   canonical names (--accent, --danger, --success, --warning,
+   canonical names (--danger, --success, --warning,
    --text-secondary, --text-muted …) are already live legacy raw
    variables with different values. Components use the utilities
    (bg-surface, text-muted, border-rule …), never the hex values. ── */
@@ -265,11 +255,10 @@
 
 /* ── Compatibility aliases (shadcn + legacy status) ─────────────
    Kept for existing consumers (Direction D §2.4). `accent`, `success`
-   and `warning` now name Direction D tokens above; the legacy accent
-   meaning lives on as `legacy-accent` (identical value), the same
-   isolation WP1a applied to the hand-written utilities. WP2 retired
-   `legacy-success`/`legacy-warning` with the Alert restyle: their only
-   consumer was FlashRegion. ── */
+   and `warning` now name Direction D tokens above. WP2 retired
+   `legacy-success`/`legacy-warning` with the Alert restyle, and EPIC-016
+   WP4 retired `legacy-accent` and the `brand-*` scale once the last Blade
+   consumer moved to the Direction D utilities. ── */
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -288,7 +277,6 @@
     --color-input: var(--input);
     --color-ring: var(--ring);
     --color-info: var(--info);
-    --color-legacy-accent: var(--accent);
 }
 
 /* ── Theme-invariant Direction D tokens (EPIC-013 WP1c) ─────── */
@@ -397,14 +385,12 @@
 
     /* Surface aliases used in component styles */
     --surface-card:    theme(colors.white);
-    --surface-input:   theme(colors.gray.50);
     --surface-success: theme(colors.green.50);
     --surface-danger:  theme(colors.red.50);
     --surface-warning: theme(colors.amber.50);
     --surface-info:    theme(colors.blue.50);
 
     /* Borders */
-    --border-subtle:  theme(colors.gray.200);
     --border-base:    theme(colors.gray.300);
     --border-success: theme(colors.green.200);
     --border-danger:  theme(colors.red.200);
@@ -421,25 +407,15 @@
     --text-warning:   theme(colors.amber.700);
     --text-info:      theme(colors.blue.700);
 
-    /* Accent */
-    --accent:        theme(colors.brand.600);
-    --accent-hover:  theme(colors.brand.700);
-    --accent-text:   theme(colors.white);
-
     /* Semantic aliases */
     --danger:        theme(colors.red.600);
     --success:       theme(colors.green.600);
     --warning:       theme(colors.amber.500);
     --info:          theme(colors.blue.600);
 
-    /* Compatibility orphans (EPIC-013 WP1b) — six variables already referenced by
-       live Blade/React markup with no prior definition. Explicit now; unchanged
-       from Direction D's own values later, this register is retired, not replaced. */
-    --surface-base:     var(--bg-base);
-    --surface-muted:    var(--bg-surface);
-    --surface-elevated: var(--bg-surface);
-    --border-muted:     var(--border-subtle);
-    --surface-accent:   var(--surface-info);
+    /* Compatibility orphan (EPIC-013 WP1b). EPIC-016 WP4 retired its five siblings
+       (`--surface-base`, `--surface-muted`, `--surface-elevated`, `--border-muted`,
+       `--surface-accent`) after the zero-use proof; this one still serves the Projects board. */
     --accent-success:   var(--success);
 
     /* Shadows */
@@ -518,14 +494,12 @@
 
     /* Surface aliases */
     --surface-card:    theme(colors.gray.800);
-    --surface-input:   theme(colors.gray.900);
     --surface-success: theme(colors.green.950);
     --surface-danger:  theme(colors.red.950);
     --surface-warning: theme(colors.amber.950);
     --surface-info:    theme(colors.blue.950);
 
     /* Borders */
-    --border-subtle:  theme(colors.gray.800);
     --border-base:    theme(colors.gray.700);
     --border-success: theme(colors.green.800);
     --border-danger:  theme(colors.red.800);
@@ -542,23 +516,13 @@
     --text-warning:   theme(colors.amber.400);
     --text-info:      theme(colors.blue.400);
 
-    /* Accent */
-    --accent:        theme(colors.brand.500);
-    --accent-hover:  theme(colors.brand.400);
-    --accent-text:   theme(colors.white);
-
     /* Semantic aliases */
     --danger:        theme(colors.red.400);
     --success:       theme(colors.green.400);
     --warning:       theme(colors.amber.400);
     --info:          theme(colors.blue.400);
 
-    /* Compatibility orphans (EPIC-013 WP1b) — see the light block for rationale */
-    --surface-base:     var(--bg-base);
-    --surface-muted:    var(--bg-surface);
-    --surface-elevated: var(--bg-surface);
-    --border-muted:     var(--border-subtle);
-    --surface-accent:   var(--surface-info);
+    /* Compatibility orphan (EPIC-013 WP1b) — see the light block for rationale */
     --accent-success:   var(--success);
 
     /* Shadows */
@@ -581,27 +545,12 @@ body {
 }
 
 /* ── Legacy utility layer (EPIC-013 WP1a) ─────────────────────
-   Prefixed so Direction D can register `surface`, `text-primary`,
-   etc. as semantic utilities later without a name collision.
-   Values unchanged from the pre-WP1a names. ────────────────── */
+   EPIC-016 WP4 retired every utility here but one, each after the
+   zero-use proof. `legacy-text-primary` stays: three React pages still use
+   it (`auth/login`, `auth/forgot-password`, `time/index`), and React is out of
+   EPIC-016's scope. It goes with its React slice. ────────────── */
 @layer utilities {
-    .legacy-bg-base       { background-color: var(--bg-base); }
-    .legacy-bg-surface    { background-color: var(--bg-surface); }
-    .legacy-bg-elevated   { background-color: var(--bg-elevated); }
-    .legacy-border-subtle { border-color: var(--border-subtle); }
-    .legacy-border-base   { border-color: var(--border-base); }
     .legacy-text-primary  { color: var(--text-primary); }
-    .legacy-text-secondary{ color: var(--text-secondary); }
-    .legacy-text-muted    { color: var(--text-muted); }
-    .legacy-text-inverse  { color: var(--text-inverse); }
-    .legacy-btn-accent {
-        background-color: var(--accent);
-        color: var(--accent-text);
-        &:hover { background-color: var(--accent-hover); }
-    }
-    .legacy-shadow-theme-sm { box-shadow: var(--shadow-sm); }
-    .legacy-shadow-theme-md { box-shadow: var(--shadow-md); }
-    .legacy-shadow-theme-lg { box-shadow: var(--shadow-lg); }
 }
 
 /* ── Direction D operator shell (EPIC-013 WP4) ────────────────

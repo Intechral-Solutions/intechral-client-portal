@@ -1,6 +1,6 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is implemented on the branch, independently reviewed (NEEDS SMALL REMEDIATION, applied) and in PR 3 ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is not started. The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
+**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is merged ([PR #26](https://github.com/Intechral-Solutions/intechral-client-portal/pull/26), merge `8db03b7`, main CI green) ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is implemented, independently reviewed (NEEDS SMALL REMEDIATION, documentation only, applied; [A4.17](#a417-independent-review)) and in the final PR, whose hosted CI is pending ([Amendment 4](#amendment-4-wp4-alias-retirement-guard-and-final-hardening-pr-4)). The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
@@ -1739,3 +1739,222 @@ WP3 proves usages are gone; it deletes nothing. WP4 owns: alias deletion and the
 - **`./dev check`** (run alone, after the focused evidence and the amendment text were final): **All checks passed, exit 0**. CLI self-tests **196 assertions**; `git diff --check` pass; Pint pass (**326 files**); frontend `npm run check` pass (Vitest **99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,412 passed (13,420 assertions)**, 514 s. This is the final-tree gate; the only edit after it is this one line.
 
 **State after remediation:** WP3 SAFE TO COMMIT. EPIC-016 stays **In Progress**; WP4 is not started.
+
+## Amendment 4: WP4 Alias Retirement, Guard and Final Hardening (PR 4)
+
+> **Status (2026-10-07): WP4 implemented on `feature/epic-016-blade-theme-control-adoption`, independently reviewed (A4.17) and submitted as the final EPIC-016 PR; hosted PR CI is pending.** EPIC-016 stays **In Progress**: not Verified (that needs the WP4 PR's hosted CI) and not Done (that needs the merge and a green `main` CI). WP4 is architecture cleanup and hardening. No route, controller, policy, query, status value, copy, script behaviour, React file or Direction D token value changed, and no dependency or workflow was added. No target Blade view changed.
+
+### A4.1 Starting point
+
+- **Starting SHA:** `8db03b77b7ea49e06a88630c011b6ad25ca36953` (`Merge pull request #26`, the WP3 merge). `HEAD`, `main` and `origin/main` were all at it, the tree was clean, PR #26 was merged, the merge-triggered `main` CI run was green, and no PR was open. Commits since the WP3 reviewed head `eccc007`: the merge only. (The remote feature branch itself still sat at `eccc007`.)
+- **Lifecycle at the start:** EPIC-016 In Progress; WP0, WP1, the Delete Role hotfix, WP2 and WP3 merged; WP4 not started.
+- WP3's census stood: the 59 locked files carried zero raw legacy variables, inline colour, literals, palette utilities and dead hovers.
+
+### A4.2 Zero-use proof
+
+Method: a whole-repository search of `resources/`, `app/`, `routes/`, `config/`, `database/`, `tests/` and `public/`, excluding `vendor/`, `node_modules/`, build output, `storage/` and the docs, run with the pattern passed as `-e` (an early version of the scan had its `--`-prefixed patterns parsed as options and reported a false zero; it was caught and redone). Dynamic construction was checked separately (template strings, `var(--${…})`, `setProperty`, `getPropertyValue`, config and `components.json`): none builds a retired name. Intra-CSS dependencies were read in `app.css`. Tailwind's automatic source detection also reads `tests/`, which is why a retired name that appears only in a test string showed up as a generated utility before (`accent-legacy-accent`, `bg-brand-600`).
+
+| Item | Consumers before (live source outside `app.css`) | Decision | Reason |
+|---|---|---|---|
+| `--accent` (both themes) | 0 (the 6 hits were tests that assert it absent or pinned it present) | **SAFE TO DELETE** | locked §16.1; only `.legacy-btn-accent` and `--color-legacy-accent` read it |
+| `--accent-hover`, `--accent-text` | 0 (pins only) | **SAFE TO DELETE** | locked; only `.legacy-btn-accent` read them |
+| `.legacy-btn-accent` | 0 | **SAFE TO DELETE** | locked |
+| `--color-legacy-accent` (`accent-legacy-accent`, `text-legacy-accent`) | 0 Blade or React uses; test strings only | **SAFE TO DELETE** | locked; the 7 Blade sites moved to `x-ui.checkbox` in WP1 |
+| `--color-brand-50 … 950` | 0 `brand-*` utilities; `theme(colors.brand.*)` only inside the retired `--accent` / `--accent-hover` | **SAFE TO DELETE** | locked; the one `brand-mark` class is a logo, not this scale |
+| `--surface-accent` | 0 (pins only) | **SAFE TO DELETE** | locked; WP2 removed the last 3 uses |
+| `--surface-input` | 0 (pin only) | **SAFE TO DELETE** | candidate; 63 target uses at baseline, all migrated |
+| `--surface-base`, `--surface-elevated`, `--surface-muted`, `--border-muted` | 0 (pins only) | **SAFE TO DELETE** | candidates; the WP1b orphans |
+| `--border-subtle` | 0; read only by `--border-muted` and `.legacy-border-subtle`, both retired | **SAFE TO DELETE** | candidate, retired after its two readers |
+| `.legacy-bg-surface`, `.legacy-bg-base`, `.legacy-bg-elevated`, `.legacy-border-subtle`, `.legacy-border-base`, `.legacy-text-secondary`, `.legacy-text-muted`, `.legacy-text-inverse`, `.legacy-shadow-theme-sm/md/lg` | 0 (the dead `hover:legacy-bg-surface` went in WP3) | **SAFE TO DELETE** | candidates, already zero |
+| `.legacy-text-primary` | **3**: `auth/login`, `auth/forgot-password`, `time/index` (React) | **KEEP — STILL USED** | React is out of EPIC-016's scope (O5, §14); §16.2 lists it as a non-candidate |
+| `--surface-card`, `--border-base`, `--text-primary` / `--text-secondary` / `--text-muted` | `cms/index`, `cms/show`, the `html` / `body` base, the shadcn aliases, React | **KEEP — STILL USED** | non-candidates (§16.2) |
+| `--surface-success/danger/warning/info`, `--border-success/danger/warning/info`, `--text-success/danger/warning/info`, `--danger`, `--success`, `--warning`, `--info` | React `Badge` and React `--text-danger` uses | **KEEP — STILL USED** | non-candidates |
+| `--bg-base`, `--bg-surface`, `--bg-elevated`, shadcn aliases, `--accent-foreground` | the base styles and shadcn aliases React consumes | **KEEP — STILL USED** | non-candidates |
+| `--accent-success` | `components/projects/board-column.tsx` | **KEEP — STILL USED** | non-candidate (Projects board) |
+| `--text-inverse`, `--bg-overlay` | 0 | **DEFER — UNCERTAIN / OUT OF SCOPE** | named by neither list; pinned by `DirectionDThemeContractTest`'s compatibility list. **Owner ruling O1: ACCEPTED — retained semantic/theme vocabulary**, see A4.14 |
+| `--shadow-sm/md/lg` | `welcome.blade.php` only (unrouted stub, excluded from the guard) | **DEFER — UNCERTAIN / OUT OF SCOPE** | named by neither list; same pin |
+
+### A4.3 Retirements performed (`resources/css/app.css`, +16 / −67 at this amendment)
+
+- the `--color-brand-50 … 950` scale and its comment, and `--color-legacy-accent` from the Tailwind exposure;
+- in **both** theme blocks: `--accent`, `--accent-hover`, `--accent-text`, `--surface-input`, `--border-subtle`, and the orphans `--surface-base`, `--surface-muted`, `--surface-elevated`, `--border-muted`, `--surface-accent` (`--accent-success` stays);
+- the legacy utility layer reduced to `.legacy-text-primary` alone;
+- the vendor pagination `@source` line (A4.5);
+- comments updated to say what was retired and why `.legacy-text-primary` stays.
+
+No `--ds-*` declaration, `@theme inline` Direction D mapping or shadcn alias that React consumes changed. `DirectionDThemeValuesTest` (WP3) stayed green throughout, and the reference fingerprints are identical (A4.9).
+
+**Contract tests flipped (`EPIC-016 WP4 FLIP`, in place and marked)** in `DirectionDThemeContractTest`: the retired names left the presence lists; `--color-legacy-accent: var(--accent);` is now pinned absent (with `--color-brand-`); the WP1b orphan mapping pin keeps only `--accent-success`; two stale comments name the retirement. Absence of the retired definitions is pinned once, by the guard's A4 rule, so the two files do not overlap.
+
+### A4.4 Candidates kept
+
+See the KEEP and DEFER rows above. Every keep decision has a live consumer or an owner question. The guard pins the one utility that is kept on a consumer: `legacy-text-primary` must stay defined while any React file uses it, and the test fails with "retire it with this guard rule" when the last consumer goes.
+
+### A4.5 Vendor pagination source cleanup
+
+- Verified: every paginator renders through `pagination.direction-d` / `pagination.simple-direction-d` (`AppServiceProvider`), the 9 `->links()` sites pass no view name, and no view calls `links('pagination::…')`. The one remaining use of the vendor view is `PaginationViewTest`'s URL-parity check, which renders it for comparison and needs no compiled CSS.
+- Removed exactly the `@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';` line. The other sources (`storage/framework/views`, Blade, JS, TS, TSX) are untouched.
+- **Build proof.** `npm run build` was run before and after, and the generated selector sets compared. Nothing was gained. 22 vendor-only classes left the bundle (`focus:border-blue-300`, `focus:outline-none`, `hover:bg-gray-100`, `active:*`, and the OS-driven `dark:*` set); the other 18 vendor classes are generic utilities the views also use. All 51 semantic utilities used by the views are still generated, plus `rounded-lg`, `bg-scrim` and `divide-rule`. The pagination browser tests pass on the new build.
+- **Caveat found while proving it.** `@source 'storage/framework/views/*.php'` still scans compiled Blade, so a compiled copy of the vendor view (left by `PaginationViewTest` rendering it) keeps those 22 classes in a bundle built on that machine until the cache is cleared. A clean checkout builds without them (in `./dev check` the build runs before Pest). Only the one stale compiled file was moved aside for the measurement.
+- **Deviation: one `@source not` line added.** Tailwind's automatic detection also reads `tests/`, and the guard's fixtures are forbidden class names on purpose (`bg-red-500`, `accent-white` …); without a guard they became utilities in the production bundle. `@source not '../../tests/Unit/Configuration/BladeThemeGuardTest.php'` excludes that one file. (The WP3 test had leaked the same way, for example `bg-gray-800`; that leak left with the file.)
+
+### A4.6 The permanent guard (`tests/Unit/Configuration/BladeThemeGuardTest.php`)
+
+132 tests, 296 assertions. It implements §17 as written and supersedes WP3's `BladeThemeNormalizationTest`, whose rules and **all** 18 fixtures and 12 near-misses it carries over. That file was deleted rather than kept, because a second copy of the same rules would drift.
+
+- **Level A.** All views except `welcome`, and React source without `*.test.*`: A1 (the retired aliases in the forms it explicitly scans: a declaration, `var()`, and the `--color-brand-*` Tailwind variable; it does not recognise every `theme()` syntax, for example `theme(colors.brand.600)`, which the Tailwind build rejects once the scale is gone, so a reintroduction still fails, at build time), A2 (`legacy-accent`, `legacy-btn-accent`, the brand scale as classes), A3 (every `legacy-*` utility except `legacy-text-primary`), A5 (numeric blue / indigo / violet / sky / purple palette utilities, React only). A4 on `app.css`: no retired definition, no retired utility, no vendor pagination `@source`, with `/* … */` comments ignored but never inside a quoted string.
+- **Level B.** An **explicit** 59-path inventory (`guardTargetInventory()`): B1 numeric palette and named white / black (every colour-bearing prefix, any variant, side and opacity), B2 literal colours, B3 legacy raw colour variables, B4 inline colour, B5 obsolete focus, B6 retired and dead utilities, B7 clearly visual overrides on `<x-ui.*>`, and G1 (P14: no `rounded-xl` card, carried from WP3).
+- **Exact membership.** The §17.2 roots are walked and the result must equal the inventory. A view added, renamed or removed fails with what to do ("a new view in a target workspace is classified by adding it to the inventory, a reviewed change; it is then held to every Level B rule"). The inventory is also checked to be unique and to lie inside the roots. This replaces `>= 59`.
+- **Reporting and allowlist.** Each failure prints `RULE file:line => match`; line numbers survive comment removal. The allowlist is a reviewed array of `file => rule => reason`; it is **empty**, and the guard fails on an entry with no reason or one that no longer matches.
+- **WP3 review gaps closed.** `style` in single quotes, bound `:style`, and multi-line values; a `style` that is only an expression is reported as opaque; PHP style strings and JavaScript `.style` / `setProperty` writes; `white` / `black` under every colour-bearing prefix (`outline`, `accent`, `shadow` were missing); exact path membership.
+- **B7 is a deny-list, not a Tailwind parser.** It walks each `<x-ui.*>` tag respecting quotes and Blade echoes (so `->` inside an attribute does not end the tag). It reports a literal class token with a visual prefix (`bg-`, `border`, `ring`, `outline`, `shadow`, `rounded`, `divide-`, `accent-`, `fill-`, `stroke-`, `opacity-`), a `text-` token that is not a size, alignment or wrapping keyword, owned geometry (`h-`, `min-h-`, `size-`, padding), a state or theme variant (`hover:`, `focus:`, `focus-visible:`, `active:`, `disabled:`, `dark:`, group / peer / aria / data), any `style=`, and any bound `:class=`. Layout classes, responsive variants, `font-*`, `sr-only` and the rest pass. A visual class outside its prefixes, an interpolated class, or a forwarded attribute bag is left to review; the contract "x-ui.* owns visual styling" (§7.2 rule 1) stays a human-review rule.
+- **Not banned:** semantic utilities, layout and spacing utilities, `min-h-[60vh]`, `--ds-*`, a non-colour custom property (`width: var(--progress)`), and `var(--…)` as a language feature (O9).
+- All 59 target views, all 73 non-`welcome` views and all React source pass today with an empty allowlist.
+
+### A4.7 Guard non-vacuity and mutation evidence
+
+Every rule has must-catch fixtures (76, each asserting the rule ids it must trip) and near-misses (40, each asserting the one rule it must not trip, including every §17.3 near-miss). Separately, each mutation below was applied **alone** to the real tree, the guard run and shown to fail with the intended report, and the file restored (`cmp`: byte-identical, or the new file removed). The one extra check, after mutation 10, re-ran that mutation to confirm which test failed.
+
+| # | Mutation (real file) | Result |
+|---|---|---|
+| 1 | `style="width: var(--accent)"` in `cms/show` (Level A only) | `A1 …cms/show.blade.php:1 => --accent` |
+| 2 | `bg-red-50` in `tickets/index` | `B1 …:1 => bg-red-50` |
+| 3 | `style='background-color: x'` (single quotes) in `crm/contacts/index` | `B4 …:1 => background-color:` |
+| 4 | `text-[#123456]` in `billing/invoices/show` | `B2 …:1 => #123456` |
+| 5 | `<x-ui.link class="text-danger">` in `tickets/create` | `B7 …:1 => <x-ui.link class "text-danger"` |
+| 6 | `<input class="outline-none">` in `admin/roles/index` | `B5 …:1 => outline-none` |
+| 7 | `hover:legacy-bg-surface` in `operator/cms/index` | `A3` and `B6 …:1 => legacy-bg-surface` (2 failures) |
+| 8 | `bg-blue-500` appended to `resources/js/lib/utils.ts` | `A5 resources/js/lib/utils.ts:7 => bg-blue-500` |
+| 9 | `--surface-input: #ffffff;` appended to `app.css` | `A1 resources/css/app.css:942 => --surface-input` |
+| 10 | the vendor `@source` line appended to `app.css` | the A4 vendor-source test fails |
+| 11 | a new `tickets/zz-new.blade.php` | the inventory test fails, naming the file and the classification rule |
+| (WP3 pin) | `--ds-text-muted` `#5C5F66` -> `#5C5F67` | `DirectionDThemeValuesTest` fails on `--ds-text-muted (light)` (A3.9, repeated unchanged) |
+
+### A4.8 Theme and transition hardening
+
+- **`tests/Browser/support/theme.ts` (new) `settleTheme` / `applyTheme`.** After a theme is requested it proves (1) `<html data-theme>` equals it, (2) the canonical `canvas` resolves to that theme's value, typed from the Direction D specification (`#F6F5F1` / `#0D1416`), not read from `app.css`, then (3) waits for every **finite** running animation or transition to finish (`getComputedTiming().endTime` is finite; infinite animations such as the live-state pulse are excluded so the wait cannot hang on them), after two animation frames so the transition has begun. A finite animation that never ends fails the wait at 5 s with a timeout; it is never skipped.
+- **Used by** `visit()` (replacing `waitForTimeout(400)`), the WP1 `errors/403` test (also a fixed delay), and the WP3 palette helper and `errors/403` loop. The 403 loop now sets the theme **after** the 403 navigation (setting it before was lost on the reload) and proves it with the same strength as every other route. No arbitrary sleep and no global timeout change was added.
+- **The WP3 palette poll is unchanged** and still the final check: a persistent wrong colour still fails at the end of its window. Its mutation evidence is A3.10 and A3.14 (a temporary inline colour failing it on the exact value); it was not re-mutated in WP4, and no browser check was weakened.
+- Other specs (`time-migration`, the Projects and Tasks specs) keep their own fixed delays; they are React specs outside EPIC-016's scope, see A4.13.
+
+### A4.9 Final census (the locked 59 target views unless stated)
+
+| Measure | Result | Meaning |
+|---|---:|---|
+| raw legacy colour-variable presentation (B3) | **0** | zero because migrated (WP3) |
+| literal colours (B2) | **0** | zero because migrated |
+| numeric or named palette utilities (B1) | **0** | zero because migrated |
+| inline `style` attributes of any kind | **0** | zero because migrated |
+| retired alias or brand utility (A1, A2) | **0** | zero because retired |
+| dead or retired `legacy-*` utility (A3, B6) | **0** | zero because retired |
+| `x-ui` visual caller overrides (B7) | **0** | every caller passes layout classes only |
+| obsolete focus treatment (B5) | **0** | |
+| `rounded-xl` cards (G1) | **0** | |
+| Direction D semantic colour utilities | **642** by this scan (WP3 recorded 643 / 648 by other regexes) | |
+| allowlisted exceptions | **0** | |
+
+**Application-wide, retired families:** zero uses of any retired alias or utility in all 73 non-`welcome` views, in React source, and as definitions in `app.css`; `.legacy-text-primary` is the single `legacy-*` utility left (3 React consumers). **Kept because legitimately used:** raw legacy colour variables remain in `cms/index` (7) and `cms/show` (6) (Resources, deferred §5.2), `welcome.blade.php` (4, an unrouted stub), React source (28 references in 9 files) and as the definitions behind them in `app.css`, the `html` / `body` base and the shadcn aliases. **It is not true that all legacy variables are gone**, and the guard does not claim it: it forbids them in the target views and the retired ones everywhere.
+
+### A4.10 Projects, Tasks and Time stability
+
+`resources/js` has no diff, and no `--ds-*` declaration, `@theme inline` mapping or consumed shadcn alias changed. Evidence: `DirectionDThemeValuesTest` green; the WP3 computed-style fingerprint (colour, background, border colour and width, radius, font size and weight, box size, for every element of `main`) of `/projects`, `/tasks` and `/time`, in light and dark at 1440 and 390, re-taken on the WP4 tree and compared with the capture taken at the WP3 tree: **12 of 12 identical** (a temporary spec, deleted afterwards); and the Projects, Tasks and Time specs green (A4.12).
+
+### A4.11 Visual and accessibility closeout
+
+A read-only probe (no form submitted) of the Helpdesk queue and ticket, reports, Directory contacts, Finance invoice form and member invoices, System users, roles and the invite modal, `errors/403` and the member ticket list, in light and dark at 1440 and 390 (25 captures), plus Projects and Tasks as references. Every capture resolved the canonical canvas for its theme, every card was `surface` + `rule` at 8px, and none overflowed the document. Images reviewed: the invite modal in both themes (the dialog stays dominant over the scrim), the dark and light ticket pages, and the dark users list at 390. No missing class after the alias deletion, no wrong-theme capture, no new overflow. The dark `Invite User` trigger behind the modal and the quieter dark dialog edge are as in WP3's review. The 390px users table still clips its Roles column (carried, A4.13). The probe's images were temporary and are not in the repository.
+
+### A4.12 Validation
+
+- **Focused Pest** (`tests/Unit/Ui`, `tests/Unit/Configuration`, `tests/Feature/Ui`, `tests/Feature/Tickets`, `tests/Feature/Billing`, `tests/Feature/Admin`, `tests/Feature/Cms`, `tests/Feature/Crm`, `BladeShellTest`, `ShellContractTest`): **917 passed (5,189 assertions)**, 106 s. It includes the guard (132 / 296), `DirectionDThemeValuesTest` (37 / 74), `DirectionDThemeContractTest`, `BladeControlAdoptionTest`, the semantic-state and pagination tests, and the role Delete form coverage.
+- **Build.** `npm run build` was re-run after the `app.css` edits and before every browser run (424 modules); the selector comparison is A4.5.
+- **Focused Playwright** (`blade-theme-controls`, `role-delete-form`, `time-migration`, `projects-migration`, `tasks-migration`, `blade-shell`; default 3 workers): **65 tests, 65 passed, 0 failed, 0 skipped**, 5.3 minutes (5m25s wall). Product data before and after: projects 2 / 2, tasks 1 / 1, time entries 2 / 2. nginx over the window: 1,273 `200`, 148 `302`, 27 `303`, **0 `5xx`, 0 `419`, 0 `429`**; 9 expected `403`s (the `errors/403` checks), 4 `404`s (cleanup of removed records), 27 `499`s (navigations aborted by the next `goto`). Run once, not repeated to green.
+- **The full browser suite was not run locally.** §18.1 makes hosted CI the authoritative complete-browser gate.
+- **`./dev check`** (run once, alone, after the focused evidence was stable; the only edit after it is to this amendment's text: two fixture counts, one over-claiming sentence in A4.8 and this line): **All checks passed, exit 0**. CLI self-tests **196 assertions**; `git diff --check` pass; Pint pass (**326 files**); frontend `npm run check` pass (`wayfinder:generate`, `tsc --noEmit`, ESLint, Prettier, **Vitest 99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,453 passed (13,589 assertions)**, 518 s. That is the WP3 gate's 2,412 less the 91 tests of the retired `BladeThemeNormalizationTest` plus the guard's 132. The first run was green; there was no red run.
+
+### A4.13 Carried-debt dispositions
+
+Every item carried by Amendments 1 to 3 and §22 ends with one disposition.
+
+| Item | Source | Disposition |
+|---|---|---|
+| WP3 independent-review: transition-settling, per-theme precondition, `errors/403` read-back, regex gaps, exact target membership | A3.14 | **CLOSED** (A4.6, A4.8) |
+| the vendor pagination `@source` line | §7.4, A1.7 | **CLOSED** |
+| alias retirement, absence pins, the permanent guard, the final census | §16, §17 | **CLOSED** |
+| the fixed-delay race in the Blade spec | A3.11, A3.14 | **CLOSED** for `blade-theme-controls`. The React specs' own delays (the `time-migration` mobile delete timeout and the hosted `tasks-migration` 30 s timeout seen once on PR #26, whose run later concluded green) are **DEFERRED — Release 1 hardening** (the test is not modified here) |
+| "All Statuss" / "All Prioritys" queue copy | A1.15 | **DEFERRED — Helpdesk MVP** (roadmap lists it) |
+| bulk-bar field error placement | A1.15 | **DEFERRED — Helpdesk MVP** |
+| `organizations/show` role field-error could surface a member-role error (practically unreachable) | A1.15 | **DEFERRED — Directory product work** |
+| "Choose Files" text sits high in the `h-9` file input | A1.15, A3.6 | **DEFERRED — the next `x-ui.input[type=file]` polish, taken with the Helpdesk MVP attachment work** |
+| 390px table and card clipping; invoice number and header-action wrapping; narrow line-item columns | A1.15, A2.18, A3.6 | **DEFERRED — P13 / P15 and the module epics (Helpdesk MVP, Finance)** |
+| table-header grammar differs across modules; table density; page frame and widths | A3.14, P13, P15 | **DEFERRED — future `DataTable` conventions in the module epics** |
+| bordered role tiles inside a card on `admin/users/show` | A3.14 | **DEFERRED — EPIC-011 Phase J** (System / administration; the roadmap keeps System as themed Blade; a Direction D "no card inside a card" case, not a theme defect) |
+| field errors added where a page had none (visible messages that were swallowed) | A1.15 #3 | **ACCEPTED — intentional current behaviour** (owner awareness recorded in WP1) |
+| the other WP1 deviations (`FieldState`, template row, `Pay Now` secondary, and so on) | A1.15 | **ACCEPTED** |
+| success alerts without a green tint, `text-sm` status labels, case of DOM status text, the live-dot pulse removed | A2.12 | **ACCEPTED** (specified, A2.18 rulings) |
+| the tracker's Start-timer measure is conditional | A2.12 #9 | **ACCEPTED** |
+| the dashed Pending and Draft glyphs look faint in dark | A2.18 | **ACCEPTED** (measured above 3:1) |
+| the 403 numeral as `text-text-muted`; the invite modal on `bg-scrim` | A3.8 | **ACCEPTED** (owner rulings) |
+| `/organizations/{id}` not in the browser palette matrix (no safe fixture lifecycle) | A3.14 | **ACCEPTED — owner ruling O2**; still inside the static guard; the §20 #12 coverage exception is recorded in A4.14 #2 and A4.15 |
+| hourglass, arrow and clock glyphs (P6, P11) | §22 | **DEFERRED — the shared cross-renderer `Status` vocabulary** (Helpdesk MVP and the Finance / React slice) |
+| `confirm()` replaced by dialogs | §22 | **DEFERRED — the module product epics** |
+| customer label "Waiting on you" | §21, §22 | **DEFERRED — Helpdesk MVP** |
+| React `Badge` legacy variants; React `--text-danger` uses; the 3 `legacy-text-primary` React uses | §22 | **DEFERRED — their next React slice** |
+| `cms/*` (Resources) colour normalization and the legacy variables it keeps alive | §5.2, §15 | **DEFERRED — Knowledge / CMS evolution** |
+| `--text-inverse`, `--bg-overlay`, `--shadow-sm/md/lg` (no live consumer beyond an unrouted stub) | A4.2 | **ACCEPTED — owner ruling O1: retained semantic/theme vocabulary** (a later design-system cleanup may revisit), A4.14 |
+| `@shadcn/lint` for the React side | §22.1 | **DEFERRED — post-EPIC-016 evaluation**, placed by the roadmap before the Helpdesk MVP's React work. **Not installed**; no dependency was added |
+| a stale compiled vendor view can keep vendor classes in a locally built bundle | A4.5 | **ACCEPTED — environmental**; a clean build lacks them |
+
+### A4.14 Findings and owner decisions
+
+1. **`--text-inverse` and `--bg-overlay` have no consumer at all, and `--shadow-sm/md/lg` only `welcome.blade.php`.** Neither epic list names them, and `DirectionDThemeContractTest` pins them, so WP4 kept them. **Owner ruling O1 (2026-10-07): ACCEPTED — retained semantic/theme vocabulary.** They are not on the locked retirement list, zero current consumers does not make a semantic design token legacy debt, WP4 retires proven compatibility debt rather than every dormant token, and a later design-system cleanup may reconsider them. They are not deleted.
+2. **`/organizations/{id}` has no browser palette coverage.** **Owner ruling O2 (2026-10-07): ACCEPTED.** The product has no organization delete route, so a browser test has no safe create/remove fixture lifecycle, and adding product behaviour only for test cleanup is rejected. The product route itself is unchanged. The organization-detail theme contract is supported by the permanent static guard (Level A and the Level B inventory, which includes `organizations/show`), the Feature / server-side coverage, and the shared semantic theme and component contracts. This is the **owner-approved coverage exception to §20 #12** recorded in A4.15; it does not weaken the light / dark / theme validation of any other route.
+3. **B7 is a deny-list.** It catches clearly visual caller overrides on `<x-ui.*>`; it cannot see an interpolated class, a forwarded attribute bag, or a visual class outside its prefixes. The human-review contract stays.
+4. **Deviations from the written plan:** the one `@source not` line (A4.5); WP3's `BladeThemeNormalizationTest` deleted as superseded rather than retained (A4.6); G1 (the 8px card radius, P14) added to Level B so WP3's `rounded-xl` check is not lost, though §17.2 does not list it; the roadmap and `docs/epics/README.md` are not updated here: the roadmap's forward notes still read "WP2 is next" (WP2 and WP3 each left them for the closing docs update), and both move with the closing update after merge (a known post-merge closeout action, not a WP4 defect).
+5. **Non-blocking guard-hardening observations (future testing evolution, not implemented here).** The independent review found three source idioms the scanner does not see, none used in the current tree: Laravel's `@style([...])` directive, a PHP style string with no trailing `;`, and a camelCase Alpine `:style` object. It also noted that `@source not` could be widened from the one guard file to all of `tests/`, since other test files still leak class names into the bundle (for example `bg-teal-600` from `ButtonAndLinkComponentTest`). They are left for the final testing evolution so the approved guard is not reopened.
+
+### A4.15 Exit criteria matrix (§20, 21 criteria)
+
+| # | Criterion | Status | Enforcing evidence | Remaining |
+|---|---|---|---|---|
+| 1 | the Blade control layer, tested | **Met** | `tests/Unit/Ui/*`, Pagination view tests | none |
+| 2 | primary actions ink; no `var(--accent)` fill | **Met** | button tests; guard A1 / B3 | none |
+| 3 | visible 2px `focus` outline on every control, both themes | **Met** | WP1 Tab-through browser tests; guard B5; the exact `focusRing` pin | none |
+| 4 | labels, errors, `control-edge`, field identity, no duplicate id, line-item repair | **Met** | `FieldComponentsTest`, `TargetFormAccessibilityTest`, the invoice line-item tests | none |
+| 5 | checkbox `accent-accent`; no legacy accent | **Met** | `x-ui.checkbox` tests; guard A2 | none |
+| 6 | pagination on Direction D; vendor `@source` gone | **Met in WP4** | `PaginationViewTest`; guard A4 vendor test; the build comparison (A4.5) | none |
+| 7 | destructive triggers use danger semantics; `confirm()` unchanged | **Met** | button tests; the Directory and System browser tests | none |
+| 8 | accessible names preserved and added | **Met** | `TargetAccessibleNamesTest`; the browser role / name checks | none |
+| 9 | `time-migration.spec.ts` green without edits | **Met** | the file is unchanged (no diff); 13 / 13 inside the 65 | none |
+| 10 | status, priority, overdue, note, role, alert and live presentation per §9, contrast re-measured | **Met** | `SemanticStateMappingTest`, `SemanticStateContrastTest`, the WP2 browser contrast checks | none |
+| 11 | every application colour semantic, justified or documented | **Met** | guard B1 / B2 / B3 / B4, empty allowlist | none |
+| 12 | raw legacy variables gone from the targets; browser palette passes on every §18.4 route | **Met, under an explicit owner-approved coverage exception** | guard B3; the palette spec on every §18.4 route but `/organizations/{id}`; for that route the static guard, the Feature coverage and the shared theme / component contracts (A4.14 #2, owner ruling O2) | none. The literal wording "every §18.4 target route" is **not** met by a browser run for `/organizations/{id}`: the product has no organization delete route, so there is no safe fixture lifecycle, and adding product behaviour only for test cleanup is rejected. Criterion #12 is considered satisfied under this exception; the light / dark / theme validation of every other route is unchanged |
+| 13 | any new token satisfies §11.4; no existing value changed | **Met** (no token added) | `DirectionDThemeValuesTest`; `resources/css` diff touches no `--ds-*` | none |
+| 14 | repeated product geometry on the shared conventions | **Met** | guard G1; the component pins; `min-w-45` | none |
+| 15 | aliases retired only after the four-part proof | **Met in WP4** | A4.2, A4.3, the flipped pins, the guard A4 | none |
+| 16 | the permanent two-level guard, with fixtures, empty allowlist | **Met in WP4** | `BladeThemeGuardTest`, A4.6, A4.7 | none |
+| 17 | light and dark browser validation across the four areas and `errors/403` | **Met** | `blade-theme-controls.spec.ts` (65 / 65 above) | none |
+| 18 | 390 and desktop validation, no document overflow | **Met** | the palette spec's overflow check on every route | none |
+| 19 | Projects and Tasks visually unchanged | **Met** | no `resources/js` diff; 12 / 12 fingerprints; the Projects, Tasks and Time specs | none |
+| 20 | `./dev check` and `./dev test:e2e` green on the final package | **`./dev check`: met (A4.12). The complete `./dev test:e2e`: pending** | focused set 65 / 65 locally | the full browser suite runs in hosted CI |
+| 21 | hosted PR CI green | **Pending** | none yet; no hosted run has happened for WP4 | the WP4 PR |
+
+Independent closeout ruling (A4.17): criteria 1–19 **satisfied**; criterion 20: the local `./dev check` half satisfied, the complete `./dev test:e2e` / hosted full browser gate **pending**; criterion 21 **pending** the hosted WP4 PR CI.
+
+EPIC-016 is therefore **not Verified** until criteria 20 and 21 close on the WP4 PR, and **not Done** until that PR merges with a green `main` CI.
+
+### A4.16 Files changed
+
+**Changed:** `src/resources/css/app.css`; `src/tests/Unit/Configuration/DirectionDThemeContractTest.php` (the WP4 FLIPs); `src/tests/Browser/blade-theme-controls.spec.ts` (three fixed delays and two theme-setting sites moved to the shared helper). **New:** `src/tests/Unit/Configuration/BladeThemeGuardTest.php`; `src/tests/Browser/support/theme.ts`. **Deleted:** `src/tests/Unit/Configuration/BladeThemeNormalizationTest.php` (superseded). **Docs:** this amendment and the status line.
+**Scope check against `8db03b7`:** only `resources/css/app.css`, `tests` and this document; nothing under `resources/js`, `resources/views`, `routes`, `app`, `database`, `config`, `.github` or any manifest. No view changed, so the reviewed WP3 normalization is untouched.
+
+### A4.17 Independent review
+
+- **Initial verdict:** WP4 NEEDS SMALL REMEDIATION. **Classification:** documentation only. **Code:** approved as-is (`app.css`, the guard, the theme helper, the contract flips and the spec changes).
+- **Zero-use review:** every retired name has zero live consumers (a fresh scan with `-e`, plus a dynamic-construction search); only test strings and explanatory comments mention them.
+- **Build comparison:** the base and WP4 `app.css` were compiled with Tailwind's Node API in clean scratch trees (empty compiled-view directory): **45 selectors removed, 0 added**, and no `var()` reference to a retired name in the WP4 bundle.
+- **Guard:** accepted. The 59-path inventory is exact; edge-case probes passed (Tailwind v4 `bg-(--accent)`, arbitrary `var()` values, `x-bind:style`, `bg-white/50`, `!bg-ink`, single-quoted classes, `md:rounded-xl`) with no false positives on layout, responsive, semantic or `--progress` / `--ds-*` samples. The parser gaps in A4.14 #5 are non-blocking.
+- **Theme helper:** accepted: finite transitions only, infinite animations cannot hang the wait, the canonical canvas is typed from the specification.
+- **Independent Pest:** 505 passed / 2,657 assertions, 25.50 s. Guard alone 132 / 296. Guard with `PaginationViewTest` 147 / 451.
+- **Independent Playwright** (`blade-theme-controls`, `role-delete-form`, `time-migration`, `projects-migration`, `tasks-migration`): 54 scheduled, 54 passed, 0 failed, 0 skipped, 3 workers, 5.0 min; product counts 2 / 1 / 2 before and after.
+- **Required remediation (this commit, documentation only):** O1 and O2 recorded as owner rulings, the §20 #12 coverage exception stated, the timer-timing destination named (Release 1 hardening), the role-tiles destination named (EPIC-011 Phase J), and the `theme()` wording in A4.6 corrected.
+- **Reviewer ruling after the documentation remediation:** WP4 SAFE TO COMMIT — the final EPIC-016 PR may open. No hosted WP4 PR CI has run; EPIC-016 stays **In Progress**.
