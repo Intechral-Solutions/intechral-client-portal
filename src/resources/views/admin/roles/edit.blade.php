@@ -14,10 +14,7 @@
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $role->name }}</h1>
             @if ($isBuiltIn)
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                  style="background-color: var(--surface-accent); color: var(--accent);">
-                Built-in
-            </span>
+            <x-ui.tag>Built-in</x-ui.tag>
             @endif
         </div>
         @if ($isBuiltIn)
@@ -29,11 +26,7 @@
 
     {{-- Flash / error --}}
     @if (session('status'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">
-        {{ session('status') }}
-    </div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('status') }}</x-ui.alert>
     @endif
 
     <form method="POST" action="{{ route('roles.update', $role) }}" class="space-y-8">

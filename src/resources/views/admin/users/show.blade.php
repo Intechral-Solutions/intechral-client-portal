@@ -21,18 +21,10 @@
 
     {{-- Flash / errors --}}
     @if (session('status'))
-    <div class="rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">
-        {{ session('status') }}
-    </div>
+    <x-ui.alert variant="success">{{ session('status') }}</x-ui.alert>
     @endif
     @if ($errors->any())
-    <div class="rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
-         role="alert">
-        {{ $errors->first() }}
-    </div>
+    <x-ui.alert variant="danger">{{ $errors->first() }}</x-ui.alert>
     @endif
 
     <div class="grid gap-8 lg:grid-cols-3">
@@ -52,9 +44,9 @@
                         <dt style="color: var(--text-secondary);">2FA</dt>
                         <dd>
                             @if ($user->two_factor_confirmed_at)
-                            <span class="text-xs font-medium" style="color: var(--text-success);">Enabled</span>
+                            <x-ui.status tone="success">Enabled</x-ui.status>
                             @else
-                            <span class="text-xs font-medium" style="color: var(--text-secondary);">Disabled</span>
+                            <x-ui.status glyph="dashed">Disabled</x-ui.status>
                             @endif
                         </dd>
                     </div>

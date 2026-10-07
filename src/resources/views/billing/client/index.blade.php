@@ -29,15 +29,6 @@
             </thead>
             <tbody class="divide-y" style="divide-color: var(--border-base);">
                 @foreach ($invoices as $invoice)
-                @php
-                    $ss = [
-                        'draft'     => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)'],
-                        'sent'      => ['bg' => 'var(--surface-info)',    'text' => 'var(--text-info)'],
-                        'paid'      => ['bg' => 'var(--surface-success)', 'text' => 'var(--text-success)'],
-                        'overdue'   => ['bg' => 'var(--surface-danger)',  'text' => 'var(--text-danger)'],
-                        'cancelled' => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)'],
-                    ][$invoice->status] ?? ['bg' => 'var(--surface-muted)', 'text' => 'var(--text-muted)'];
-                @endphp
                 <tr>
                     <td class="px-4 py-3">
                         <x-ui.link variant="row" :href="route('billing.client.invoices.show', $invoice)" class="font-mono">
@@ -45,18 +36,15 @@
                         </x-ui.link>
                     </td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $invoice->issued_at->format('M j, Y') }}</td>
-                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium' : '' }}"
-                        style="color: {{ $invoice->isOverdue() ? 'var(--text-danger)' : 'var(--text-secondary)' }};">
+                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
+                        @unless ($invoice->isOverdue()) style="color: var(--text-secondary);" @endunless>
                         {{ $invoice->due_at->format('M j, Y') }}
                     </td>
-                    <td class="px-4 py-3 text-right font-medium" style="color: var(--text-primary);">
+                    <td class="px-4 py-3 text-right font-medium {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">
                         {{ $invoice->currency }} {{ number_format((float)$invoice->total, 2) }}
                     </td>
                     <td class="px-4 py-3 text-center">
-                        <span class="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium capitalize"
-                              style="background-color: {{ $ss['bg'] }}; color: {{ $ss['text'] }};">
-                            {{ $invoice->status }}
-                        </span>
+                        @include('billing._invoice_status', ['status' => $invoice->status])
                     </td>
                     <td class="px-4 py-3 text-right">
                         @if ($invoice->isPayable())

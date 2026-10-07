@@ -234,3 +234,45 @@ expect()->extend('toHaveViolation', function (string $needle) {
         'Failed asserting that a violation contains "'.$needle.'". Violations: '.json_encode($this->value),
     );
 });
+
+/*
+ * EPIC-016 WP2: contrast helpers over the theme tokens in resources/css/app.css (WCAG 2.x relative
+ * luminance). Values come from the `[data-theme]` blocks, so a retuned token fails the evidence.
+ */
+
+/** The body of one theme block (`light` or `dark`) in app.css. */
+function uiThemeBlock(string $theme): string
+{
+    preg_match('/^\[data-theme="'.$theme.'"\]\s*\{(.*?)^\}/ms', (string) file_get_contents(resource_path('css/app.css')), $match);
+
+    return $match[1] ?? '';
+}
+
+/** A `--ds-*` token's hex value in a theme, failing loudly when it is not a plain hex colour. */
+function uiTokenHex(string $theme, string $token): string
+{
+    preg_match('/^\s*--ds-'.preg_quote($token, '/').':\s*(#[0-9A-Fa-f]{6})\b/m', uiThemeBlock($theme), $match);
+
+    if (! isset($match[1])) {
+        throw new RuntimeException("Token --ds-{$token} is not a hex colour in the {$theme} theme.");
+    }
+
+    return $match[1];
+}
+
+function uiLuminance(string $hex): float
+{
+    [$r, $g, $b] = array_map(
+        fn (string $pair) => ($c = hexdec($pair) / 255) <= 0.04045 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4,
+        str_split(ltrim($hex, '#'), 2),
+    );
+
+    return 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
+}
+
+function uiContrast(string $a, string $b): float
+{
+    [$x, $y] = [uiLuminance($a), uiLuminance($b)];
+
+    return (max($x, $y) + 0.05) / (min($x, $y) + 0.05);
+}

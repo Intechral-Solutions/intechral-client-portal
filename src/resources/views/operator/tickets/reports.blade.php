@@ -39,7 +39,7 @@
                 @foreach ($byCategory as $category => $count)
                 <li class="flex items-center justify-between text-sm">
                     <span style="color: var(--text-primary);">{{ $category }}</span>
-                    <span class="font-semibold tabular-nums" style="color: var(--accent);">{{ $count }}</span>
+                    <span class="font-mono font-semibold tabular-nums text-text">{{ $count }}</span>
                 </li>
                 @endforeach
             </ul>
@@ -56,7 +56,7 @@
                 @foreach ($byPriority as $priority => $count)
                 <li class="flex items-center justify-between text-sm">
                     @include('tickets._priority_badge', ['priority' => $priority])
-                    <span class="font-semibold tabular-nums" style="color: var(--accent);">{{ $count }}</span>
+                    <span class="font-mono font-semibold tabular-nums text-text">{{ $count }}</span>
                 </li>
                 @endforeach
             </ul>
@@ -81,7 +81,7 @@
                         @foreach ($volumeByDay as $date => $count)
                         <tr>
                             <td class="py-2 pr-6" style="color: var(--text-primary);">{{ $date }}</td>
-                            <td class="py-2 text-right tabular-nums font-medium" style="color: var(--accent);">{{ $count }}</td>
+                            <td class="py-2 text-right font-mono tabular-nums font-medium text-text">{{ $count }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -107,7 +107,7 @@
                     <tr>
                         <td class="py-2 pr-6" style="color: var(--text-primary);">{{ $row->name }}</td>
                         <td class="py-2 pr-6 text-right tabular-nums" style="color: var(--text-secondary);">{{ $row->count }}</td>
-                        <td class="py-2 text-right tabular-nums font-medium" style="color: var(--accent);">{{ number_format($row->avg_hours, 1) }}h</td>
+                        <td class="py-2 text-right font-mono tabular-nums font-medium text-text">{{ number_format($row->avg_hours, 1) }}h</td>
                     </tr>
                     @endforeach
                 </tbody>

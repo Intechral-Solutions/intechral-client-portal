@@ -1,11 +1,17 @@
+{{--
+    EPIC-016 WP2: the ticket priority mapping (§9.2, Direction D §10.3): bars + visible label. low 1 bar,
+    medium 2, high 3, all neutral; critical is 3 bars in danger. Values, ordering and sorting are unchanged.
+    An unknown priority falls back to one neutral bar.
+
+    @param string $priority
+--}}
 @php
-$styles = [
-    'critical' => 'background-color:#fef2f2;color:#dc2626;',
-    'high'     => 'background-color:#fff7ed;color:#ea580c;',
-    'medium'   => 'background-color:#fefce8;color:#ca8a04;',
-    'low'      => 'background-color:#f0fdf4;color:#16a34a;',
+$map = [
+    'low'      => ['bars' => 1, 'tone' => 'neutral'],
+    'medium'   => ['bars' => 2, 'tone' => 'neutral'],
+    'high'     => ['bars' => 3, 'tone' => 'neutral'],
+    'critical' => ['bars' => 3, 'tone' => 'danger'],
 ];
-$style = $styles[$priority] ?? '';
+$entry = $map[$priority] ?? ['bars' => 1, 'tone' => 'neutral'];
 @endphp
-<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-      style="{{ $style }}">{{ $priority }}</span>
+<x-ui.priority :bars="$entry['bars']" :tone="$entry['tone']" data-ticket-priority="{{ $priority }}">{{ ucfirst($priority) }}</x-ui.priority>

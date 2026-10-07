@@ -15,14 +15,10 @@
 
     {{-- Flash --}}
     @if (session('status'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('status') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('status') }}</x-ui.alert>
     @endif
     @if ($errors->any())
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger);"
-         role="alert">{{ $errors->first() }}</div>
+    <x-ui.alert variant="danger" class="mb-6">{{ $errors->first() }}</x-ui.alert>
     @endif
 
     {{-- Filters --}}
@@ -76,7 +72,7 @@
             </thead>
             <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 @forelse ($tickets as $ticket)
-                <tr class="transition-colors hover:legacy-bg-surface {{ $ticket->isOverdue() ? 'bg-red-50' : '' }}">
+                <tr class="transition-colors hover:legacy-bg-surface">
                     <td class="px-4 py-3">
                         <x-ui.checkbox name="ticket_ids[]" id="ticket-cb-{{ $ticket->id }}" value="{{ $ticket->id }}"
                                        aria-label="Select ticket {{ $ticket->ticket_number }}" class="ticket-cb" />
@@ -90,11 +86,11 @@
                     <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">
                         {{ $ticket->assignee?->name ?? '—' }}
                     </td>
-                    <td class="px-4 py-3 text-sm {{ $ticket->isOverdue() ? '' : '' }}"
-                        style="color: {{ $ticket->isOverdue() ? 'var(--text-danger)' : 'var(--text-secondary)' }};">
+                    <td class="px-4 py-3 text-sm {{ $ticket->isOverdue() ? 'font-medium text-danger' : '' }}"
+                        @unless ($ticket->isOverdue()) style="color: var(--text-secondary);" @endunless>
                         {{ $ticket->sla_due_at?->format('d M H:i') ?? '—' }}
                         @if ($ticket->isOverdue())
-                        <span class="text-xs font-semibold" style="color: var(--text-danger);">Overdue</span>
+                        @include('tickets._overdue_status', ['class' => 'ml-1'])
                         @endif
                     </td>
                     <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">{{ $ticket->created_at->diffForHumans() }}</td>

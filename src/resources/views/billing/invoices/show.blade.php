@@ -30,9 +30,7 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -49,20 +47,7 @@
                         <p class="font-semibold" style="color: var(--text-primary);">{{ $invoice->client->name }}</p>
                         <p class="text-sm" style="color: var(--text-secondary);">{{ $invoice->client->email }}</p>
                     </div>
-                    @php
-                        $statusStyles = [
-                            'draft'     => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)',   'border' => 'var(--border-muted)'],
-                            'sent'      => ['bg' => 'var(--surface-info)',    'text' => 'var(--text-info)',    'border' => 'var(--border-info)'],
-                            'paid'      => ['bg' => 'var(--surface-success)', 'text' => 'var(--text-success)', 'border' => 'var(--border-success)'],
-                            'overdue'   => ['bg' => 'var(--surface-danger)',  'text' => 'var(--text-danger)',  'border' => 'var(--border-danger)'],
-                            'cancelled' => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)',   'border' => 'var(--border-muted)'],
-                        ];
-                        $ss = $statusStyles[$invoice->status] ?? $statusStyles['draft'];
-                    @endphp
-                    <span class="rounded-full border px-3 py-1 text-sm font-medium capitalize"
-                          style="background-color: {{ $ss['bg'] }}; color: {{ $ss['text'] }}; border-color: {{ $ss['border'] }};">
-                        {{ $invoice->status }}
-                    </span>
+                    @include('billing._invoice_status', ['status' => $invoice->status])
                 </div>
 
                 <div class="grid grid-cols-3 gap-4 text-sm border-t pt-4" style="border-color: var(--border-base);">
@@ -72,8 +57,8 @@
                     </div>
                     <div>
                         <p class="text-xs" style="color: var(--text-muted);">Due</p>
-                        <p class="{{ $invoice->isOverdue() ? 'font-medium' : '' }}"
-                           style="color: {{ $invoice->isOverdue() ? 'var(--text-danger)' : 'var(--text-primary)' }};">
+                        <p class="{{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
+                           @unless ($invoice->isOverdue()) style="color: var(--text-primary);" @endunless>
                             {{ $invoice->due_at->format('M j, Y') }}
                         </p>
                     </div>
@@ -121,7 +106,7 @@
                         @endif
                         <tr class="font-semibold">
                             <td colspan="3" class="px-4 py-3 text-right" style="color: var(--text-primary);">Total ({{ $invoice->currency }})</td>
-                            <td class="px-4 py-3 text-right text-base" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-base {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -145,7 +130,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-muted);">Payment</p>
 
                 @if ($invoice->isPaid())
-                <p class="text-sm font-medium mb-1" style="color: var(--text-success);">&#10003; Paid {{ $invoice->paid_at->format('M j, Y') }}</p>
+                <p class="text-sm font-medium mb-1 text-success">&#10003; Paid {{ $invoice->paid_at->format('M j, Y') }}</p>
                 @elseif ($invoice->isPayable())
                 <p class="text-sm mb-3" style="color: var(--text-secondary);">
                     Amount due: <span class="font-semibold" style="color: var(--text-primary);">{{ $invoice->currency }} {{ number_format((float)$invoice->total, 2) }}</span>
@@ -166,7 +151,7 @@
                 @foreach ($invoice->payments as $payment)
                 <div class="flex justify-between text-sm mb-2">
                     <span style="color: var(--text-secondary);">{{ $payment->paid_at->format('M j, Y') }} &mdash; {{ ucfirst($payment->method) }}</span>
-                    <span class="font-medium" style="color: var(--text-success);">+{{ number_format((float)$payment->amount, 2) }}</span>
+                    <span class="font-medium text-success">+{{ number_format((float)$payment->amount, 2) }}</span>
                 </div>
                 @endforeach
             </div>

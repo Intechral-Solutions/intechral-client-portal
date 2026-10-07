@@ -143,14 +143,21 @@ it('names the new-ticket form fields, including the attachments input', function
         ->and(uiNames($html, '//input[@type="file"]'))->toBe(['Attachments']);
 });
 
-it('leaves the embedded ticket time tracker, and its Start Timer name, untouched', function () {
+// EPIC-016 WP2 FLIP (A2.9): WP1 pinned the tracker markup as untouched (`time-tracker-start-btn`). WP2 owns the
+// tracker (A1.15 #2), so the utility-class hook became a `data-*` hook and the button an `x-ui.button`. What
+// does NOT change, and is still asserted: the visible name `▶ Start Timer` that time-migration.spec.ts finds
+// by role and name (/Start Timer/).
+it('keeps the embedded ticket time tracker Start Timer name through the WP2 migration', function () {
     $owner = User::factory()->create()->assignRole('user');
     $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
     $html = $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()->getContent();
+    $xpath = uiDom($html);
 
-    // tests/Browser/time-migration.spec.ts addresses the tracker by /Start Timer/; the markup is untouched.
-    expect($html)->toContain('time-tracker-start-btn')
-        ->and(preg_replace('/\s+/', ' ', $html))->toContain('&#9654; Start Timer');
+    $start = uiOne($xpath, '//button[@data-time-tracker-start]');
+
+    // A button is named by its content: the same visible text the browser role/name lookup resolves.
+    expect(preg_replace('/\s+/', ' ', trim($start->textContent)))->toBe('▶ Start Timer')
+        ->and($html)->not->toContain('time-tracker-start-btn');
 });
 
 it('names the report date range by its existing From and To labels', function () {

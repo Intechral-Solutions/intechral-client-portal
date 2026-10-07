@@ -19,9 +19,7 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- Filters --}}
@@ -52,34 +50,21 @@
             </thead>
             <tbody class="divide-y" style="divide-color: var(--border-base);">
                 @forelse ($invoices as $invoice)
-                @php
-                    $statusStyles = [
-                        'draft'     => ['bg' => 'var(--surface-muted)',    'text' => 'var(--text-muted)',    'border' => 'var(--border-muted)'],
-                        'sent'      => ['bg' => 'var(--surface-info)',     'text' => 'var(--text-info)',     'border' => 'var(--border-info)'],
-                        'paid'      => ['bg' => 'var(--surface-success)',  'text' => 'var(--text-success)',  'border' => 'var(--border-success)'],
-                        'overdue'   => ['bg' => 'var(--surface-danger)',   'text' => 'var(--text-danger)',   'border' => 'var(--border-danger)'],
-                        'cancelled' => ['bg' => 'var(--surface-muted)',    'text' => 'var(--text-muted)',    'border' => 'var(--border-muted)'],
-                    ];
-                    $ss = $statusStyles[$invoice->status] ?? $statusStyles['draft'];
-                @endphp
                 <tr class="hover:opacity-90 transition-opacity">
                     <td class="px-4 py-3">
                         <x-ui.link variant="row" :href="route('billing.invoices.show', $invoice)" class="font-mono">{{ $invoice->invoice_number }}</x-ui.link>
                     </td>
                     <td class="px-4 py-3" style="color: var(--text-primary);">{{ $invoice->client->name }}</td>
                     <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $invoice->issued_at->format('M j, Y') }}</td>
-                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium' : '' }}"
-                        style="color: {{ $invoice->isOverdue() ? 'var(--text-danger)' : 'var(--text-secondary)' }};">
+                    <td class="px-4 py-3 {{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
+                        @unless ($invoice->isOverdue()) style="color: var(--text-secondary);" @endunless>
                         {{ $invoice->due_at->format('M j, Y') }}
                     </td>
-                    <td class="px-4 py-3 text-right font-medium" style="color: var(--text-primary);">
+                    <td class="px-4 py-3 text-right font-medium {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">
                         {{ $invoice->currency }} {{ number_format((float) $invoice->total, 2) }}
                     </td>
                     <td class="px-4 py-3 text-center">
-                        <span class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize"
-                              style="background-color: {{ $ss['bg'] }}; color: {{ $ss['text'] }}; border-color: {{ $ss['border'] }};">
-                            {{ $invoice->status }}
-                        </span>
+                        @include('billing._invoice_status', ['status' => $invoice->status])
                     </td>
                 </tr>
                 @empty

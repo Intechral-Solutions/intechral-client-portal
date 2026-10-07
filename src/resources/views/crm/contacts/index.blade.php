@@ -12,9 +12,7 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- Search --}}

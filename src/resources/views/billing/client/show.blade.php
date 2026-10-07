@@ -19,28 +19,14 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- Status & dates --}}
     <div class="mb-6 rounded-xl border p-5"
          style="background-color: var(--surface-card); border-color: var(--border-base);">
-        @php
-            $ss = [
-                'sent'      => ['bg' => 'var(--surface-info)',    'text' => 'var(--text-info)'],
-                'paid'      => ['bg' => 'var(--surface-success)', 'text' => 'var(--text-success)'],
-                'overdue'   => ['bg' => 'var(--surface-danger)',  'text' => 'var(--text-danger)'],
-                'cancelled' => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)'],
-                'draft'     => ['bg' => 'var(--surface-muted)',   'text' => 'var(--text-muted)'],
-            ][$invoice->status] ?? ['bg' => 'var(--surface-muted)', 'text' => 'var(--text-muted)'];
-        @endphp
         <div class="flex items-center justify-between mb-4">
-            <span class="rounded-full px-3 py-1 text-sm font-medium capitalize"
-                  style="background-color: {{ $ss['bg'] }}; color: {{ $ss['text'] }};">
-                {{ $invoice->status }}
-            </span>
+            @include('billing._invoice_status', ['status' => $invoice->status])
             @if ($invoice->project)
             <span class="text-sm" style="color: var(--text-secondary);">{{ $invoice->project->name }}</span>
             @endif
@@ -52,8 +38,8 @@
             </div>
             <div>
                 <p class="text-xs" style="color: var(--text-muted);">Due</p>
-                <p class="{{ $invoice->isOverdue() ? 'font-medium' : '' }}"
-                   style="color: {{ $invoice->isOverdue() ? 'var(--text-danger)' : 'var(--text-primary)' }};">
+                <p class="{{ $invoice->isOverdue() ? 'font-medium text-danger' : '' }}"
+                   @unless ($invoice->isOverdue()) style="color: var(--text-primary);" @endunless>
                     {{ $invoice->due_at->format('M j, Y') }}
                 </p>
             </div>
@@ -95,7 +81,7 @@
                 @endif
                 <tr class="font-semibold">
                     <td colspan="3" class="px-4 py-3 text-right" style="color: var(--text-primary);">Total ({{ $invoice->currency }})</td>
-                    <td class="px-4 py-3 text-right text-base" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</td>
+                    <td class="px-4 py-3 text-right text-base {{ $invoice->status === 'cancelled' ? 'line-through' : '' }}" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</td>
                 </tr>
             </tfoot>
         </table>

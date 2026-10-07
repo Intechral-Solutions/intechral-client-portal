@@ -15,9 +15,7 @@
     </div>
 
     @if (session('success'))
-    <div class="mb-6 rounded-lg border px-4 py-3 text-sm"
-         style="background-color: var(--surface-success); border-color: var(--border-success); color: var(--text-success);"
-         role="alert">{{ session('success') }}</div>
+    <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -54,11 +52,7 @@
                             <p class="text-xs" style="color: var(--text-muted);">{{ $member->email }}</p>
                         </td>
                         <td class="px-5 py-3">
-                            <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                                  style="background-color: {{ $member->pivot->role === 'admin' ? 'var(--surface-warning)' : 'var(--surface-input)' }};
-                                         color: {{ $member->pivot->role === 'admin' ? 'var(--text-warning)' : 'var(--text-muted)' }};">
-                                {{ ucfirst($member->pivot->role) }}
-                            </span>
+                            <x-ui.tag>{{ ucfirst($member->pivot->role) }}</x-ui.tag>
                         </td>
                         <td class="px-5 py-3 text-right">
                             <div class="flex items-center justify-end gap-3">
