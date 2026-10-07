@@ -74,6 +74,17 @@ worker cap. `blade-shell.spec.ts` (EPIC-013 WP5) is such a file — it adds ten 
 sign-out coverage rides on `shell.spec.ts`'s existing single `e2e-signout` login, which now signs out
 from the Blade account menu.
 
+## Shared records: never select by position
+
+Workers share one database, so a list or `<select>` another spec's fixture can enter must be addressed by a
+stable identity, never by `index`, `nth()` or sort order. The Finance invoice tests once chose the client with
+`selectOption({ index: 1 })`. `projects-migration.spec.ts` temporarily creates a user named `</select>...`, which
+sorts before every seeded name, so on overlapping workers index 1 was that user. Its teardown deleted the user, and
+`invoices.client_id` cascades, so the Finance test's invoice vanished mid-test and the invoice-list assertion failed
+(two hosted runs on docs-only commits, 2026-10-07). The tests now select the seeded operator by label
+(`chooseInvoiceClient` in `blade-theme-controls.spec.ts`), and the draft-invoice test asserts the invoice is billed to
+that client.
+
 ## Guards against regression
 
 - `tests/Browser/session-isolation.spec.ts` — behavioral: an explicitly anonymous context really
