@@ -85,14 +85,17 @@ test('the compatibility layer stays defined in both theme blocks', function () {
         '--destructive', '--destructive-foreground', '--border', '--input', '--ring',
         // raw legacy families
         '--bg-base', '--bg-surface', '--bg-elevated', '--bg-overlay',
-        '--surface-card', '--surface-input', '--surface-success', '--surface-danger', '--surface-warning', '--surface-info',
-        '--border-subtle', '--border-base', '--border-success', '--border-danger', '--border-warning', '--border-info',
+        '--surface-card', '--surface-success', '--surface-danger', '--surface-warning', '--surface-info',
+        '--border-base', '--border-success', '--border-danger', '--border-warning', '--border-info',
         '--text-primary', '--text-secondary', '--text-muted', '--text-inverse',
         '--text-success', '--text-danger', '--text-warning', '--text-info',
-        '--accent', '--accent-hover', '--accent-text', '--danger', '--success', '--warning', '--info',
+        '--danger', '--success', '--warning', '--info',
         '--shadow-sm', '--shadow-md', '--shadow-lg',
-        // EPIC-013 WP1b orphans
-        '--surface-base', '--surface-muted', '--surface-elevated', '--border-muted', '--surface-accent', '--accent-success',
+        // EPIC-013 WP1b orphan that survives (the Projects board still reads it)
+        // EPIC-016 WP4 FLIP: `--accent`, `--accent-hover`, `--accent-text`, `--surface-input`, `--border-subtle` and
+        // the five other WP1b orphans left this presence list when they were retired; their absence is asserted
+        // by `BladeThemeGuardTest` (A4), shared with the Blade and React source rules.
+        '--accent-success',
     ];
 
     foreach (['light', 'dark'] as $theme) {
@@ -104,11 +107,14 @@ test('the compatibility layer stays defined in both theme blocks', function () {
     }
 
     // `legacy-success` / `legacy-warning` were retired in WP2 with the Alert restyle (their only
-    // consumer, FlashRegion, moved to the Direction D Alert); `legacy-accent` still has Blade consumers.
+    // consumer, FlashRegion, moved to the Direction D Alert).
+    // EPIC-016 WP4 FLIP: `legacy-accent` was pinned present while Blade consumers remained; the last one moved to
+    // `x-ui.checkbox` / `x-ui.link` in WP1-WP3, so the exposure is now pinned ABSENT.
     expect(directionDTailwindExposure())
-        ->toContain('--color-legacy-accent: var(--accent);')
+        ->not->toContain('--color-legacy-accent')
         ->not->toContain('--color-legacy-success')
-        ->not->toContain('--color-legacy-warning');
+        ->not->toContain('--color-legacy-warning')
+        ->not->toContain('--color-brand-');
 });
 
 /*
@@ -145,17 +151,14 @@ test('no source uses `primary` for an accent meaning (text, border, ring or acce
     }
 
     // `bg-primary` / `text-primary-foreground` (an action fill and its text) are still legitimate ink
-    // uses; the accent-meaning idioms above must go through `accent`, `accent-line`, `ink` or `legacy-accent`.
+    // uses; the accent-meaning idioms above must go through `accent`, `accent-line` or `ink` (the `legacy-accent` utility was retired in EPIC-016 WP4).
     expect($offenders)->toBe([]);
 });
 
-test('the WP1b compatibility orphans keep their accepted mappings', function () {
+test('the one WP1b compatibility orphan that survives keeps its accepted mapping', function () {
+    // EPIC-016 WP4 FLIP: the mapping pins for `--surface-base`, `--surface-muted`, `--surface-elevated`,
+    // `--border-muted` and `--surface-accent` were dropped with those orphans (zero consumers; A4 pins absence).
     $mappings = [
-        '--surface-base' => 'var(--bg-base)',
-        '--surface-muted' => 'var(--bg-surface)',
-        '--surface-elevated' => 'var(--bg-surface)',
-        '--border-muted' => 'var(--border-subtle)',
-        '--surface-accent' => 'var(--surface-info)',
         '--accent-success' => 'var(--success)',
     ];
 

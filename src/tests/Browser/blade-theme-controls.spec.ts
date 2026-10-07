@@ -5,6 +5,7 @@ import type { Locator, Page } from '@playwright/test';
 import { signedIn } from './support/auth';
 import { expect, test } from './support/e2e-fixtures';
 import { hasHorizontalOverflow } from './support/shell';
+import { applyTheme, settleTheme } from './support/theme';
 
 /**
  * EPIC-016 WP1 (Controls and Accessibility): the Blade control layer in real Chromium (§18.4).
@@ -65,18 +66,18 @@ function readTokens(page: Page): Promise<Tokens> {
 }
 
 /**
- * Open `path` in a theme at a viewport, and wait out the 120ms colour transition the theme switch starts,
- * so computed colours are at rest. Transitions stay ON: the focus-ring check must see what a keyboard user
- * sees at the moment of focus (a ring that fades in from `currentColor` is a defect).
+ * Open `path` in a theme at a viewport. `settleTheme` (support/theme.ts) proves the requested theme is active (the
+ * attribute AND the canonical canvas value) and waits for the FINITE colour transitions the switch started, so computed
+ * colours are at rest. It replaces a fixed delay that raced those transitions on a loaded machine (EPIC-016 WP4).
+ * Transitions stay ON: the focus-ring check must see what a keyboard user sees at the moment of focus (a ring that
+ * fades in from `currentColor` is a defect).
  */
 async function visit(page: Page, path: string, theme: Theme, viewport: { width: number; height: number }) {
     await page.setViewportSize(viewport);
     await signedIn(page, path);
-    await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
-    // EPIC-016 WP3 (the WP2 review hardening): a measurement must never silently run in the other theme.
-    expect(await page.locator('html').getAttribute('data-theme'), `${path}: the ${theme} theme is applied`).toBe(theme);
     await expect(page.locator('#main-content')).toBeVisible();
-    await page.waitForTimeout(400);
+    // A measurement must never silently run in the other theme (WP2 review hardening, strengthened in WP4).
+    await applyTheme(page, theme, path);
 
     return readTokens(page);
 }
@@ -433,8 +434,7 @@ test.describe('Helpdesk as a member', () => {
             const response = await page.goto('/admin/users');
 
             expect(response?.status()).toBe(403);
-            await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
-            await page.waitForTimeout(400);
+            await applyTheme(page, theme, `403 ${theme} ${viewport.width}`);
             const tokens = await readTokens(page);
 
             await expect(inMain(page).getByRole('heading', { name: 'Access Denied' })).toBeVisible();
@@ -1518,7 +1518,8 @@ async function expectNormalized(page: Page, path: string, label: string) {
         const where = `${label} ${theme} ${viewport.width}`;
 
         await visit(page, path, theme, viewport);
-        expect(await page.locator('html').getAttribute('data-theme'), `${where}: the theme is applied`).toBe(theme);
+        // `visit` has already proved the theme and settled the finite transitions; this is a second, independent read.
+        await settleTheme(page, theme, where);
         // Polled: the theme switch starts a 120ms colour transition, and a loaded machine can be slow to settle it.
         // A real offender is still there at the end of the window, so this cannot hide one.
         await expect
@@ -1613,11 +1614,10 @@ test.describe('Theme normalization: Helpdesk and Finance as a member, and errors
 
             await page.setViewportSize(viewport);
             await signedIn(page);
-            await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
             const response = await page.goto('/admin/users');
             expect(response?.status(), `${where}: the member is forbidden`).toBe(403);
-            await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
-            await page.waitForTimeout(400);
+            // The same strength as every other route: the attribute, the canonical canvas, then settled transitions.
+            await applyTheme(page, theme, where);
 
             await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
             await expect
