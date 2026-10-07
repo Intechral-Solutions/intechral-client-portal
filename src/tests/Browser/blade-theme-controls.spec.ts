@@ -275,6 +275,19 @@ async function createViaForm(page: Page, path: string, token: string, form: Reco
     return response.headers()['location'];
 }
 
+/**
+ * The client every invoice this spec creates is billed to: the seeded operator (`DevSeeder`), which no spec creates,
+ * renames or deletes. Never pick a client by position. The client list is sorted by name and the specs run in parallel,
+ * so another spec's temporary user (projects-migration.spec.ts adds one named `</select>...`, which sorts first) can
+ * become `index: 1`; its teardown then deletes that user, and `invoices.client_id` cascades, deleting this spec's invoice.
+ * Selecting by label also fails loudly if the seeded client is missing.
+ */
+const INVOICE_CLIENT = { label: 'Dev Operator <operator@intechral.test>', email: 'operator@intechral.test' };
+
+async function chooseInvoiceClient(page: Page) {
+    await inMain(page).getByLabel('Client').selectOption({ label: INVOICE_CLIENT.label });
+}
+
 test.afterEach(async ({ page }) => {
     if (created.length === 0) {
         return;
@@ -605,7 +618,7 @@ test.describe('Finance', () => {
         // Remove the extras, fill the first row, create the invoice and clean up.
         await inMain(page).getByRole('button', { name: 'Remove line item' }).nth(2).click();
         await inMain(page).getByRole('button', { name: 'Remove line item' }).nth(1).click();
-        await inMain(page).getByLabel('Client').selectOption({ index: 1 });
+        await chooseInvoiceClient(page);
         await page.locator('#items-0-description').fill('E2E WP1 line');
         await page.locator('#items-0-unit_price').fill('12.50');
         await inMain(page).getByRole('button', { name: 'Create Invoice' }).click();
@@ -1299,13 +1312,14 @@ test.describe('Semantic state on real Finance pages', () => {
         test.setTimeout(240_000);
 
         await visit(page, '/billing/invoices/create', 'light', XL);
-        await inMain(page).getByLabel('Client').selectOption({ index: 1 });
+        await chooseInvoiceClient(page);
         await page.locator('#items-0-description').fill('E2E WP2 line');
         await page.locator('#items-0-unit_price').fill('12.50');
         await inMain(page).getByRole('button', { name: 'Create Invoice' }).click();
         await expect(page).toHaveURL(/\/billing\/invoices\/\d+$/);
         const invoicePath = new URL(page.url()).pathname;
         created.push(invoicePath);
+        await expect(inMain(page), 'the invoice is billed to the seeded client, not whoever sorts first').toContainText(INVOICE_CLIENT.email);
 
         for (const { theme, viewport } of MODES) {
             const where = `${theme} ${viewport.width}`;
@@ -1570,7 +1584,7 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
         created.push(company, contact);
 
         await visit(page, '/billing/invoices/create', 'light', XL);
-        await inMain(page).getByLabel('Client').selectOption({ index: 1 });
+        await chooseInvoiceClient(page);
         await page.locator('#items-0-description').fill('E2E WP3 line');
         await page.locator('#items-0-unit_price').fill('20.00');
         await inMain(page).getByRole('button', { name: 'Create Invoice' }).click();
