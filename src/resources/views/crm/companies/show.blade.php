@@ -6,7 +6,7 @@
     <div class="mb-8 flex items-start justify-between">
         <div>
             <x-ui.link variant="quiet" :href="route('crm.companies.index')" class="text-sm">&larr; Companies</x-ui.link>
-            <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $company->name }}</h1>
+            <h1 class="mt-2 text-2xl font-semibold text-text">{{ $company->name }}</h1>
             @if ($company->website)
             <x-ui.link :href="$company->website" target="_blank" rel="noopener" class="mt-0.5 text-sm">
                 {{ parse_url($company->website, PHP_URL_HOST) }} ↗
@@ -35,27 +35,27 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {{-- Details --}}
-        <div class="lg:col-span-1 rounded-xl border p-5 space-y-3" style="background-color: var(--surface-card); border-color: var(--border-base);">
-            <h2 class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--text-muted);">Details</h2>
+        <div class="lg:col-span-1 rounded-lg border p-5 space-y-3 bg-surface border-rule">
+            <h2 class="text-xs font-semibold uppercase tracking-wide mb-2 text-text-muted">Details</h2>
             @if ($company->phone)
-            <div><p class="text-xs" style="color: var(--text-muted);">Phone</p><p class="text-sm" style="color: var(--text-primary);">{{ $company->phone }}</p></div>
+            <div><p class="text-xs text-text-muted">Phone</p><p class="text-sm text-text">{{ $company->phone }}</p></div>
             @endif
             @if ($company->address)
-            <div><p class="text-xs" style="color: var(--text-muted);">Address</p><p class="text-sm whitespace-pre-line" style="color: var(--text-primary);">{{ $company->address }}</p></div>
+            <div><p class="text-xs text-text-muted">Address</p><p class="text-sm whitespace-pre-line text-text">{{ $company->address }}</p></div>
             @endif
             @if ($company->notes)
-            <div><p class="text-xs" style="color: var(--text-muted);">Notes</p><p class="text-sm whitespace-pre-line" style="color: var(--text-secondary);">{{ $company->notes }}</p></div>
+            <div><p class="text-xs text-text-muted">Notes</p><p class="text-sm whitespace-pre-line text-text-secondary">{{ $company->notes }}</p></div>
             @endif
         </div>
 
         {{-- Contacts --}}
-        <div class="lg:col-span-2 rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
-            <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-base);">
-                <h2 class="text-sm font-semibold" style="color: var(--text-primary);">Contacts</h2>
+        <div class="lg:col-span-2 rounded-lg border overflow-hidden bg-surface border-rule">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-rule">
+                <h2 class="text-sm font-semibold text-text">Contacts</h2>
                 <x-ui.link :href="route('crm.contacts.create', ['company_id' => $company->id])" class="text-xs font-medium">+ Add Contact</x-ui.link>
             </div>
             <table class="w-full text-sm">
-                <tbody class="divide-y" style="divide-color: var(--border-base);">
+                <tbody class="divide-y divide-rule">
                     @forelse ($company->contacts as $contact)
                     <tr>
                         <td class="px-5 py-3">
@@ -63,13 +63,13 @@
                                 {{ $contact->fullName() }}
                             </x-ui.link>
                             @if ($contact->job_title)
-                            <span class="text-xs ml-1" style="color: var(--text-muted);">— {{ $contact->job_title }}</span>
+                            <span class="text-xs ml-1 text-text-muted">— {{ $contact->job_title }}</span>
                             @endif
                         </td>
-                        <td class="px-5 py-3 text-xs" style="color: var(--text-secondary);">{{ $contact->email ?? '' }}</td>
+                        <td class="px-5 py-3 text-xs text-text-secondary">{{ $contact->email ?? '' }}</td>
                     </tr>
                     @empty
-                    <tr><td class="px-5 py-8 text-center text-sm" style="color: var(--text-muted);">No contacts yet.</td></tr>
+                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No contacts yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

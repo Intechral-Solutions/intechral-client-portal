@@ -11,7 +11,7 @@
             </svg>
             Back to Roles
         </x-ui.link>
-        <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Create Role</h1>
+        <h1 class="text-2xl font-semibold text-text">Create Role</h1>
     </div>
 
     <form method="POST" action="{{ route('roles.store') }}" class="space-y-8">
@@ -24,7 +24,7 @@
                         required maxlength="64" autocomplete="off"
                         placeholder="e.g. account-manager" aria-describedby="name-hint" class="w-full" />
             <x-ui.field-error for="name" />
-            <p id="name-hint" class="text-xs" style="color: var(--text-secondary);">
+            <p id="name-hint" class="text-xs text-text-secondary">
                 Use lowercase letters, numbers, and hyphens only.
             </p>
         </div>
@@ -32,19 +32,18 @@
         {{-- Permissions --}}
         <div id="permissions-group" role="group" aria-labelledby="permissions-heading"
              @if ($errors->has('permissions') || $errors->has('permissions.*')) aria-describedby="permissions-group-error" @endif>
-            <p id="permissions-heading" class="text-sm font-medium mb-3" style="color: var(--text-primary);">Permissions</p>
+            <p id="permissions-heading" class="text-sm font-medium mb-3 text-text">Permissions</p>
             @foreach ($grouped as $module => $permissions)
             <div class="mb-6">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                     {{ $module }}
                 </p>
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($permissions as $permission)
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
-                           style="border-color: var(--border-base);">
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface-hover border-rule">
                         <x-ui.checkbox name="permissions[]" value="{{ $permission }}"
                                        :checked="in_array($permission, old('permissions', []))" />
-                        <span style="color: var(--text-primary);">{{ Str::after($permission, '.') }}</span>
+                        <span class="text-text">{{ Str::after($permission, '.') }}</span>
                     </label>
                     @endforeach
                 </div>

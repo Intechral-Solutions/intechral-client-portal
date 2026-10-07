@@ -6,8 +6,8 @@
     {{-- Header --}}
     <div class="mb-8 flex items-start justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Users</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Manage platform users and their roles.</p>
+            <h1 class="text-2xl font-semibold text-text">Users</h1>
+            <p class="mt-1 text-sm text-text-secondary">Manage platform users and their roles.</p>
         </div>
         @can('users.invite')
         <x-ui.button type="button"
@@ -39,32 +39,29 @@
     </form>
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-xl border" style="border-color: var(--border-base); background-color: var(--surface-base);">
-        <table class="min-w-full divide-y" style="border-color: var(--border-subtle);">
+    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
+        <table class="min-w-full divide-y divide-rule">
             <thead>
-                <tr style="background-color: var(--surface-elevated);">
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Name</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Email</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Roles</th>
+                <tr class="bg-surface-sunken">
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Name</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Email</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Roles</th>
                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="border-color: var(--border-subtle);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($users as $user)
-                <tr class="transition-colors hover:legacy-bg-surface">
+                <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-6 py-4">
-                        <span class="font-medium" style="color: var(--text-primary);">{{ $user->name }}</span>
+                        <span class="font-medium text-text">{{ $user->name }}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm" style="color: var(--text-secondary);">
+                    <td class="px-6 py-4 text-sm text-text-secondary">
                         {{ $user->email }}
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex flex-wrap gap-1">
                             @foreach ($user->roles as $role)
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                  style="background-color: var(--surface-elevated); color: var(--text-secondary);">
-                                {{ $role->name }}
-                            </span>
+                            <x-ui.tag>{{ $role->name }}</x-ui.tag>
                             @endforeach
                         </div>
                     </td>
@@ -74,7 +71,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="4" class="px-6 py-10 text-center text-sm" style="color: var(--text-secondary);">
+                    <td colspan="4" class="px-6 py-10 text-center text-sm text-text-secondary">
                         No users found{{ request('search') ? ' matching "' . e(request('search')) . '"' : '' }}.
                     </td>
                 </tr>
@@ -95,11 +92,9 @@
 {{-- Invite modal --}}
 @can('users.invite')
 <div id="invite-modal" hidden
-     class="fixed inset-0 z-50 flex items-center justify-center p-4"
-     style="background-color: rgba(0,0,0,0.5);">
-    <div class="w-full max-w-md rounded-xl border p-6 shadow-xl"
-         style="background-color: var(--surface-base); border-color: var(--border-base);">
-        <h2 class="mb-4 text-lg font-semibold" style="color: var(--text-primary);">Invite User</h2>
+     class="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
+    <div class="w-full max-w-md rounded-lg border p-6 shadow-xl bg-surface border-rule">
+        <h2 class="mb-4 text-lg font-semibold text-text">Invite User</h2>
         <form method="POST" action="{{ route('invitations.store') }}">
             @csrf
             <div class="mb-4 space-y-2">

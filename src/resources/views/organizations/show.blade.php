@@ -6,8 +6,8 @@
     <div class="mb-8 flex items-start justify-between">
         <div>
             <x-ui.link variant="quiet" :href="route('organizations.index')" class="text-sm">&larr; Organizations</x-ui.link>
-            <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $organization->name }}</h1>
-            <p class="mt-0.5 text-xs font-mono" style="color: var(--text-muted);">{{ $organization->slug }}</p>
+            <h1 class="mt-2 text-2xl font-semibold text-text">{{ $organization->name }}</h1>
+            <p class="mt-0.5 text-xs font-mono text-text-muted">{{ $organization->slug }}</p>
         </div>
         @if ($organization->company)
         <x-ui.button :href="route('crm.companies.show', $organization->company)" variant="secondary">View CRM Record</x-ui.button>
@@ -21,35 +21,35 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         {{-- Info card --}}
-        <div class="rounded-xl border p-5 space-y-3" style="background-color: var(--surface-card); border-color: var(--border-base);">
-            <h2 class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Details</h2>
+        <div class="rounded-lg border p-5 space-y-3 bg-surface border-rule">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Details</h2>
             <div>
-                <p class="text-xs" style="color: var(--text-muted);">Owner</p>
-                <p class="text-sm font-medium" style="color: var(--text-primary);">{{ $organization->owner->name }}</p>
+                <p class="text-xs text-text-muted">Owner</p>
+                <p class="text-sm font-medium text-text">{{ $organization->owner->name }}</p>
             </div>
             <div>
-                <p class="text-xs" style="color: var(--text-muted);">Members</p>
-                <p class="text-sm font-medium" style="color: var(--text-primary);">{{ $organization->members->count() }}</p>
+                <p class="text-xs text-text-muted">Members</p>
+                <p class="text-sm font-medium text-text">{{ $organization->members->count() }}</p>
             </div>
             <div>
-                <p class="text-xs" style="color: var(--text-muted);">Created</p>
-                <p class="text-sm" style="color: var(--text-secondary);">{{ $organization->created_at->format('M j, Y') }}</p>
+                <p class="text-xs text-text-muted">Created</p>
+                <p class="text-sm text-text-secondary">{{ $organization->created_at->format('M j, Y') }}</p>
             </div>
         </div>
 
         {{-- Members --}}
-        <div class="lg:col-span-2 rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
-            <div class="px-5 py-4 border-b" style="border-color: var(--border-base);">
-                <h2 class="text-sm font-semibold" style="color: var(--text-primary);">Members</h2>
+        <div class="lg:col-span-2 rounded-lg border overflow-hidden bg-surface border-rule">
+            <div class="px-5 py-4 border-b border-rule">
+                <h2 class="text-sm font-semibold text-text">Members</h2>
             </div>
 
             <table class="w-full text-sm">
-                <tbody class="divide-y" style="divide-color: var(--border-base);">
+                <tbody class="divide-y divide-rule">
                     @forelse ($organization->members as $member)
                     <tr>
                         <td class="px-5 py-3">
-                            <p class="font-medium" style="color: var(--text-primary);">{{ $member->name }}</p>
-                            <p class="text-xs" style="color: var(--text-muted);">{{ $member->email }}</p>
+                            <p class="font-medium text-text">{{ $member->name }}</p>
+                            <p class="text-xs text-text-muted">{{ $member->email }}</p>
                         </td>
                         <td class="px-5 py-3">
                             <x-ui.tag>{{ ucfirst($member->pivot->role) }}</x-ui.tag>
@@ -74,14 +74,14 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td class="px-5 py-8 text-center text-sm" style="color: var(--text-muted);">No members yet.</td></tr>
+                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No members yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
 
             {{-- Add member form --}}
             @if ($availableUsers->isNotEmpty())
-            <div class="border-t px-5 py-4" style="border-color: var(--border-base);">
+            <div class="border-t px-5 py-4 border-rule">
                 <form method="POST" action="{{ route('organizations.members.store', $organization) }}" class="flex gap-2">
                     @csrf
                     <x-ui.select name="user_id" aria-label="Person to add" class="min-w-0 flex-1">

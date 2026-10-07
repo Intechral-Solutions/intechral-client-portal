@@ -5,9 +5,8 @@
 @php $isEdit = isset($invoice); @endphp
 
 {{-- Details --}}
-<div class="rounded-xl border p-6 space-y-5"
-     style="background-color: var(--surface-card); border-color: var(--border-base);">
-    <h2 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Invoice Details</h2>
+<div class="rounded-lg border p-6 space-y-5 bg-surface border-rule">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-text-muted">Invoice Details</h2>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="space-y-2">
@@ -86,9 +85,8 @@
     $integerKeys = array_filter(array_keys($existingItems), 'is_int');
     $nextItemIndex = $integerKeys === [] ? 0 : max($integerKeys) + 1;
 @endphp
-<div class="rounded-xl border p-6"
-     style="background-color: var(--surface-card); border-color: var(--border-base);">
-    <h2 id="line-items-heading" class="mb-4 text-sm font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Line Items</h2>
+<div class="rounded-lg border p-6 bg-surface border-rule">
+    <h2 id="line-items-heading" class="mb-4 text-sm font-semibold uppercase tracking-wide text-text-muted">Line Items</h2>
     <x-ui.field-error for="line-items" error-key="items" class="mb-3" />
 
     <div id="line-items" role="group" aria-labelledby="line-items-heading"

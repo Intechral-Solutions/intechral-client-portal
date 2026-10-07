@@ -5,10 +5,10 @@
 
     <div class="mb-8">
         <x-ui.link variant="quiet" :href="route('crm.contacts.show', $contact)" class="text-sm">&larr; {{ $contact->fullName() }}</x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">Edit Contact</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">Edit Contact</h1>
     </div>
 
-    <div class="rounded-xl border p-6" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('crm.contacts.update', $contact) }}" class="space-y-4">
             @csrf @method('PUT')
             @include('crm.contacts._form', ['companyId' => null])
@@ -19,8 +19,8 @@
         </form>
     </div>
 
-    <div class="mt-8 rounded-xl border border-danger p-5" style="background-color: var(--surface-card);">
-        <h2 class="mb-2 text-sm font-semibold" style="color: var(--text-danger);">Delete Contact</h2>
+    <div class="mt-8 rounded-lg border border-danger p-5 bg-surface">
+        <h2 class="mb-2 text-sm font-semibold text-danger">Delete Contact</h2>
         <form method="POST" action="{{ route('crm.contacts.destroy', $contact) }}"
               onsubmit="return confirm('Delete {{ addslashes($contact->fullName()) }}?')">
             @csrf @method('DELETE')

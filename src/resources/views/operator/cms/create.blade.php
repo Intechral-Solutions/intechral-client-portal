@@ -5,10 +5,10 @@
 
     <div class="mb-8">
         <x-ui.link variant="quiet" :href="route('operator.cms.index')" class="text-sm">&larr; Pages</x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">New Page</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">New Page</h1>
     </div>
 
-    <div class="rounded-xl border p-6" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('operator.cms.store') }}" class="space-y-4">
             @csrf
             @include('operator.cms._form')

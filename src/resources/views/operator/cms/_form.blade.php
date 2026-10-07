@@ -9,7 +9,7 @@
 <div class="space-y-2">
     <x-ui.label for="slug">
         Slug
-        <span class="font-normal" style="color: var(--text-muted);">(leave blank to auto-generate)</span>
+        <span class="font-normal text-text-muted">(leave blank to auto-generate)</span>
     </x-ui.label>
     <x-ui.input type="text" name="slug" :value="old('slug', $page->slug ?? '')"
                 placeholder="my-page-slug" class="w-full font-mono" />

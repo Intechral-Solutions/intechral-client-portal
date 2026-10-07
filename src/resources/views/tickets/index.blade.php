@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">My Tickets</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Track the status of your support requests.</p>
+            <h1 class="text-2xl font-semibold text-text">My Tickets</h1>
+            <p class="mt-1 text-sm text-text-secondary">Track the status of your support requests.</p>
         </div>
         @can('tickets.create')
         <x-ui.button :href="route('tickets.create')" class="shrink-0">
@@ -40,23 +40,23 @@
     </form>
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-xl border" style="border-color: var(--border-base); background-color: var(--surface-base);">
-        <table class="min-w-full divide-y" style="border-color: var(--border-subtle);">
+    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
+        <table class="min-w-full divide-y divide-rule">
             <thead>
-                <tr style="background-color: var(--surface-elevated);">
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Ticket</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Priority</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Status</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Created</th>
+                <tr class="bg-surface-sunken">
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Ticket</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Priority</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Status</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Created</th>
                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">View</span></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="border-color: var(--border-subtle);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($tickets as $ticket)
-                <tr class="transition-colors hover:legacy-bg-surface">
+                <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-6 py-4">
-                        <p class="font-medium text-sm" style="color: var(--text-primary);">{{ $ticket->title }}</p>
-                        <p class="text-xs mt-0.5" style="color: var(--text-secondary);">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }}</p>
+                        <p class="font-medium text-sm text-text">{{ $ticket->title }}</p>
+                        <p class="text-xs mt-0.5 text-text-secondary">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }}</p>
                     </td>
                     <td class="px-6 py-4">
                         @include('tickets._priority_badge', ['priority' => $ticket->priority])
@@ -64,7 +64,7 @@
                     <td class="px-6 py-4">
                         @include('tickets._status_badge', ['status' => $ticket->status])
                     </td>
-                    <td class="px-6 py-4 text-sm" style="color: var(--text-secondary);">
+                    <td class="px-6 py-4 text-sm text-text-secondary">
                         {{ $ticket->created_at->diffForHumans() }}
                     </td>
                     <td class="px-6 py-4 text-right">
@@ -73,7 +73,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-10 text-center text-sm" style="color: var(--text-secondary);">
+                    <td colspan="5" class="px-6 py-10 text-center text-sm text-text-secondary">
                         No tickets found.
                     </td>
                 </tr>

@@ -12,13 +12,13 @@
             Back to Roles
         </x-ui.link>
         <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $role->name }}</h1>
+            <h1 class="text-2xl font-semibold text-text">{{ $role->name }}</h1>
             @if ($isBuiltIn)
             <x-ui.tag>Built-in</x-ui.tag>
             @endif
         </div>
         @if ($isBuiltIn)
-        <p class="mt-1.5 text-sm" style="color: var(--text-secondary);">
+        <p class="mt-1.5 text-sm text-text-secondary">
             This is a built-in role. Its name cannot be changed, but permissions can be updated.
         </p>
         @endif
@@ -36,19 +36,18 @@
         {{-- Permissions --}}
         <div id="permissions-group" role="group" aria-labelledby="permissions-heading"
              @if ($errors->has('permissions') || $errors->has('permissions.*')) aria-describedby="permissions-group-error" @endif>
-            <p id="permissions-heading" class="text-sm font-medium mb-3" style="color: var(--text-primary);">Permissions</p>
+            <p id="permissions-heading" class="text-sm font-medium mb-3 text-text">Permissions</p>
             @foreach ($grouped as $module => $permissions)
             <div class="mb-6">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                     {{ $module }}
                 </p>
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($permissions as $permission)
                     @php $checked = in_array($permission, old('permissions', $assigned)); @endphp
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
-                           style="border-color: var(--border-base);">
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface-hover border-rule">
                         <x-ui.checkbox name="permissions[]" value="{{ $permission }}" :checked="$checked" />
-                        <span style="color: var(--text-primary);">{{ Str::after($permission, '.') }}</span>
+                        <span class="text-text">{{ Str::after($permission, '.') }}</span>
                     </label>
                     @endforeach
                 </div>

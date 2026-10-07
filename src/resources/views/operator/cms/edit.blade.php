@@ -6,7 +6,7 @@
     <div class="mb-8 flex items-start justify-between">
         <div>
             <x-ui.link variant="quiet" :href="route('operator.cms.index')" class="text-sm">&larr; Pages</x-ui.link>
-            <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">{{ $page->title }}</h1>
+            <h1 class="mt-2 text-2xl font-semibold text-text">{{ $page->title }}</h1>
             <div class="mt-1 flex items-center gap-3">
                 @include('operator.cms._state', ['published' => $page->isPublished()])
                 @if ($page->isPublished())
@@ -33,7 +33,7 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="rounded-xl border p-6" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('operator.cms.update', $page) }}" class="space-y-4">
             @csrf @method('PUT')
             @include('operator.cms._form')
@@ -44,9 +44,9 @@
         </form>
     </div>
 
-    <div class="mt-8 rounded-xl border border-danger p-5" style="background-color: var(--surface-card);">
-        <h2 class="mb-2 text-sm font-semibold" style="color: var(--text-danger);">Delete Page</h2>
-        <p class="mb-4 text-xs" style="color: var(--text-muted);">Permanently delete this page. This cannot be undone.</p>
+    <div class="mt-8 rounded-lg border border-danger p-5 bg-surface">
+        <h2 class="mb-2 text-sm font-semibold text-danger">Delete Page</h2>
+        <p class="mb-4 text-xs text-text-muted">Permanently delete this page. This cannot be undone.</p>
         <form method="POST" action="{{ route('operator.cms.destroy', $page) }}"
               onsubmit="return confirm('Delete \'{{ addslashes($page->title) }}\'?')">
             @csrf @method('DELETE')

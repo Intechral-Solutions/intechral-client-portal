@@ -73,6 +73,8 @@ async function visit(page: Page, path: string, theme: Theme, viewport: { width: 
     await page.setViewportSize(viewport);
     await signedIn(page, path);
     await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
+    // EPIC-016 WP3 (the WP2 review hardening): a measurement must never silently run in the other theme.
+    expect(await page.locator('html').getAttribute('data-theme'), `${path}: the ${theme} theme is applied`).toBe(theme);
     await expect(page.locator('#main-content')).toBeVisible();
     await page.waitForTimeout(400);
 
@@ -1009,13 +1011,13 @@ function galleryHtml(): string {
 }
 
 /**
- * Inject the gallery into the real page's own card (the queue's table card, a legacy `surface` today), so the
+ * Inject the gallery into the real page's own card (the queue's table card, `bg-surface`), so the
  * effective background every mark is measured against is the one a user really sees there, not the canvas.
  * Fails loudly if the page has no card to host it.
  */
 async function injectGallery(page: Page) {
     const hosted = await page.evaluate((html) => {
-        const host = document.querySelector('#main-content .rounded-xl.border');
+        const host = document.querySelector('#main-content .rounded-lg.border.bg-surface');
         if (!host) {
             return false;
         }
@@ -1426,6 +1428,201 @@ test.describe('Semantic state on real System pages', () => {
             const row = inMain(page).getByRole('row').filter({ hasText: 'E2E WP2 Page' });
 
             await expectMark(row.locator('[data-page-state]'), 'Published', 'success', 'check', ds, `${where} list`);
+            expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+        }
+    });
+});
+
+
+// ═══ Theme normalization (EPIC-016 WP3) ═══════════════════════════════════════════
+//
+// §18.4 "palette conformance (from PR 3)": every computed text, background and border colour in `main` equals
+// one of the CURRENT theme's Direction D token values, resolved from the live `--ds-*` properties, at rest.
+// It catches a legacy Tailwind gray, an indigo, a hex or a raw legacy variable by VALUE, whatever syntax
+// produced it. Alpha is ignored (an alert edge such as `border-danger/50` is the danger token at 50%); a fully
+// transparent colour paints nothing and is skipped. Colour that a page inherits is checked where it is
+// painted: a text colour is read on elements that own a text node.
+//
+// The routes cover the four target workspaces and `errors/403`, in light and dark, at 1440 and 390, along with
+// the document-level overflow check. Records the spec needs are created through the application's own routes
+// and removed in `afterEach`, exactly as the WP1 tests do. The claim is scoped to the target pages; it is not a
+// product-wide dark-mode claim.
+
+const DIRECTION_D_COLOURS = [
+    'canvas', 'rail', 'drawer', 'surface', 'surface-sunken', 'surface-hover', 'surface-selected', 'rule', 'rule-control',
+    'control-edge', 'rule-strong', 'text', 'text-secondary', 'text-muted', 'text-faint', 'accent', 'accent-hover',
+    'accent-soft', 'accent-line', 'live', 'live-soft', 'live-text', 'ink', 'on-ink', 'danger', 'danger-soft', 'warning',
+    'warning-glyph', 'warning-soft', 'success', 'success-glyph', 'progress-fill', 'progress-track', 'stage-future',
+    'focus', 'scrim',
+];
+
+/** Colours in `main` that are not a Direction D token of the current theme (none is expected). */
+async function paletteOffenders(page: Page) {
+    return page.evaluate((names) => {
+        const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+        const rgbOf = (css: string): [number, number, number, number] => {
+            context.clearRect(0, 0, 1, 1);
+            context.fillStyle = '#000';
+            context.fillStyle = css;
+            context.fillRect(0, 0, 1, 1);
+            const data = context.getImageData(0, 0, 1, 1).data;
+
+            return [data[0], data[1], data[2], data[3] / 255];
+        };
+
+        const probe = document.createElement('i');
+        document.body.appendChild(probe);
+        const tokens = new Set<string>();
+        for (const name of names) {
+            probe.style.color = `var(--ds-${name})`;
+            tokens.add(rgbOf(getComputedStyle(probe).color).slice(0, 3).join(','));
+        }
+        probe.remove();
+
+        const offenders: string[] = [];
+        const check = (element: Element, what: string, css: string) => {
+            const [r, g, b, a] = rgbOf(css);
+            if (a === 0 || tokens.has(`${r},${g},${b}`)) {
+                return;
+            }
+            const label = `${element.tagName.toLowerCase()}.${String(element.getAttribute('class') ?? '').split(/\s+/).slice(0, 4).join('.')}`;
+            offenders.push(`${what} ${css} on ${label}`);
+        };
+
+        for (const element of document.querySelectorAll('#main-content, #main-content *')) {
+            const computed = getComputedStyle(element);
+            if (computed.display === 'none' || computed.visibility === 'hidden') {
+                continue;
+            }
+            const ownText = [...element.childNodes].some((node) => node.nodeType === 3 && (node.textContent ?? '').trim() !== '');
+            if (ownText) {
+                check(element, 'text', computed.color);
+            }
+            check(element, 'background', computed.backgroundColor);
+            for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
+                const width = parseFloat(computed.getPropertyValue(`border-${side.toLowerCase()}-width`));
+                const borderStyle = computed.getPropertyValue(`border-${side.toLowerCase()}-style`);
+                if (width > 0 && borderStyle !== 'none') {
+                    check(element, `border-${side.toLowerCase()}`, computed.getPropertyValue(`border-${side.toLowerCase()}-color`));
+                }
+            }
+        }
+
+        return [...new Set(offenders)];
+    }, DIRECTION_D_COLOURS);
+}
+
+/** Open `path` in every mode and require the palette, the theme and the overflow check to hold. */
+async function expectNormalized(page: Page, path: string, label: string) {
+    for (const { theme, viewport } of MODES) {
+        const where = `${label} ${theme} ${viewport.width}`;
+
+        await visit(page, path, theme, viewport);
+        expect(await page.locator('html').getAttribute('data-theme'), `${where}: the theme is applied`).toBe(theme);
+        // Polled: the theme switch starts a 120ms colour transition, and a loaded machine can be slow to settle it.
+        // A real offender is still there at the end of the window, so this cannot hide one.
+        await expect
+            .poll(() => paletteOffenders(page), { message: `${where}: every colour in main is a Direction D token`, timeout: 6000 })
+            .toEqual([]);
+        expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
+    }
+}
+
+test.describe('Theme normalization: Helpdesk, Finance, System as an operator', () => {
+    test('queue, ticket, reports, invoices, users, roles and pages draw only Direction D colours', async ({ page }) => {
+        test.setTimeout(420_000);
+
+        await visit(page, '/operator/tickets', 'light', XL);
+        const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
+        const ticketPath = new URL(href ?? '', 'http://localhost').pathname;
+
+        // The seeded ticket also has a request page (`/tickets/{id}`, which hosts the embedded time tracker); the
+        // operator owns it, so it is reached through their own list, the real production route (independent review Y2A).
+        await visit(page, '/tickets', 'light', XL);
+        const requestHref = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
+        const requestPath = new URL(requestHref ?? '', 'http://localhost').pathname;
+        expect(requestPath).toMatch(/^\/tickets\/\d+$/);
+
+        for (const [label, path] of [
+            ['queue', '/operator/tickets'],
+            ['ticket', ticketPath],
+            ['request page', requestPath],
+            ['reports', '/operator/tickets/reports'],
+            ['invoices', '/billing/invoices'],
+            ['invoice form', '/billing/invoices/create'],
+            ['users', '/admin/users'],
+            ['roles', '/admin/roles'],
+            ['role form', '/admin/roles/create'],
+            ['pages', '/operator/cms'],
+            ['page form', '/operator/cms/create'],
+        ] as const) {
+            await expectNormalized(page, path, label);
+        }
+    });
+
+    test('the Directory and a created invoice draw only Direction D colours', async ({ page }) => {
+        test.setTimeout(420_000);
+
+        const token = await csrf(page);
+        const company = pathOf(await createViaForm(page, '/crm/companies', token, { name: 'E2E WP3 Company' }));
+        const contact = pathOf(await createViaForm(page, '/crm/contacts', token, { first_name: 'E2E', last_name: 'WP3 Contact' }));
+        created.push(company, contact);
+
+        await visit(page, '/billing/invoices/create', 'light', XL);
+        await inMain(page).getByLabel('Client').selectOption({ index: 1 });
+        await page.locator('#items-0-description').fill('E2E WP3 line');
+        await page.locator('#items-0-unit_price').fill('20.00');
+        await inMain(page).getByRole('button', { name: 'Create Invoice' }).click();
+        await expect(page).toHaveURL(/\/billing\/invoices\/\d+$/);
+        const invoice = new URL(page.url()).pathname;
+        created.push(invoice);
+
+        for (const [label, path] of [
+            ['contacts', '/crm/contacts'],
+            ['contact', contact],
+            ['contact form', `${contact}/edit`],
+            ['companies', '/crm/companies'],
+            ['company', company],
+            ['company form', `${company}/edit`],
+            ['organizations', '/organizations'],
+            ['invoice', invoice],
+            ['invoice edit', `${invoice}/edit`],
+        ] as const) {
+            await expectNormalized(page, path, label);
+        }
+    });
+});
+
+test.describe('Theme normalization: Helpdesk and Finance as a member, and errors/403', () => {
+    test.use({ persona: 'member' });
+
+    test('my requests, the new-ticket form, my invoices and the 403 page draw only Direction D colours', async ({ page }) => {
+        test.setTimeout(300_000);
+
+        for (const [label, path] of [
+            ['my requests', '/tickets'],
+            ['new ticket', '/tickets/create'],
+            ['my invoices', '/my/invoices'],
+        ] as const) {
+            await expectNormalized(page, path, label);
+        }
+
+        // errors/403: the member requests /admin/users and receives HTTP 403 inside the Blade shell.
+        for (const { theme, viewport } of MODES) {
+            const where = `403 ${theme} ${viewport.width}`;
+
+            await page.setViewportSize(viewport);
+            await signedIn(page);
+            await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
+            const response = await page.goto('/admin/users');
+            expect(response?.status(), `${where}: the member is forbidden`).toBe(403);
+            await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
+            await page.waitForTimeout(400);
+
+            await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
+            await expect
+                .poll(() => paletteOffenders(page), { message: `${where}: every colour in main is a Direction D token`, timeout: 6000 })
+                .toEqual([]);
             expect(await hasHorizontalOverflow(page), `${where}: no document-level horizontal overflow`).toBe(false);
         }
     });

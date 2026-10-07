@@ -13,8 +13,8 @@
         </x-ui.link>
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">{{ $user->name }}</h1>
-                <p class="mt-0.5 text-sm" style="color: var(--text-secondary);">{{ $user->email }}</p>
+                <h1 class="text-2xl font-semibold text-text">{{ $user->name }}</h1>
+                <p class="mt-0.5 text-sm text-text-secondary">{{ $user->email }}</p>
             </div>
         </div>
     </div>
@@ -33,15 +33,15 @@
         <div class="space-y-8 lg:col-span-2">
 
             {{-- Account info --}}
-            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Account</h2>
+            <section class="rounded-lg border p-6 border-rule bg-surface">
+                <h2 class="mb-4 text-base font-semibold text-text">Account</h2>
                 <dl class="space-y-3 text-sm">
                     <div class="flex justify-between gap-4">
-                        <dt style="color: var(--text-secondary);">Member since</dt>
-                        <dd style="color: var(--text-primary);">{{ $user->created_at->format('d M Y') }}</dd>
+                        <dt class="text-text-secondary">Member since</dt>
+                        <dd class="text-text">{{ $user->created_at->format('d M Y') }}</dd>
                     </div>
                     <div class="flex justify-between gap-4">
-                        <dt style="color: var(--text-secondary);">2FA</dt>
+                        <dt class="text-text-secondary">2FA</dt>
                         <dd>
                             @if ($user->two_factor_confirmed_at)
                             <x-ui.status tone="success">Enabled</x-ui.status>
@@ -52,21 +52,18 @@
                     </div>
                     @if ($user->invitation)
                     <div class="flex justify-between gap-4">
-                        <dt style="color: var(--text-secondary);">Invited by</dt>
-                        <dd style="color: var(--text-primary);">
+                        <dt class="text-text-secondary">Invited by</dt>
+                        <dd class="text-text">
                             {{ $user->invitation->invitedBy?->name ?? '—' }}
                         </dd>
                     </div>
                     @endif
                     @if ($user->socialAccounts->isNotEmpty())
                     <div class="flex justify-between gap-4">
-                        <dt style="color: var(--text-secondary);">SSO providers</dt>
+                        <dt class="text-text-secondary">SSO providers</dt>
                         <dd class="flex gap-1 flex-wrap">
                             @foreach ($user->socialAccounts as $account)
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-                                  style="background-color: var(--surface-elevated); color: var(--text-secondary);">
-                                {{ $account->provider }}
-                            </span>
+                            <x-ui.tag>{{ $account->provider }}</x-ui.tag>
                             @endforeach
                         </dd>
                     </div>
@@ -75,23 +72,23 @@
             </section>
 
             {{-- Activity log --}}
-            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Recent Activity</h2>
+            <section class="rounded-lg border p-6 border-rule bg-surface">
+                <h2 class="mb-4 text-base font-semibold text-text">Recent Activity</h2>
                 @if ($activity->isEmpty())
-                <p class="text-sm" style="color: var(--text-secondary);">No activity recorded.</p>
+                <p class="text-sm text-text-secondary">No activity recorded.</p>
                 @else
                 <ol class="space-y-3">
                     @foreach ($activity as $log)
                     <li class="flex items-start justify-between gap-4 text-sm">
                         <div>
-                            <span style="color: var(--text-primary);">{{ $log->description }}</span>
+                            <span class="text-text">{{ $log->description }}</span>
                             @if ($log->properties->isNotEmpty())
-                            <p class="text-xs mt-0.5 font-mono" style="color: var(--text-secondary);">
+                            <p class="text-xs mt-0.5 font-mono text-text-secondary">
                                 {{ $log->properties->except('ip')->toJson() }}
                             </p>
                             @endif
                         </div>
-                        <time class="shrink-0 text-xs" style="color: var(--text-secondary);"
+                        <time class="shrink-0 text-xs text-text-secondary"
                               datetime="{{ $log->created_at->toIso8601String() }}">
                             {{ $log->created_at->diffForHumans() }}
                         </time>
@@ -106,8 +103,8 @@
         {{-- Right column: roles --}}
         @can('users.manage')
         <aside>
-            <section class="rounded-xl border p-6" style="border-color: var(--border-base); background-color: var(--surface-base);">
-                <h2 id="user-roles-heading" class="mb-4 text-base font-semibold" style="color: var(--text-primary);">Roles</h2>
+            <section class="rounded-lg border p-6 border-rule bg-surface">
+                <h2 id="user-roles-heading" class="mb-4 text-base font-semibold text-text">Roles</h2>
                 <form method="POST" action="{{ route('users.roles.update', $user) }}">
                     @csrf
                     @method('PUT')
@@ -115,11 +112,10 @@
                          @if ($errors->has('roles') || $errors->has('roles.*')) aria-describedby="user-roles-group-error" @endif
                          class="space-y-2 mb-4">
                         @foreach ($allRoles as $role)
-                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:legacy-bg-surface"
-                               style="border-color: var(--border-base);">
+                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface-hover border-rule">
                             <x-ui.checkbox name="roles[]" value="{{ $role->name }}"
                                            :checked="$user->hasRole($role->name)" />
-                            <span style="color: var(--text-primary);">{{ $role->name }}</span>
+                            <span class="text-text">{{ $role->name }}</span>
                         </label>
                         @endforeach
                     </div>

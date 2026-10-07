@@ -1,6 +1,6 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is implemented and independently reviewed, and is submitted as a pull request with hosted CI pending at the time of writing ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 and WP4 are not started. The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
+**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is implemented on the branch, independently reviewed (NEEDS SMALL REMEDIATION, applied) and in PR 3 ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is not started. The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
@@ -1559,3 +1559,183 @@ Screenshots (light and dark, 1440 and 390; the scratchpad, **not** in the reposi
 - **Optional test hardening (not a WP2 blocker):** pin the gallery's SLA wrapper the way the note-card wrapper is pinned; make the shared `visit()` helper assert `data-theme` directly.
 - **Visual watch item:** the dashed Pending and Draft glyphs look relatively faint in dark mode; their measured non-text contrast passes 3:1 and no WP2 change is required.
 - **Pre-existing or out of scope, destinations unchanged:** 390px table and card clipping on the queue, roles and invoice list; "All Statuss" / "All Prioritys"; the invoice number wrapping at 390px; slate dark-surface debt and heavy table dividers (WP3); the danger-zone raw text variables, the `errors/403` numeral and the cancelled-amount muting (WP3).
+
+---
+
+## Amendment 3: WP3 Blade Theme Normalization (PR 3)
+
+> **Status (2026-10-07): WP3 implemented and independently reviewed on `feature/epic-016-blade-theme-control-adoption` (verdict NEEDS SMALL REMEDIATION; remediation applied, see A3.14), for PR 3.** EPIC-016 stays **In Progress**. WP4 is not started. WP3 is a presentation-system migration: nothing in it changes a route, controller, policy, query, validation rule, status value, form field name, redirect, visible copy or script behaviour, and no React file, theme-token value or `app.css` line changed. The historical design-gate text above is unchanged.
+
+### A3.1 Starting point
+
+- **Starting SHA:** `95554304ec3558f761d53b7785cbf9e28764abbc` (`Merge pull request #25`, the WP2 merge). `HEAD`, `main` and `origin/main` were all at it, the tree was clean, no stash existed, no PR was open, and the merge-triggered `main` CI run was green. Commits since the WP2 reviewed head `0c90acc`: the merge only.
+- **Lifecycle at the start:** EPIC-016 In Progress; WP0, WP1, the Delete Role hotfix and WP2 merged; WP3 and WP4 not started.
+- **Scope used.** The §17.2 path list: `tickets/`, `operator/tickets/`, `crm/`, `organizations/`, `billing/`, `admin/`, `operator/cms/`, `components/ui/`, `components/time-tracker*`, `pagination/` and `errors/403` (59 Blade files). `cms/*`, the shell, `welcome` and React are outside it.
+
+### A3.2 Updated census (re-taken at `9555430`, the same scan before and after)
+
+The WP0 estimate (about 545 references) was a planning figure; the actual baseline was lower, well inside the §19 split trigger (about 800), so WP3 stayed one package.
+
+| Measure (59 files) | At `9555430` | After WP3 |
+|---|---:|---:|
+| raw legacy colour-variable references `var(--…)` | 478 | **0** |
+| inline `style` attributes | 420 | **0** |
+| of which set a colour, background or border | 410 | **0** |
+| literal colours (`#…`, `rgb(…)`, `hsl(…)`, `oklch(…)`) | 1 (the modal scrim `rgba`) | **0** |
+| numeric or named palette utilities | 0 | 0 |
+| legacy accent / brand utilities | 0 | 0 |
+| dead `hover:legacy-bg-surface` | 7 | **0** |
+| `rounded-xl` cards | 59 | **0** (8px `rounded-lg`) |
+| `outline-none` / `focus:ring-*` | 0 | 0 |
+| Direction D semantic colour utilities | 157 | 643 |
+
+By family at the start: `--text-secondary` 114, `--text-primary` 108, `--text-muted` 88, `--border-base` 84, `--surface-card` 35, `--surface-base` 24, `--border-subtle` 14, `--surface-elevated` 7, `--text-danger` 3, `--accent` 1. (A2.7 recorded 479 / 421 over a slightly different path set; the 1-reference difference is the `pagination/` and `components/` files counted here.) After WP3 the only remaining uses of the legacy variable families are outside the target scope: `welcome.blade.php`, `cms/index` and `cms/show` (Resources, deferred by §5.2), and React (`resources/js`, untouched).
+
+### A3.3 Review groups (one PR; the working diff is organised as the three §19 commits)
+
+| Group | Areas | Files | Raw variables → 0 | Inline styles → 0 |
+|---|---|---:|---:|---:|
+| **A** | Helpdesk (`tickets/*`, `operator/tickets/*`, the time-tracker card) + Directory (`crm/*`, `organizations/*`) | 17 | 252 | 220 |
+| **B** | Finance (`billing/*`) + System (`admin/*`, `operator/cms/*`) + `errors/403` | 18 | 226 | 200 |
+| **C** | geometry only: `rounded-xl` → `rounded-lg` on 59 cards and panels, plus 7 dead hovers | (same files) | — | — |
+
+The grouping of §19 stood: the mapping is one-to-one, so A and B are the same transformation on different areas, and C is a pure class swap on actual card and panel surfaces (every one of the 59 was reviewed in a list; none is a control or a status).
+
+### A3.4 Mappings used (by meaning, never by value)
+
+| Legacy | Semantic utility | Where |
+|---|---|---|
+| `--text-primary` | `text-text` | headings, names, values |
+| `--text-secondary` | `text-text-secondary` | metadata, table body secondary, header labels |
+| `--text-muted` | `text-text-muted` | captions, field-group labels (now ≥ 4.5:1; the old value was `gray-400`) |
+| `--text-danger` | `text-danger` | the three danger-zone headings |
+| `--surface-card`, `--surface-base` | `bg-surface` | cards, panels, table wrappers, the modal card, ordinary reply cards |
+| `--surface-elevated` | `bg-surface-sunken` | table header rows |
+| `--border-base` / `--border-subtle` on a card, panel, footer or section divider | `border-rule` | |
+| the same on a table-header row (`border-b`) | `border-rule-control` | Direction D §4.3 |
+| the same as `divide-color` / on a `divide-y` | `divide-rule` | row dividers |
+| `rgba(0,0,0,0.5)` | `bg-scrim` | invite-modal overlay |
+| `--accent` on the `errors/403` numeral | `text-text-muted` | see A3.8 |
+| `hover:legacy-bg-surface` (generates no CSS) | `hover:bg-surface-hover` | table rows, permission tiles |
+| user-role and SSO-provider chips | `x-ui.tag` | categorical kinds (A2.18 disposition) |
+
+Distinctions kept: primary actions stay ink, links accent, status and alert components own their colours, `rule` (structure) stays apart from `control-edge` (the field boundary, owned by the components). No conditional state was flattened: an overdue due date is still `text-danger font-medium` and otherwise `text-text` / `text-text-secondary`, now chosen inside one class expression instead of an `@unless` plus an inline style (nine sites); a cancelled invoice amount is `text-text-muted line-through` (four cells).
+
+### A3.5 Normalization by area
+
+- **Helpdesk.** Ticket list, detail (member and operator), queue, reports and the embedded time-tracker card. The reply card is one expression: an internal note is `border-dashed border-warning-glyph bg-warning-soft` (WP2), any other reply `border-rule bg-surface`; the old inline surface for ordinary replies is gone. The queue's table header is `bg-surface-sunken`, its dividers hairline.
+- **Directory.** Contacts, companies, organizations: lists, details, forms, danger zones (`border-danger` + `bg-surface`). The `mailto:` link is now the default accent `x-ui.link` (it was the `row` variant, which added `font-medium`).
+- **Finance.** Invoice list, detail, form, client list and detail, the payment page. Dividers, totals and the cancelled amount as above. The Stripe Payment Element is third-party and untouched.
+- **System.** Users, roles, pages, the invite modal (`bg-scrim`). User-role chips (`admin/users/index`) and SSO-provider chips (`admin/users/show`) are `x-ui.tag`; the DOM text is unchanged (the tag draws it uppercase).
+- **`errors/403`.** Copy, navigation, buttons and layout unchanged; the three inline colours became `text-text-muted` (numeral), `text-text` (heading), `text-text-secondary` (body).
+
+### A3.6 Carried findings (every item assigned to WP3 in Amendments 1 and 2)
+
+| Item | Source | Disposition |
+|---|---|---|
+| user-role chips, SSO-provider chips | A2.18 | **fixed**: `x-ui.tag` |
+| three danger-zone headings (`crm/contacts/edit`, `crm/companies/edit`, `operator/cms/edit`) | A2.12 #6 | **fixed**: `text-danger` |
+| `errors/403` accent numeral | A2.12 #6 | **fixed**: `text-text-muted` (see A3.8) |
+| cancelled-invoice amount not muted | A2.12 #6 | **fixed**: `text-text-muted line-through` |
+| dead `hover:legacy-bg-surface` | EPIC-013 WP1a | **fixed**: `hover:bg-surface-hover` |
+| invite-modal scrim | §19 WP3 | **fixed**: `bg-scrim` |
+| 12px → 8px card radius (P14) | §19 WP3 | **fixed** |
+| slate / cool-gray dark surfaces, heavy table dividers | A2.18 / review | **fixed**: `bg-surface`, `divide-rule` (the old `divide-y` carried an inline `border-color` / invalid `divide-color` that never reached the rows, so the dividers fell back to the text colour: near-black in light and bright in dark) |
+| `mailto:` link's `font-medium` | A1.15 observation | **fixed**: accent link variant |
+| the two optional WP2 hardening items | A2.18 | **done**: the gallery's SLA wrapper is pinned like the note card; `visit()` asserts `data-theme` |
+| "Choose Files" text sits high in the `h-9` file input | A1.15 observation | **deferred**: cosmetic, a native control, no colour or regression issue; reviewed screenshots show it as acceptable. Destination: a component-polish pass |
+| bulk-bar field errors; `organizations/show` role error | A1.15 observations | **deferred**: their own destinations (Helpdesk and Directory product work), not presentation |
+| "All Statuss" / "All Prioritys" | A1.15 | **deferred**: Helpdesk copy follow-up |
+| 390px table and card clipping; invoice number and header-action wrapping at 390; narrow line-item columns | A1.15, A2.18 | **deferred**: pre-existing layout, P13 / P15 and Finance product work |
+
+### A3.7 Exceptions, tokens and theme-value stability
+
+- **Exceptions:** none. No documented exception was needed in the target views.
+- **New token:** **none** (§11.3 B, §19 expected outcome). Every concept was expressed by the existing vocabulary, so no architectural finding was raised.
+- **Theme-value stability.** `git diff` shows **no change** under `resources/css`, `resources/js`, `app`, `routes`, `database`, `config` or `.github`: no token value, `@theme` mapping or React file moved, which shows no token moved, but is not a pin that survives later edits. **The required value pin (§18.3) was missing from the first WP3 tree; the independent review found it (A3.14) and it is now present** as `tests/Unit/Configuration/DirectionDThemeValuesTest` (A3.9). The reference surfaces were also measured: a computed-style fingerprint (colour, background, border colour and width, radius, font size and weight, box size, for every element of `main`) of `/projects`, `/tasks` and `/time`, in light and dark at 1440 and 390 (12 captures), was taken on the WP3 tree and again on the base commit's tree (the work stashed, assets rebuilt, restored byte-identically afterwards). **All 12 are identical.**
+
+### A3.8 Rulings and visible changes
+
+1. **The `errors/403` numeral is `text-text-muted`.** The old accent was decorative; §9.8 says accent is not decoration, and the numeral is not a link or a state. Muted keeps the heading dominant and still clears the 3:1 large-text bar. It reads close to heading weight in light (a reviewer noted that); if a lighter or stronger numeral is wanted it is a one-class change and an **owner decision**.
+2. **Table dividers are now hairline** (`divide-rule`), a visible change that fixes a latent defect (above), as intended by §11.5.
+3. **Light pages move from Tailwind gray to the warm Direction D neutrals**, and dark cards from the cool `gray-800` to the teal-black `surface`: the intended adoption (§11.5, R16).
+4. **The invite-modal overlay is lighter** in light mode (`bg-scrim` is 18%, was 50%), by Direction D's scrim token.
+5. **Header-action and tag text:** the chips draw uppercase through CSS; no DOM text changed.
+
+### A3.9 Tests
+
+- **`tests/Unit/Configuration/BladeThemeNormalizationTest`** (new; 91 tests, 98 assertions). Over the 59-file scope it fails on any raw legacy colour variable, literal colour, numeric or named palette utility, inline colour declaration (`style` or a JavaScript `.style` write), legacy accent / brand / dead `legacy-*` utility, or `rounded-xl`. It is **not** the WP4 guard: no allowlist, no B5 / B7, no React or `app.css`. Every rule has a fixture it must catch (18) and a near-miss it must pass (12: semantic utilities, a non-colour inline style, a non-colour custom property, `href="#"`, `&#9654;`, element ids, `min-h-[60vh]`, ordinary radius, a class that merely contains a family word, a border width). `var(--…)` is not banned as such (O9).
+- **`tests/Browser/blade-theme-controls.spec.ts`** gained a palette-conformance check (§18.4, from PR 3): every computed text, background and border colour in `main` must equal a live Direction D token of the current theme (alpha ignored; transparent skipped), over the Helpdesk, Finance, System and Directory pages and `errors/403`, light and dark at 1440 and 390, plus the document-overflow check. Three tests; records they need are created and removed through the application's own routes. After the independent review the operator test also visits the real `/tickets/{id}` request page of the seeded `TKT-E2E1` (the route that hosts the embedded tracker), so the matrix covers both ticket-detail routes. The check polls up to 6 s for the 120 ms theme transition to settle (see A3.11).
+- **`tests/Unit/Configuration/DirectionDThemeValuesTest`** (added in remediation; 37 tests, 74 assertions): pins the light and dark value of every canonical §2.2 colour token (36 tokens, 72 values), typed from the specification table independently of `app.css`, with no stylesheet snapshot. A mutation (`--ds-text-muted` light `#5C5F66` -> `#5C5F67`) fails it on exactly that token; the file was restored byte-identically. It stays in place for WP4, which edits `app.css`.
+- **WP3 FLIPs (in place, marked):** `SemanticStateMappingTest` located the reply cards by `rounded-xl` (now `rounded-lg`); the gallery markup and the browser spec's gallery host selector follow the same radius. No behavioural or security assertion changed.
+- **Two WP2 hardening items** (A3.6): a Pest pin for the SLA wrapper and a `data-theme` assertion in `visit()`.
+
+### A3.10 Mutation checks
+
+Each was introduced alone in a real view, the check was run and shown to fail, and the file was restored (verified with `cmp` against a scratchpad copy; nothing is left in the tree).
+
+| Mutation | Result |
+|---|---|
+| a raw `style="color: var(--text-secondary)"` in `tickets/index` | the conformance test fails (legacy colour variable, inline colour) |
+| an inline `#6b7280` in `billing/invoices/show` | fails (literal colour) |
+| `bg-gray-800` in `crm/contacts/index` | fails (palette utility) |
+| `style="background-color: var(--surface-elevated)"` in `admin/roles/index` | fails (legacy variable) |
+| browser: an inline `background-color: #eef2ff` in the operator queue | the palette check fails on the exact colour; a raw `var(--text-secondary)` equals the token by value, so that class of regression is the Pest test's job, not the browser check's |
+
+(The first attempt at the raw-text-variable mutation did not apply because its search pattern matched nothing; it was caught by checking that the file had changed, and redone.)
+
+### A3.11 Evidence
+
+- **Visual review.** 96 screenshots (24 routes, light and dark at 1440 and 390: the Helpdesk queue with the WP2 state gallery, ticket, reports, member list and form; invoices list, detail and form, member invoices; contacts, companies, organizations; users, roles, role form, pages and page edit; `errors/403`; Projects and Tasks as references) were reviewed by me and by three independent reviewers. Findings: no wrong-theme capture, no stray blue or indigo, no cool-gray surface, no heavy divider, no card-on-card, no lost hierarchy. Minor, none introduced by WP3: the 390px clipping and wrapping already recorded; the reports "Volume by Day" table never had a sunken header; required asterisks are red by the `x-ui.label` contract; System pages use different content widths and row-action styles (P13, product work). Not reached: a real internal note and an overdue ticket on a full page, which no supported route can create without leaving records; both were checked through the WP2 gallery. The temporary screenshot tooling was deleted. The images were written to `src/storage/app/wp3-shots/` (gitignored, never part of the repository); the independent reviewer sampled them there. They were temporary validation artifacts, and that directory was deleted after review (A3.14); this paragraph keeps the evidence summary, not the files.
+- **Focused Pest** (`tests/Unit/Ui`, `tests/Unit/Configuration`, `tests/Feature/Ui`, `tests/Feature/Tickets`, `tests/Feature/Billing`, `tests/Feature/Admin`, `tests/Feature/Cms`, `tests/Feature/Crm`): **803 passed (4,497 assertions)**, 104 s (the WP2 amendment's 710 / 4,387 of the same set, plus its MFA follow-up, is the base; the rest are WP3's).
+- **Focused Playwright** (`blade-theme-controls`, `time-migration`, `role-delete-form`, `blade-shell`, `projects-migration`, `tasks-migration`; 3 workers): **65 tests, 65 passed, 0 failed, 0 skipped, 5.9 minutes**; product data before and after: projects 2 / 2, tasks 1 / 1, time entries 2 / 2. **History:** the first run of this set was 63 passed, 2 failed. One was the new palette check on "invoice form, dark, 390", which read light-theme values while `data-theme` was already dark: the 120 ms colour transition had not settled while three workers loaded the machine (it had passed solo). That is why the check now polls. The other was `time-migration.spec.ts` "manual entries … on mobile", at a `toHaveCount(0)` after a delete on the React `/time` page, which WP3 does not touch; it did not reproduce and is recorded as an observed flake, not investigated further. Both reruns of the set were fully green. HTTP over the 40-minute window of the evidence runs (nginx): 2,841 `200`, 323 `302`, 54 `303`, **0 `5xx`, 0 `419`, 0 `429`**; 26 expected `403`s (the 403 page checks), 10 `404`s (cleanup of removed records), 81 `499`s (navigations aborted by the next `goto`).
+- **Build.** `npm run build` was re-run before every browser run; every semantic utility used in the views is present in the built CSS (the three names a scan flagged as missing are `hover:` / `before:` variants of utilities that exist).
+- **`./dev check`:** **All checks passed, exit 0** (run alone, on the final tree including this amendment). CLI self-tests **196 assertions**; `git diff --check` pass; Pint pass (**325 files**); frontend `npm run check` pass (`wayfinder:generate`, `tsc --noEmit`, ESLint, Prettier, **Vitest 99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,375 passed (13,346 assertions)**, 558 s. **The first run was not green:** every step passed except Pint, which flagged one `single_quote` style issue in the new `BladeThemeNormalizationTest` (2,375 / 13,346 Pest passed in that run too). Pint fixed that one file (quote style only, no behavioural change), the conformance test was re-run green, and the full gate was re-run in full.
+
+### A3.12 Files changed
+
+**Changed views (35):** `admin/roles/{create,edit,index}`, `admin/users/{index,show}`, `billing/client/{index,show}`, `billing/invoices/{_form,create,edit,index,show}`, `billing/payment/show`, `components/time-tracker`, `crm/companies/{create,edit,index,show}`, `crm/contacts/{create,edit,index,show}`, `errors/403`, `operator/cms/{_form,create,edit,index}`, `operator/tickets/{index,reports,show}`, `organizations/{index,show}`, `tickets/{create,index,show}`.
+**Tests:** new `tests/Unit/Configuration/BladeThemeNormalizationTest.php` and (remediation) `tests/Unit/Configuration/DirectionDThemeValuesTest.php`; changed `tests/Browser/blade-theme-controls.spec.ts`, `tests/Feature/Ui/SemanticStateMappingTest.php`, `tests/Support/semantic_state_gallery.php`. **Docs:** this amendment and the status lines.
+**Scope check against `9555430`:** only `resources/views`, `tests` and this document; nothing under `resources/js`, `resources/css`, `routes`, `app`, `database`, `config`, `.github` or any manifest.
+
+### A3.13 Left for WP4
+
+WP3 proves usages are gone; it deletes nothing. WP4 owns: alias deletion and the four-part zero-use proof (the evidence now is: `var(--accent)` has **no** consumer in any Blade view or in React; `--surface-accent` has none in the views; `--text-*`, `--surface-*` and `--border-*` are consumed only by `welcome`, `cms/index`, `cms/show` and React); the vendor pagination `@source` line; the permanent two-level guard (§17, with its allowlist, B5 and B7); the compatibility tests flipped to absence; the final census; and the closeout. The three remaining `legacy-text-primary` uses are in React (`auth/login`, `auth/forgot-password`, `time/index`) and are WP4's to resolve before retiring that utility. EPIC-016 stays **In Progress**.
+
+### A3.14 Independent review and remediation
+
+**Initial verdict: WP3 NEEDS SMALL REMEDIATION.** Blocking production findings: **none**. The production migration was accepted as a one-to-one semantic normalization (mapping by meaning, no behaviour, route, token, Stripe, Delete Role or React change). Remediation touched tests, this document and one gitignored directory only; **no production view changed**.
+
+**Independent census** (reviewer, same 59-file scope, base `9555430` to the working tree): raw legacy colour variables 478 -> 0; inline styles 420 -> 0; literal colours 1 -> 0; numeric palette utilities 0 -> 0; dead legacy hover utilities 7 -> 0; `rounded-xl` cards 59 -> 0. Semantic utilities: reviewer 162 -> 648, author 157 -> 643; the regexes differ, the conclusion (a large genuine increase) is the same. Of the 59 locked files, 35 changed and 24 were already compliant (the components, pagination views, ticket partials, `_form` / `_line_item` / state partials), so no file left the census.
+
+**Findings and dispositions**
+
+| # | Finding | Disposition |
+|---|---|---|
+| Y1 | the required §18.3 `--ds-*` value pin was missing; the git-diff and fingerprint evidence did not replace it | **fixed**: `DirectionDThemeValuesTest` (A3.9); the reference fingerprints (12 byte-identical captures, dark captures verified to be dark) are accepted as extra evidence only |
+| Y2a | the palette check omitted `/tickets/{id}` | **fixed**: the operator test visits the real request page of the seeded `TKT-E2E1`; a temporary inline colour on that page failed it on the exact value, and the file was restored |
+| Y2b | `/organizations/{id}` is not in the browser palette matrix | **recorded, not added**: there is no organization delete route, so the browser suite cannot create and remove an organization fixture safely. It was **not browser-tested** in WP3. It stays inside the 59-file static census and conformance scan, and its Feature evidence is intact. A browser-route coverage limit, not an exclusion from the normalization contract |
+| Y2c | `/crm/contacts/create` is not a separate palette route | **recorded**: it renders the same `crm/contacts/_form` partial as the covered edit route; `create` and `edit` differ only in heading text and form action, and their card and heading classes are identical. No separate browser work was added |
+| Y3 | A3.11 placed the screenshots in the scratchpad | **fixed**: the record now names `src/storage/app/wp3-shots/` (gitignored); the 96 images and the temporary reference JSON were deleted; the evidence summary stays |
+
+**Browser synchronization ruling.** The first red run's 29 offenders were the exact light-theme values on `x-ui` controls that carry a 120 ms colour transition, while every non-transitioning element on the same page was already dark. That is a CSS-transition race under load, not a wrong-theme product defect. The poll compares painted colours against the live tokens of the requested theme, so a persistent mismatch still fails at the end of the window (shown again above). It is accepted.
+
+**Independent runs (reviewer, not the author's).** Pest (`BladeThemeNormalizationTest`, `DirectionDThemeContractTest`, `BladeControlAdoptionTest`, `tests/Unit/Ui`, `tests/Feature/Ui`, `BladeShellTest`, `tests/Feature/Admin`, `tests/Feature/Billing`): **577 passed (3,392 assertions)**. Playwright (`blade-theme-controls`, `role-delete-form`, `projects-migration`, `tasks-migration`, 3 workers): **41 scheduled, 40 passed, 1 failed, 0 skipped**, 5.5 minutes, product data 2 / 1 / 2 before and after. **The failure is recorded as it happened**: the WP1 test "Directory: people and organizations" read a mid-transition ink value (`rgb(222,230,231)` against `rgb(230,238,239)`) after its fixed 400 ms wait. The focused repeat (`--repeat-each=3`) passed 3 of 3. It is the same fixed-delay transition race, in a pre-WP3 assertion.
+
+**Remediation validation (author).**
+- Pest `tests/Unit/Configuration`: **312 passed (1,769 assertions)**, including the new value pin (37 tests, 74 assertions) and `BladeThemeNormalizationTest`.
+- Playwright `blade-theme-controls.spec.ts` alone (24 tests; one spec file gets one worker): **24 passed**, 5.2 minutes. The review's four-spec set, 3 workers: **41 passed, 0 failed, 0 skipped**, 5.4 minutes. Product data 2 / 1 / 2 before and after, both runs.
+
+**Carried forward, not implemented in WP3**
+
+| Item | Destination |
+|---|---|
+| fixed-delay semantic-style measurements race CSS transitions (`visit()` waits 400 ms); replace with deterministic settling where appropriate, taking care with infinite animations such as live-state pulses | WP4 final browser and test hardening |
+| a per-theme semantic-value precondition in the palette check (the only proof the theme is active is reading back the attribute the test set); `errors/403` theme read-back consistency | WP4 final hardening |
+| conformance-regex gaps: single-quoted and bound style syntaxes, white / black with `outline-`, `accent-`, `shadow-` prefixes, exact locked-path handling instead of `>= 59` | WP4 permanent guard (`BladeThemeNormalizationTest` is migration-completion evidence, not the guard) |
+| table-header grammar differs across modules (sunken header and secondary text in Helpdesk and System, unfilled header with muted text and a `rule-control` underline in Directory, Finance and CMS) | P15, future DataTable conventions |
+| 390px clipping and wrapping, "All Statuss" / "All Prioritys", "Choose Files" alignment, bordered role tiles inside a card on `admin/users/show`, the `time-migration` mobile timing flake | existing product debt, unchanged |
+
+- **`./dev check`** (run alone, after the focused evidence and the amendment text were final): **All checks passed, exit 0**. CLI self-tests **196 assertions**; `git diff --check` pass; Pint pass (**326 files**); frontend `npm run check` pass (Vitest **99 files / 1,684 tests**, `vite build` **424 modules**); full Pest **2,412 passed (13,420 assertions)**, 514 s. This is the final-tree gate; the only edit after it is this one line.
+
+**State after remediation:** WP3 SAFE TO COMMIT. EPIC-016 stays **In Progress**; WP4 is not started.

@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-start justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Ticket Queue</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Triage, assign, and manage all support requests.</p>
+            <h1 class="text-2xl font-semibold text-text">Ticket Queue</h1>
+            <p class="mt-1 text-sm text-text-secondary">Triage, assign, and manage all support requests.</p>
         </div>
         <div class="flex items-center gap-2">
             <x-ui.button :href="route('operator.tickets.reports')" variant="secondary">Reports</x-ui.button>
@@ -54,53 +54,52 @@
         @csrf
 
     {{-- Table --}}
-    <div class="overflow-x-auto rounded-xl border" style="border-color: var(--border-base); background-color: var(--surface-base);">
-        <table class="min-w-full divide-y" style="border-color: var(--border-subtle);">
+    <div class="overflow-x-auto rounded-lg border border-rule bg-surface">
+        <table class="min-w-full divide-y divide-rule">
             <thead>
-                <tr style="background-color: var(--surface-elevated);">
+                <tr class="bg-surface-sunken">
                     <th class="px-4 py-3">
                         <x-ui.checkbox id="select-all" aria-label="Select all tickets on this page" />
                     </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Ticket</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Priority</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Status</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Assignee</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">SLA Due</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Submitted</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Ticket</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Priority</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Status</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Assignee</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">SLA Due</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Submitted</th>
                     <th scope="col" class="relative px-4 py-3"><span class="sr-only">View</span></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="border-color: var(--border-subtle);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($tickets as $ticket)
-                <tr class="transition-colors hover:legacy-bg-surface">
+                <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-4 py-3">
                         <x-ui.checkbox name="ticket_ids[]" id="ticket-cb-{{ $ticket->id }}" value="{{ $ticket->id }}"
                                        aria-label="Select ticket {{ $ticket->ticket_number }}" class="ticket-cb" />
                     </td>
                     <td class="px-4 py-3">
-                        <p class="font-medium text-sm" style="color: var(--text-primary);">{{ $ticket->title }}</p>
-                        <p class="text-xs mt-0.5" style="color: var(--text-secondary);">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }} &middot; {{ $ticket->user->name }}</p>
+                        <p class="font-medium text-sm text-text">{{ $ticket->title }}</p>
+                        <p class="text-xs mt-0.5 text-text-secondary">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }} &middot; {{ $ticket->user->name }}</p>
                     </td>
                     <td class="px-4 py-3">@include('tickets._priority_badge', ['priority' => $ticket->priority])</td>
                     <td class="px-4 py-3">@include('tickets._status_badge', ['status' => $ticket->status])</td>
-                    <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">
+                    <td class="px-4 py-3 text-sm text-text-secondary">
                         {{ $ticket->assignee?->name ?? '—' }}
                     </td>
-                    <td class="px-4 py-3 text-sm {{ $ticket->isOverdue() ? 'font-medium text-danger' : '' }}"
-                        @unless ($ticket->isOverdue()) style="color: var(--text-secondary);" @endunless>
+                    <td class="px-4 py-3 text-sm {{ $ticket->isOverdue() ? 'font-medium text-danger' : 'text-text-secondary' }}">
                         {{ $ticket->sla_due_at?->format('d M H:i') ?? '—' }}
                         @if ($ticket->isOverdue())
                         @include('tickets._overdue_status', ['class' => 'ml-1'])
                         @endif
                     </td>
-                    <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">{{ $ticket->created_at->diffForHumans() }}</td>
+                    <td class="px-4 py-3 text-sm text-text-secondary">{{ $ticket->created_at->diffForHumans() }}</td>
                     <td class="px-4 py-3 text-right">
                         <x-ui.link :href="route('operator.tickets.show', $ticket)" class="text-sm font-medium">View</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-10 text-center text-sm" style="color: var(--text-secondary);">
+                    <td colspan="8" class="px-6 py-10 text-center text-sm text-text-secondary">
                         No tickets found.
                     </td>
                 </tr>
@@ -110,9 +109,8 @@
     </div>
 
     {{-- Bulk action bar --}}
-    <div id="bulk-bar" class="hidden mt-4 flex items-center gap-3 rounded-lg border px-4 py-3"
-         style="border-color: var(--border-base); background-color: var(--surface-elevated);">
-        <span class="text-sm" style="color: var(--text-secondary);"><span id="selected-count">0</span> selected</span>
+    <div id="bulk-bar" class="hidden mt-4 flex items-center gap-3 rounded-lg border px-4 py-3 border-rule bg-surface-sunken">
+        <span class="text-sm text-text-secondary"><span id="selected-count">0</span> selected</span>
         <x-ui.select name="action" required aria-label="Bulk action">
             <option value="">Choose action&hellip;</option>
             <option value="assign">Assign to&hellip;</option>

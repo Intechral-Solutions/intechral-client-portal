@@ -5,8 +5,8 @@
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--text-primary);">Organizations</h1>
-            <p class="mt-1 text-sm" style="color: var(--text-secondary);">Client organizations promoted from the CRM.</p>
+            <h1 class="text-2xl font-semibold text-text">Organizations</h1>
+            <p class="mt-1 text-sm text-text-secondary">Client organizations promoted from the CRM.</p>
         </div>
         <x-ui.button :href="route('crm.companies.index')" variant="secondary">View Companies</x-ui.button>
     </div>
@@ -15,18 +15,18 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="rounded-xl border overflow-hidden" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
-                <tr class="border-b" style="border-color: var(--border-base);">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Slug</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Owner</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style="color: var(--text-muted);">Members</th>
+                <tr class="border-b border-rule-control">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Slug</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Owner</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">Members</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y" style="divide-color: var(--border-base);">
+            <tbody class="divide-y divide-rule">
                 @forelse ($organizations as $org)
                 <tr>
                     <td class="px-4 py-3 font-medium">
@@ -34,16 +34,16 @@
                             {{ $org->name }}
                         </x-ui.link>
                     </td>
-                    <td class="px-4 py-3 font-mono text-xs" style="color: var(--text-muted);">{{ $org->slug }}</td>
-                    <td class="px-4 py-3" style="color: var(--text-secondary);">{{ $org->owner->name }}</td>
-                    <td class="px-4 py-3 text-right" style="color: var(--text-secondary);">{{ $org->members_count }}</td>
+                    <td class="px-4 py-3 font-mono text-xs text-text-muted">{{ $org->slug }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $org->owner->name }}</td>
+                    <td class="px-4 py-3 text-right text-text-secondary">{{ $org->members_count }}</td>
                     <td class="px-4 py-3 text-right">
                         <x-ui.link variant="quiet" :href="route('organizations.show', $org)" class="text-xs">Manage</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm" style="color: var(--text-muted);">
+                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">
                         No organizations yet.
                         <x-ui.link :href="route('crm.companies.index')">Promote a company</x-ui.link>
                         to get started.

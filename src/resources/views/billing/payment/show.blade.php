@@ -14,25 +14,23 @@
             </svg>
             {{ $invoice->invoice_number }}
         </x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">Pay Invoice</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">Pay Invoice</h1>
     </div>
 
     {{-- Invoice summary --}}
-    <div class="mb-6 rounded-xl border p-5"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="mb-6 rounded-lg border p-5 bg-surface border-rule">
         <div class="flex items-center justify-between mb-3">
-            <span class="font-mono font-semibold" style="color: var(--text-primary);">{{ $invoice->invoice_number }}</span>
-            <span class="text-xs" style="color: var(--text-muted);">Due {{ $invoice->due_at->format('M j, Y') }}</span>
+            <span class="font-mono font-semibold text-text">{{ $invoice->invoice_number }}</span>
+            <span class="text-xs text-text-muted">Due {{ $invoice->due_at->format('M j, Y') }}</span>
         </div>
         <div class="flex items-baseline gap-1">
-            <span class="text-3xl font-bold" style="color: var(--text-primary);">{{ number_format((float)$invoice->total, 2) }}</span>
-            <span class="text-sm font-medium" style="color: var(--text-muted);">{{ $invoice->currency }}</span>
+            <span class="text-3xl font-bold text-text">{{ number_format((float)$invoice->total, 2) }}</span>
+            <span class="text-sm font-medium text-text-muted">{{ $invoice->currency }}</span>
         </div>
     </div>
 
     {{-- Stripe Elements --}}
-    <div class="rounded-xl border p-5 space-y-4"
-         style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
         <div id="payment-element">
             {{-- Stripe.js injects the Payment Element here --}}
         </div>
@@ -45,7 +43,7 @@
         </x-ui.button>
     </div>
 
-    <p class="mt-4 text-center text-xs" style="color: var(--text-muted);">
+    <p class="mt-4 text-center text-xs text-text-muted">
         Payments are securely processed by <x-ui.link href="https://stripe.com" target="_blank">Stripe</x-ui.link>.
     </p>
 </div>

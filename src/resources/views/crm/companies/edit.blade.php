@@ -5,10 +5,10 @@
 
     <div class="mb-8">
         <x-ui.link variant="quiet" :href="route('crm.companies.show', $company)" class="text-sm">&larr; {{ $company->name }}</x-ui.link>
-        <h1 class="mt-2 text-2xl font-semibold" style="color: var(--text-primary);">Edit Company</h1>
+        <h1 class="mt-2 text-2xl font-semibold text-text">Edit Company</h1>
     </div>
 
-    <div class="rounded-xl border p-6" style="background-color: var(--surface-card); border-color: var(--border-base);">
+    <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('crm.companies.update', $company) }}" class="space-y-4">
             @csrf @method('PUT')
             @include('crm.companies._form')
@@ -20,9 +20,9 @@
     </div>
 
     {{-- Danger zone --}}
-    <div class="mt-8 rounded-xl border border-danger p-5" style="background-color: var(--surface-card);">
-        <h2 class="mb-2 text-sm font-semibold" style="color: var(--text-danger);">Delete Company</h2>
-        <p class="mb-4 text-xs" style="color: var(--text-muted);">This will permanently remove the company and all its contacts.</p>
+    <div class="mt-8 rounded-lg border border-danger p-5 bg-surface">
+        <h2 class="mb-2 text-sm font-semibold text-danger">Delete Company</h2>
+        <p class="mb-4 text-xs text-text-muted">This will permanently remove the company and all its contacts.</p>
         <form method="POST" action="{{ route('crm.companies.destroy', $company) }}"
               onsubmit="return confirm('Delete {{ addslashes($company->name) }}? This cannot be undone.')">
             @csrf @method('DELETE')
