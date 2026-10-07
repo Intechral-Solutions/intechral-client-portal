@@ -305,6 +305,17 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 | **7. Release 1 hardening** | Release-scoped hardening with the exit gates in [Release 1 hardening](#release-1-hardening). It is exercised on `1.0.0-rc.N` candidates deployed to staging. | Phases 5, 6 | Release 1 hardening epic (successor of EPIC-011 Phase K, scoped) | An accepted release candidate |
 | **8. Release 1** | Tag `v1.0.0`, run the EPIC-010D preflight, deploy, verify health, then post-release watch. | Phase 7 | Release procedure, no epic | Production; principle 8's second half takes effect |
 
+> **Forward note (2026-10-07): `@shadcn/lint` evaluation. Outcome: ADOPT `@shadcn/lint`, approved for tooling implementation.** Evaluated on `main` @ `73909ac` against `@shadcn/lint` **0.2.0** (2026-09-22) with a dry run from an isolated scratch install; **nothing is installed yet**.
+> - **Compatibility:** compatible as-is. Node 22, ESLint 10, typescript-eslint 8.70 and Tailwind 4.3 meet its requirements. **ESLint is chosen over Oxlint** (Oxlint's plugin API is alpha; no second linter), through the existing `npm run lint`.
+> - **Six rules evaluated:** `no-raw-colors`, `no-unknown-classes`, `no-restyle`, `no-arbitrary-values`, `no-inline-styles`, `require-static-classes`. Dry run over the 246 files `npm run lint` covers: 0, 0 (application source), 66 (19 under a Direction D policy), 22, 6 and 4 respectively.
+> - **Owner rulings (2026-10-07):**
+>   - **R1, adoption mode:** selected rules run as **error** with a checked-in ESLint bulk-suppression baseline for existing findings, so new violations fail immediately. Warnings are not used (the repo lints with `--max-warnings=0`), and no rule is blanket-disabled for existing debt.
+>   - **R2, typography:** callers do not own primitive typography. No broad `typography` allowance; `text-*`, `font-*`, `leading-*` and `tracking-*` stay visual on governed primitives. Special cases get a variant or a narrow documented suppression.
+>   - **R3, React danger Button:** a shared non-solid danger treatment on the Button primitive (secondary surface, danger text and boundary) for destructive triggers; the solid `destructive` stays the confirmation treatment (P4). The Project edit trigger consumes it.
+>   - **R4, 11px labels:** the drawer and nav-sheet 11px labels move to the 12px Direction D scale. **The spec-defined 10px rail label stays 10px** (a narrow documented suppression if flagged).
+> - **Other decisions:** pin exactly `0.2.0` (no caret or tilde; the package is young, so upgrades are deliberate and re-baselined). Composite contracts for `page-frame`, `page-header`, `section` and `pagination` are deferred until evidence supports governing them as primitives.
+> - The Helpdesk MVP is not blocked by this work.
+
 **Why this order and not another.**
 - **Helpdesk still leads.**
   - It has no hard dependency left.
