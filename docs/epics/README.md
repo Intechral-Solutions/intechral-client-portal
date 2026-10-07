@@ -27,7 +27,7 @@ Development is organized into epics that build the platform iteratively from fou
 | [EPIC-013](./EPIC-013-direction-d-shell-design-system.md) | Direction D Application Shell and Design System Foundation | **Done** |
 | [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md) | Tasks Workspace Overhaul | **Done** |
 | [EPIC-015](./EPIC-015-projects-ux-expansion.md) | Projects UX Expansion | **Done** |
-| [EPIC-016](./EPIC-016-direction-d-blade-theme-control-adoption.md) | Direction D Theme and Control Adoption for Blade Workspaces | **In Progress** |
+| [EPIC-016](./EPIC-016-direction-d-blade-theme-control-adoption.md) | Direction D Theme and Control Adoption for Blade Workspaces | **Done** |
 
 ## Epic Lifecycle
 
@@ -49,4 +49,4 @@ Major milestone records are tracked in [docs/progress/](../progress/).
 
 As of 2026-09-24, strategic sequencing comes from the [Product Roadmap](../product/product-roadmap.md); epics remain the implementation contracts for the work it sequences. EPIC-013 (2026-09-25) is the implementation contract for the roadmap's paired *New application shell* and *Design system* items, built against the approved [Direction D design system](../design/direction-d-design-system.md). EPIC-014 (planned 2026-09-29) is the implementation contract for the roadmap's *Tasks overhaul* item. EPIC-015 (planned 2026-10-02) is the implementation contract for the roadmap's *Projects UX expansion* item. EPIC-016 (planned 2026-10-05) is the implementation contract for the roadmap's *Blade workspace theme and control adoption* item. It moves the Blade Helpdesk, Directory, Finance and System workspaces onto the Direction D semantic theme and a shared Blade control layer, in four PRs and without renderer or product redesign. It is the destination of EPIC-013 A13.4 and EPIC-015 A6.16.
 
-On 2026-10-06 the roadmap was re-oriented around **Release 1**, the first customer production release ([Product Roadmap → Release 1](../product/product-roadmap.md#release-1-re-orientation-2026-10-06)). EPIC-016 is its Phase 1, with **WP2 the next unstarted package**. Later vehicles (Helpdesk MVP, Directory, Finance, Advanced Projects, release engineering, Release 1 hardening) receive epic numbers only when they are planned. Development may pause at this point by owner choice; the roadmap's restart checkpoint records how to resume.
+On 2026-10-06 the roadmap was re-oriented around **Release 1**, the first customer production release ([Product Roadmap → Release 1](../product/product-roadmap.md#release-1-re-orientation-2026-10-06)). EPIC-016, its Phase 1, was completed on 2026-10-07; the next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP. Later vehicles (Helpdesk MVP, Directory, Finance, Advanced Projects, release engineering, Release 1 hardening) receive epic numbers only when they are planned. Development may pause at this point by owner choice; the roadmap's restart checkpoint records how to resume.

@@ -82,21 +82,21 @@ Each item becomes one or more implementation epics before work begins, consisten
 
 ### Development pause and restart checkpoint
 
-> **DEVELOPMENT MAY PAUSE HERE BY OWNER CHOICE. NO PRODUCT OR TECHNICAL BLOCKER IS IMPLIED.** EPIC-016 is In Progress, not blocked or abandoned. The owner rulings D1–D4 are locked ([Owner rulings D1–D4](#owner-rulings-d1d4)). Nothing needs owner input before work resumes.
+> **EPIC-016 IS DONE (2026-10-07).** Release 1 Phase 1's epic is complete and merged. The immediate next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP. Development may pause between epics by owner choice; no product or technical blocker is implied. The owner rulings D1–D4 are locked ([Owner rulings D1–D4](#owner-rulings-d1d4)). Nothing needs owner input before work resumes.
 
-**Checkpoint (2026-10-06)**
+**Checkpoint (2026-10-07, EPIC-016 Done).** The 2026-10-06 pause checkpoint (integrated at `88e15d7`, WP2–WP4 not started) is superseded by this one; it remains in the git history.
 
 | Item | State |
 |---|---|
-| Integrated code checkpoint | `88e15d7`: merge of PR #24, the System Delete Role form hotfix. `main` CI run 37502988782 is green. Product code is clean at this commit. |
-| Pause marker | The documentation-only commit `docs: orient roadmap to Release 1`, directly on top of `88e15d7`, is the pause marker. Its SHA is deliberately not written into the file itself; find it with `git log --oneline -1 --grep="orient roadmap to Release 1"`. |
+| Integrated code checkpoint | `af36b03`: merge of PR #27 (EPIC-016 WP4). Merge-triggered `main` CI run 37651408249 is green (`./dev check` gates and Playwright 166 / 166). The EPIC-016 closeout is documentation only on top of it. |
+| Closeout marker | The documentation-only commit `docs: close EPIC-016`, directly on top of `af36b03`. Its SHA is deliberately not written into the file itself; find it with `git log --oneline -1 --grep="close EPIC-016"`. |
 | Release 1 roadmap | Committed (this section) |
-| Active epic | [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md): **In Progress** |
-| EPIC-016 packages | WP0 **complete** (design gate, `d07384d`) · WP1 **merged / verified** (Controls and Accessibility, PR #23, `6dfc115`) · Delete Role hotfix **merged / verified** (PR #24, `88e15d7`; A1.19; not an EPIC-016 package) · WP2 **not started** · WP3 **not started** · WP4 **not started** |
-| **Next unstarted work package** | **EPIC-016 WP2: Status and Semantic State** ([§19](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md#19-work-packages)) |
+| Last completed epic | [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md): **Done** (2026-10-07). No epic is active. |
+| EPIC-016 packages | WP0 **complete** (design gate, `d07384d`) · WP1 **merged / verified** (PR #23, `6dfc115`) · Delete Role hotfix **merged / verified** (PR #24, `88e15d7`; A1.19; not an EPIC-016 package) · WP2 **merged / verified** (PR #25, `9555430`) · WP3 **merged / verified** (PR #26, `8db03b7`) · WP4 **merged / verified** (PR #27, `af36b03`) |
+| **Next step** | **Evaluate `@shadcn/lint`** (a time-boxed adopt-or-decline decision, recorded; React/Tailwind tooling, EPIC-016 §22.1; **not installed**). Then the **Helpdesk MVP**, whose first package is the dedicated customer shell. |
 | Open PRs | None |
-| Branches | Implementation branch `feature/epic-016-blade-theme-control-adoption`. The local branch was fast-forwarded to the pause marker. The remote branch (`origin/feature/epic-016-…`) may lag behind `main`, because no active work depends on it. It must be brought to current `main` before WP2 (EPIC-016 §25: merge or fast-forward, no force push). Other local branches are historical. |
-| Last completed epics | EPIC-013 (shell + design system), EPIC-014 (Tasks), EPIC-015 (Projects UX): all **Done** |
+| Branches | `feature/epic-016-blade-theme-control-adoption` is merged and may be deleted (local and remote); `origin/main` is the only authority. Other local branches are historical. |
+| Earlier completed epics | EPIC-013 (shell + design system), EPIC-014 (Tasks), EPIC-015 (Projects UX): all **Done** |
 
 **First action on return**
 
@@ -105,16 +105,16 @@ Each item becomes one or more implementation epics before work begins, consisten
 3. List the open PRs.
 4. Check hosted CI on current `main`.
 5. Fast-forward local `main`.
-6. Bring `feature/epic-016-blade-theme-control-adoption` to current `main` (fast-forward or merge, no force push).
-7. Read this Release 1 section, EPIC-016's current status and amendments, and the relevant Direction D sections (the [minimum document set](#documents-to-read-on-return)).
-8. Verify that WP2 really has not started: check for branch commits, open PRs, and an EPIC-016 amendment for WP2.
-9. Bring the dev stack up (`./dev doctor`, `./dev check`). Then plan and implement **EPIC-016 WP2** from its §19 / §9 contract, re-running its census first.
+6. Branch the next vehicle from current `main` (no epic branch exists after EPIC-016).
+7. Read this Release 1 section, EPIC-016's status and Amendment 4, and the relevant Direction D sections (the [minimum document set](#documents-to-read-on-return)).
+8. Verify that the `@shadcn/lint` evaluation has not already been decided: check for a recorded decision and open PRs.
+9. Bring the dev stack up (`./dev doctor`, `./dev check`). Then run the `@shadcn/lint` evaluation, and plan the Helpdesk MVP with its customer shell as the first package.
 
 <a id="documents-to-read-on-return"></a>
 **Documents to read on return (minimum set, in order)**
 
 1. This section and the rest of [Release 1](#release-1-re-orientation-2026-10-06).
-2. [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md): header status, §9, §19–§20, Amendment 1 (A1.15–A1.19).
+2. [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md): header status, §16–§17 (the retirements and the permanent guard), §20, Amendment 4.
 3. [Direction D design system](../design/direction-d-design-system.md): §9–§10 (status semantics), §19–§20.
 4. [`docs/testing/ci.md`](../testing/ci.md) and the `./dev help` output.
 5. [Epics overview](../epics/README.md) for the lifecycle states.
@@ -123,13 +123,13 @@ Each item becomes one or more implementation epics before work begins, consisten
 
 - **That CI is still green.** Re-check it. Runner images, dependency resolution and the hosted Chromium can drift while the code stands still.
 - **That feature-branch remote pointers are current.** Local and remote feature branches may be stale. `origin/main` is the only authority.
-- **That no dependency or security update occurred.** Laravel, Inertia, Tailwind, shadcn, Playwright and Stripe may have new releases or advisories. Triage them separately; do not upgrade as part of resuming WP2 unless a security advisory demands it.
+- **That no dependency or security update occurred.** Laravel, Inertia, Tailwind, shadcn, Playwright and Stripe may have new releases or advisories. Triage them separately; do not upgrade as part of resuming work unless a security advisory demands it.
 - **That hosting assumptions remain valid.** Nothing has been deployed. Host capabilities (PHP, Redis, queue, cron, backups) are **unproven** ([Deployment model](#deployment-model-and-open-gates)).
 - **That a production host has been selected.** It has not ([D4](#owner-rulings-d1d4)). RE-0 decides.
 - **That the EPIC-012 renderer decision has been made.** It has not. EPIC-012 is still Planned / Discovery.
 - **That today's ordering survived later owner decisions.** Check this file's history for anything newer than this section.
-- **That WP2 exists because it was "next".** Nothing of WP2 has been built. Older NEXT / "next planned work" statements in epic forward notes or in the historical buckets below are superseded by this section.
-- **That EPIC-016 census counts are still accurate.** Colour references and file counts may have drifted. Re-measure them at the start of each package.
+- **That an epic exists for the next vehicle.** The Helpdesk MVP has no epic number until it is planned. Older NEXT / "next planned work" statements in epic forward notes or in the historical buckets below are superseded by this section.
+- **That the Blade theme state still holds.** `BladeThemeGuardTest` enforces EPIC-016's final census on every `./dev check`, so drift in the target Blade workspaces fails the gate; re-measure anything outside its scope (CMS, React).
 
 <a id="verification-commands"></a>
 **Restart commands (run from the repository root)**
@@ -196,7 +196,7 @@ Recorded 2026-10-06 as current owner direction.
 | **Done** | Lightweight CI baseline | PR #2; [`docs/testing/ci.md`](../testing/ci.md) |
 | **Done** | Tasks overhaul | EPIC-014 (optional WP6 enhancements deferred) |
 | **Done** | Projects UX expansion | EPIC-015 |
-| **In Progress** | Blade theme and control adoption | EPIC-016: WP0, WP1 merged; WP2–WP4 not started |
+| **Done** | Blade theme and control adoption | EPIC-016 (Done 2026-10-07): WP0–WP4 merged, permanent Blade theme guard |
 | **Planned / Discovery** | Document generation and PDF architecture | EPIC-012: no renderer chosen; DOMPDF is installed but unused |
 | **Roadmap item, no epic yet** | Helpdesk MVP, Directory, Finance, Advanced Projects, customer product / customer shell, release engineering, Release 1 hardening, Timer UX improvement, Knowledge/CMS evolution, platform capabilities | This section. No epic numbers are assigned until each is planned. |
 
@@ -206,7 +206,7 @@ Every known item has exactly one class: **A** Required · **B** Conditional (dep
 
 | Item | Class | Why |
 |---|---|---|
-| EPIC-016 completion (WP2–WP4) | **A** | In-flight foundation. It gives every Blade surface that survives into Release 1 (System, CMS-adjacent, and any module page not yet re-rendered) accessible controls, semantic status and theme parity, plus the permanent guard. Locked four-PR plan (O4). |
+| EPIC-016 (Done 2026-10-07) | **A** | Completed foundation. It gives every Blade surface that survives into Release 1 (System, CMS-adjacent, and any module page not yet re-rendered) accessible controls, semantic status and theme parity, plus the permanent guard. Delivered as the locked four-PR plan (O4). |
 | Helpdesk MVP core: operator queue and ticket workspace on the new shell, React renderer migration, customer request/reply flow, attachments by visibility, ticket time, reporting at least at today's CSV parity | **A** | Customer-facing, the most-used support surface, already hardened. See [Helpdesk](#helpdesk-release-1). |
 | Helpdesk Incident baseline | **B** | Include only if Helpdesk MVP planning shows day-one operational need. Default: Post-v1. |
 | Helpdesk Knowledge baseline | **C** | Knowledge/CMS is Post-v1 (owner ruling 1). |
@@ -253,7 +253,7 @@ Every known item has exactly one class: **A** Required · **B** Conditional (dep
 
 | Item | Depends on | Notes |
 |---|---|---|
-| EPIC-016 WP2–4 | **H** WP1 (done) | Nothing else blocks it. |
+| EPIC-016 | **H** WP1 (done) | **Done** (2026-10-07). |
 | Helpdesk MVP | **H** EPIC-010D (done), shell and design system (done) · **S** EPIC-016 Done · its customer surfaces are built on the customer shell, its first package (D1) | **Not** dependent on Directory: EPIC-010D D1 locked owner-only customer visibility, so `tickets.company_id` is provenance only. No dependency on a notification or search platform (existing email notifications and queue search are kept). |
 | Customer shell foundation | **H** shell foundation (done); routing-topology decision (Direction D §20 Q1, default: same routes with capability-aware pages) · first package of Helpdesk MVP (D1) | The multi-org switcher is driven by Directory and customer-identity requirements, not by the shell. |
 | Directory | **H** shell and design system · **S** after Helpdesk MVP (the customer shell exists) · **P** Directory data-model ADR during Helpdesk | **H** prerequisite of Finance's Billing Account. Under D3 (clean install plus seed), it may reseed rather than transform. Its migrations must still be reversible in development. |
@@ -281,8 +281,8 @@ Questions answered:
 Phases are numbered (not lettered) so they are not confused with EPIC-011's lettered phases. Only EPIC-016 and EPIC-012 have epic numbers. Every other vehicle gets its number when it is planned.
 
 **In short:**
-1. Finish EPIC-016.
-2. Evaluate `@shadcn/lint`.
+1. EPIC-016 — **Done** (2026-10-07).
+2. Evaluate `@shadcn/lint` (**next**).
 3. Helpdesk MVP, starting with the customer shell.
 4. Directory.
 5. Finance, with the invoice PDF capability.
@@ -296,7 +296,7 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 
 | Phase | Purpose | Depends on | Likely epic / package | Gate unlocked |
 |---|---|---|---|---|
-| **1. Complete the current foundation** | Finish EPIC-016 WP2 → WP3 → WP4. Then a time-boxed `@shadcn/lint` evaluation (an adopt-or-decline decision, recorded). It is React/Tailwind tooling, complements EPIC-016's Blade guard, and is not part of EPIC-016. | – | EPIC-016; small tooling follow-up | Every Blade target themed and guarded; React lint posture decided before Helpdesk's substantial React work |
+| **1. Complete the current foundation** | **EPIC-016 is Done (2026-10-07).** What remains is a time-boxed `@shadcn/lint` evaluation (an adopt-or-decline decision, recorded), to run before substantial Helpdesk React work. It is React/Tailwind tooling, complements EPIC-016's Blade guard, is not part of EPIC-016, and is not yet installed. | – | EPIC-016 (Done); small tooling follow-up | Every Blade target themed and guarded (met); React lint posture decided before Helpdesk's substantial React work |
 | **2. First customer-facing module** | Helpdesk MVP, beginning with the customer shell foundation (D1). In parallel: **RE-0** host discovery and deployment ADR, the **EPIC-012** discovery spike on the same host evidence, and the **Directory data-model ADR** (docs only). | Phase 1 (soft) | Helpdesk MVP epic (renderer migration = EPIC-011 Phase F) | Customer shell exists; host facts known; Directory model decided |
 | **3. Data and customer foundation** | Directory core and its schema consolidation, while data is still disposable. In parallel: **RE-1** CLI and version foundation, **RE-2** build/package/versioning, **EPIC-012 ADR** and invoice PDF implementation. | Phase 2 ADRs | Directory epic (EPIC-011 Phase H); RE foundation epic; EPIC-012 implementation | Organization and Person model final; release artifacts reproducible; PDF renderer chosen |
 | **4. Finance** | Billing Account, invoices, Stripe, customer invoices, issued PDFs, audit minimum. In parallel: **RE-3** deployment and **RE-4** safety/recovery, and a **first staging deployment** from the release tooling. | Phase 3 | Finance epic (EPIC-011 Phase G); RE deployment epic | Customers can be invoiced and pay; the application deploys and rolls back on the real host stack |
@@ -585,7 +585,7 @@ This scopes the historical [FINAL HARDENING](#final-hardening) to Release 1. It 
 - Advanced Projects ∥ RE-5 and continuous staging deploys.
 
 **Not in parallel:**
-- EPIC-016 WP2–4 with Helpdesk MVP: both rewrite Helpdesk views, and WP4 retires aliases application-wide.
+- EPIC-016 with Helpdesk MVP: both rewrote or would rewrite Helpdesk views. EPIC-016 is Done, so the conflict no longer applies; the permanent guard now protects the themed Helpdesk views the MVP builds on.
 - Directory with Finance's Billing Account: it needs the final Organization model.
 - Two module epics touching the shared `Status` vocabulary or the customer shell at once.
 
@@ -623,7 +623,7 @@ No other owner decision currently blocks the Release 1 plan.
 | Bucket | Items | Class |
 |--------|-------|-------|
 | **NOW** | Critical Helpdesk hardening · Product/UX rebase (this) · Claude Design brief and exploration | Security/integrity · Direction · UX foundation |
-| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) · Blade workspace theme and control adoption (EPIC-016, In Progress) | UX foundation · Platform capability · Hardening |
+| **NEXT** | New application shell · Design system · Lightweight CI baseline (Done) · Blade workspace theme and control adoption (EPIC-016, Done 2026-10-07) | UX foundation · Platform capability · Hardening |
 | **NEXT** | Tasks overhaul · Timer UX improvement · Projects UX expansion | Product functionality |
 | **LATER** | Helpdesk MVP · Directory · Finance · Advanced Projects · Knowledge/CMS evolution | Product functionality (+ first platform-capability consumers) |
 | **FUTURE** | Reusable approvals, notifications, global search, integrations, external API, observability, audit/history, automation · Deployment/release engineering (trigger-based) | Platform capability |
@@ -702,7 +702,7 @@ Semantic tokens; typography; spacing; surfaces and elevation; tables (compact an
 
 **Class:** Hardening / design-system adoption.
 
-**Vehicle:** [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (**Planned** 2026-10-05; **In Progress** 2026-10-06, WP1 merged).
+**Vehicle:** [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (**Planned** 2026-10-05; **In Progress** 2026-10-06, WP1 merged; **Verified** and **Done** 2026-10-07, WP4 merged).
 
 The Blade page bodies of Helpdesk, Directory, Finance and System style themselves inline: the legacy indigo `--accent` on actions, legacy gray variables for text, borders and surfaces, and hex status pills. They use no Direction D semantic utilities, 44 of their field sites have no visible keyboard focus, and their statuses ignore the theme.
 
@@ -720,7 +720,9 @@ It does **not** migrate renderers, change routes or redesign the modules: that s
 
 **Depends on:** shell and design system (EPIC-013, Done); uses Projects/Tasks (EPIC-014, EPIC-015) as the visual reference.
 
-> **Forward note (2026-10-06).** The System Delete Role form hotfix carried out of the WP1 review (EPIC-016 A1.19) merged as PR #24 (`88e15d7`), with `main` CI green. **WP2 is the next unstarted package; WP3 and WP4 follow.** EPIC-016 is Phase 1 of the [Release 1 sequence](#release-1-sequence). Development may pause here by owner choice; no blocker is implied.
+> **Forward note (2026-10-06, historical).** The System Delete Role form hotfix carried out of the WP1 review (EPIC-016 A1.19) merged as PR #24 (`88e15d7`), with `main` CI green. **WP2 is the next unstarted package; WP3 and WP4 follow.** EPIC-016 is Phase 1 of the [Release 1 sequence](#release-1-sequence). Development may pause here by owner choice; no blocker is implied.
+>
+> **Forward note (2026-10-07).** EPIC-016 is **Done**: WP2 (PR #25), WP3 (PR #26) and WP4 (PR #27, merge `af36b03`) merged with `main` CI green. The statement above that WP2 is next is historical. The Blade workspaces are theme-first, retired aliases are gone and pinned absent, and a permanent two-level guard (`BladeThemeGuardTest`) is active. The next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP and its customer shell.
 
 ### Lightweight CI baseline
 
@@ -770,7 +772,7 @@ These are the first product slices on the new shell. They exercise the design sy
 
 > **Forward note (2026-10-05).** EPIC-015 is **Done** (2026-10-05; Planned 2026-10-02, In Progress 2026-10-04, Verified 2026-10-05): WP1–WP6 are merged (the optional WP5 Board Complete/Reopen, per-surface drawer defaults and Project Time tab included), all 16 §19 criteria are satisfied, and WP6 merged as PR #22 (merge commit `76be9cd`) with green PR CI and green `main` CI. The customer-product gap (EPIC-015 §22) and a post-EPIC global design-token / UI consistency audit (Helpdesk, Directory, Finance, System; EPIC-015 A6.16) are still unplaced and not started.
 >
-> **Forward note (2026-10-05, later).** The consistency audit has run (on `d87b5b1`) and is placed: its remediation is [Blade workspace theme and control adoption](#blade-workspace-theme-and-control-adoption), vehicle [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned). The customer-product gap remains unplaced.
+> **Forward note (2026-10-05, later).** The consistency audit has run (on `d87b5b1`) and is placed: its remediation is [Blade workspace theme and control adoption](#blade-workspace-theme-and-control-adoption), vehicle [EPIC-016](../epics/EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned at the time; **Done** 2026-10-07). The customer-product gap remains unplaced.
 >
 > **Forward note (2026-10-06).** This forward note's "remains unplaced" is **superseded**: the customer-product gap is resolved by owner ruling D1. Release 1 includes the dedicated customer shell, Helpdesk MVP owns its first implementation, and later customer-facing modules adopt it. See [Customer product and customer shell](#customer-product-and-customer-shell).
 

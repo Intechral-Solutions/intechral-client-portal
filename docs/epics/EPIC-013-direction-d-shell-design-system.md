@@ -1519,7 +1519,7 @@ Two notes this epic hands forward: the Playwright suite grows by roughly twelve 
 >
 > **Forward note (2026-10-05).** EPIC-015 has delivered that row (WP1–WP5 merged; its WP6 closeout merged as PR #22, `76be9cd`; EPIC-015 is Done): `StagePath` is a shared primitive, derived project health and Monitoring V1 are on the Project Overview, and the project Tasks list is live. The `ProjectIntegrityTest` half of A13.13 was fixed in EPIC-015 WP1; `BrowserAuthContractTest:84` is still with its existing owner. EPIC-015 also delivered Direction D §5.3's per-surface drawer defaults (forward note in the design system). `CustomerShell`, `TopNav` and customer routing remain customer product work.
 >
-> **Forward note (2026-10-05, EPIC-016).** For the Helpdesk, Directory, Finance and System Blade page bodies and `errors/403`, the following are now owned by [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned):
+> **Forward note (2026-10-05, EPIC-016).** For the Helpdesk, Directory, Finance and System Blade page bodies and `errors/403`, the following are now owned by [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned at the time; **Done** 2026-10-07):
 > - the "Legacy Blade page-body contrast (A13.4)" row above;
 > - the theme normalization of those page bodies (every application colour becomes a semantic Tailwind utility or a documented exception);
 > - the dead `hover:legacy-bg-surface` sites;
@@ -5245,7 +5245,7 @@ None is new, none changed during this epic, and each belongs to its module's pro
 | White on legacy `--accent` fill (Blade primary buttons) and `--accent` link text in dark | — / 4.47, 4.08–4.16, 3.28 | screens 5, 6, 7, 8, 9 |
 | Legacy Blade field boundaries (`--border-base`) — below 3:1, visible | 1.35–1.47 / 1.42–1.95 | screens 5, 6, 8 |
 
-> **Forward note (2026-10-05).** Every debt in the two tables above, within the Helpdesk, Directory, Finance and System page bodies, now has one destination: [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned). EPIC-016 does not wait for each module's product epic, and it does not migrate renderers. Its §20 #10 requires these pairs to be re-measured and pass in both themes, and its theme normalization replaces the legacy page-body colours themselves. The `cms/*` instances stay with Knowledge/CMS evolution. The record above is unchanged.
+> **Forward note (2026-10-05).** Every debt in the two tables above, within the Helpdesk, Directory, Finance and System page bodies, now has one destination: [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned at the time; **Done** 2026-10-07). EPIC-016 does not wait for each module's product epic, and it does not migrate renderers. Its §20 #10 requires these pairs to be re-measured and pass in both themes, and its theme normalization replaces the legacy page-body colours themselves. The `cms/*` instances stay with Knowledge/CMS evolution. The record above is unchanged.
 
 ### A13.5 Responsive pass
 

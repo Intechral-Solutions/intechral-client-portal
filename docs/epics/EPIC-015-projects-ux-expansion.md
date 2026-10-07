@@ -1903,7 +1903,7 @@ No finding is blocking.
 
 Out of EPIC-015 scope and **not started**: controls under **Helpdesk, Directory, Finance and System** still use blue or legacy Tailwind styling instead of Direction D's green/teal semantic control language. A dedicated audit should cover direct Tailwind palette use where semantic tokens belong; legacy control classes; shared-primitive adoption; forms, buttons, badges and focus rings; light/dark parity; and which colour differences are intentional semantics versus accidents. It needs its own roadmap placement and contract. **Projects-owned surfaces were checked in the WP6 visual closeout and carry no legacy blue control** (WP4 already normalized the two it found).
 
-> **Forward note (2026-10-05).** The audit has run, read-only on `d87b5b1`, and its destination is [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned).
+> **Forward note (2026-10-05).** The audit has run, read-only on `d87b5b1`, and its destination is [EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces](./EPIC-016-direction-d-blade-theme-control-adoption.md) (Planned at the time; **Done** 2026-10-07).
 > - The "blue" is the legacy indigo `--accent` (`#4F46E5` / `#6366F1`), hand-written into Blade page bodies that have no shared control layer and use no Direction D semantic utilities.
 > - The audit also found 44 Blade field sites with no visible keyboard focus.
 > - EPIC-016 adds the shared Blade controls and normalizes those workspaces' colours to the semantic Tailwind theme, in four PRs.

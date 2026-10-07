@@ -1,13 +1,15 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** Verified (2026-10-07; hosted CI green on the WP4 PR head `1cdcb68`, [Amendment 4 A4.18](#a418-hosted-verification)). Not yet Done: that follows the merge of [PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27) and a green `main` CI. Earlier history: In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is merged ([PR #26](https://github.com/Intechral-Solutions/intechral-client-portal/pull/26), merge `8db03b7`, main CI green) ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is implemented, independently reviewed (NEEDS SMALL REMEDIATION, documentation only, applied; [A4.17](#a417-independent-review)) and in the final PR ([PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27)), whose hosted CI is green (A4.18) ([Amendment 4](#amendment-4-wp4-alias-retirement-guard-and-final-hardening-pr-4)). The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
+**Status:** **Done** (2026-10-07). Lifecycle: Planned (2026-10-05) → In Progress (2026-10-06, WP1 merged) → Verified (2026-10-07, hosted CI green on the WP4 PR) → **Done** (2026-10-07, [PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27) merged as `af36b03`, merge-triggered `main` CI green; [Amendment 4 A4.19](#a419-closeout-done)). WP0 (this document, the design gate) is complete; WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), `6dfc115`), the Delete Role hotfix ([PR #24](https://github.com/Intechral-Solutions/intechral-client-portal/pull/24), `88e15d7`, [A1.19](#a119-carried-finding-the-delete-role-form-hotfix)), WP2 ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), `9555430`), WP3 ([PR #26](https://github.com/Intechral-Solutions/intechral-client-portal/pull/26), `8db03b7`) and WP4 (PR #27, `af36b03`) are merged and verified. All 21 exit criteria (§20) are satisfied, `/organizations/{id}` browser coverage being the one owner-approved exception to criterion #12 (A4.14 #2); no blocking finding remains. Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1), [Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2), [Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3) and [Amendment 4](#amendment-4-wp4-alias-retirement-guard-and-final-hardening-pr-4).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
 **Inherits:** EPIC-013 [A13.4](./EPIC-013-direction-d-shell-design-system.md#a134-contrast-debt-disposition) (legacy Blade page-body contrast debt) and the matching [§31](./EPIC-013-direction-d-shell-design-system.md#31-deferred-follow-on-work) row · EPIC-015 [A6.16](./EPIC-015-projects-ux-expansion.md#a616-post-epic-follow-up-global-design-token--ui-consistency-audit-recorded-only) (post-EPIC design-token / UI consistency audit)
 **Planning baseline:** `main` @ `d87b5b1` (`docs: close EPIC-015`), equal to `origin/main`, working tree clean, verified 2026-10-05. The read-only consistency audit that precedes this document was run on the same commit.
 
-> **Forward note (2026-10-06, Release 1 re-orientation).** The Delete Role hotfix (A1.19) merged as PR #24 (`88e15d7`), with `main` CI green.
+> **Forward note (2026-10-07, closeout).** EPIC-016 is **Done**. The 2026-10-06 note below (WP2 next, development may pause) is historical. The next step is the `@shadcn/lint` evaluation (§22.1; React/Tailwind tooling, not part of this epic, not installed), then the Helpdesk MVP with its customer shell as the first package; see the roadmap's [Release 1 sequence](../product/product-roadmap.md#release-1-sequence).
+>
+> **Forward note (2026-10-06, Release 1 re-orientation, historical).** The Delete Role hotfix (A1.19) merged as PR #24 (`88e15d7`), with `main` CI green.
 > - **Next unstarted package: WP2** (Status and Semantic State). Then WP3 and WP4. No WP2–WP4 work exists on any branch.
 > - EPIC-016 is Phase 1 of the [Release 1 sequence](../product/product-roadmap.md#release-1-sequence). The §22.1 `@shadcn/lint` evaluation is placed right after it, before the Helpdesk MVP's React work.
 > - Development may pause here by owner choice. No product or technical blocker is implied, and EPIC-016 stays **In Progress**.
@@ -1742,7 +1744,7 @@ WP3 proves usages are gone; it deletes nothing. WP4 owns: alias deletion and the
 
 ## Amendment 4: WP4 Alias Retirement, Guard and Final Hardening (PR 4)
 
-> **Status (2026-10-07): WP4 implemented on `feature/epic-016-blade-theme-control-adoption`, independently reviewed (A4.17) and submitted as the final EPIC-016 PR #27; hosted PR CI is green on `1cdcb68` (A4.18).** EPIC-016 is **Verified**, not yet Done. EPIC-016 stays **In Progress**: not Verified (that needs the WP4 PR's hosted CI) and not Done (that needs the merge and a green `main` CI). WP4 is architecture cleanup and hardening. No route, controller, policy, query, status value, copy, script behaviour, React file or Direction D token value changed, and no dependency or workflow was added. No target Blade view changed.
+> **Status (2026-10-07): WP4 implemented, independently reviewed (A4.17), hosted-verified (A4.18) and merged as PR #27 (`af36b03`) with `main` CI green. EPIC-016 is Done (A4.19).** The text of A4.1 to A4.18 below is the dated record as it stood at each step (for example "uncommitted" and "pending" describe the time of writing). WP4 is architecture cleanup and hardening. No route, controller, policy, query, status value, copy, script behaviour, React file or Direction D token value changed, and no dependency or workflow was added. No target Blade view changed.
 
 ### A4.1 Starting point
 
@@ -1940,7 +1942,7 @@ Every item carried by Amendments 1 to 3 and §22 ends with one disposition.
 
 Independent closeout ruling (A4.17): criteria 1–19 **satisfied**; criterion 20: the local `./dev check` half satisfied, the complete `./dev test:e2e` / hosted full browser gate and criterion 21 were pending at that ruling and are closed by A4.18.
 
-All 21 criteria are satisfied: EPIC-016 is **Verified** (A4.18) and **not Done** until PR #27 merges with a green `main` CI.
+All 21 criteria are satisfied: EPIC-016 was **Verified** (A4.18) and is **Done** since PR #27 merged with a green `main` CI (A4.19).
 
 ### A4.16 Files changed
 
@@ -1965,5 +1967,41 @@ All 21 criteria are satisfied: EPIC-016 is **Verified** (A4.18) and **not Done**
 - **`./dev check gates`: success, 6m31s.** Pest and Vitest totals are not printed in the hosted log, so none is claimed here.
 - **Playwright browser suite: success.** `./dev test:e2e`: **166 passed, 0 failed, 3 workers**, 7.3 min of a 10m59s job. Product data on the CI database: projects 0 / tasks 0 / time entries 0 before and after.
 - **Criterion #20** (`./dev check` and the complete browser suite) and **criterion #21** (hosted PR CI) are met. All 21 §20 criteria are satisfied (criterion #12 under the owner-approved exception, A4.14 #2).
-- **Lifecycle:** EPIC-016 is **Verified**. It is **not Done**: that needs PR #27 merged and a green merge-triggered `main` CI. The roadmap and `docs/epics/README.md` ("WP2 is next", the In Progress row) are updated by the separate closing docs commit after that.
+- **Lifecycle at that point:** EPIC-016 was **Verified**. It was **not yet Done**: that needs PR #27 merged and a green merge-triggered `main` CI. The roadmap and `docs/epics/README.md` ("WP2 is next", the In Progress row) are updated by the separate closing docs commit after that.
 - This section is itself a docs-only commit, so the PR head moves from `1cdcb68`; CI is re-checked on the final head before the PR is called merge-ready.
+
+### A4.19 Closeout (Done)
+
+- **Merge:** [PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27) merged on 2026-10-07 as `af36b03a0abaa6e6118d2b906a6683bca9b3d834` (first parent `8db03b7`, second parent `1adba50`). `main`, `origin/main` and the merge commit were identical before this closeout; no EPIC-016 PR remains open.
+- **Reviewed head contained:** the final Verified-doc head `1adba50d37e5fe8c185522bd426ce477699197dd` is an ancestor of `main`, and the merge commit's tree is identical to the tree of `1adba50` (`14ba23b`), so exactly the reviewed content merged. The WP4 code commit was `1cdcb68`.
+- **Hosted PR CI history (nothing hidden).**
+  - `1cdcb68` (the WP4 code head): both jobs green; `./dev check` gates 6m31s; Playwright 166 / 166, 3 workers (A4.18).
+  - `1adba50` (a docs-only commit that changed one markdown file): the first run's `./dev check` gates passed, but the first Playwright run failed, **165 passed, 1 failed**, on the existing Finance semantic-state test "a draft invoice is Draft" (`blade-theme-controls.spec.ts:1298`; at dark / 390 the invoice-list row for the created invoice was not found within the 5 s timeout).
+  - The first Playwright run on the final Verified-doc head failed on the existing Finance fixture/timing case. No files changed. A single rerun of the failed hosted job on the exact same head passed (166 / 166, 3 workers, 9.4 min; product counts 0 / 0 / 0 before and after). The failure was therefore non-reproduced and no product/test change was made. The root cause was not investigated and is not claimed: it is carried as an intermittent Finance fixture/timing observation for **Release 1 hardening** (the browser-suite timing item in A4.13).
+- **Merge-triggered `main` CI** (run 37651408249, on `af36b03`): **green**. `./dev check` gates success (about 9 min); Playwright **166 passed, 0 failed, 3 workers**, 10.5 min; product counts 0 / 0 / 0 before and after.
+- **Exit criteria:** all 21 are satisfied through merge: criteria 1 to 19 by the evidence in A4.15 and the independent review (A4.17), criterion 20 by the local `./dev check` (A4.12) and the hosted complete browser suite (A4.18, and again on `main`), criterion 21 by hosted PR CI (A4.18 and the passing rerun above). Criterion 12 keeps its owner-approved coverage exception exactly as settled (A4.14 #2): `/organizations/{id}` is not browser-covered, and no route was added for test cleanup. No blocking finding remains.
+- **Lifecycle:** Planned (2026-10-05) → In Progress (2026-10-06) → Verified (2026-10-07) → **Done (2026-10-07)**.
+
+**Final packages**
+
+| Package | State | Merge |
+|---|---|---|
+| WP0 design gate | complete | `d07384d` |
+| WP1 Controls and Accessibility | merged / verified | PR #23, `6dfc115` |
+| Delete Role hotfix (A1.19; not an EPIC-016 package) | merged / verified | PR #24, `88e15d7` |
+| WP2 Status and Semantic State | merged / verified | PR #25, `9555430` |
+| WP3 Blade Theme Normalization | merged / verified | PR #26, `8db03b7` |
+| WP4 Alias Retirement, Guard and Final Hardening | merged / verified | PR #27, `af36b03` |
+
+**What EPIC-016 leaves in the repository**
+
+- Shared Blade controls (WP1) and semantic state primitives with their domain mappings (WP2).
+- The Helpdesk, Directory, Finance and System Blade workspaces and `errors/403` normalized to the semantic Direction D theme (WP3), including the 8px card radius.
+- The retired compatibility aliases are gone and pinned absent (WP4); the one legacy utility with live consumers, `legacy-text-primary`, stays until its React slice.
+- A permanent two-level Blade theme guard, `BladeThemeGuardTest`, with an exact 59-path inventory, runs on every `./dev check`. It is a source scan with a documented human-review residual (B7), not a Tailwind parser.
+- The canonical Direction D token values are pinned independently of `app.css` (`DirectionDThemeValuesTest`).
+- The vendor pagination `@source` is retired; every paginator renders the Direction D views.
+- The browser theme helper (`tests/Browser/support/theme.ts`) gives deterministic theme and transition preconditions.
+- The Projects / Tasks React reference surfaces are unchanged (no `resources/js` diff in WP4).
+
+**Deliberately deferred, with destinations, not reopened here:** Release 1 hardening (browser-suite timing, the timer and Finance fixture flake); EPIC-011 Phase J (System role tiles); the future `DataTable` and page-frame conventions in the module epics; the real P6 / P11 glyphs and the richer confirmation dialog (Helpdesk MVP and the Finance / React slice); known 390px clipping and wrapping; "All Statuss" / "All Prioritys" and "Choose Files" alignment; `cms/*` and React legacy variables; and the `@shadcn/lint` evaluation (§22.1), which is the **next step**: React/Tailwind tooling, complementary to the Blade guard, not part of EPIC-016, not installed. After it, the Helpdesk MVP begins with the dedicated customer shell.
