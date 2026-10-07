@@ -1,6 +1,6 @@
 # EPIC-016: Direction D Theme and Control Adoption for Blade Workspaces
 
-**Status:** In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is merged ([PR #26](https://github.com/Intechral-Solutions/intechral-client-portal/pull/26), merge `8db03b7`, main CI green) ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is implemented, independently reviewed (NEEDS SMALL REMEDIATION, documentation only, applied; [A4.17](#a417-independent-review)) and in the final PR, whose hosted CI is pending ([Amendment 4](#amendment-4-wp4-alias-retirement-guard-and-final-hardening-pr-4)). The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
+**Status:** Verified (2026-10-07; hosted CI green on the WP4 PR head `1cdcb68`, [Amendment 4 A4.18](#a418-hosted-verification)). Not yet Done: that follows the merge of [PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27) and a green `main` CI. Earlier history: In Progress (2026-10-06). WP0 (this document, the design gate) and WP1 ([PR #23](https://github.com/Intechral-Solutions/intechral-client-portal/pull/23), merged as `6dfc115`, main CI green) are done; WP2 is merged ([PR #25](https://github.com/Intechral-Solutions/intechral-client-portal/pull/25), merge `9555430`, main CI green) ([Amendment 2](#amendment-2-wp2-status-and-semantic-state-pr-2)); WP3 is merged ([PR #26](https://github.com/Intechral-Solutions/intechral-client-portal/pull/26), merge `8db03b7`, main CI green) ([Amendment 3](#amendment-3-wp3-blade-theme-normalization-pr-3)); WP4 is implemented, independently reviewed (NEEDS SMALL REMEDIATION, documentation only, applied; [A4.17](#a417-independent-review)) and in the final PR ([PR #27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27)), whose hosted CI is green (A4.18) ([Amendment 4](#amendment-4-wp4-alias-retirement-guard-and-final-hardening-pr-4)). The lifecycle moved from Planned to In Progress when PR 1 merged (§20). Results and review rulings are in [Amendment 1](#amendment-1-wp1-controls-and-accessibility-pr-1); the System Delete Role defect carried out of the WP1 review is closed by the hotfix in [A1.19](#a119-carried-finding-the-delete-role-form-hotfix).
 **Class:** Hardening / design-system adoption (Product Roadmap [NEXT — Product/UX foundation → Blade workspace theme and control adoption](../product/product-roadmap.md#blade-workspace-theme-and-control-adoption))
 **Design contract:** [Direction D — Design System Specification](../design/direction-d-design-system.md), as implemented in `src/resources/css/app.css` (the `--ds-*` layer and its `@theme inline` utilities) and the React primitives in `src/resources/js/components/ui/`
 **Prerequisites:** [EPIC-013: Direction D Application Shell and Design System Foundation](./EPIC-013-direction-d-shell-design-system.md) (Done) · [EPIC-014: Tasks Workspace Overhaul](./EPIC-014-tasks-workspace-overhaul.md) (Done) · [EPIC-015: Projects UX Expansion](./EPIC-015-projects-ux-expansion.md) (Done) · Lightweight CI baseline (Done, [`docs/testing/ci.md`](../testing/ci.md))
@@ -1742,7 +1742,7 @@ WP3 proves usages are gone; it deletes nothing. WP4 owns: alias deletion and the
 
 ## Amendment 4: WP4 Alias Retirement, Guard and Final Hardening (PR 4)
 
-> **Status (2026-10-07): WP4 implemented on `feature/epic-016-blade-theme-control-adoption`, independently reviewed (A4.17) and submitted as the final EPIC-016 PR; hosted PR CI is pending.** EPIC-016 stays **In Progress**: not Verified (that needs the WP4 PR's hosted CI) and not Done (that needs the merge and a green `main` CI). WP4 is architecture cleanup and hardening. No route, controller, policy, query, status value, copy, script behaviour, React file or Direction D token value changed, and no dependency or workflow was added. No target Blade view changed.
+> **Status (2026-10-07): WP4 implemented on `feature/epic-016-blade-theme-control-adoption`, independently reviewed (A4.17) and submitted as the final EPIC-016 PR #27; hosted PR CI is green on `1cdcb68` (A4.18).** EPIC-016 is **Verified**, not yet Done. EPIC-016 stays **In Progress**: not Verified (that needs the WP4 PR's hosted CI) and not Done (that needs the merge and a green `main` CI). WP4 is architecture cleanup and hardening. No route, controller, policy, query, status value, copy, script behaviour, React file or Direction D token value changed, and no dependency or workflow was added. No target Blade view changed.
 
 ### A4.1 Starting point
 
@@ -1935,12 +1935,12 @@ Every item carried by Amendments 1 to 3 and §22 ends with one disposition.
 | 17 | light and dark browser validation across the four areas and `errors/403` | **Met** | `blade-theme-controls.spec.ts` (65 / 65 above) | none |
 | 18 | 390 and desktop validation, no document overflow | **Met** | the palette spec's overflow check on every route | none |
 | 19 | Projects and Tasks visually unchanged | **Met** | no `resources/js` diff; 12 / 12 fingerprints; the Projects, Tasks and Time specs | none |
-| 20 | `./dev check` and `./dev test:e2e` green on the final package | **`./dev check`: met (A4.12). The complete `./dev test:e2e`: pending** | focused set 65 / 65 locally | the full browser suite runs in hosted CI |
-| 21 | hosted PR CI green | **Pending** | none yet; no hosted run has happened for WP4 | the WP4 PR |
+| 20 | `./dev check` and `./dev test:e2e` green on the final package | **Met.** `./dev check` (A4.12); the complete browser suite in hosted CI: 166 / 166 (A4.18) | focused set 65 / 65 locally; hosted Playwright job green | none |
+| 21 | hosted PR CI green | **Met** | PR #27, both hosted jobs green on `1cdcb68` (A4.18) | none |
 
-Independent closeout ruling (A4.17): criteria 1–19 **satisfied**; criterion 20: the local `./dev check` half satisfied, the complete `./dev test:e2e` / hosted full browser gate **pending**; criterion 21 **pending** the hosted WP4 PR CI.
+Independent closeout ruling (A4.17): criteria 1–19 **satisfied**; criterion 20: the local `./dev check` half satisfied, the complete `./dev test:e2e` / hosted full browser gate and criterion 21 were pending at that ruling and are closed by A4.18.
 
-EPIC-016 is therefore **not Verified** until criteria 20 and 21 close on the WP4 PR, and **not Done** until that PR merges with a green `main` CI.
+All 21 criteria are satisfied: EPIC-016 is **Verified** (A4.18) and **not Done** until PR #27 merges with a green `main` CI.
 
 ### A4.16 Files changed
 
@@ -1957,4 +1957,13 @@ EPIC-016 is therefore **not Verified** until criteria 20 and 21 close on the WP4
 - **Independent Pest:** 505 passed / 2,657 assertions, 25.50 s. Guard alone 132 / 296. Guard with `PaginationViewTest` 147 / 451.
 - **Independent Playwright** (`blade-theme-controls`, `role-delete-form`, `time-migration`, `projects-migration`, `tasks-migration`): 54 scheduled, 54 passed, 0 failed, 0 skipped, 3 workers, 5.0 min; product counts 2 / 1 / 2 before and after.
 - **Required remediation (this commit, documentation only):** O1 and O2 recorded as owner rulings, the §20 #12 coverage exception stated, the timer-timing destination named (Release 1 hardening), the role-tiles destination named (EPIC-011 Phase J), and the `theme()` wording in A4.6 corrected.
-- **Reviewer ruling after the documentation remediation:** WP4 SAFE TO COMMIT — the final EPIC-016 PR may open. No hosted WP4 PR CI has run; EPIC-016 stays **In Progress**.
+- **Reviewer ruling after the documentation remediation:** WP4 SAFE TO COMMIT — the final EPIC-016 PR may open. At that ruling no hosted WP4 PR CI had run; EPIC-016 was still **In Progress** (see A4.18).
+
+### A4.18 Hosted verification
+
+- **PR:** [#27](https://github.com/Intechral-Solutions/intechral-client-portal/pull/27), `main` <- `feature/epic-016-blade-theme-control-adoption`. **Head tested:** `1cdcb68f972257bc3f5b4df12fd64354c9711741` (`chore: harden Direction D Blade theming`), run 37625720993.
+- **`./dev check gates`: success, 6m31s.** Pest and Vitest totals are not printed in the hosted log, so none is claimed here.
+- **Playwright browser suite: success.** `./dev test:e2e`: **166 passed, 0 failed, 3 workers**, 7.3 min of a 10m59s job. Product data on the CI database: projects 0 / tasks 0 / time entries 0 before and after.
+- **Criterion #20** (`./dev check` and the complete browser suite) and **criterion #21** (hosted PR CI) are met. All 21 §20 criteria are satisfied (criterion #12 under the owner-approved exception, A4.14 #2).
+- **Lifecycle:** EPIC-016 is **Verified**. It is **not Done**: that needs PR #27 merged and a green merge-triggered `main` CI. The roadmap and `docs/epics/README.md` ("WP2 is next", the In Progress row) are updated by the separate closing docs commit after that.
+- This section is itself a docs-only commit, so the PR head moves from `1cdcb68`; CI is re-checked on the final head before the PR is called merge-ready.
