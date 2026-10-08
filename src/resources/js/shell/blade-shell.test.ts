@@ -234,6 +234,114 @@ describe('account menu', () => {
     });
 });
 
+// EPIC-017 WP1: the Focused customer frame has no panel, but its account menu and menu sheet are the
+// same hooks, so the same script must drive them. jsdom has no <dialog> modal behaviour, so the two
+// methods it lacks are stubbed; real focus containment and Escape are covered in Chromium
+// (`tests/Browser/customer-shell.spec.ts`).
+describe('the Focused customer frame', () => {
+    function mountFocused() {
+        document.body.innerHTML = `
+            <div data-shell="focused" data-shell-renderer="blade">
+                <header data-shell-topbar>
+                    <nav aria-label="Main" data-shell-topnav><a href="/dashboard" aria-current="page">Home</a></nav>
+                    <div data-shell-topbar-end>
+                        <button type="button" data-shell-sheet-trigger aria-expanded="false" aria-controls="shell-sheet" aria-label="Open navigation"></button>
+                        <dialog id="shell-sheet" data-shell-sheet="focused">
+                            <button type="button" data-shell-sheet-close aria-label="Close navigation"></button>
+                            <nav aria-label="Main"><a href="/dashboard">Home</a></nav>
+                        </dialog>
+                        <div data-shell-account-root>
+                            <button type="button" data-shell-account aria-expanded="false">Account menu: Ada</button>
+                            <div role="menu" data-shell-account-menu hidden>
+                                <a role="menuitem" tabindex="-1" href="/profile">Profile</a>
+                                <div role="group" aria-label="Appearance">
+                                    <button type="button" role="menuitemradio" tabindex="-1" aria-checked="false" data-shell-appearance="light">light</button>
+                                    <button type="button" role="menuitemradio" tabindex="-1" aria-checked="false" data-shell-appearance="dark">dark</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                <div data-shell-column><main id="main-content">Page</main></div>
+            </div>`;
+
+        const dialog = document.querySelector<HTMLDialogElement>('dialog')!;
+        dialog.showModal = vi.fn(() => dialog.setAttribute('open', ''));
+        dialog.close = vi.fn(() => {
+            dialog.removeAttribute('open');
+            dialog.dispatchEvent(new Event('close'));
+        });
+
+        initBladeShell();
+
+        return dialog;
+    }
+
+    it('initialises with no panel to control, and without throwing', () => {
+        expect(() => mountFocused()).not.toThrow();
+        expect(root.dataset.drawer).toBe('collapsed');
+    });
+
+    it('opens and closes the account menu and keeps aria-expanded truthful', () => {
+        mountFocused();
+
+        const trigger = document.querySelector<HTMLElement>('[data-shell-account]')!;
+        const menu = document.querySelector<HTMLElement>('[data-shell-account-menu]')!;
+
+        trigger.click();
+
+        expect(menu.hidden).toBe(false);
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+        menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        expect(menu.hidden).toBe(true);
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect(trigger).toHaveFocus();
+    });
+
+    it('switches the theme from the account menu exactly as the Operational frame does', () => {
+        mountFocused();
+
+        document.querySelector<HTMLElement>('[data-shell-account]')!.click();
+        byText('dark').click();
+
+        expect(root.dataset.theme).toBe('dark');
+        expect(localStorage.getItem('theme')).toBe('dark');
+    });
+
+    it('opens the menu sheet, keeps aria-expanded truthful, and returns focus to the trigger on close', () => {
+        const dialog = mountFocused();
+        const trigger = document.querySelector<HTMLElement>('[data-shell-sheet-trigger]')!;
+
+        trigger.click();
+
+        expect(dialog.showModal).toHaveBeenCalledTimes(1);
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+        document.querySelector<HTMLElement>('[data-shell-sheet-close]')!.click();
+
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect(trigger).toHaveFocus();
+    });
+
+    it('closes the sheet on a backdrop click, which lands on the dialog element itself', () => {
+        const dialog = mountFocused();
+
+        dialog.click();
+
+        expect(dialog.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('draws no timer, so the Blade timer script has nothing to drive', async () => {
+        mountFocused();
+        const { initBladeTimer } = await import('./blade-timer');
+
+        expect(document.querySelector('[data-shell-timer]')).toBeNull();
+        expect(() => initBladeTimer()).not.toThrow();
+    });
+});
+
 it('does nothing on a page without the Blade shell', () => {
     document.body.innerHTML = '<div data-shell="operational"></div>';
 

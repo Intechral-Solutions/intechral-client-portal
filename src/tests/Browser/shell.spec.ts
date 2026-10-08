@@ -548,7 +548,12 @@ test('the rail and drawer are reachable by plain Tab with visible focus', async 
 test.describe('as a member', () => {
     // These two assert what this actor may and may not reach, so the persona IS the test. It must not
     // be collapsed onto the operator to save a login: that would delete the authorization coverage.
-    test.use({ persona: 'member' });
+    //
+    // FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer shell (its coverage is
+    // `customer-shell.spec.ts`), so these two, whose subject is the Operational RAIL, use the
+    // `operationalMember` persona: the same built-in `user` role plus `projects.manage`, which keeps
+    // the Operational shell and the same capability filtering (no System, no Directory).
+    test.use({ persona: 'operationalMember' });
 
     test('capability filtering holds on the shell, and visibility is not authorization', async ({
         page,

@@ -112,6 +112,11 @@ it('leaves every other workspace exactly as before', function (string $route, st
 
 it('gives the hint no authority: a surface never changes the authorized model', function () {
     $customer = makeUser();
+    // FLIPPED IN EPIC-017 WP1: a plain customer is in the Focused shell, which has no drawer hints to
+    // test. `settings.view` is an operator-surface capability that gates no surface and adds no
+    // navigation, so this customer keeps the Operational shell and the same limited navigation, and is
+    // granted nothing a customer could not already do.
+    $customer->givePermissionTo('settings.view');
     $this->project->members()->attach($customer->id, ['role' => 'member']);
 
     foreach ([$this->operator, $customer] as $actor) {
@@ -161,11 +166,36 @@ it('stamps no surface on a Blade page', function () {
 
 it('stamps the surface for a viewer whose navigation differs, without granting anything', function () {
     $customer = makeUser();
+    // FLIPPED IN EPIC-017 WP1: see above — `settings.view` keeps this customer on the Operational shell.
+    $customer->givePermissionTo('settings.view');
     $this->project->members()->attach($customer->id, ['role' => 'member']);
 
     $html = drawerRootTag($this->actingAs($customer)->get(route('projects.tasks.index', $this->project))->assertOk()->getContent());
 
     expect($html)->toContain('data-drawer-surface="projects.tasks"');
     // The customer still cannot reach the create surface the operator's drawer offers.
+    $this->actingAs($customer)->get(route('projects.create'))->assertForbidden();
+});
+
+it('stamps no drawer input and no operational hint for a Focused customer: the presentation has no drawer', function () {
+    // EPIC-017 WP1: a plain member is in the Focused shell, whose navigation carries no contextual
+    // content, so there is no panel default or surface for the pre-paint bootstrap to be given.
+    $customer = makeUser();
+    $this->project->members()->attach($customer->id, ['role' => 'member']);
+
+    $response = $this->actingAs($customer)->get(route('projects.tasks.index', $this->project))->assertOk();
+    $html = drawerRootTag($response->getContent());
+    $navigation = drawerNavigation($response);
+
+    expect($html)->toContain('data-workspace="projects"')
+        ->and($html)->not->toContain('data-drawer-default')
+        ->and($html)->not->toContain('data-drawer-surface');
+
+    foreach ($navigation['workspaces'] as $workspace) {
+        expect($workspace['context'])->toBe([])
+            ->and(array_keys($workspace['presentation']))->toBe(['focused']);
+    }
+
+    // And it still cannot reach what the Operational drawer offers: presentation grants nothing.
     $this->actingAs($customer)->get(route('projects.create'))->assertForbidden();
 });

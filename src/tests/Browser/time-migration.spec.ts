@@ -27,7 +27,13 @@ import {
 // and tray flows therefore live in the describe block at the foot of this file rather than in a
 // spec of their own. No new persona was added for them: a third identity would be one more login
 // against Fortify's per-email limiter for no behavioural gain.
-test.use({ persona: 'member' });
+//
+// FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer shell, which by design draws no
+// global timer pill or tray, so every flow below (whose subject IS the pill and tray) uses the
+// `operationalMember` persona: the built-in `user` role plus `projects.manage`, which keeps the
+// Operational shell. It is now the SINGLE OWNER of the active-timer set described above. A plain
+// customer's `/time` Start -> Stop is `customer-shell.spec.ts`, on its own `customer` persona.
+test.use({ persona: 'operationalMember' });
 
 function section(page: Page, heading: string): Locator {
     return page.getByRole('heading', { name: heading }).locator('..');

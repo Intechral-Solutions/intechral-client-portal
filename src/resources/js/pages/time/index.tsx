@@ -1,10 +1,11 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Clock3, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 
 import { ContextSelector, type SelectedContext } from '@/components/time/context-selector';
 import { TimerContextLink } from '@/components/time/timer-context-link';
+import { TimerControl } from '@/components/time/timer-control';
 import { useTimers } from '@/components/time/timer-provider';
 import { FormFieldError } from '@/components/forms/form-field-error';
 import { PageHeader } from '@/components/page-header';
@@ -27,7 +28,7 @@ import {
     update,
 } from '@/routes/time';
 import type { Paginated } from '@/types/pagination';
-import type { TimeEntryData } from '@/types/time';
+import type { ActiveTimer, TimeEntryData } from '@/types/time';
 
 type ProjectOption = { id: number; name: string };
 
@@ -74,6 +75,69 @@ function formatDuration(totalMinutes: number) {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return hours ? `${hours}h ${minutes ? `${minutes}m` : ''}`.trim() : `${minutes}m`;
+}
+
+/**
+ * What names a running timer on this page: the record it is on, else what the person typed, else a
+ * plain fallback. The same name is the Stop control's accessible label, so it has to be unambiguous.
+ */
+function timerName(timer: ActiveTimer) {
+    return timer.context?.label || timer.description || 'Unassigned timer';
+}
+
+/**
+ * The page-local Stop (EPIC-017 WP1, F1 — preservation required by the shell migration).
+ *
+ * This page can start a timer from any shell, but only the Operational shell draws the global pill and
+ * tray that stop one. A customer in the Focused shell has no global timer chrome by design, so without
+ * this list `/time` would be a start with no stop. It is the existing `TimerControl` in its running
+ * mode over the existing `TimerProvider` state — no new request, permission or timer behaviour — and it
+ * does not look at the presentation: an operator simply gets a second, contextual way to stop the same
+ * timer (Direction D §12.3), kept consistent with the pill because both read one provider.
+ *
+ * It draws nothing until the first read is confirmed (§15.1: never invent a state) and nothing while no
+ * timer runs.
+ */
+function RunningTimers() {
+    const { timers, confirmation } = useTimers();
+    const confirmedIds = useRef<Set<number> | null>(null);
+
+    // When a timer that was in the confirmed set is gone — stopped here, in the tray, or in another
+    // tab — the entry it just became is not in this page's props yet. A timer APPEARING changes no
+    // entry (the entry exists once it stops), so only a disappearance reloads, and only these props.
+    useEffect(() => {
+        if (confirmation !== 'confirmed') {
+            return;
+        }
+
+        const current = new Set(timers.map((timer) => timer.id));
+        const previous = confirmedIds.current;
+        confirmedIds.current = current;
+
+        if (previous && [...previous].some((id) => !current.has(id))) {
+            router.reload({ only: ['entries', 'totalMinutes'] });
+        }
+    }, [timers, confirmation]);
+
+    if (confirmation !== 'confirmed' || timers.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="space-y-2">
+            <h3 className="text-sm font-medium text-text">Running timers</h3>
+            <ul className="divide-y divide-rule border-y border-rule">
+                {timers.map((timer) => (
+                    <li key={timer.id} className="flex items-center justify-between gap-3 py-2">
+                        <span className="min-w-0 truncate text-sm text-text">
+                            {timerName(timer)}
+                        </span>
+                        <TimerControl label={timerName(timer)} payload={{}} running={timer} />
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 }
 
 function TimerStartForm() {
@@ -390,6 +454,7 @@ export function TimePage({ entries, projects, filters, totalMinutes }: PageProps
 
                 <section className="space-y-4 border-b border-border pb-6">
                     <h2 className="text-base font-semibold">Start a timer</h2>
+                    <RunningTimers />
                     <TimerStartForm />
                 </section>
 

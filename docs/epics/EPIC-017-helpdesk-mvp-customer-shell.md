@@ -7,6 +7,7 @@
 - the E2E cleanup command is locked ([§25.3](#253-playwright)).
 
 No implementation has started, and no implementation branch exists.
+**Update (2026-10-08):** WP1 (the customer shell foundation) is implemented on `feature/epic-017-helpdesk-mvp-customer-shell`, uncommitted and awaiting independent review ([Amendment 1](#amendment-1-wp1-customer-shell-foundation-pr-1)). The status stays **Planned** until PR 1 merges; nothing has been pushed and hosted CI has not run. The sentence above describes the design-gate baseline.
 **Class:** Product functionality + UX foundation (Product Roadmap [Release 1 → Helpdesk](../product/product-roadmap.md#helpdesk-release-1) and [Customer product and customer shell](../product/product-roadmap.md#customer-product-and-customer-shell); Release 1 Phase 2)
 **Renderer record:** This is the implementation contract for [EPIC-011 Phase F (Tickets)](./EPIC-011-react-frontend-migration.md#phase-f-tickets). No separate EPIC-011F document is created.
 **Design contract:** [Direction D](../design/direction-d-design-system.md): §7 customer shell, §10.4 ticket statuses, §13 account menu, §14 focus and keyboard, §15 states.
@@ -64,6 +65,7 @@ No implementation has started, and no implementation branch exists.
 36. [Plan-level choices (approved)](#36-plan-level-choices-approved)
 37. [Owner decisions](#37-owner-decisions)
 38. [Restart and handoff notes](#38-restart-and-handoff-notes)
+39. [Amendment 1: WP1 Customer Shell Foundation](#amendment-1-wp1-customer-shell-foundation-pr-1)
 
 ---
 
@@ -1371,3 +1373,251 @@ These design decisions were taken by this gate and **approved by the owner (2026
   - that RE-0 has chosen a host.
 - **The owner rulings are settled:** O1–O3 and P1–P6 are approved (§36, §37). Revisiting one is an explicit owner act, recorded with a date.
 - **Parallel tracks, never blockers:** RE-0 host discovery, EPIC-012 discovery and the Directory data-model ADR may run alongside. Directory implementation follows this epic. No other epic may touch the customer shell or the shared `Status` vocabulary while EPIC-017 is in progress (roadmap [Parallelism](../product/product-roadmap.md#parallelism)).
+
+---
+
+## Amendment 1: WP1 Customer Shell Foundation (PR 1)
+
+> **Status (2026-10-08): WP1 implemented on `feature/epic-017-helpdesk-mvp-customer-shell`; uncommitted and unpushed at the time of writing, awaiting independent review.** EPIC-017 stays **Planned** until PR 1 merges ([§32](#32-branch-and-pr-strategy)); it is **not** marked merged or verified, and **hosted CI has not run**. WP2 is not started. The historical design-gate text above is unchanged. No owner ruling (O1–O3) or plan choice (P1–P6) was reopened, and this amendment raises **no new owner decision**.
+
+### A1.1 Starting point and method
+
+- **Starting SHA:** `865896066c28bd031c069dee9fee34368290bbb7` (`8658960`, `docs: update EPIC-017 post tooling merge`), equal to `main` and `origin/main`; branch `feature/epic-017-helpdesk-mvp-customer-shell`; working tree clean; no open PR; no remote EPIC-017 branch. `main` CI run 37747293979 for that SHA was green (`./dev check gates` and the Playwright suite). `./dev doctor` reported no failure (three pre-existing ownership warnings), and the entry `./dev check` on the untouched tree was green (Vitest 99 files / 1,687 tests; Pest 2,453 tests / 13,589 assertions).
+- **Lint baseline at the start:** `src/eslint-suppressions.json` = **15 files / 31 suppressions** (`no-arbitrary-values` 17, `no-restyle` 10, `require-static-classes` 4), SHA-256 `5bf90c806b213966df0df1c2a5f2dcbfb587718a458802a0fb3175714dfbe688`. **At the end the file is byte-identical** (`cmp` against a copy taken before the first edit).
+- **Method.** The plan's order, with the work kept in separable semantic units for the eventual commits: resolver, classification and drift guard; the Focused navigation projection; the profile anchors; the `TimerProvider` hoist; the `/time` Stop preservation; the React customer shell; the personas; the presentation switch with the Blade frame and the test conversions; the customer Home; the browser closeout. Three revisions to the approved plan were applied as given: **Revision 1** (the `/time` local Stop, F1), **Revision 2** (the sheet width in `app.css`, not a utility) and **Revision 3** (the section scroll margin only when an `id` is present).
+- **No schema, route, policy, permission, `PermissionCatalogue`, `ProjectTimeAccess`, `AccessibleTimeContext`, `TimerProvider`, timer API or Helpdesk file changed.** No new RBAC permission, dependency, design token or CI change.
+
+### A1.2 The resolver contract (P1)
+
+`App\Shared\Shell\ShellPresentation` (enum `Operational = 'operational'`, `Focused = 'focused'`) and `App\Shared\Shell\ShellPresentationResolver`.
+
+- `forUser(?User): ShellPresentation` — `Operational` for a guest, and for any user for whom `$user->can($c)` holds for **any** `$c` in `ShellPresentationResolver::OPERATIONAL`; otherwise `Focused`. It reads capabilities through the Gate and **never a role name**.
+- `forRequest(Request): ShellPresentation` — memoized on `$request->attributes`, keyed by the user's identifier, so a changed user is recomputed. **No static state**; the class is stateless.
+- **Cost.** `can()` answers from the user's already-loaded roles and permissions, so the resolver adds **zero queries** (proved below, A1.14). `shell.presentation` is now a lazy closure, so a partial reload that does not ask for it resolves nothing.
+- **Readers (the only ones).** `HandleInertiaRequests` (the one writer of `shell.presentation`, and the presentation passed to `NavigationBuilder`), `ShellComposer` (the one writer of the Blade `$shell`), and `DashboardController` (which chooses *which page component* the route renders; the operator branch is byte-for-byte unchanged). `NavigationBuilder` names the enum only as a parameter type. No route, middleware, policy, query or model reads it, and no PHP file states a presentation literal. `ShellSeamContractTest` pins all of it.
+- A guest keeps the Operational frame (an empty rail on `errors/403`), as before the resolver existed; three existing tests pin it.
+
+### A1.3 Capability classification and the permanent drift guard
+
+Recovered from the registered routes and the code against the 42 catalogue capabilities. **The approved P1 list is still exact: nothing was added, removed or reclassified.**
+
+| Class | Count | Capabilities |
+|---|---:|---|
+| Customer defaults (`userDefaults()`) | 12 | `tickets.view`, `tickets.create`, `tickets.view_org`, `projects.view`, `projects.view_org`, `tasks.view_org`, `billing.view`, `billing.view_org`, `time.log`, `time.view_own`, `time.view_org`, `cms.view` |
+| **Operational** (`OPERATIONAL`) | 11 | `tickets.assign`, `crm.manage`, `billing.manage`, `users.view`, `roles.view`, `settings.view`, `cms.edit`, `time.view_all`, `tasks.view_all`, `projects.manage`, `projects.admin` |
+| **Presentation-neutral** (`PRESENTATION_NEUTRAL`, each with a written reason) | 19 | `users.invite`, `users.manage`, `users.admin`, `roles.manage`, `roles.admin`, `settings.manage`, `tickets.admin`, `projects.create`, `billing.create`, `billing.admin`, `time.manage`, `crm.view`, `crm.create`, `crm.admin`, `org.admin`, `org.invite`, `org.manage_roles`, `cms.publish`, `cms.admin` |
+
+`settings.view` gates no surface today; it is kept as approved so the first Settings surface cannot silently render a customer top bar to someone whose only navigation is the rail.
+
+`ShellPresentationDriftGuardTest` (43 tests) derives the gating capabilities from what is actually registered, not from the hand-written list:
+
+- **R1** the catalogue is exactly the three disjoint sets, with the approved sizes 12 / 11 / 19 and a non-empty reason for every neutral capability.
+- **R2** every `can:` / `permission:` ability on any registered route is a known, classified capability (an unknown one fails with "classify by hand").
+- **R3** every GET/HEAD page gated by a non-default ability carries an Operational capability.
+- **R4** every route under `operator/`, `admin/`, `crm/`, `organizations`, `invitations` and `billing/invoices` is capability-gated, with exactly two reasoned exceptions (`billing.invoices.pay`, `billing.invoices.pay.intent`: a customer paying their own invoice, authorized by `InvoicePolicy`).
+- **R5** for each of the 30 non-default capabilities, an actor holding customer defaults plus it is compared with the baseline Operational navigation: a capability that changes the payload must be Operational, and every neutral one must leave it unchanged.
+- **R6** sentinel fixtures feed each rule input the real routes never contain and prove R2–R5 can fail, plus a parser test for the middleware forms.
+
+### A1.4 Focused navigation (§14)
+
+`NavigationBuilder::build(Request, ShellPresentation = Operational)`. **The default Operational output is byte-identical**: `NavigationBuilderTest` is untouched and green.
+
+- **Refinement of the approved metadata.** A workspace declares `focused: {label, order, item}`. It does **not** state a destination: `href` and `visit` are copied from the **surviving** capability-filtered context item named by `item` (or the workspace's own destination when `item` is null). The plan's `{label, href, order}` is therefore refined to `{label, order, item}` so the projection can only ever point at something the actor already survived filtering for.
+- Entries: Home 10 (`/dashboard`, inertia), Support 20 (`helpdesk.requests`, `/tickets`, document), Projects 30 (`projects.all`, `/projects`, inertia), Invoices 40 (`finance.my-invoices`, `/my/invoices`, document; never the operator invoice surface), Resources 50 (`/pages`, document). Tasks, Time, Directory and System declare none (O1).
+- A removed capability removes its entry; there are no placeholders; `context` is always `[]`; the only presentation hint is `{focused: {order}}`; no route, pattern, query or surface metadata is serialized; the workspace keys are exactly `key, label, icon, href, visit, isActive, context, presentation`. Active state is server-side (`billing.invoices.pay` marks Invoices current; Profile, Tasks and Time mark nothing).
+- `FocusedNavigationTest` (112 tests): labels, order, hrefs and visit modes; capability removal; **Focused ⊆ Operational for 37 personas** (every operational and every neutral capability held on top of the customer defaults, each of four customer defaults removed in turn, the operator, and a user with no permissions), including that every Focused destination is one the actor is already offered Operationally; ≤5 entries; no operator/admin/CRM/organization href and no metadata keys at any depth; the active-state table; guest; the shared-prop allowlists (A1.12); a Focused customer is refused every operator surface (403) yet `/tasks` and `/time` stay reachable (hidden navigation is not authorization).
+
+### A1.5 The shell component tree (React)
+
+```
+AppShell                       (the one branch point; the only reader of the presentation prop)
+ └─ TimerProvider              (hoisted; enabled by time.log alone)
+     ├─ CustomerShell          (Focused)
+     │   ├─ SkipLink           (first focusable, targets main#main-content)
+     │   ├─ header[data-shell-topbar]  60px
+     │   │   ├─ brand          (BrandMark + aria-hidden wordmark; not a link)
+     │   │   ├─ TopNav         nav[aria-label=Main]; ShellLink; aria-current + accent-line underline
+     │   │   └─ [data-shell-topbar-end]
+     │   │       ├─ CustomerMenuSheet   Radix Dialog; data-shell-sheet="focused"
+     │   │       └─ AccountMenu placement="topbar"
+     │   └─ [data-shell-column]  ≤1080px, centred
+     │       ├─ FlashRegion
+     │       ├─ main#main-content[tabindex=-1]
+     │       └─ route announcer (usePageAnnouncement; [data-shell-announcer])
+     └─ OperatorShell          (Operational; unchanged, minus its provider wrapper)
+```
+
+- No rail, drawer, utility bar, breadcrumb or global timer is ever rendered by `CustomerShell`; `trail` is accepted and ignored; the shell reads no presentation (`ShellSeamContractTest`: only `app-shell.tsx` contains the discriminator, and no page may import `CustomerShell`, `TopNav` or `CustomerMenuSheet`).
+- **`CustomerMenuSheet`** reuses Radix `Dialog` (focus trap, Esc, outside click, focus return) exactly as the operator `NavSheet`; `NavSheet` is not refactored. **Its width is not a utility** (Revision 2): the content carries `data-shell-sheet="focused"`, and `app.css` holds `[data-shell-sheet='focused'] { width: min(20rem, 88vw); }`, keyed on the attribute alone because Radix portals the dialog to `<body>`, outside `[data-shell='focused']`. The Blade `<dialog>` matches the same rule. No design token was added for it.
+- **`AccountMenu`** gains `placement: 'rail' | 'topbar'` (default `rail`; `OperatorShell` is unchanged). The top-bar trigger is a **static class string** (the circular avatar is the trigger; menu opens `side="bottom" align="end"`). The existing rail trigger is untouched.
+- **Direction D addition: `Avatar size="account"`** (`h-8.5 w-8.5 text-sm`, 34px, Direction D §13.1) in `components/ui/avatar.tsx`, between the 28px rail mark and the 36px menu header. It is the only new variant; it lives in `ui/`, where `no-arbitrary-values` is off, and `h-8.5` is a scale value.
+- **Focused CSS** (`app.css`, unlayered like the operational block): `[data-shell='focused']` flex column on `--ds-canvas`; `[data-shell-topbar]` sticky, 60px, hairline rule; `[data-shell-column]` max 1080px, centred, `min-width: 0`, **no padding** (the page frame keeps its own gutters); `[data-shell-topnav]` hidden below 900px (`display: none`, so it leaves the accessibility tree) and `[data-shell-sheet-trigger]` hidden from 900px.
+
+### A1.6 `TimerProvider` seam, and the hook inventory (N7, §8.3)
+
+`TimerProvider` moved from `OperatorShell` to `AppShell`, above the presentation branch, still `enabled` by `time.log`. `OperatorShell` lost only its wrapper (the pill is still rendered by its utility bar). `timer-provider.tsx`, `timer-pill.tsx`, `timer-tray.tsx` and `timer-control.tsx` are untouched; no timer API, permission, query or `AccessibleTimeContext` change; a Focused customer with `time.log` makes the same single `GET /time/timers/active` that they made under `OperatorShell`.
+
+**Inventory of every shell-provided hook a page consumes** (the only React context in the application is `TimerContext`):
+
+| Hook | Consumers (non-test) | Pages that reach them |
+|---|---|---|
+| `useTimers()` (throws outside a provider) | `pages/time/index.tsx`; `components/projects/task-time-panel.tsx`; `components/time/timer-control.tsx`, `timer-pill.tsx`, `timer-tray.tsx` | `/time`; `tasks/show`; `projects/tasks/show` |
+| `useOptionalTimers()` | `components/tasks/task-list-actions.tsx` | `tasks/index`; `projects/tasks/index` |
+
+Vitest (`app-shell.test.tsx`) proves a page gets `useTimers()` under both presentations; that the pill appears only in the Operational shell and never in the Focused one even with `time.log`; that the provider is disabled without `time.log` (no request, either shell); and that `/time` renders under the Focused shell.
+
+### A1.7 `/time` Start → Stop preservation (Revision 1; F1 closed by plan)
+
+WP1 removes the global pill and tray for a Focused customer, yet `/time` could start a timer and had no Stop control. This is **preservation required by the shell migration, not new Time product scope.** Only `pages/time/index.tsx` changed:
+
+- A page-local `RunningTimers` in the existing "Start a timer" section, over `useTimers()` and the existing `TimerControl` in running mode. It renders nothing before the first read is confirmed (§15.1) and nothing with zero timers; each row is named by `context.label`, else `description`, else "Unassigned timer"; no `className` is passed to `TimerControl`; it reads no presentation.
+- When a timer that was in the **confirmed** set disappears (stopped here, in the tray or in another tab), the page calls `router.reload({ only: ['entries', 'totalMinutes'] })`. A timer **appearing** reloads nothing, and the first confirmed read reloads nothing.
+- Operators get the same list as a second, contextual way to stop the same timer, consistent with the pill because both read one provider.
+- Tests: 7 Vitest cases (before-confirmation, empty, naming, stop + reload, no reload on appear, failure keeps the row, no timer chrome) and one Playwright journey on the `customer` persona (start, see "Running timers", stop, the entry appears, no `[data-shell-timer]`). **Cleanup is not brittle:** the journey uses the existing `E2eCleanup` fixture, which records the entry from the start response and deletes it over HTTP even when the test fails, and a `finally` stops whatever is still active through the application's own endpoints.
+
+### A1.8 Blade parity (§9.3)
+
+`layouts/app.blade.php` is the only Blade branch point: `@if ($shell['presentation'] === 'focused')` renders the customer frame, `@else` renders the Operational frame (its markup is the original; only the skip-link anchor became the shared `skip-link` partial, with identical output). New partials: `topbar`, `focused-sheet`, `skip-link`; `account-menu` gained `$placement` (rail output unchanged). `blade-shell.ts` widened only its root selector to `[data-shell][data-shell-renderer="blade"]`; `initPanel` finds nothing to control in the Focused frame, and `blade-timer.ts` already no-ops without timer markup. There is no Helpdesk logic in the shell (a test asserts it) and no new per-request disk read.
+
+**Parity is measured, not byte-compared.** Pest (`BladeFocusedFrameTest`, 28 tests) owns the Blade half: the bar and sheet links equal the Focused payload (label, order, destination, current item) on the Helpdesk list, new request, own invoices, an own invoice, **invoice payment** (Stripe stubbed), resources and the 403 page; no rail, drawer, utility bar, breadcrumb or timer; skip link first; one `main`; the account trigger, menu items, hrefs and below-and-right-aligned menu; no operator/admin/CRM href; no panel stamped on the root; the shared bootstrap inlined once before any stylesheet; the Operational frame for the operator and for mixed-capability users. Vitest (`customer-shell.test.tsx`, `customer-menu-sheet.test.tsx`) owns the React half. Playwright (`customer-shell.spec.ts`) owns parity across the two renderers.
+
+`BladeThemeGuardTest` gained an explicit Level B scan of `topbar`, `focused-sheet`, `skip-link` and `account-menu` **without growing the inventory (still exactly 59)**. `layouts/app.blade.php` is deliberately not scanned: its one finding is `outline-none` on `<main tabindex="-1">`, the skip link's programmatic focus target, identical to React's `main` and to the pre-existing Operational branch.
+
+### A1.9 Customer Home (§5)
+
+`DashboardController` asks the resolver; Focused renders `dashboard/customer-home`, Operational runs the existing dashboard unchanged. Props are `null` for any section whose capability the actor lacks: `waitingOnYou` (own `pending_user`, latest 5), `openRequests` (own `open`/`in_progress`, latest 5), `invoices` (existing own outstanding count), `projects` (existing `Project::visibleTo` active count), and `support` / `newRequest` route descriptors. Ticket rows are an **exact-key allowlist** (`id, number, title, createdAt, createdAtHuman, href, visit`, plus `status, statusLabel` for open rows): no requester, priority, SLA, assignee, company or time. The page has one `h1` "Home", the single ink-primary "New request", the reading order Waiting on you → Your open requests → Invoices → Your projects, and calm empty states. **Four data queries** (the two ticket lists, the outstanding-invoice count and the active-project count), asserted exactly. `CustomerHomeTest` also compares the request's **entire query list** (not only those four) at 1, 5 and 30 of each record, with tolerance 0 and tickets that carry an assignee, so a per-row query against any table the fixtures exercise would change it. What this proves is that nothing grows between those sizes; it does not prove boundedness for a relation the fixtures never populate. The two ticket lists are additionally capped by `limit(5)` and the two counts are single aggregates.
+
+### A1.10 N6: the profile anchors
+
+All three destinations already existed and are always rendered (a passwordless account shows an explanation inside the same section), so this was an id fix, not a missing-section case. `Section` accepts `id` and applies `scroll-mt-20` **only when `id` is present** (both layouts; Revision 3); `SectionPanel` passes it through; `profile/show` gains `#security` (on Password, the start of the security block), `#connected-accounts` and `#sessions`. No Profile redesign. Both shells use the same `AccountMenu` / Blade menu, and Inertia scrolls to the anchor on load. Focus is not moved, only scrolled. Playwright confirms Sessions lands on its section clear of the 60px bar, from both a React and a Blade page.
+
+### A1.11 Personas and fixtures
+
+`DevSeeder` (`firstOrCreate` by email, password `password`, idempotent, local/testing only): `e2e-customer@intechral.test` and `e2e-customer-other@intechral.test` (both plain `user`), and **`e2e-operational-member@intechral.test`** (`user` + a direct `projects.manage`). Also the read-only fixture **`TKT-E2E2`** (owned by `e2e-customer`, `pending_user`, titled `E2E fixture: …`, deliberately not `E2E-…`, so a later cleanup command that matches the `E2E-` prefix cannot touch it). `auth.ts` gained the three personas (sessions mint lazily; `customerOther` costs no login); `BrowserAuthContractTest` and `docs/testing/e2e-browser-suite.md` (identities, login budget, the "which shell" note) were updated.
+
+### A1.12 Security and privacy invariants
+
+| Invariant | Enforcing test |
+|---|---|
+| Presentation is never authorization: no route/policy/query/model reads it; no literal writer | `ShellSeamContractTest` (PHP readers, enum readers, literal guard, one Blade reader) |
+| A user with any operator-surface capability is Operational; the capability sets are complete | resolver matrix (32) + drift guard R1–R6 (43) |
+| A customer cannot reach an operator surface by presentation or by URL | `FocusedNavigationTest` (403 on 9 surfaces); Playwright 403-inside-the-Focused-frame |
+| Hidden navigation is not authorization (`/tasks`, `/time` stay reachable) | `FocusedNavigationTest`; Playwright |
+| No operator link reaches the Focused shell, React or Blade | `FocusedNavigationTest`, `BladeFocusedFrameTest` |
+| Shared props are exact and minimal: top-level `errors, app, auth, shell, navigation, flash`; `auth.user` = `id, name, email, avatar`; `shell` = `presentation`; `flash.bulk` = null | `FocusedNavigationTest` (exact keys) |
+| Blade and React render one navigation and one account menu | `BladeFocusedFrameTest`, `customer-shell.test.tsx`, Playwright parity |
+| Presentation changes the next request after a role change | resolver test |
+| The timer provider enables on `time.log` only; Focused draws no timer chrome | `app-shell.test.tsx`, `customer-shell.test.tsx`, Playwright |
+| The customer Home leaks no operator field | `CustomerHomeTest` (exact keys; keys, not substrings, scanned at any depth) |
+
+Ticket-time security (N1) is **not** touched and remains WP2's.
+
+### A1.13 Accessibility and responsive results
+
+Per-surface checks only; **no product-wide WCAG claim.** Vitest owns semantics; Playwright owns the keyboard and the browser. Verified: skip link first and targeting `main#main-content`; `header` containing a labelled `nav "Main"`, then one `main`; one `h1` on Home; `aria-current` in the bar and the sheet; the account trigger's name, `aria-haspopup` and `aria-expanded`; the sheet as a titled dialog with a focus trap, Esc, outside click and focus return (a native Blade `<dialog>` may cycle through the browser's own chrome but never lands on the page behind it); the visible 2px `focus` outline; the route announcement; reduced motion (the sheet fades in ≤120ms with no travel); and no operator-only control.
+
+`customer-shell.spec.ts` (18 tests) drives `/dashboard`, `/profile`, `/projects` (React) and `/tickets`, `/my/invoices`, `/pages` (Blade) at **390, 768 and 1280 in light and dark** and asserts: no document overflow; a 60px bar; a column ≤1080px (exactly 1080 at 1280, centred); the 34px account trigger inside the viewport; the full nav only from 900px and the sheet trigger only below it; ≤5 entries in the server's order; the current entry's underline is 2px and resolves to `--ds-accent-line`; and no rail, drawer, utility bar, breadcrumb or timer.
+
+### A1.14 Query and performance evidence
+
+Warm total queries per request, measured on the starting tree and on the WP1 tree with the same probe:
+
+| Request | Before | After |
+|---|---:|---:|
+| operator `GET /dashboard` | 15 | 15 |
+| operator `GET /operator/tickets` (Blade) | 7 | 7 |
+| operator `GET /projects` | 7 | 7 |
+| user + `projects.manage` `GET /profile` (Operational both times) | 8 | 8 |
+| plain user `GET /profile` (Operational before, **Focused after**) | 8 | **8** |
+| plain user `GET /tickets` (Blade) | 6 | 6 |
+| plain user `GET /projects` | 7 | 7 |
+| plain user `GET /pages` | 6 | 6 |
+| plain user `GET /dashboard` (operator dashboard before, **customer Home after**) | 12 | 10 |
+
+The resolver adds **zero queries**: a plain user's `/profile` costs the same 8 before and after, and equals the Operational user's; Pest also asserts a hydrated `forUser()` and a second `forRequest()` issue none, and that a partial reload that does not ask for the shell issues no role or permission query and omits `shell` (with the control that asking for it returns it). The customer Home is bounded and constant (A1.9).
+
+### A1.15 Lint baseline
+
+Unchanged: **15 files / 31 suppressions, byte-identical**, SHA-256 `5bf90c80…bfbe688`. `npm run lint` is clean with `--max-warnings=0`; no rule was relaxed, scoped out or suppressed; no `eslint-disable` was added; no raw colour, unknown class or inline style. The new top-bar account trigger uses a static class string (so `account-menu.tsx` kept exactly its two baselined `require-static-classes` findings), and the one new primitive variant is `Avatar size="account"`. **Finding F-A:** the merged policy is `no-arbitrary-values: { allow: ['layout'] }`, so an arbitrary *width* is permitted in application code (the operator `NavSheet` carries `w-[min(20rem,88vw)]`). The approved plan did not use one and this implementation does not; the CSS hook is a design choice that also solves the portal, not a lint workaround, and the policy is not changed here.
+
+### A1.16 Test-conversion ledger
+
+Every historical assertion is kept; where the old test's subject was **Operational chrome** it moved to `operationalMember`, and where it was about **customer page content** it kept the customer and changed only the shell expectation. Each is marked `FLIPPED IN EPIC-017 WP1` in source.
+
+| Test | Change |
+|---|---|
+| `InertiaFoundationTest` "renders an authenticated production inertia page…" | plain `user` now gets `dashboard/customer-home` and `focused`; the shared-prop assertions are unchanged |
+| `DashboardInertiaTest` "renders scoped user dashboard data…" | actor is `user` + `projects.manage` (still own-records scoped, still the operator dashboard); every assertion unchanged. The plain customer is `CustomerHomeTest` |
+| `BladeShellTest` (5 dataset rows, `stamps the pre-paint inputs…`, `never renders a destination…`) | member actor → `operational-member` (`user` + `projects.manage`); every assertion unchanged. Focused equivalents: `BladeFocusedFrameTest` |
+| `ProjectDrawerSurfaceTest` ×2 | the customer holds `settings.view` (an Operational capability that gates nothing and adds no navigation) so the drawer-hint assertions keep their subject; **new** test: a Focused customer gets no drawer input or operational hint, and is still refused `projects.create` |
+| `ProjectDashboardCountTest` ×2 | the helper reads `metrics` for Operational actors and `projects.active` for Focused ones (same `visibleTo` count), so "agrees with the index" keeps asserting |
+| `ShellSeamContractTest`, `BladeThemeGuardTest`, `BrowserAuthContractTest` | extended (A1.2, A1.8, A1.11). The one-Blade-reader guard detects `$shell['presentation']` and `$shell["presentation"]` alike, with a positive and negative sample test for the detector |
+| Playwright `shell.spec.ts` ("as a member"), `blade-shell.spec.ts` ("as a member"), `time-migration.spec.ts` (whole member group; now the single owner of the active-timer set) | persona → `operationalMember` |
+| `tasks-migration.spec.ts` (drawer clamp) | the drawer assertions run as `operationalMember`; a plain-customer block asserts the same clamp where the Focused shell has no drawer and no Tasks entry |
+| `projects-workspace.spec.ts`, `task-detail-wp5.spec.ts` (customer member pages) | one breadcrumb → none (the Focused shell owns no breadcrumb), one `h1` kept |
+| `inertia-coexistence.spec.ts` | Profile is reached from the account menu (the Focused Home has no quick actions). The narrow-sheet test's subject is the Operational rail folding into its sheet, which a Focused actor has none of (its "Workspaces hidden" assertion would pass vacuously), so it moved to `operationalMember`; it is kept non-vacuous by a temporary run at 1280px, where the rail is visible and the assertion fails. The Focused sheet at the same widths is `customer-shell.spec.ts` |
+| **New** | `ShellPresentationResolverTest` (32), `ShellPresentationDriftGuardTest` (43), `FocusedNavigationTest` (112), `BladeFocusedFrameTest` (28), `CustomerHomeTest` (14); Vitest `customer-shell`, `customer-menu-sheet`, `customer-home`, plus additions to `app-shell`, `account-menu`, `avatar`, `section`, `profile/show`, `pages/time`, `blade-shell`; `customer-shell.spec.ts` (18) |
+
+Unchanged regression (not touched, still green): `NavigationBuilderTest`, `ShellContractTest`, `LoginTest`, every operator `BladeShellTest` case, the rail/drawer/skip-link/timer Vitest, and the member specs that assert page content only.
+
+### A1.17 Validation evidence
+
+Run on the **final, unchanged code tree**; this documentation edit is the only change made after them (no test reads the docs, and `git diff --check` was re-run).
+
+- **Entry gate (starting tree):** `./dev doctor` no failures; `./dev check` green (Vitest 99 files / 1,687 tests; Pest 2,453 tests / 13,589 assertions).
+- **A full Pest run mid-implementation** found failures only in the behaviours the ledger predicts (A1.16) and nothing else; each was converted, then the affected files re-ran green. The ledger names behaviours, not a case count. Counted as test cases, an independent re-run of the starting revision's Pest suite against the WP1 product code fails **13 cases in 5 files**: `BladeShellTest` 7 (five dataset rows plus the pre-paint and withheld-destination cases), `ProjectDashboardCountTest` 2, `ProjectDrawerSurfaceTest` 2, `DashboardInertiaTest` 1 and `InertiaFoundationTest` 1 (2,440 others pass). All 13 are in the A1.16 rows and all are converted. An earlier draft of this line said "six flips" and "the six files"; neither was the count of failing cases or files, and it is corrected here.
+- **Focused Pest (final):** `ShellPresentationResolverTest` 32 · `ShellPresentationDriftGuardTest` 43 · `FocusedNavigationTest` 112 · `BladeFocusedFrameTest` 28 · `CustomerHomeTest` 14 (229 tests, all green), plus the extended `ShellSeamContractTest`, `BladeThemeGuardTest` (the Level B inventory still exactly 59) and `BrowserAuthContractTest`, and the converted `InertiaFoundationTest`, `DashboardInertiaTest`, `ProjectDashboardCountTest`, `ProjectDrawerSurfaceTest` and `BladeShellTest`.
+- **Focused Vitest (final):** `customer-shell` 10 · `customer-menu-sheet` 7 · `customer-home` 8 · `pages/time` 24 (7 new) · and additions to `app-shell`, `account-menu`, `avatar`, `section`, `profile/show` and `blade-shell`.
+- **Typecheck, `npm run lint` (`--max-warnings=0`), `npm run format:check`, `npm run build`:** clean (all inside `npm run check`).
+- **Focused Playwright before the full run:** `customer-shell.spec.ts` 18/18 (two first-run failures were assumptions in my own assertions — a native `<dialog>` may cycle focus through the browser chrome, and Radix hides the open menu's trigger from role queries — and were corrected, not the product); the converted specs 74/74.
+- **Full local Playwright, once, after re-seeding `DevSeeder`** (`./dev test:e2e`): **184 passed, 0 failed, 0 flaky, 0 skipped**; **3 workers**; **6.3 minutes**; product-data counts **before = after = `projects=2 tasks=1 time_entries=2`** ("unchanged"). The harness does not report HTTP 5xx / 419 / 429; the application log was not written during the run (F-D). (The single `✘` line in the output is `e2e-cleanup.spec.ts`'s deliberately failing fixture test, which Playwright counts as an expected pass.)
+- **`./dev check`, once, on the final tree:** **All checks passed** — CLI self-tests PASS; `git diff --check` PASS; Pint PASS (333 files); `npm run check` PASS (**Vitest 102 files / 1,747 tests**); Pest PASS (**2,697 tests, 15,758 assertions**, 568 s).
+- **Pre-commit remediation (after the independent review).** Test and documentation changes only, no product file: the customer Home query test, the Blade-reader guard and its detector test, the `inertia-coexistence.spec.ts` persona, and A1.9, A1.16 and A1.17. The Home test and the guard were each shown to fail when violated (a per-row `assignee` lookup: 12 → 20 queries; a second Blade view reading `$shell['presentation']` or `$shell["presentation"]`) and to pass once restored; the spec's Workspaces assertion was shown to fail at 1280px. Re-run: `./dev check` Pest **2,698 tests, 15,768 assertions** (a net +1 test and +10 assertions against the 2,697 / 15,758 above), Vitest unchanged at 102 files / 1,747 tests; `inertia-coexistence.spec.ts` 3/3. The first re-run's Pint step failed on a style issue in the new Home test (fixed); the Pest total above was measured just before that fix, and after it the two touched test files, Pint (all 333 files) and the frontend gate were re-run green.
+- **Lint baseline** byte-identical (A1.15). **Hosted CI: not run** — it is claimed nowhere here.
+
+### A1.18 Visual review
+
+22 captures were generated with a temporary probe and **each was inspected**, then deleted: the Customer Home at 1280/768/390 in both themes (React), the Blade `/my/invoices` frame at the same six, the open menu sheet at 390 in both themes, the Blade account menu at 1280 in both themes, and the operator dashboard before (starting tree) and after at all six. Findings: **no overflow**; the right theme in every capture; the full nav at 1280 and the menu button at 768 and 390; a 60px bar; the accent-line underline on the current entry (teal in light, cyan in dark); the circular account trigger; the sheet anchored to the right and titled; the Blade frame matching the React frame pixel for pixel in the bar. **Operator regressions: none** — the six before/after pairs are identical apart from the relative "7 minutes ago" / "8 minutes ago" text. One cosmetic observation, not a WP1 regression: in the customer Home's empty "Your open requests", `EmptyState`'s own top rule sits just below the section rule (the same primitive does this on the operator Home).
+
+### A1.19 Mutation and non-vacuity evidence
+
+Each mutation was applied, the named check was confirmed to **fail**, and the file was restored and verified byte-identical (the suppression file and the whole tree were re-verified against checksums afterwards).
+
+| # | Mutation | Result |
+|---|---|---|
+| 1 | `tickets.assign` moved from Operational to neutral | drift guard R3 and R5, the resolver test and the size check fail (R1's partition alone passes, as it should); removing it instead fails R1 |
+| 2 | a new `operator/widgets` route gated by an unclassified ability | R2 and R3 fail |
+| 3 | `focused:` declared on the Tasks workspace | `FocusedNavigationTest` fails (labels, count) |
+| 4 | `TimerPill` rendered in `CustomerShell` | `customer-shell` and `app-shell` Vitest fail (3 tests) |
+| 5 | `['presentation' => 'operational']` literal in `ShellComposer` | `ShellSeamContractTest` literal guard and the Blade frame tests fail |
+| 6 | `'priority'` added to a customer Home row | `CustomerHomeTest` allowlist fails |
+| 7 | `text-[13px]` in `CustomerMenuSheet`; `text-red-500` in `TopNav`; `className="font-bold"` on `<Status>` | `shadcn/no-arbitrary-values`, `no-raw-colors` and `no-restyle` fail |
+| 8 | `scroll-mt-20` on every `Section` | the "no id → no scroll margin" tests fail |
+| 9 | `/time` reloads whenever the timer set changes size | the "does not reload when a timer appears" test fails |
+
+Two first attempts did **not** fail and were corrected rather than accepted: an arbitrary *width* (allowed by policy, F-A) and a string concatenated onto `buttonVariants()` on a plain `<a>` (not a primitive restyle).
+
+### A1.20 Findings and deviations
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Start without Stop on `/time` for a Focused customer | **CLOSED BY PLAN** and implemented (A1.7) |
+| F2 | The `member` persona becomes Focused, which broke 11 timer tests and 3 rail tests whose subject is Operational chrome | the `operationalMember` persona (A1.11); recorded in A1.16 |
+| F3 | §22.6 says Home shows Projects' "existing project list"; the dashboard computes only a count | Home shows the count (§5: no new queries) |
+| F4 | §14's `{label, href, order}` | implemented as `{label, order, item}`, `href` derived from the survivor (A1.4) |
+| F5 | A guest has no actor | stays Operational; already pinned by three tests |
+| F6 | §8.2 "nothing reads the presentation" vs §5's controller choosing the Home | `DashboardController` is the one sanctioned component chooser; data stays capability-gated; statically guarded |
+| F-A | the lint policy allows arbitrary layout values | A1.15; no change |
+| F-B | Signing out from the Focused shell is covered by `auth-migration.spec.ts` (`e2e-login-flow` is a plain `user`, now Focused), not by `customer-shell.spec.ts`: sign-out destroys the worker's shared session row | no action |
+| F-C | `./dev test:e2e` does not forward arbitrary environment variables into the container | tooling observation (it affected a throwaway probe only); no repository change |
+| F-D | the harness does not report HTTP 5xx / 419 / 429 | the application log (`storage/logs/laravel.log`) was not written during the run |
+
+**No owner decision is raised.**
+
+### A1.21 Scope integrity
+
+None of the following entered the tree: React ticket list/create/detail; requester ticket resources; the N1 ticket-time/privacy correction; the O2 reply lifecycle; ticket attachments; the ticket cleanup command; the operator ticket workspace, queue or reports; email changes; O3; Directory; Finance or Projects redesign; release engineering. The **only** Time-module change is `pages/time/index.tsx` (A1.7).
+
+### A1.22 Lifecycle
+
+EPIC-017 stays **Planned**; WP1 is implemented, uncommitted and awaiting independent review; WP2–WP5 are not started; hosted CI has not run. Entering WP2 needs WP1 reviewed, committed, merged and green on `main`.

@@ -170,6 +170,42 @@ export function navigation(
 }
 
 /**
+ * The Focused (customer) projection, shaped exactly as `NavigationBuilder` serializes it for a plain
+ * customer: five entries in the server's order, no contextual sections, and only the `focused`
+ * presentation hint. `current` names the entry the server marked active, or none.
+ */
+export function focusedNavigation(current: string | null = null): Navigation {
+    const entry = (
+        key: string,
+        label: string,
+        icon: string,
+        href: string,
+        visit: Workspace['visit'],
+        order: number,
+    ): Workspace => ({
+        key,
+        label,
+        icon,
+        href,
+        visit,
+        isActive: key === current,
+        context: [],
+        presentation: { focused: { order } },
+    });
+
+    return {
+        currentWorkspace: current,
+        workspaces: [
+            entry('home', 'Home', 'house', '/dashboard', 'inertia', 10),
+            entry('helpdesk', 'Support', 'life-buoy', '/tickets', 'document', 20),
+            entry('projects', 'Projects', 'folder-kanban', '/projects', 'inertia', 30),
+            entry('finance', 'Invoices', 'receipt', '/my/invoices', 'document', 40),
+            entry('resources', 'Resources', 'library', '/pages', 'document', 50),
+        ],
+    };
+}
+
+/**
  * jsdom has no layout, and `test/setup.ts` stubs `matchMedia` as "no preference matches anything".
  * The panel's initial state depends on the XL width class (Direction D §5.2), so a test that cares
  * has to say which width class it is standing in: XL (>= 1360), L (1024-1359) or M/S (< 1024).

@@ -18,10 +18,23 @@ beforeEach(function () {
     $this->seedRolesAndPermissions();
 });
 
+/**
+ * FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer shell (covered by
+ * `Shell/BladeFocusedFrameTest`), so the cases below whose subject is the OPERATIONAL rail, panel and
+ * sheet for a customer-scoped actor use `operational-member`: the built-in `user` role plus a direct
+ * `projects.manage`, the same shape as the E2E persona of that name. They keep every original
+ * assertion; only who the actor is changed.
+ */
 function bladeShellActor(string $role): User
 {
     $user = User::factory()->create();
-    $user->assignRole($role);
+
+    if ($role === 'operational-member') {
+        $user->assignRole('user');
+        $user->givePermissionTo('projects.manage');
+    } else {
+        $user->assignRole($role);
+    }
 
     return $user->fresh();
 }
@@ -140,9 +153,9 @@ it('renders the canonical workspaces and context exactly as the server built the
     'operator, System roles' => ['operator', 'roles.index'],
     'operator, Directory people' => ['operator', 'crm.contacts.index'],
     'operator, Finance invoices' => ['operator', 'billing.invoices.index'],
-    'member, Helpdesk requests' => ['user', 'tickets.index'],
-    'member, Finance own invoices' => ['user', 'billing.client.invoices.index'],
-    'member, Resources' => ['user', 'cms.index'],
+    'member, Helpdesk requests' => ['operational-member', 'tickets.index'],
+    'member, Finance own invoices' => ['operational-member', 'billing.client.invoices.index'],
+    'member, Resources' => ['operational-member', 'cms.index'],
 ]);
 
 it('keeps active state server-owned: aria-current is exactly the payload isActive set', function (
@@ -172,8 +185,8 @@ it('keeps active state server-owned: aria-current is exactly the payload isActiv
     'reports, not queue' => ['operator', 'operator.tickets.reports', 'Helpdesk', 'Reports'],
     'queue' => ['operator', 'operator.tickets.index', 'Helpdesk', 'Queue'],
     'nested roles route' => ['operator', 'roles.create', 'System', 'Roles'],
-    'client finance branch' => ['user', 'billing.client.invoices.index', 'Finance', 'My invoices'],
-    'single-surface Resources' => ['user', 'cms.index', 'Resources', null],
+    'client finance branch' => ['operational-member', 'billing.client.invoices.index', 'Finance', 'My invoices'],
+    'single-surface Resources' => ['operational-member', 'cms.index', 'Resources', null],
 ]);
 
 it('stamps the pre-paint inputs on the Blade root from the payload', function () {
@@ -183,7 +196,7 @@ it('stamps the pre-paint inputs on the Blade root from the payload', function ()
     expect($html->getAttribute('data-workspace'))->toBe('helpdesk')
         ->and($html->getAttribute('data-drawer-default'))->toBe('open');
 
-    $member = bladeShellActor('user');
+    $member = bladeShellActor('operational-member');
     $resources = bladeShellPage($member, 'cms.index');
     $root = $resources->query('/html')->item(0);
 
@@ -200,7 +213,7 @@ it('stamps the pre-paint inputs on the Blade root from the payload', function ()
 // ─────────────────────────────────────────────────────────────────────────────
 
 it('never renders a destination the server withheld from a member', function () {
-    $member = bladeShellActor('user');
+    $member = bladeShellActor('operational-member');
     $page = bladeShellPage($member, 'tickets.index');
 
     $shellHrefs = array_map(

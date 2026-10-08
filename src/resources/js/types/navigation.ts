@@ -45,6 +45,13 @@ export type ContextSection = {
  * adding `focused` later is additive.
  */
 export type WorkspacePresentation = {
+    /**
+     * The Focused (customer) shell's hint: only the entry's position, because its destination and label
+     * are the workspace's own and it has no drawer. Present only in the Focused projection.
+     */
+    focused?: {
+        order: number;
+    };
     operational?: {
         /**
          * The contextual-panel default; null when the workspace has no contextual panel at all. On a
@@ -79,7 +86,10 @@ export type Navigation = {
     workspaces: Workspace[];
 };
 
-/** The presentation family the shell should render (§12.5). Names a presentation, never a role. */
+/**
+ * The presentation family the shell should render (§12.5). Names a presentation, never a role: the
+ * server resolves it from capabilities, and it never authorizes anything.
+ */
 export type ShellProps = {
-    presentation: 'operational';
+    presentation: 'operational' | 'focused';
 };

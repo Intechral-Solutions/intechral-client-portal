@@ -7,6 +7,9 @@ beforeEach(function () {
     $this->seedRolesAndPermissions();
 });
 
+// FLIPPED IN EPIC-017 WP1: a plain `user` now resolves to the Focused customer shell, so /dashboard
+// renders the customer Home and the presentation is `focused`. The shared-prop contract asserted below
+// is unchanged; the operator dashboard is pinned by DashboardInertiaTest.
 it('renders an authenticated production inertia page with minimal shared props', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
@@ -14,7 +17,7 @@ it('renders an authenticated production inertia page with minimal shared props',
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->component('dashboard/index')
+            ->component('dashboard/customer-home')
             ->where('app.name', config('app.name'))
             ->where('auth.user.id', $user->id)
             ->where('auth.user.name', $user->name)
@@ -24,7 +27,7 @@ it('renders an authenticated production inertia page with minimal shared props',
             // the server-derived avatar. Their own coverage is in ShellContractTest.
             ->has('navigation.workspaces')
             ->has('navigation.currentWorkspace')
-            ->where('shell.presentation', 'operational')
+            ->where('shell.presentation', 'focused')
             ->has('auth.user.avatar')
             ->has('flash')
             ->missing('auth.user.password')

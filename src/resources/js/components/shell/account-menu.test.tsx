@@ -181,3 +181,55 @@ it('signs out by posting, never by navigating', async () => {
 
     expect(inertiaSpies.router.post).toHaveBeenCalledWith('/logout');
 });
+
+// ── The Focused top bar placement (Direction D §13.1; EPIC-017 WP1) ───────────────────────────────
+
+describe('in the customer top bar', () => {
+    it('is the circular avatar itself, named like the rail trigger', () => {
+        render(<AccountMenu user={user} placement="topbar" />);
+
+        const trigger = screen.getByRole('button', { name: 'Account menu: Dana Webb' });
+
+        expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect(trigger).toHaveAttribute('data-shell-account');
+        // The avatar is the control: a circle with the 34px account size, no square tile around it.
+        expect(trigger.className).toContain('rounded-full');
+        expect(trigger.className).not.toContain('rounded-md');
+        expect(trigger.className).not.toContain('ring-1');
+        expect(trigger.querySelector('.h-8\\.5')).not.toBeNull();
+        expect(trigger.textContent).toBe('DW');
+        // Visible keyboard focus is spelled out, not left to a default.
+        expect(trigger.className).toContain('focus-visible:outline-2');
+    });
+
+    it('opens the same personal menu below the trigger, right-aligned', async () => {
+        const actor = userEvent.setup();
+        render(<AccountMenu user={user} placement="topbar" />);
+
+        const menu = await openMenu(actor);
+
+        expect(menu).toHaveAttribute('data-side', 'bottom');
+        expect(menu).toHaveAttribute('data-align', 'end');
+        expect(within(menu).getByRole('menuitem', { name: 'Profile' })).toHaveAttribute(
+            'href',
+            '/profile',
+        );
+        expect(within(menu).getByRole('menuitem', { name: 'Sessions' })).toHaveAttribute(
+            'href',
+            '/profile#sessions',
+        );
+        expect(within(menu).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+    });
+
+    it('leaves the rail placement exactly as it was: beside the trigger, in a square tile', async () => {
+        const actor = userEvent.setup();
+        render(<AccountMenu user={user} />);
+
+        const trigger = screen.getByRole('button', { name: 'Account menu: Dana Webb' });
+        const menu = await openMenu(actor);
+
+        expect(trigger.className).toContain('rounded-md');
+        expect(menu).toHaveAttribute('data-side', 'right');
+    });
+});

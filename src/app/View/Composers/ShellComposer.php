@@ -3,6 +3,7 @@
 namespace App\View\Composers;
 
 use App\Shared\Navigation\NavigationBuilder;
+use App\Shared\Shell\ShellPresentationResolver;
 use App\Support\Initials;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,16 +25,20 @@ final class ShellComposer
     public function __construct(
         private readonly NavigationBuilder $builder,
         private readonly Request $request,
+        private readonly ShellPresentationResolver $presentation,
     ) {}
 
     public function compose(View $view): void
     {
-        $navigation = $this->builder->build($this->request);
+        // The one resolver decides the frame (EPIC-017 P1); the navigation is projected for it, so the
+        // Blade frame and the React shell are fed the same Focused or Operational model.
+        $presentation = $this->presentation->forRequest($this->request);
+        $navigation = $this->builder->build($this->request, $presentation);
         $user = $this->request->user();
 
         $view->with([
             'navigation' => $navigation,
-            'shell' => ['presentation' => 'operational'],
+            'shell' => ['presentation' => $presentation->value],
             'shellRoot' => self::rootState($navigation),
             'shellWorkspace' => self::currentWorkspace($navigation),
             'shellUser' => $user ? [

@@ -115,7 +115,7 @@ it('keeps auth-subject flows off the reusable personas\' own Fortify bucket', fu
         // Every worker that needs the operator/member persona mints its own real login too
         // (support/auth.ts); an auth-subject flow spending the SAME identity's login budget on top
         // of that is exactly the collision the dedicated fixtures exist to avoid.
-        foreach (['operator@intechral.test', 'user@intechral.test'] as $reusable) {
+        foreach (reusablePersonaEmails() as $reusable) {
             expect($contents)->not->toContain("signIn(page, '{$reusable}'");
         }
     }
@@ -158,13 +158,45 @@ it('caps parallel workers so a persona\'s login budget cannot depend on machine 
     expect($workers)->toBeGreaterThan(0)->toBeLessThanOrEqual(4);
 });
 
-it('keeps the two capability profiles distinct', function () {
+/**
+ * The reusable personas: every identity a worker mints a session for (support/auth.ts). EPIC-017 WP1
+ * adds the three customer-shell personas to the original operator and member.
+ */
+function reusablePersonaEmails(): array
+{
+    return [
+        'operator@intechral.test',
+        'user@intechral.test',
+        'e2e-customer@intechral.test',
+        'e2e-customer-other@intechral.test',
+        'e2e-operational-member@intechral.test',
+    ];
+}
+
+it('keeps the capability profiles distinct', function () {
     $auth = (string) file_get_contents(base_path('tests/Browser/support/auth.ts'));
 
     // Collapsing the member onto the operator would save logins by deleting the authorization
     // coverage that the capability-filtering and read-only-board specs exist to provide.
-    expect($auth)->toContain("'operator@intechral.test'")
-        ->and($auth)->toContain("'user@intechral.test'");
+    foreach (reusablePersonaEmails() as $email) {
+        expect($auth)->toContain("'{$email}'");
+    }
+});
+
+it('seeds every reusable persona, and gives the Operational member exactly one direct capability', function () {
+    $seeder = (string) file_get_contents(base_path('database/seeders/DevSeeder.php'));
+
+    foreach (reusablePersonaEmails() as $email) {
+        // operator@ and user@ are seeded by the base DevSeeder; every e2e-* identity is `firstOrCreate`d.
+        expect($seeder)->toContain($email);
+    }
+
+    // EPIC-017 WP1: the two customers are plain `user`s (Focused shell). The one persona that keeps the
+    // Operational shell does so through a single direct operator-surface capability, nothing broader.
+    expect(substr_count($seeder, "givePermissionTo('projects.manage')"))->toBe(1)
+        ->and($seeder)->toContain('$operationalMember->givePermissionTo')
+        ->and($seeder)->not->toContain('$customer->givePermissionTo')
+        ->and($seeder)->not->toContain('$customerOther->givePermissionTo');
 });
 
 it('stores authentication only, never shell preferences', function () {

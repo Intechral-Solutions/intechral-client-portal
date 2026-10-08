@@ -698,7 +698,11 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
                     <ProfileInformationForm profile={profile} />
                 </SectionPanel>
 
+                {/* The three ids are the targets of the account menu's Security & MFA, Connected
+                    accounts and Sessions entries (N6). Security starts at Password and runs through
+                    Two-factor authentication. */}
                 <SectionPanel
+                    id="security"
                     title="Password"
                     description="Use a unique password you do not use elsewhere."
                 >
@@ -730,6 +734,7 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
                 </SectionPanel>
 
                 <SectionPanel
+                    id="connected-accounts"
                     title="Connected accounts"
                     description="Manage the external providers available for sign-in."
                 >
@@ -737,6 +742,7 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
                 </SectionPanel>
 
                 <SectionPanel
+                    id="sessions"
                     title="Browser sessions"
                     description="Review browser activity and sign out sessions on other devices."
                 >

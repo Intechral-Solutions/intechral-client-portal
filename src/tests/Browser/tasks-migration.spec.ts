@@ -405,7 +405,10 @@ test('filters, search and sort live in the URL, history restores each state, and
 
     // A viewer without the permission asking for view=all is served My tasks, with no Assignee
     // control and no All tasks view in the drawer: the server, not the URL, decides.
-    const memberContext = await contextFor('member');
+    // FLIPPED IN EPIC-017 WP1: the drawer assertions are Operational chrome, so they run as
+    // `operationalMember` (`user` + `projects.manage`, still without tasks.view_all). The same clamp
+    // for a plain customer is asserted below, where the Focused shell has no drawer at all.
+    const memberContext = await contextFor('operationalMember');
     try {
         const memberPage = await memberContext.newPage();
         await memberPage.goto('/tasks?view=all');
@@ -416,6 +419,22 @@ test('filters, search and sort live in the URL, history restores each state, and
         await expect(drawerLink(memberPage, 'Tasks', 'All tasks')).toHaveCount(0);
     } finally {
         await memberContext.close();
+    }
+
+    const customerContext = await contextFor('member');
+    try {
+        const customerPage = await customerContext.newPage();
+        await customerPage.goto('/tasks?view=all');
+        await expect(customerPage.getByRole('heading', { level: 1, name: 'My tasks' })).toBeVisible();
+        await expect(customerPage.getByRole('combobox', { name: 'Assignee' })).toHaveCount(0);
+        // Tasks stays reachable by URL but is not customer navigation, and there is no drawer to open.
+        await expect(customerPage.locator('[data-shell="focused"]')).toHaveCount(1);
+        await expect(customerPage.locator('[data-shell-drawer]')).toHaveCount(0);
+        await expect(
+            customerPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tasks' }),
+        ).toHaveCount(0);
+    } finally {
+        await customerContext.close();
     }
 });
 

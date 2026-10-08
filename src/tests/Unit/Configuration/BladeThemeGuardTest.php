@@ -565,6 +565,42 @@ it('Level B: the target views carry no palette, literal colour, legacy variable,
     expect(implode("\n", $violations))->toBe('');
 });
 
+/**
+ * EPIC-017 WP1: the Blade Focused frame's shell partials. `resources/views/layouts` is outside every
+ * §17.2 Level B root, so the exact 59-view inventory above must NOT grow for them — and they must not
+ * escape the rules for that reason. They are held to every Level B rule here, by name, so a palette
+ * class, literal colour, legacy variable or retired utility cannot enter the customer top bar.
+ */
+function guardFocusedShellPartials(): array
+{
+    // `layouts/app.blade.php` is deliberately not listed: its one finding is `outline-none` on
+    // `<main tabindex="-1">`, the skip link's programmatic focus target. React's `main` and the
+    // pre-existing Operational branch carry the same class, and a target that is never reached by Tab
+    // draws no ring by design (the visible-focus rule is for controls). The partials own every control.
+    return [
+        'layouts/partials/shell/topbar.blade.php',
+        'layouts/partials/shell/focused-sheet.blade.php',
+        'layouts/partials/shell/skip-link.blade.php',
+        'layouts/partials/shell/account-menu.blade.php',
+    ];
+}
+
+it('Level B: the Focused shell partials carry the same Direction D rules as the target views, outside the inventory', function () {
+    $violations = [];
+
+    foreach (guardFocusedShellPartials() as $view) {
+        expect(file_exists(guardRoot()."/resources/views/{$view}"))->toBeTrue($view);
+
+        $source = guardPrepare((string) file_get_contents(guardRoot()."/resources/views/{$view}"), 'blade');
+        array_push($violations, ...guardReport("resources/views/{$view}", guardScan($source, GUARD_LEVEL_B_RULES)));
+    }
+
+    expect(implode("\n", $violations))->toBe('')
+        // They are scanned, never inventoried: the exact Level B membership stays 59.
+        ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
+        ->and(count(guardTargetInventory()))->toBe(59);
+});
+
 it('keeps every allowlist entry reasoned and still needed', function () {
     foreach (guardAllowlist() as $file => $rules) {
         $source = guardPrepare((string) file_get_contents(guardRoot()."/{$file}"), str_ends_with($file, '.php') ? 'blade' : 'js');

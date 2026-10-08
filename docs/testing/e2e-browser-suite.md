@@ -42,15 +42,25 @@ spec files need that persona or how many cores the machine has. `playwright.conf
 | Identity | Role | Used by | Why this identity |
 |---|---|---|---|
 | `operator@intechral.test` | operator (all permissions) | Reusable persona; default for most feature specs | Authorization coverage depends on the full-permission actor |
-| `user@intechral.test` | user (minimal) | Reusable persona; `persona: 'member'` | Authorization coverage depends on the minimal-permission actor; kept distinct from operator so capability-filtering specs mean something |
+| `user@intechral.test` | user (minimal) | Reusable persona; `persona: 'member'` | Authorization coverage depends on the minimal-permission actor; kept distinct from operator so capability-filtering specs mean something. Since EPIC-017 WP1 this actor is in the **Focused** customer shell (top bar; no rail, drawer, breadcrumb or global timer) |
 | `e2e-login-flow@intechral.test` | user | `auth-migration.spec.ts` (invalid credentials, valid login, logout, password confirmation) | The test's subject is the login form itself, not a permission; using the reusable operator email would add this file's login churn to the same Fortify bucket every worker's own operator login already shares |
 | `e2e-profile-mutation@intechral.test` | user | `inertia-coexistence.spec.ts` (account-mutation test) | Edits its own name/email; a failure part-way must never leave the *shared* operator account looking like a different person for every later run |
 | `e2e-signout@intechral.test` | operator (all permissions) | `shell.spec.ts` (sign-out test) | Sessions are database-backed, so signing out destroys the session row presented; the test's assertion (no admin item leaks into a fully-permissioned account's menu) holds for any fully-permissioned account, not specifically the shared one |
+| `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TKT-E2E2` request that is waiting on it |
+| `e2e-customer-other@intechral.test` | user (minimal) | none in EPIC-017 WP1; `persona: 'customerOther'` | A second, unrelated customer, seeded for the Helpdesk isolation journey of the next package (it must be unable to see `e2e-customer`'s tickets). Costs no login until a spec uses it |
+| `e2e-operational-member@intechral.test` | user + `projects.manage` (direct) | `shell.spec.ts`, `blade-shell.spec.ts`, `time-migration.spec.ts`, `tasks-migration.spec.ts`; `persona: 'operationalMember'` | A customer-scoped actor that still gets the **Operational** shell (`projects.manage` is an operator-surface capability), for specs whose subject is the rail, drawer, breadcrumb or timer pill and tray, which a plain customer no longer sees. It is the single owner of the member active-timer set that `time-migration.spec.ts` documents |
 | dynamically created manager (`e2e-wp3-manager-<timestamp>@intechral.test`) | user + `projects.manage` | `projects-migration.spec.ts` (membership test) | Created by the test itself to prove a *specific* non-admin manager's read-only membership view; a fresh, explicitly anonymous context (`contextFor('anonymous')`) is required so it doesn't inherit the project's authenticated `storageState` |
 
-The three `e2e-*` fixtures are seeded by `database/seeders/DevSeeder.php`, guarded (like the
+The six `e2e-*` fixtures are seeded by `database/seeders/DevSeeder.php`, guarded (like the
 operator/user accounts) to `local`/`testing` environments only, and never a production bootstrap
-requirement.
+requirement. Re-seed the development database after pulling a change that adds one
+(`docker compose exec app php artisan db:seed --class=DevSeeder` is idempotent: every account is
+`firstOrCreate` by email); a hosted run seeds from scratch.
+
+**Which shell an identity sees** is decided by capability, never by name: any operator-surface
+capability (`ShellPresentationResolver::OPERATIONAL`) selects the Operational shell, anything else
+the Focused customer shell. A spec that asserts Operational chrome must therefore use `operator` or
+`operationalMember`, not a plain customer.
 
 ## Login budget
 
@@ -63,6 +73,9 @@ Fortify's limiter key is email + IP, 5 requests/minute. With `workers: 3`:
 | `e2e-login-flow@intechral.test` | ≤ 3 | One file, one worker, sequential tests: 1 (invalid) + 1 (valid) + 1 (password confirmation) |
 | `e2e-profile-mutation@intechral.test` | 1 | One test, one login |
 | `e2e-signout@intechral.test` | 1 | One test, one login |
+| `e2e-customer@intechral.test` | ≤ 3 | A worker mints it at most once; one spec file uses it |
+| `e2e-customer-other@intechral.test` | 0 | Seeded, not yet used by any spec |
+| `e2e-operational-member@intechral.test` | ≤ 3 | A worker mints it at most once; at most 3 workers exist |
 | dynamically created manager | 1 per run, unique email every time | Never shares a bucket with any other run or test |
 
 Every bucket stays at least 2 attempts below the 5/minute ceiling, without depending on exact

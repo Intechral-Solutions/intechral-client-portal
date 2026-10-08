@@ -444,7 +444,11 @@ test('keyboard: the skip link is first, and the rail and panel are plain Tab sto
 
 test.describe('as a member', () => {
     // The authorization assertions are about this actor's own capability profile.
-    test.use({ persona: 'member' });
+    //
+    // FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer shell on these Blade
+    // pages (covered by `customer-shell.spec.ts`), so this test, whose subject is the Operational
+    // Blade RAIL and panel, uses `operationalMember`: `user` plus `projects.manage`.
+    test.use({ persona: 'operationalMember' });
 
     test('Blade reveals nothing the server withheld, keeps Resources, and 403 still holds', async ({
         page,

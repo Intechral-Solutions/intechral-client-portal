@@ -9,15 +9,26 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
+use App\Models\User;
+use App\Shared\Shell\ShellPresentation;
+use App\Shared\Shell\ShellPresentationResolver;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, ShellPresentationResolver $presentation): Response
     {
         $user = $request->user();
+
+        // The one place a controller reads the presentation, and only to choose WHICH page this route
+        // renders (EPIC-017 §5, F6): the Focused shell's calm customer Home, or the operator dashboard
+        // below, which is unchanged. It never decides what the actor may see — every section of the
+        // customer Home is gated by the same capability the data has always required.
+        if ($presentation->forRequest($request) === ShellPresentation::Focused) {
+            return $this->customerHome($user);
+        }
 
         // ── Ticket stats ──────────────────────────────────────
         $openTicketCount = $user->can('tickets.assign')
@@ -106,6 +117,66 @@ class DashboardController extends Controller
                 'href' => route('crm.companies.index'),
                 'visit' => 'document',
             ] : null,
+        ]);
+    }
+
+    /**
+     * The Focused customer Home (EPIC-017 §5): what is waiting on the actor, their open requests,
+     * their invoices and their projects, in that order.
+     *
+     * Only data the dashboard already computes for this actor, scoped to their own records, plus the
+     * own `pending_user` list. Each section is null without the capability that has always gated its
+     * data, so the page shows nothing the actor could not already open. Ticket rows carry a deliberately
+     * small, allowlisted shape: no requester, priority, SLA, assignee, company or any time data.
+     * Four bounded queries, constant in the amount of data.
+     */
+    private function customerHome(User $user): Response
+    {
+        $canTickets = $user->can('tickets.view');
+
+        $own = fn (array $statuses) => Ticket::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', $statuses)
+            ->latest()
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get(['id', 'ticket_number', 'title', 'status', 'created_at']);
+
+        $row = fn (Ticket $ticket, array $extra = []) => [
+            'id' => $ticket->id,
+            'number' => $ticket->ticket_number,
+            'title' => $ticket->title,
+            'createdAt' => $ticket->created_at->toIso8601String(),
+            'createdAtHuman' => $ticket->created_at->diffForHumans(),
+            'href' => route('tickets.show', $ticket),
+            'visit' => 'document',
+            ...$extra,
+        ];
+
+        $statusLabels = ['open' => 'Open', 'in_progress' => 'In progress'];
+
+        return Inertia::render('dashboard/customer-home', [
+            'waitingOnYou' => $canTickets
+                ? $own(['pending_user'])->map(fn (Ticket $ticket) => $row($ticket))->values()
+                : null,
+            'openRequests' => $canTickets
+                ? $own(['open', 'in_progress'])->map(fn (Ticket $ticket) => $row($ticket, [
+                    'status' => $ticket->status,
+                    'statusLabel' => $statusLabels[$ticket->status] ?? ucfirst(str_replace('_', ' ', $ticket->status)),
+                ]))->values()
+                : null,
+            'invoices' => $user->can('billing.view') ? [
+                'outstanding' => Invoice::where('client_id', $user->id)->whereIn('status', ['sent', 'overdue'])->count(),
+                'href' => route('billing.client.invoices.index'),
+                'visit' => 'document',
+            ] : null,
+            'projects' => $user->can('projects.view') ? [
+                'active' => Project::visibleTo($user)->where('status', 'active')->count(),
+                'href' => route('projects.index'),
+                'visit' => 'inertia',
+            ] : null,
+            'support' => $canTickets ? ['href' => route('tickets.index'), 'visit' => 'document'] : null,
+            'newRequest' => $user->can('tickets.create') ? ['href' => route('tickets.create'), 'visit' => 'document'] : null,
         ]);
     }
 

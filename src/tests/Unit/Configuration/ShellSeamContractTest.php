@@ -137,10 +137,18 @@ it('keeps pages chrome-agnostic', function (string $forbidden) {
     'NavSheet',
     'AccountMenu',
     'TimerPill',
+    // EPIC-017 WP1: the customer shell's parts are chrome too. A page that rendered the top bar, its
+    // menu sheet or the shell itself would be choosing a presentation, which only AppShell may do.
+    'CustomerShell',
+    'TopNav',
+    'CustomerMenuSheet',
     '@/components/shell/rail',
     '@/components/shell/drawer',
     '@/components/shell/utility-bar',
     '@/components/shell/operator-shell',
+    '@/components/shell/customer-shell',
+    '@/components/shell/top-nav',
+    '@/components/shell/customer-menu-sheet',
     // WP6: the pill is shell chrome mounted by the utility bar. A page reaching for it would be
     // building a second global timer affordance, which Direction D §12.1 permits exactly one of.
     '@/components/time/timer-pill',
@@ -174,6 +182,121 @@ it('reads the presentation discriminator in exactly one component', function () 
     }
 
     expect($readers)->toBe(['components/shell/app-shell.tsx']);
+});
+
+/*
+ * EPIC-017 WP1 (P1) — the PHP half of the single-branch contract.
+ *
+ * Presentation chooses a projection, never a permission. So the resolver that decides it may be read
+ * only by the three places that project (the Inertia share, the Blade composer, and the dashboard's
+ * choice of page component), and the enum only additionally by the builder that takes it as input.
+ * No route, middleware, policy, query, model or controller may consult it.
+ */
+function shellSeamPhpSources(): array
+{
+    $sources = [];
+
+    foreach (['app', 'routes', 'bootstrap', 'config'] as $directory) {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path($directory), FilesystemIterator::SKIP_DOTS));
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && str_ends_with($file->getFilename(), '.php')) {
+                $sources[str_replace(base_path().'/', '', $file->getPathname())] = (string) file_get_contents($file->getPathname());
+            }
+        }
+    }
+
+    ksort($sources);
+
+    return $sources;
+}
+
+it('finds the PHP tree it is asserting over', function () {
+    expect(array_keys(shellSeamPhpSources()))->toContain('app/Shared/Shell/ShellPresentationResolver.php', 'app/Http/Middleware/HandleInertiaRequests.php');
+});
+
+it('lets only the projecting seams read the presentation resolver', function () {
+    $readers = array_keys(array_filter(
+        shellSeamPhpSources(),
+        fn (string $source) => str_contains($source, 'ShellPresentationResolver'),
+    ));
+
+    expect($readers)->toBe([
+        'app/Http/Controllers/DashboardController.php',
+        'app/Http/Middleware/HandleInertiaRequests.php',
+        'app/Shared/Shell/ShellPresentationResolver.php',
+        'app/View/Composers/ShellComposer.php',
+    ]);
+});
+
+it('lets only the resolver, the inertia share, the dashboard and the navigation builder name the presentation enum', function () {
+    $readers = array_keys(array_filter(
+        shellSeamPhpSources(),
+        fn (string $source) => (bool) preg_match('/\bShellPresentation\b(?!Resolver)/', $source),
+    ));
+
+    expect($readers)->toBe([
+        'app/Http/Controllers/DashboardController.php',
+        'app/Http/Middleware/HandleInertiaRequests.php',
+        'app/Shared/Navigation/NavigationBuilder.php',
+        'app/Shared/Shell/ShellPresentation.php',
+        'app/Shared/Shell/ShellPresentationResolver.php',
+    ]);
+});
+
+it('gates nothing on the presentation: no route file, policy, middleware alias or query reads it', function () {
+    foreach (shellSeamPhpSources() as $file => $source) {
+        if (str_starts_with($file, 'routes/') || str_starts_with($file, 'app/Policies/') || str_starts_with($file, 'app/Queries/') || str_starts_with($file, 'app/Models/') || str_starts_with($file, 'bootstrap/') || str_starts_with($file, 'config/')) {
+            expect($source)->not->toContain('ShellPresentation', "{$file} must not consult the shell presentation");
+        }
+    }
+});
+
+it('writes the presentation from the resolver alone: no PHP file states one as a literal', function () {
+    // A literal `'presentation' => 'focused'` (or 'operational') would be a second writer.
+    $offenders = array_keys(array_filter(
+        shellSeamPhpSources(),
+        fn (string $source) => (bool) preg_match("/['\"]presentation['\"]\s*=>\s*['\"]/", $source),
+    ));
+
+    expect($offenders)->toBe([]);
+});
+
+/**
+ * Whether Blade source indexes a presentation key, in either quote style: `$shell['presentation']`,
+ * `$shell["presentation"]`, with or without spaces inside the brackets. The quote must match its pair,
+ * and a bare word, an attribute name or a longer key (`presentationFoo`) is not a read.
+ */
+function shellSeamBladeReadsPresentation(string $source): bool
+{
+    return (bool) preg_match('/\[\s*([\'"])presentation\1\s*\]/', $source);
+}
+
+it('detects a Blade presentation read in either quote style, and only a real one', function () {
+    // The guard below must be able to fail on BOTH forbidden forms, so each is asserted here.
+    expect(shellSeamBladeReadsPresentation("@if (\$shell['presentation'] === 'focused')"))->toBeTrue()
+        ->and(shellSeamBladeReadsPresentation('@if ($shell["presentation"] === "focused")'))->toBeTrue()
+        ->and(shellSeamBladeReadsPresentation("{{ \$shell[ 'presentation' ] }}"))->toBeTrue()
+        ->and(shellSeamBladeReadsPresentation('{{ $shell[ "presentation" ] }}'))->toBeTrue()
+        // Not reads: an attribute, a longer key, a mismatched pair, and prose.
+        ->and(shellSeamBladeReadsPresentation('<div data-presentation="focused">'))->toBeFalse()
+        ->and(shellSeamBladeReadsPresentation("\$x['presentationFamily']"))->toBeFalse()
+        ->and(shellSeamBladeReadsPresentation("\$x['presentation\"]"))->toBeFalse()
+        ->and(shellSeamBladeReadsPresentation('the presentation is chosen by the server'))->toBeFalse();
+});
+
+it('branches on the presentation in one Blade view, and that view reads the composer value only', function () {
+    $readers = [];
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(resource_path('views'), FilesystemIterator::SKIP_DOTS));
+
+    foreach ($iterator as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')
+            && shellSeamBladeReadsPresentation((string) file_get_contents($file->getPathname()))) {
+            $readers[] = str_replace(resource_path('views').'/', '', $file->getPathname());
+        }
+    }
+
+    expect($readers)->toBe(['layouts/app.blade.php']);
 });
 
 it('no longer ships the pre-WP4 shell', function () {

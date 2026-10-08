@@ -1,11 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { useTimers } from '@/components/time/timer-provider';
+import { TimePage } from '@/pages/time';
 import { emitInertiaNavigate, resetInertiaMock, setPageProps } from '@/test/inertia';
 import type { Navigation, Workspace } from '@/types';
 
 import { AppShell, type BreadcrumbSegment } from './app-shell';
 import {
+    focusedNavigation,
     helpdesk,
     home,
     navigation,
@@ -584,4 +587,142 @@ describe('a Projects surface with its own default', () => {
         expect(screen.getByRole('navigation', { name: 'Projects views' })).toBeInTheDocument();
         expect(document.documentElement.dataset.drawerSurface).toBeUndefined();
     });
+});
+
+// ── The timer context above the presentation branch (EPIC-017 §8.3, N7) ───────────────────────────
+//
+// `TimerProvider` moved out of `OperatorShell` so chrome-agnostic pages (`/time`, the task time
+// panel) work under every presentation. The pill and tray stay Operational-only, and hiding them in
+// the Focused shell is presentation, never authorization.
+describe('the timer context above the presentation branch', () => {
+    function Probe() {
+        const { status, timers } = useTimers();
+
+        return (
+            <span data-testid="timer-context">
+                {status}:{timers.length}
+            </span>
+        );
+    }
+
+    function mountPresentation(presentation: 'operational' | 'focused', permissions: string[]) {
+        setPageProps({
+            auth: { user, permissions },
+            shell: { presentation },
+            navigation:
+                presentation === 'focused'
+                    ? focusedNavigation('home')
+                    : navigation([projects], 'projects'),
+        });
+
+        return render(
+            <AppShell>
+                <Probe />
+            </AppShell>,
+        );
+    }
+
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+        vi.stubGlobal('fetch', fetchMock);
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each(['operational', 'focused'] as const)(
+        'gives a page useTimers() under the %s presentation',
+        async (presentation) => {
+            mountPresentation(presentation, ['time.log']);
+
+            // useTimers() throws outside a provider, so reaching the probe proves the provider is mounted.
+            expect(await screen.findByText('ready:0')).toBeInTheDocument();
+        },
+    );
+
+    it.each(['operational', 'focused'] as const)(
+        'reads the active timers once when time.log is held, under the %s presentation',
+        async (presentation) => {
+            mountPresentation(presentation, ['time.log']);
+            await screen.findByText('ready:0');
+
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/time/timers/active');
+        },
+    );
+
+    it.each(['operational', 'focused'] as const)(
+        'is disabled without time.log: no timer request under the %s presentation',
+        (presentation) => {
+            mountPresentation(presentation, []);
+
+            expect(screen.getByTestId('timer-context')).toHaveTextContent('ready:0');
+            expect(fetchMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it('draws the global pill in the Operational shell and never in the Focused shell', async () => {
+        const { unmount } = mountPresentation('operational', ['time.log']);
+
+        expect(await screen.findByTestId('timer-pill')).toBeInTheDocument();
+        unmount();
+        resetInertiaMock();
+
+        mountPresentation('focused', ['time.log']);
+        await screen.findByText('ready:0');
+
+        expect(screen.queryByTestId('timer-pill')).toBeNull();
+        expect(document.querySelector('[data-shell-timer]')).toBeNull();
+    });
+
+    it('lets /time render under the Focused shell with its start form and no global timer', async () => {
+        setPageProps({
+            auth: { user, permissions: ['time.log'] },
+            shell: { presentation: 'focused' },
+            navigation: focusedNavigation('home'),
+        });
+
+        render(
+            <AppShell>
+                <TimePage
+                    entries={{
+                        data: [],
+                        current_page: 1,
+                        last_page: 1,
+                        from: null,
+                        to: null,
+                        total: 0,
+                        links: [],
+                        prev_page_url: null,
+                        next_page_url: null,
+                    }}
+                    projects={[]}
+                    filters={{ project_id: null, ticket_id: null, from: null, to: null }}
+                    totalMinutes={0}
+                />
+            </AppShell>,
+        );
+
+        expect(await screen.findByRole('button', { name: 'Start timer' })).toBeInTheDocument();
+        expect(document.querySelector('[data-shell="focused"]')).not.toBeNull();
+        expect(screen.queryByTestId('timer-pill')).toBeNull();
+    });
+});
+
+it('branches on the presentation here and nowhere else: Focused renders the customer shell', () => {
+    setPageProps({
+        auth: { user, permissions: [] },
+        shell: { presentation: 'focused' },
+        navigation: focusedNavigation('home'),
+    });
+
+    render(
+        <AppShell>
+            <h1>Home</h1>
+        </AppShell>,
+    );
+
+    expect(document.querySelector('[data-shell="focused"]')).not.toBeNull();
+    expect(document.querySelector('[data-shell="operational"]')).toBeNull();
 });

@@ -20,6 +20,9 @@ const avatarVariants = cva(
                 sm: 'h-6 w-6 text-[10px]',
                 md: 'h-7 w-7 text-xs',
                 lg: 'h-9 w-9 text-sm',
+                // The customer top bar's account trigger is the avatar itself (Direction D §13.1): a
+                // 34px circle, between the rail's 28px mark and the menu header's 36px.
+                account: 'h-8.5 w-8.5 text-sm',
             },
         },
         defaultVariants: { size: 'md' },

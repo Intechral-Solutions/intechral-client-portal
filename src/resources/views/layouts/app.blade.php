@@ -8,6 +8,12 @@
     exactly the ones §14.2 permits — a docked-or-hidden panel with no overlay, pin or view switcher.
 
     Page bodies (@yield('content')) are untouched and keep their own containers (§14.3).
+
+    EPIC-017 WP1 — this file is the Blade branch point for the shell presentation, as AppShell is for
+    React. `$shell['presentation']` comes from the one ShellPresentationResolver (via ShellComposer): a
+    `focused` user gets the customer top bar and a centred column, an `operational` one (and a guest)
+    gets the rail, panel and utility bar below. The navigation each reads is the projection the same
+    resolver chose, so neither branch filters, matches a URL or computes an active state.
 --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light"
@@ -35,30 +41,49 @@
     @stack('head')
 </head>
 <body class="min-h-screen antialiased">
-    <div data-shell="operational"
-         data-shell-renderer="blade"
-         data-panel="{{ $shellRoot['hasPanel'] ? 'true' : 'false' }}">
-        {{-- First focusable element; visible on focus, never removed (Direction D §14.1). --}}
-        <a href="#main-content"
-           class="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:rounded-control focus-visible:bg-surface focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:text-text focus-visible:shadow-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Skip to content</a>
+    @if ($shell['presentation'] === 'focused')
+        {{-- The Focused (customer) shell: a 60px top bar and one centred column, no rail, panel,
+             utility bar or timer (Direction D §7). Geometry is the same `[data-shell='focused']` block in
+             app.css that lays out React, off the same hooks. --}}
+        <div data-shell="focused"
+             data-shell-renderer="blade">
+            {{-- First focusable element; visible on focus, never removed (Direction D §14.1). --}}
+            @include('layouts.partials.shell.skip-link')
 
-        @include('layouts.partials.shell.rail')
+            @include('layouts.partials.shell.topbar')
 
-        @if ($shellRoot['hasPanel'])
-            @include('layouts.partials.shell.drawer')
-        @endif
-
-        <div data-shell-canvas>
-            {{-- Carries the breadcrumb and, on its right, the timer pill (WP6, §18.4). The
-                 pre-Direction-D timer strip that used to follow it here is retired. --}}
-            @include('layouts.partials.shell.utility-bar')
-
-            {{-- `tabindex="-1"` makes it the skip link's focus target. --}}
-            <main id="main-content" tabindex="-1" class="min-w-0 flex-1 outline-none">
-                @yield('content')
-            </main>
+            <div data-shell-column>
+                {{-- `tabindex="-1"` makes it the skip link's focus target. --}}
+                <main id="main-content" tabindex="-1" class="min-w-0 flex-1 outline-none">
+                    @yield('content')
+                </main>
+            </div>
         </div>
-    </div>
+    @else
+        <div data-shell="operational"
+             data-shell-renderer="blade"
+             data-panel="{{ $shellRoot['hasPanel'] ? 'true' : 'false' }}">
+            {{-- First focusable element; visible on focus, never removed (Direction D §14.1). --}}
+            @include('layouts.partials.shell.skip-link')
+
+            @include('layouts.partials.shell.rail')
+
+            @if ($shellRoot['hasPanel'])
+                @include('layouts.partials.shell.drawer')
+            @endif
+
+            <div data-shell-canvas>
+                {{-- Carries the breadcrumb and, on its right, the timer pill (WP6, §18.4). The
+                     pre-Direction-D timer strip that used to follow it here is retired. --}}
+                @include('layouts.partials.shell.utility-bar')
+
+                {{-- `tabindex="-1"` makes it the skip link's focus target. --}}
+                <main id="main-content" tabindex="-1" class="min-w-0 flex-1 outline-none">
+                    @yield('content')
+                </main>
+            </div>
+        </div>
+    @endif
 
     @stack('scripts')
 </body>

@@ -31,10 +31,23 @@ it('hides itself from assistive technology when the name is printed beside it', 
 });
 
 it('is a circle at every size, whatever the person is', () => {
-    for (const size of ['sm', 'md', 'lg'] as const) {
+    for (const size of ['sm', 'md', 'lg', 'account'] as const) {
         const { container, unmount } = render(<Avatar name="Operator Person" size={size} />);
 
         expect(container.firstElementChild).toHaveClass('rounded-full');
         unmount();
     }
+});
+
+it('offers a 34px account size for the customer top-bar trigger, between the rail mark and the menu header', () => {
+    const { container } = render(<Avatar name="Ada Lovelace" size="account" />);
+    const avatar = container.firstElementChild;
+
+    // h-8.5 / w-8.5 are 34px on the 4px spacing scale. The 28px (md) rail mark and 36px (lg) menu
+    // header sizes are unchanged.
+    expect(avatar).toHaveClass('h-8.5', 'w-8.5', 'text-sm');
+    expect(avatar).toHaveClass('rounded-full');
+
+    const { container: md } = render(<Avatar name="Ada Lovelace" />);
+    expect(md.firstElementChild).toHaveClass('h-7', 'w-7');
 });
