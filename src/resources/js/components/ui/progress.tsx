@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import type { HTMLAttributes } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -51,8 +51,8 @@ export function Progress({ value, max = 100, label, valueText, size, className, 
             {...props}
         >
             <div
-                className="h-full rounded-full bg-progress-fill transition-[width] duration-motion-base ease-motion motion-reduce:transition-none"
-                style={{ width: `${percent}%` }}
+                className="h-full w-(--progress-value) rounded-full bg-progress-fill transition-[width] duration-motion-base ease-motion motion-reduce:transition-none"
+                style={{ '--progress-value': `${percent}%` } as CSSProperties}
             />
         </div>
     );

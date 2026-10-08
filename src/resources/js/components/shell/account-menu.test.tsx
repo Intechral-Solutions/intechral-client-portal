@@ -37,7 +37,7 @@ it('exposes the rail account trigger as a named menu button with a circular avat
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     // Direction D §13.1 / L9: a rounded-square 40x40 control containing a circular avatar. The
     // avatar never encodes role, so the circle is not conditional.
-    expect(trigger.className).toContain('rounded-[6px]');
+    expect(trigger.className).toContain('rounded-md');
     expect(trigger.querySelector('.rounded-full')).not.toBeNull();
 });
 

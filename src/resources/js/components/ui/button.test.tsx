@@ -87,8 +87,37 @@ describe('variant contract', () => {
         expect(buttonVariants({ variant: 'destructive' })).toContain('bg-destructive');
     });
 
+    it('gives a destructive trigger its own non-solid danger treatment, so callers do not restyle a secondary', () => {
+        const trigger = buttonVariants({ variant: 'danger-secondary' });
+
+        // The secondary surface with a danger edge and danger text: it looks like a trigger, not a confirmation.
+        expect(trigger).toContain('bg-surface');
+        expect(trigger).toContain('border-danger');
+        expect(trigger).toContain('text-danger');
+        expect(trigger).not.toMatch(/bg-(destructive|danger(?!-soft))/);
+        expect(trigger).not.toContain('border-control-edge');
+        expect(trigger).not.toContain('text-destructive-foreground');
+    });
+
+    it('leaves the ordinary secondary and the solid destructive exactly as they were', () => {
+        expect(buttonVariants({ variant: 'secondary' })).toContain('border-control-edge');
+        expect(buttonVariants({ variant: 'secondary' })).toContain('text-text');
+        expect(buttonVariants({ variant: 'secondary' }).split(' ')).not.toContain('border-danger');
+        expect(buttonVariants({ variant: 'destructive' })).toContain('bg-destructive');
+        expect(buttonVariants({ variant: 'destructive' })).toContain('text-destructive-foreground');
+        expect(buttonVariants({ variant: 'destructive' }).split(' ')).not.toContain('bg-surface');
+    });
+
+    it('renders the danger trigger without any caller class', () => {
+        render(<Button variant="danger-secondary">Delete project</Button>);
+
+        const button = screen.getByRole('button', { name: 'Delete project' });
+        expect(button).toHaveClass('border-danger', 'text-danger', 'bg-surface');
+        expect(button).not.toHaveClass('border-control-edge', 'bg-destructive');
+    });
+
     it('never carries two classes for the same property, since links use the raw string', () => {
-        for (const variant of ['primary', 'secondary', 'ghost', 'destructive'] as const) {
+        for (const variant of ['primary', 'secondary', 'ghost', 'danger-secondary', 'destructive'] as const) {
             for (const size of ['sm', 'md', 'lg', 'icon'] as const) {
                 const classes = buttonVariants({ variant, size }).split(' ');
                 const of = (pattern: RegExp) => classes.filter((c) => pattern.test(c));
@@ -101,7 +130,7 @@ describe('variant contract', () => {
     });
 
     it('keeps a disabled label readable: muted text, never the faint token', () => {
-        for (const variant of ['primary', 'secondary', 'ghost', 'destructive'] as const) {
+        for (const variant of ['primary', 'secondary', 'ghost', 'danger-secondary', 'destructive'] as const) {
             expect(buttonVariants({ variant })).toContain('disabled:text-text-muted');
             expect(buttonVariants({ variant })).not.toContain('text-faint');
         }
