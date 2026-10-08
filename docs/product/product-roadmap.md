@@ -82,6 +82,13 @@ Each item becomes one or more implementation epics before work begins, consisten
 
 ### Development pause and restart checkpoint
 
+> **Forward note (2026-10-07, Helpdesk MVP planned).** The Helpdesk MVP, the **next product epic**, now has its design gate: [EPIC-017: Helpdesk MVP and Customer Shell](../epics/EPIC-017-helpdesk-mvp-customer-shell.md), **Planned**.
+> - **Owner review is complete:** the architecture, owner decisions O1–O3 and plan choices P1–P6 are approved (EPIC-017 §36–§37). No owner decision remains open.
+> - **WP1 is the dedicated customer shell** (D1).
+> - The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29)) is owner-approved and green. At the last verification (2026-10-08) it was **not yet merged**, so its merge remains WP1's only external entry condition.
+> - No implementation branch exists yet.
+> - The checkpoint table below is otherwise unchanged and remains the record of the EPIC-016 close.
+
 > **EPIC-016 IS DONE (2026-10-07).** Release 1 Phase 1's epic is complete and merged. The immediate next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP. Development may pause between epics by owner choice; no product or technical blocker is implied. The owner rulings D1–D4 are locked ([Owner rulings D1–D4](#owner-rulings-d1d4)). Nothing needs owner input before work resumes.
 
 **Checkpoint (2026-10-07, EPIC-016 Done).** The 2026-10-06 pause checkpoint (integrated at `88e15d7`, WP2–WP4 not started) is superseded by this one; it remains in the git history.
@@ -316,6 +323,14 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 > - **Other decisions:** pin exactly `0.2.0` (no caret or tilde; the package is young, so upgrades are deliberate and re-baselined). Composite contracts for `page-frame`, `page-header`, `section` and `pagination` are deferred until evidence supports governing them as primitives.
 > - The Helpdesk MVP is not blocked by this work.
 
+> **Forward note (2026-10-07): Phase 2 vehicle planned.** The Helpdesk MVP is [EPIC-017](../epics/EPIC-017-helpdesk-mvp-customer-shell.md) (**Planned**; design gate approved by the owner, O1–O3 and P1–P6 recorded).
+> - **Packages:** WP1 customer shell foundation (first, per D1); WP2 customer Helpdesk in React; WP3 operator ticket workspace; WP4 operator queue, bulk and reports (completing EPIC-011 Phase F); WP5 notification hardening and closeout.
+> - **Architecture:** same routes with capability-aware pages (Direction D §20 Q1), and no organization switcher (§20 Q3).
+> - **Prerequisites:** no Directory dependency, no schema change.
+> - **RE-0** (with the EPIC-012 discovery spike and the Directory data-model ADR) runs **in parallel** and is **not** a Helpdesk blocker. EPIC-017 §23 lists the Helpdesk runtime assumptions RE-0 must verify.
+> - **Order unchanged:** Helpdesk MVP → Directory → Finance → Advanced Projects.
+> - **Precondition:** the `@shadcn/lint` adoption (PR #29) must be on `main` before WP1. It was still open at the last verification (2026-10-08).
+
 **Why this order and not another.**
 - **Helpdesk still leads.**
   - It has no hard dependency left.
@@ -349,6 +364,12 @@ The epic absorbs EPIC-016's deferred Helpdesk items:
 **Company-level visibility stays owner-only (EPIC-010D D1, locked).** Organization-level ticket visibility is Post-v1 and depends on Directory. Incidents are conditional (default Post-v1). Knowledge is Post-v1; SLA, routing and automation remain Future.
 
 **Is Helpdesk still the best next major product epic? Yes**, on the evidence above. Under owner ruling D1 it also delivers the customer shell, as its first package.
+
+> **Forward note (2026-10-07).** The implementation contract for this scope is [EPIC-017](../epics/EPIC-017-helpdesk-mvp-customer-shell.md) (Planned). Its §10 classifies every Helpdesk capability, and its §28 disposes of the absorbed EPIC-016 items listed above.
+>
+> It also records a security/privacy defect found while planning, a **Release 1 requirement**: the customer ticket page lists operators' time entries, because the built-in `user` role holds `time.log`.
+> - WP2 closes it on the server: requester props carry no time data, and ticket-context time is operator-only (owner ruling O1).
+> - The owner-approved customer lifecycle (O2) and the email additions (O3) are recorded there too. O3 includes a new-ticket operator alert whose production destination must be verified before Release 1.
 
 <a id="directory-release-1"></a>
 **Directory.**

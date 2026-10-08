@@ -11,6 +11,10 @@
 > - Phase F (Tickets) has not begun and has no implementation document. Critical Ticket authorization/integrity fixes are sequenced first as a separate hardening package; Helpdesk implementation sequencing is revisited under the roadmap and new design system.
 >
 > The phase sequence below is preserved unchanged as the historical plan and implementation record.
+>
+> **Forward note (2026-10-07).** The statement above that Phase F has no implementation document is superseded. [EPIC-017: Helpdesk MVP and Customer Shell](./EPIC-017-helpdesk-mvp-customer-shell.md) (Planned) is the Phase F contract.
+> - WP2 migrates the customer Ticket pages; WP3 and WP4 migrate the operator pages.
+> - No separate EPIC-011F document is created.
 
 ---
 

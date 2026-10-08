@@ -888,6 +888,13 @@ Suggested branch: `hardening/epic-10d-helpdesk-security` (matching the EPIC-010C
 
 ## 20. Deferred Helpdesk work
 
+> **Forward note (2026-10-07).** Each item below now has a disposition in [EPIC-017 §28](./EPIC-017-helpdesk-mvp-customer-shell.md#28-existing-technical-debt) (Planned):
+> - **Included:** F-2, F-3 (escaping), F-4, F-6, F-7, stale-assignee surfacing, skipped-row bulk reporting and the React migration.
+> - **Left with Directory:** F-1/D3 organization context, F-5 and organization-level visibility.
+> - **Post-v1:** D5 and SLA/routing.
+>
+> The D1–D5 decisions and the final contract above are unchanged and bind EPIC-017.
+
 Carried to the [Helpdesk MVP](../product/product-roadmap.md#later--helpdesk-mvp) or named platform work, not EPIC-010D:
 
 - Organization-level Ticket visibility for customers (D1), on the Directory model, possibly via `tickets.view_org` or a relationship policy
