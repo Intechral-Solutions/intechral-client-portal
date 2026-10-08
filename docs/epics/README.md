@@ -55,4 +55,5 @@ On 2026-10-06 the roadmap was re-oriented around **Release 1**, the first custom
 EPIC-017 (planned 2026-10-07) is the implementation contract for the roadmap's Release 1 *Helpdesk MVP* item and for EPIC-011 Phase F (Tickets).
 - Its first package is the dedicated customer shell (Release 1 ruling D1).
 - Its design gate has completed owner review: the architecture, decisions O1–O3 and plan choices P1–P6 are approved.
-- The `@shadcn/lint` adoption (PR #29), whose merge is WP1's entry condition, was still open at the last verification (2026-10-08).
+- The `@shadcn/lint` adoption (PR #29) merged on 2026-10-08 (`61e46ab`) and is part of the current `main` baseline; it is not a WP1 dependency.
+- EPIC-017 is **Planned**: WP0 is committed and WP1 has not started.

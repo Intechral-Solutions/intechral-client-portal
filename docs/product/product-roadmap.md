@@ -85,7 +85,7 @@ Each item becomes one or more implementation epics before work begins, consisten
 > **Forward note (2026-10-07, Helpdesk MVP planned).** The Helpdesk MVP, the **next product epic**, now has its design gate: [EPIC-017: Helpdesk MVP and Customer Shell](../epics/EPIC-017-helpdesk-mvp-customer-shell.md), **Planned**.
 > - **Owner review is complete:** the architecture, owner decisions O1–O3 and plan choices P1–P6 are approved (EPIC-017 §36–§37). No owner decision remains open.
 > - **WP1 is the dedicated customer shell** (D1).
-> - The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29)) is owner-approved and green. At the last verification (2026-10-08) it was **not yet merged**, so its merge remains WP1's only external entry condition.
+> - The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29)) is **merged** (merge `61e46ab`, 2026-10-08) and is part of the current `main` baseline. It is not a WP1 dependency.
 > - No implementation branch exists yet.
 > - The checkpoint table below is otherwise unchanged and remains the record of the EPIC-016 close.
 
@@ -322,6 +322,8 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 >   - **R4, 11px labels:** the drawer and nav-sheet 11px labels move to the 12px Direction D scale. **The spec-defined 10px rail label stays 10px** (a narrow documented suppression if flagged).
 > - **Other decisions:** pin exactly `0.2.0` (no caret or tilde; the package is young, so upgrades are deliberate and re-baselined). Composite contracts for `page-frame`, `page-header`, `section` and `pagination` are deferred until evidence supports governing them as primitives.
 > - The Helpdesk MVP is not blocked by this work.
+>
+> **Forward note (2026-10-08).** The adoption described above is **merged**: [PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29), merge commit `61e46ab176fb223c8190698e535a580b46a2d95d`. The "awaiting" and "not on `main`" wording in the first line of this note is historical. The post-merge `main` CI is green overall (its Playwright job was red on the first attempt and green on an unchanged rerun; the cause of the first failure was not established).
 
 > **Forward note (2026-10-07): Phase 2 vehicle planned.** The Helpdesk MVP is [EPIC-017](../epics/EPIC-017-helpdesk-mvp-customer-shell.md) (**Planned**; design gate approved by the owner, O1–O3 and P1–P6 recorded).
 > - **Packages:** WP1 customer shell foundation (first, per D1); WP2 customer Helpdesk in React; WP3 operator ticket workspace; WP4 operator queue, bulk and reports (completing EPIC-011 Phase F); WP5 notification hardening and closeout.
@@ -329,7 +331,7 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 > - **Prerequisites:** no Directory dependency, no schema change.
 > - **RE-0** (with the EPIC-012 discovery spike and the Directory data-model ADR) runs **in parallel** and is **not** a Helpdesk blocker. EPIC-017 §23 lists the Helpdesk runtime assumptions RE-0 must verify.
 > - **Order unchanged:** Helpdesk MVP → Directory → Finance → Advanced Projects.
-> - **Precondition:** the `@shadcn/lint` adoption (PR #29) must be on `main` before WP1. It was still open at the last verification (2026-10-08).
+> - **Foundation:** the `@shadcn/lint` adoption (PR #29) is merged and current; there is no external precondition. WP1 starts from the clean integrated `main`.
 
 **Why this order and not another.**
 - **Helpdesk still leads.**

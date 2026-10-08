@@ -14,9 +14,13 @@ No implementation has started, and no implementation branch exists.
 **Shell seam:** [EPIC-013 §23](./EPIC-013-direction-d-shell-design-system.md#23-audience-presentation-and-the-shell-seam): the presentation discriminator, `AppShell` as the single branch point, and chrome-agnostic pages.
 **Prerequisites:**
 - [EPIC-013](./EPIC-013-direction-d-shell-design-system.md), [EPIC-014](./EPIC-014-tasks-workspace-overhaul.md), [EPIC-015](./EPIC-015-projects-ux-expansion.md) and [EPIC-016](./EPIC-016-direction-d-blade-theme-control-adoption.md): all Done.
-- The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29), head `e0cc0bf671d6deb6bef9b54d012eaa5c99647113`, both PR CI jobs green). **At the last verification it was open and not merged**: the GitHub API reported `merged: false` on 2026-10-08 00:10 UTC, and `origin/main` was still `2fd0918`. Its merge is therefore **still the entry condition of WP1** ([§31](#31-work-packages)), the only remaining one besides committing WP0. When it merges, record the merge SHA and the merge-triggered `main` CI here, and remove this condition ([§38](#38-restart-and-handoff-notes)).
+- The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29)) is **merged** and is part of the current `main` baseline: final head `e0cc0bf671d6deb6bef9b54d012eaa5c99647113`, merge commit `61e46ab176fb223c8190698e535a580b46a2d95d` (2026-10-08 00:34 UTC). It is **no longer a WP1 dependency** ([§24](#24-shadcnlint-contract), [§31](#31-work-packages)). Its post-merge `main` CI is recorded under the integrated baseline below.
 
-**Planning baseline:** `main` @ `2fd0918e17f6378442d566cd6b0703ec1c7a3ff9`, the merge of PR #28. It was equal to `origin/main`, with a clean working tree. Merge-triggered `main` CI run 37694314651 was green. Verified 2026-10-07 and **re-verified 2026-10-08 during the owner-review remediation**: `origin/main` had not advanced.
+**Integrated baseline (current).** `main` @ `61e46ab176fb223c8190698e535a580b46a2d95d`, the merge of PR #29, on top of the WP0 commit `9f94667` (`docs: establish EPIC-017 Helpdesk MVP`). `AGENTS.md` and `src/eslint-suppressions.json` are on `main`.
+- **WP0 commit run** 37707351215 (`9f94667`): green.
+- **PR #29 merge run** 37708447871 (`61e46ab`): overall **green**. Attempt 1 had `./dev check gates` green and the Playwright browser suite **red**. Attempt 2, an unchanged rerun of the same commit, was green on both jobs. **The cause of the first Playwright failure was not established**; it is recorded as an observed flake and is not diagnosed here. It belongs with the known browser-suite timing debt carried to Release 1 hardening ([§28](#28-existing-technical-debt)).
+
+**Historical planning baseline (2026-10-07/08).** WP0 was written against `main` @ `2fd0918e17f6378442d566cd6b0703ec1c7a3ff9` (the merge of PR #28; `main` CI run 37694314651 green), **while PR #29 was still open**. It was re-verified as still open on 2026-10-08 00:10 UTC during the owner-review remediation, before it merged at 00:34 UTC. The sections below that mention PR #29 as open are marked as that historical baseline.
 
 ---
 
@@ -84,16 +88,13 @@ At the end of the epic:
 
 | Check | Result |
 |---|---|
-| Branch / HEAD | `main` @ `2fd0918e17f6378442d566cd6b0703ec1c7a3ff9`, equal to `origin/main`, clean |
+| Branch / HEAD | `main` @ `2fd0918e17f6378442d566cd6b0703ec1c7a3ff9`, equal to `origin/main`, clean *(historical planning baseline; the current baseline is in the header)* |
 | Latest `main` CI | Run 37694314651 (merge of PR #28): **green**. The earlier red run 37661096171 (`docs: approve shadcn lint adoption`) was the Finance fixture collision that PR #28 fixed. |
-| Open PRs | **#29 `Adopt shadcn lint for Direction D React styling`** (`tooling/shadcn-lint-adoption`, head `e0cc0bf`): open, mergeable, both CI jobs green, **not merged**. It is tooling only and explicitly excludes Helpdesk and customer-shell work. It is not unrelated product work, so planning proceeds; its merge is a WP1 entry condition. **Re-verified 2026-10-08 00:10 UTC:** still open, `merged: false`. |
+| Open PRs *(at the planning baseline)* | **#29 `Adopt shadcn lint for Direction D React styling`** (`tooling/shadcn-lint-adoption`, head `e0cc0bf`) was open, mergeable and green, and **not merged** at that time. It is tooling only and excluded Helpdesk and customer-shell work. **It has since merged** (`61e46ab`, 2026-10-08 00:34 UTC). |
 | Helpdesk branches / partial work | None. No `EPIC-017` reference, no Helpdesk or customer-shell branch, and no React Ticket page or type exists. |
-| Local branches | `tooling/shadcn-lint-adoption` (PR #29). Remote `origin/*` feature branches are historical, already merged. |
+| Local branches *(at the planning baseline)* | `tooling/shadcn-lint-adoption` (PR #29). Remote `origin/*` feature branches were historical, already merged. |
 
-**Correction to the planning premise.** Both the handoff prompt for this design gate and the later owner-review remediation brief stated that the `@shadcn/lint` adoption was merged. The repository and the GitHub API show that it is green but **not merged** (re-verified 2026-10-08):
-
-- `main` has no `@shadcn/lint`, no `AGENTS.md` and no `src/eslint-suppressions.json`.
-- This document plans against the policy in PR #29 (its `AGENTS.md`, the ESLint configuration and the `docs/testing/ci.md` additions), because the owner has approved that adoption ([roadmap forward note, 2026-10-07](../product/product-roadmap.md#release-1-sequence)).
+**Historical note on the planning premise.** Two of the briefs that produced this gate described the `@shadcn/lint` adoption as already merged while PR #29 was in fact still open on the remote. The gate was therefore written against the true state: PR #29 open, green and unmerged. **That has since been resolved**: PR #29 merged on 2026-10-08, so the policy this document plans against (its `AGENTS.md`, the ESLint configuration and the `docs/testing/ci.md` additions) is now on `main`.
 
 **Documents read for this gate:**
 
@@ -887,9 +888,9 @@ RE-0 is **not** implemented by this epic and chooses no host. EPIC-017 only stat
 
 ## 24. `@shadcn/lint` contract
 
-The owner-approved policy (PR #29: its `AGENTS.md`, `eslint.config.js` and `docs/testing/ci.md`) is authoritative for all React work here.
+The `@shadcn/lint` policy (merged in PR #29, `AGENTS.md`, `eslint.config.js`, `src/eslint-suppressions.json` and `docs/testing/ci.md`) is on `main` and is **authoritative for all React work here**.
 
-At the last verification (2026-10-08) PR #29 was green but **not yet merged**, which is why it remains WP1's entry condition. WP1 starts from the merged policy and re-reads it at start, because the baseline may evolve.
+It is part of the baseline, not a prerequisite. WP1 re-reads it at start, because the baseline may evolve.
 
 - **All six rules stay at error** for Helpdesk and customer-shell code: `no-raw-colors`, `no-unknown-classes`, `no-restyle`, `no-arbitrary-values`, `no-inline-styles`, `require-static-classes`.
 - **No rule is weakened, scoped out or bulk-suppressed** for this epic. `src/eslint-suppressions.json` **must not grow**; it may only shrink.
@@ -1111,7 +1112,9 @@ Six packages, WP0 included. Each implementation WP is one PR from the epic branc
 - **Contract already decided:** O1's nav set (no Tasks, no Time) and P1's resolver are part of this package's contract, not open inputs.
 - **Dependencies:**
   - WP0 committed on `main`;
-  - the `@shadcn/lint` adoption (PR #29) merged on `main`. At the last verification (2026-10-08) it was green but not yet merged ([header](#epic-017-helpdesk-mvp-and-customer-shell)). This condition drops away once it merges.
+  - current `main` integrated and green, with a clean implementation start ([§38](#38-restart-and-handoff-notes)).
+
+  The `@shadcn/lint` adoption is already on `main` and is not a dependency.
 - **Key tests:** the resolver matrix and the **drift guard**; Focused ⊆ Operational; shared-props allowlist; zero extra queries; `CustomerShell` and `AppShell` Vitest (`TimerProvider` under both presentations, no pill or tray in Focused); Blade Focused frame Pest; Playwright journeys 1, 2 and 11; existing operator shell suites unchanged.
 - **Exit criteria:**
   - a `user` customer sees the top bar on Home, Projects, Profile, Tickets (Blade), Invoices and Pages, at 390, 768 and 1280, in both themes, with no overflow;
@@ -1256,7 +1259,7 @@ This follows EPIC-016's practice, confirmed from git history: WP0 as a docs comm
 | E2E ticket growth (no delete route) | High without action | The locked local/testing-only cleanup command ([§25.3](#253-playwright)); `tickets` is tracked in the run counts |
 | The cleanup command is ever run against real data | Low | It refuses production and non-allowlisted environments, matches only the `E2E-` title contract, and takes no target arguments (Pest-tested) |
 | The P1 resolver list drifts from new capabilities | Low | Permanent drift guard derived from the registered routes and `NavigationBuilder` (P1), plus the `PermissionCatalogue` classification check |
-| PR #29 merges late or is reworked before merge | Low | It is WP1's entry condition; re-read the policy at WP1 start |
+| The `@shadcn/lint` baseline or suppression file evolves before or during the epic | Low | Re-read the policy at WP1 start; the no-growth rule ([§24](#24-shadcnlint-contract)) applies to whatever the baseline is then |
 | Production ships with no new-ticket alert | Medium without a check | RE-H13 preflight; an explicit owner ruling needed for any alternative |
 | Upload limits on the host lower than 20 MB | Medium | RE-H5. The app limit becomes a config value. Lowering it is acceptable. |
 | Mail Markdown escaping changes the look of existing mails | Low | Snapshot the rendered mail before and after |
@@ -1357,11 +1360,11 @@ These design decisions were taken by this gate and **approved by the owner (2026
 - **Before WP1:**
   1. Fetch, fast-forward `main` to `origin/main`, and check that the tree is clean and the latest `main` CI is green.
   2. Confirm WP0 is committed on `main`.
-  3. Confirm the `@shadcn/lint` adoption is on `main`: `src/eslint-suppressions.json` and `AGENTS.md` are present. At the last verification (2026-10-08) PR #29 was still open. **If it has merged,** record its merge SHA and merge CI run in this document's header and drop the condition there and in WP1.
-  4. Create `feature/epic-017-helpdesk-mvp-customer-shell` from current `main`.
-  5. Run `./dev doctor` and `./dev check`.
-  6. **Re-inventory** the Helpdesk views and shell hooks against this document's §4 (EPIC-011 L484: inventories are planning baselines).
-  7. **Re-read the `@shadcn/lint` baseline** (`AGENTS.md`, `eslint.config.js`, `src/eslint-suppressions.json`), because it may evolve.
+  3. Create or switch to `feature/epic-017-helpdesk-mvp-customer-shell` from current `main`.
+  4. Run `./dev doctor` and `./dev check`.
+  5. **Re-inventory** the Helpdesk views and shell hooks against this document's §4 (EPIC-011 L484: inventories are planning baselines).
+  6. **Re-read the `@shadcn/lint` baseline** (`AGENTS.md`, `eslint.config.js`, `src/eslint-suppressions.json`), because it may evolve.
+  7. Begin WP1.
 - **Do not assume:**
   - that the line numbers in §4 are still exact;
   - that `@shadcn/lint`'s suppression baseline is unchanged;
