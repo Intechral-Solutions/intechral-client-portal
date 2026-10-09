@@ -17,6 +17,9 @@ DEV_LIB_LOADED=1
 # shellcheck disable=SC2034
 readonly SVC_APP=app SVC_DB=db SVC_NGINX=nginx
 readonly DEV_ENV=local DEV_DB=portal DEV_DB_HOST=db
+# The user php-fpm runs as (.docker/php/Dockerfile, php-fpm www.conf). It owns the private attachment files, so
+# the E2E ticket cleanup runs as it: another user may not even be able to see a 0700 `tickets/` directory.
+readonly WEB_USER=portal
 readonly TEST_ENV=testing TEST_DB=intechral_client_portal_testing TEST_DB_HOST=db
 # shellcheck disable=SC2034
 readonly E2E_BASE_URL=http://nginx           # Playwright inside portal_app reaches the app via nginx
@@ -27,7 +30,9 @@ readonly E2E_BROWSERS_PATH=/opt/ms-playwright # baked into the image (ENV in .do
 readonly REBUILD_HINT='docker compose build && ./dev restart'
 # shellcheck disable=SC2034
 readonly APP_DIR=/var/www/app
-readonly COUNT_SQL='SELECT (SELECT COUNT(*) FROM projects), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM time_entries)'
+# The first three fields keep their order (compare_counts); `tickets` joins them for the E2E ticket cleanup
+# reconciliation (EPIC-017 §25.3).
+readonly COUNT_SQL='SELECT (SELECT COUNT(*) FROM projects), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM time_entries), (SELECT COUNT(*) FROM tickets)'
 
 # Generated/host-mounted paths that must stay owned by the host user (checked by doctor).
 # shellcheck disable=SC2034
@@ -235,11 +240,75 @@ backup_database() {
 }
 
 # ── Product-data counts (E2E leak reporting) ───────────────────────────────────
-# product_counts <db>  - prints "<projects> <tasks> <time_entries>"
+# product_counts <db>  - prints "<projects> <tasks> <time_entries> <tickets>"
 product_counts() {
     dc exec -T "$SVC_DB" sh -c \
         'MYSQL_PWD="$MYSQL_PASSWORD" exec mariadb -N -B -u"$MYSQL_USER" "$1" -e "$2"' \
         sh "$1" "$COUNT_SQL" </dev/null
+}
+
+# ── One E2E suite per database (EPIC-017 §25.3) ────────────────────────────────
+# The ticket cleanup is untargeted (every `E2E-` ticket of the seeded E2E customers), so a second suite on
+# the same database could lose tickets it is still using. Two small checks, neither a lock service:
+#   * a host lock directory (mkdir is atomic) for ./dev against ./dev, with a stale-lock check by PID;
+#   * a probe of the app container's process table for a `playwright test` process, which also sees a suite
+#     started by hand with `npm run test:e2e` or from another shell.
+# Neither can see a suite on another machine or a process started after the check. It is the supported
+# single-suite constraint, enforced as far as this reaches, not a guarantee.
+# Resolved on use, not at load, so sourcing this file needs nothing beyond Bash.
+e2e_lock_dir() {
+    if [[ -n ${DEV_E2E_LOCK:-} ]]; then
+        printf '%s\n' "$DEV_E2E_LOCK"
+    else
+        printf '%s/dev-e2e-suite.%s.lock\n' "${TMPDIR:-/tmp}" "$(printf '%s' "$DEV_ROOT" | cksum | cut -d' ' -f1)"
+    fi
+}
+
+# Exits 0 when a `playwright test` process exists in the container. The bracket keeps this very script (whose
+# own command line contains the pattern) from matching itself. `e2e_suite_probe` names it for the self-tests.
+readonly E2E_SUITE_PROBE_SH='e2e_suite_probe=1; for p in /proc/[0-9]*; do [ -r "$p/cmdline" ] || continue; if tr "\0" " " <"$p/cmdline" 2>/dev/null | grep -Eq "[p]laywright(/cli\.js)? test"; then exit 0; fi; done; exit 1'
+
+# e2e_suite_running - true when a Playwright suite is already running in the app container.
+e2e_suite_running() {
+    app_probe sh -c "$E2E_SUITE_PROBE_SH"
+}
+
+# acquire_e2e_lock - dies if another ./dev test:e2e holds the lock; clears a lock whose owner is gone.
+acquire_e2e_lock() {
+    local owner attempt lock
+    lock="$(e2e_lock_dir)"
+    for attempt in 1 2; do
+        if mkdir "$lock" 2>/dev/null; then
+            printf '%s\n' "$$" >"$lock/pid"
+            return 0
+        fi
+        owner="$(cat "$lock/pid" 2>/dev/null || true)"
+        if [[ -n $owner ]] && kill -0 "$owner" 2>/dev/null; then
+            die "another ./dev test:e2e (pid $owner) is already running against this database. Two suites on one database can delete each other's tickets; wait for it to finish."
+        fi
+        rm -rf "$lock"
+    done
+    die "could not take the E2E suite lock at $lock."
+}
+
+release_e2e_lock() {
+    local lock
+    lock="$(e2e_lock_dir)"
+    [[ "$(cat "$lock/pid" 2>/dev/null || true)" == "$$" ]] && rm -rf "$lock"
+    return 0
+}
+
+# ── Attachment directories (EPIC-017 §25.3) ────────────────────────────────────
+# A deleted ticket row is no proof its private files went. The ticket cleanup is compared against the number of
+# entries under storage/app/private/tickets (one directory per ticket that ever had an attachment) taken before
+# and after the suite. It is read as the web-server user, because that directory is 0700 and owned by it: any
+# other user would see nothing and call it zero, so an unreadable directory FAILS here and is never counted as 0.
+# The `e2e_ticket_dirs=1;` prefix names the script for the self-tests. $1 is the application directory.
+readonly E2E_TICKET_DIRS_SH='e2e_ticket_dirs=1; cd "$1" || exit 1; p=storage/app/private; l=$(ls -A "$p") || exit 1; printf "%s\n" "$l" | grep -qx tickets || { echo 0; exit 0; }; n=$(find "$p/tickets" -mindepth 1 -maxdepth 1 -printf x) || exit 1; printf "%s" "$n" | wc -c | tr -d " "'
+
+# ticket_dir_count - prints the number of entries under tickets/, or fails if they cannot be listed.
+ticket_dir_count() {
+    dc exec -T -u "$WEB_USER" -e HOME=/tmp "$SVC_APP" sh -c "$E2E_TICKET_DIRS_SH" sh "$APP_DIR" </dev/null
 }
 
 # confirm_yes <prompt> - true only for an exact "yes" on stdin (EOF/anything else declines).

@@ -26,7 +26,7 @@ DEV_COMMANDS=(
     'db:backup||Dump the development DB to backups/dev/<db>-<timestamp>.sql'
     '#Tests and checks'
     'test:php|[pest args]|Pest against the TESTING DB (intechral_client_portal_testing); refuses otherwise'
-    'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; prints before/after counts'
+    'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; sweeps and cleans up E2E tickets; prints before/after counts'
     'check|[--no-php]|CLI self-tests, git diff --check, Pint, npm run check, then the full Pest suite (--no-php skips Pest)'
 )
 
@@ -181,11 +181,29 @@ cmd_test_php() {
     run_pest "$@"
 }
 
+# run_ticket_cleanup <label> - the E2E ticket cleanup command (EPIC-017 §25.3) against the verified dev
+# target, as the web-server user (owner of the attachment files). It takes no ticket arguments; the command
+# itself decides what is eligible and refuses the rest.
+run_ticket_cleanup() {
+    head_line "E2E ticket cleanup ($1)"
+    dc exec -T -u "$WEB_USER" -e HOME=/tmp "$SVC_APP" env "APP_ENV=$DEV_ENV" "DB_DATABASE=$DEV_DB" "DB_HOST=$DEV_DB_HOST" php artisan e2e:cleanup-tickets --no-interaction </dev/null
+}
+
+# cmd_test_e2e - one suite per database, with the ticket cleanup around it:
+#   lock + competing-suite probe -> recovery sweep -> baseline counts -> Playwright -> post-run cleanup ->
+#   after counts -> reconciliation (ticket rows AND attachment directories).
+# The wrapper owns the cleanup. It runs as the web-server user, which owns the private attachment files; a
+# Playwright globalTeardown runs as whoever launched Playwright (a hosted runner's UID, not `portal`) and could
+# not see them. So Playwright is told (E2E_TICKET_CLEANUP_OWNER=dev) that its teardown must hand the cleanup
+# over, and the wrapper runs it after Playwright has exited. The cleanup therefore never runs while Playwright
+# is running: the sweep is before it and the post-run cleanup after it, in this one process, and Playwright's own
+# run is a single foreground command. Test, cleanup and reconciliation results are kept apart so none hides
+# another.
 cmd_test_e2e() {
     require_docker
     require_running "$SVC_APP" "$SVC_NGINX" "$SVC_DB"
 
-    local before='' after='' listing=0 arg rc=0
+    local before='' after='' dirs_before='' listing=0 arg pw_rc=0 cleanup_rc=0 reconcile_rc=0 dirs_rc=0 final_rc=0
     for arg in "$@"; do
         if [[ $arg == --list ]]; then listing=1; fi
     done
@@ -198,39 +216,111 @@ cmd_test_e2e() {
         say
         say "${C_YLW}NOTE:${C_RST} the browser suite currently exercises the DEVELOPMENT database \"$R_DB\"."
         say "      Test fixtures clean up after themselves; counts are compared below."
+        say "      Only one suite may use this database at a time: the ticket cleanup is untargeted."
+
+        acquire_e2e_lock
+        trap release_e2e_lock EXIT
+        if e2e_suite_running; then
+            die "a Playwright suite is already running in '$SVC_APP'. Not starting a second one against the same database, and not sweeping tickets under it."
+        fi
+
+        # Recovery from an interrupted earlier run (SIGKILL and a lost container run no teardown). Before the
+        # baseline, so the baseline is the non-E2E state and the comparison below is meaningful.
+        if ! run_ticket_cleanup "recovery sweep, before the suite"; then
+            die "the recovery sweep failed, so the ticket baseline would not be clean. Nothing was run. Fix the cause shown above, then run ./dev test:e2e again."
+        fi
+        say
         before="$(product_counts "$R_DB")" || die "could not read baseline counts."
         print_counts "Before" "$before"
+        # After the sweep, so it holds only the directories of tickets this suite must not touch.
+        dirs_before="$(ticket_dir_count)" || die "could not read the attachment directory baseline as '$WEB_USER'. Nothing was run; the private files are not readable by the cleanup identity."
+        say "Before: ticket attachment directories=$dirs_before"
         say
     fi
 
     say "Running Playwright in '$SVC_APP' as $HOST_UID:$HOST_GID (isolated output: $E2E_OUTPUT_DIR), base URL $E2E_BASE_URL"
-    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || rc=$?
+    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" "E2E_TICKET_CLEANUP_OWNER=dev" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || pw_rc=$?
 
     if [[ $listing -eq 0 ]]; then
         say
-        after="$(product_counts "$R_DB")" || die "Playwright finished (exit $rc) but the after-counts could not be read."
+        # The one post-suite cleanup: Playwright's teardown handed it over (E2E_TICKET_CLEANUP_OWNER), and it runs
+        # here as the web-server user once every worker has exited. Idempotent, so a run whose teardown never
+        # happened (a runner crash) is covered too.
+        run_ticket_cleanup "after the suite" || cleanup_rc=$?
+        say
+        after="$(product_counts "$R_DB")" || die "Playwright finished (exit $pw_rc) but the after-counts could not be read."
         print_counts "After" "$after"
         compare_counts "$before" "$after"
+        reconcile_tickets "$before" "$after" || reconcile_rc=$?
+        reconcile_ticket_dirs "$dirs_before" || dirs_rc=$?
     fi
-    [[ $rc -eq 0 ]] || say "Failure traces (if any) stay inside the container at $E2E_OUTPUT_DIR."
-    return "$rc"
+
+    final_rc=$pw_rc
+    if [[ $final_rc -eq 0 && ( $cleanup_rc -ne 0 || $reconcile_rc -ne 0 || $dirs_rc -ne 0 ) ]]; then final_rc=1; fi
+
+    if [[ $listing -eq 0 ]]; then
+        say
+        say "Playwright exit: $pw_rc | ticket cleanup exit: $cleanup_rc | ticket reconciliation: $([[ $reconcile_rc -eq 0 ]] && echo ok || echo FAILED) | attachment directories: $([[ $dirs_rc -eq 0 ]] && echo ok || echo FAILED)"
+        [[ $pw_rc -eq 0 ]] || say "Failure traces (if any) stay inside the container at $E2E_OUTPUT_DIR."
+        [[ $cleanup_rc -eq 0 ]] || say "${C_RED}The ticket cleanup failed:${C_RST} E2E tickets may remain. The next ./dev test:e2e sweeps them once the cause above is fixed."
+    fi
+    return "$final_rc"
 }
 
-# print_counts <label> "<projects> <tasks> <time_entries>"
+# print_counts <label> "<projects> <tasks> <time_entries> <tickets>"
 print_counts() {
-    local p t e
-    read -r p t e <<<"$2"
-    printf '%-7s projects=%s  tasks=%s  time_entries=%s\n' "$1:" "$p" "$t" "$e"
+    local p t e k
+    read -r p t e k <<<"$2"
+    printf '%-7s projects=%s  tasks=%s  time_entries=%s  tickets=%s\n' "$1:" "$p" "$t" "$e" "$k"
 }
 
-# compare_counts <before> <after> - informational only; never deletes anything.
+# compare_counts <before> <after> - informational only (projects, tasks, time_entries); never deletes anything.
 compare_counts() {
-    if [[ $1 == "$2" ]]; then
+    local bp bt be bk ap at ae ak
+    read -r bp bt be bk <<<"$1"
+    read -r ap at ae ak <<<"$2"
+    if [[ "$bp $bt $be" == "$ap $at $ae" ]]; then
         say "${C_GRN}Product-data counts unchanged.${C_RST} (Session rows may change; they are not counted.)"
     else
         say "${C_YLW}WARNING: product-data counts changed. The suite may have leaked fixtures,"
         say "or data was edited while it ran. Nothing was deleted; inspect the development DB.${C_RST}"
     fi
+}
+
+# reconcile_tickets <before> <after> - the ticket count must return to the baseline taken after the recovery
+# sweep. The baseline already holds every non-E2E ticket and the seeded fixtures, so they cancel out. A
+# mismatch is a failure, not something to repair: nothing is deleted to make it pass (a ticket cleanup
+# refused, a storage error and a ticket someone created by hand during the run all show up here).
+reconcile_tickets() {
+    local bp bt be bk ap at ae ak
+    read -r bp bt be bk <<<"$1"
+    read -r ap at ae ak <<<"$2"
+    if [[ $bk == "$ak" ]]; then
+        say "${C_GRN}Ticket count back at its baseline${C_RST} ($ak)."
+        return 0
+    fi
+    say "${C_RED}Ticket count did not return to its baseline:${C_RST} before=$bk after=$ak. Nothing was deleted to reconcile it."
+    say "      Read the cleanup output above (a refusal or storage error), or a ticket created by hand while the suite ran."
+    return 1
+}
+
+# reconcile_ticket_dirs <baseline> - the attachment directory count must return to the baseline taken after the
+# recovery sweep. A ticket row that is gone says nothing about its files, so this reads the directory itself, as the
+# web-server user. A directory that cannot be read is a failure, never zero. Nothing is deleted to make it pass: no
+# general orphan sweep exists, and a file left behind by a deleted row is exactly what this is here to expose.
+reconcile_ticket_dirs() {
+    local now
+    if ! now="$(ticket_dir_count)"; then
+        say "${C_RED}Attachment directories could not be read after the suite${C_RST} (as '$WEB_USER'); the private files cannot be shown to be gone."
+        return 1
+    fi
+    if [[ $now == "$1" ]]; then
+        say "${C_GRN}Attachment directories back at their baseline${C_RST} ($now)."
+        return 0
+    fi
+    say "${C_RED}Attachment directories did not return to their baseline:${C_RST} before=$1 after=$now. Nothing was deleted to reconcile it."
+    say "      A ticket's files outlived its row (or a ticket got attachments by hand while the suite ran). They are private files: look before removing any."
+    return 1
 }
 
 # ── Check ──────────────────────────────────────────────────────────────────────

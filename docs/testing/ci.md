@@ -172,6 +172,11 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   reports the tracked `projects`/`tasks`/`time_entries` counts unchanged, and a second full run starts
   from the same baseline ([EPIC-014 Amendment 6](../epics/EPIC-014-tasks-workspace-overhaul.md#amendment-6-wp7-hardening-and-closeout-2026-10-01)).
   A run killed outright (no teardown) can still leave rows; they are development data.
+  Tickets are different: they have no delete route, so `./dev test:e2e` also sweeps and cleans them with
+  `e2e:cleanup-tickets` (run by the wrapper as the web-server user after Playwright exits, because Playwright itself
+  runs as the runner's UID and cannot see the `0700` private files) and **fails** when the `tickets` count or the
+  number of attachment directories does not return to its baseline (EPIC-017 §25.3;
+  [E2E ticket cleanup](e2e-browser-suite.md#e2e-ticket-cleanup)).
   A test whose project-create redirect times out before the id is registered with
   `cleanup.trackProject` also leaves that project behind (EPIC-015 A2.12 #5, A4.12 #6, A5.11): under a
   contended local machine this has happened several times. Hosted CI starts from an empty database and

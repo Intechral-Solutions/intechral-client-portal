@@ -98,6 +98,178 @@ sorts before every seeded name, so on overlapping workers index 1 was that user.
 (`chooseInvoiceClient` in `blade-theme-controls.spec.ts`), and the draft-invoice test asserts the invoice is billed to
 that client.
 
+## E2E ticket cleanup
+
+Tickets have no delete route, so the suite's tickets are removed by a local/testing-only command
+(EPIC-017 §25.3, WP2 G3-A): `php artisan e2e:cleanup-tickets`. It takes **no argument and no option**.
+
+**What it deletes.** A ticket is eligible only when **both** hold: its title begins with the literal,
+case-sensitive prefix `E2E-`, **and** its requester is one of the seeded E2E customers,
+`e2e-customer@intechral.test` or `e2e-customer-other@intechral.test` (`DevSeeder`). Anything else is left alone:
+an ordinary ticket, an `e2e-…` in lower case, an `E2E-…` owned by the operator or any other account, and the seeded
+fixtures `TKT-E2E1` and `TKT-E2E2` (titled `E2E fixture: …`, so never eligible, whoever owns them). Replies,
+attachment rows and status histories go with the ticket through their existing `cascadeOnDelete` keys, and the
+ticket's private files go with it. Both conditions are checked again on the locked row just before it is removed
+(below), so a ticket renamed or reassigned after the run began is left alone.
+
+**Where it runs: the environment contract.** `local` and `testing` only, and it checks **two** values, both of which
+must be one of them: the runtime environment (`app()->environment()`) **and** the configured one (`config('app.env')`,
+from `APP_ENV`). Laravel's global `--env=local` option overrides only the runtime value, so a command-line selector
+alone cannot authorise a run: `APP_ENV=production php artisan e2e:cleanup-tickets --env=local` is refused. Any
+other environment, `production` included, is refused with a non-zero exit **before** the command reads or changes
+anything. `CleanupE2eTicketsTest` proves the `--env` case in a real child process pointed at an unreachable database,
+so "refused" also means "before any query".
+
+**Linked time or tasks are refused, never detached.** `time_entries.ticket_id` and `tasks.ticket_id` are
+`nullOnDelete`; deleting a ticket would silently detach that record. Two layers keep that from happening:
+
+1. *Up front, for the whole run.* If **any** eligible ticket has a linked time entry or task, the command deletes
+   **nothing at all**, names the ticket number and the counts, and exits non-zero. It does not delete, re-point or
+   null those records; they belong to a person. This is a plain read, so it is a courtesy (a known blocker never
+   produces a half-done cleanup), **not** the safety mechanism.
+2. *Per ticket, in one transaction, under a row lock.* This is the mechanism. For each ticket the command opens a
+   transaction and takes `SELECT … FOR UPDATE` on the ticket row. InnoDB takes a shared lock on the **parent** row
+   whenever a child row is inserted or re-pointed at it, so while that lock is held no time entry or task can be
+   linked to the ticket: the attempt waits. Under the lock it re-checks the title and owner, reads the linked rows with
+   locking reads (`select id … lock in share mode`, rows rather than an aggregate, and a *current* read rather than a
+   snapshot), refuses if any exist, removes the attachment directory, deletes the row and commits. The lock is held
+   through the file removal, so nothing can be linked while the files are going. After the ticket is gone, the foreign
+   key itself rejects a late attempt (error 1452) instead of the delete nulling it.
+   `TicketService::addReply` also locks the ticket row before it writes an attachment, so an upload cannot interleave.
+
+`CleanupE2eTicketsConcurrencyTest` proves it with a **second database connection** and the real command, at two exact
+moments, and asserts the persisted state rather than query order: a link **committed before** the lock makes the command
+refuse and leaves the link intact; a link **attempted after** the lock is held is stopped by the lock wait (1205) and,
+once the ticket is gone, by the foreign key (1452) — a new time entry, a standalone time entry re-pointed at the ticket,
+and a standalone task re-pointed at it — and nothing is ever attached or nulled. `CleanupE2eTicketsTest` also asserts the
+SQL shape (a row lock on `tickets`, then locking reads of both child tables, then the delete).
+
+Remaining limits, stated plainly: the database lock cannot make the **filesystem** transactional (see the table); a
+conflicting lock held by someone else waits up to `innodb_lock_wait_timeout` (50 s by default) and then that ticket is
+reported as a failure; and a deadlock with a concurrent time-entry write is possible in principle, in which case InnoDB
+aborts one side and the ticket is reported as a failure and kept. None of these detaches anything.
+
+**Files first, then the row.** For each ticket the command removes its `tickets/{id}/` directory on the private
+`local` disk (the path comes from the integer id, never from a title or a stored path), confirms the directory is
+gone, and only then deletes the row, all inside the transaction above.
+
+**Directory state is proven, not guessed.** PHP's `is_dir` and `file_exists` return false both for "not there" and for
+"not allowed to look", so they are not used to prove absence. The command lists the storage root, then `tickets/`, then
+`tickets/{id}`. A directory is **absent** only when its parent listed fine and does not contain it. If any of those
+listings fails, the state is **unknown**, the ticket is kept, and the run exits non-zero. If any candidate's state is
+unknown, the whole run is refused up front (a permission mismatch is systemic) and nothing is deleted.
+
+| Situation | Result |
+|---|---|
+| Directory exists with files | files removed, directory confirmed gone, row deleted; counted, exit 0 |
+| Directory exists and is empty | removed, row deleted; counted, exit 0 |
+| Directory provably absent (parent listed, entry not in it) | safe absence: the row is deleted |
+| `tickets/` or `tickets/{id}` exists but cannot be listed (a `0700` directory owned by another user) | **unknown**: nothing deleted, row kept, exit 1; the output says to run as the web-server user |
+| Storage root cannot be listed, or `tickets/{id}` is not a plain directory | unknown: row kept, exit 1 |
+| Directory cannot be emptied (no write permission), or the storage call fails or returns `false` | row **kept**, ticket reported, exit 1; the next run retries it |
+| Partially removed (some files gone, then a failure) | row kept, exit 1; the next run removes what is left |
+| Directory is still there although the delete reported success | row kept, exit 1 |
+| Row delete fails after the files went | reported, exit 1; the transaction rolls back, the next run finds a ticket with no files and deletes it |
+| The ticket has attachment records but the storage has no `tickets/` directory at all | failure, row kept (a different storage root than the database's) |
+| Ticket already gone when the lock is taken | nothing to do; not counted as deleted |
+| Second run | `Eligible E2E tickets: 0`, exit 0 |
+
+The previous design inferred absence from the **root** being invisible; that missed the real case (`storage/app/private`
+is `0777` and `tickets/` is `0700 portal`, so another user sees `tickets/` but not `tickets/{id}`), and a run under the
+wrong user deleted the rows, orphaned the files and exited 0. The regression tests use real `chmod` on a disposable
+disk, and the same scenario was re-run as a different UID against the real command: it now refuses and exits 1. Another
+user's access cannot be simulated without root, so the Pest tests remove the permissions from the current user (also
+true to what a non-owner sees); they are skipped when run as root.
+
+Atomicity the design does **not** have: a file deletion and a database commit cannot be made one operation. A crash
+(`SIGKILL`) after the files went and before the commit leaves a ticket with no files, which the next run deletes; the
+files of an E2E ticket are test data and are not recoverable once removed. Nothing here can lose the row while its
+files remain.
+
+The report gives counts and ticket **numbers** only: eligible, deleted, files and directories removed, and each
+failure. It prints no titles, file names or contents, and error text from the storage layer has the private storage
+path replaced with `<storage>`.
+
+**Lifecycle.** Cleanup is **suite-level**; it never runs per test or per worker, because every worker's tickets
+share the `E2E-` prefix and a run mid-suite would delete tickets other workers are still using.
+
+1. `./dev test:e2e` takes a host lock, probes the app container for a running `playwright test` process, and
+   refuses to start if either shows another suite.
+2. It runs a **recovery sweep** (the command, as the web-server user `portal`, which owns the attachment files)
+   before the baseline is read. A failed sweep stops the run before Playwright starts.
+3. It reads the baseline: the counts (`projects`, `tasks`, `time_entries`, `tickets`) and the number of entries under
+   `storage/app/private/tickets`, so the baseline holds only the non-E2E state and the seeded fixtures. The directory
+   count is read as `portal` (the directory is `0700`), and an unreadable directory **stops the run**; it is never
+   read as zero.
+4. Playwright runs, as the host user, with `E2E_TICKET_CLEANUP_OWNER=dev` in its environment. Its **`globalTeardown`**
+   (`tests/Browser/support/global-teardown.ts`) sees that and **does not delete anything**; it only reports that the
+   cleanup is handed over.
+5. After Playwright has exited, the wrapper runs the command **as `portal`** and reads the counts and the directory
+   count again.
+6. Reconciliation: `tickets` must equal its baseline **and** the attachment directory count must equal its baseline. A
+   mismatch of either **fails** the run and nothing is deleted to make it pass; `projects`, `tasks` and `time_entries`
+   keep their warning-only comparison. The directory count is there because a missing ticket row is no proof that its
+   private files are gone. It is not an orphan sweeper: it deletes nothing and does not look inside the directories.
+
+**Who runs the cleanup, and why.** The private files are `0600` in `0700` directories owned by `portal` (the user
+php-fpm runs as). `./dev test:e2e` runs Playwright as the host user (`HOST_UID:HOST_GID`), which is `portal`'s UID on
+the maintainers' machines but is the runner's own UID on a hosted runner, and a non-root process cannot become
+`portal` from inside the container. So `globalTeardown` runs under an identity that may not see the files, and the only
+place a `portal` invocation is available is the wrapper's `docker compose exec -u portal`. Hence the hand-off. The
+files' permissions are not relaxed, and the hosted runner's UID is not assumed.
+
+**A suite started by hand** (`npm run test:e2e` from `./dev shell` or elsewhere) has no wrapper, so there is no
+hand-off variable and **`globalTeardown` is responsible**: it runs the command as the current user, after every
+worker. Where that user cannot see the files the command refuses (see the table), the teardown throws, and the run
+**fails**; it never reports a cleanup that did not happen. That run gets no sweep, no lock, no reconciliation and no
+directory count; run `./dev test:e2e` afterwards to clean up as `portal`.
+
+The wrapper reports four results separately and never lets one hide another: `Playwright exit`, `ticket cleanup
+exit`, `ticket reconciliation` and `attachment directories`. The exit status is Playwright's own when it failed,
+otherwise 1 if the cleanup or either reconciliation failed.
+
+**Interruption.** Teardown runs after a failed test or fixture, a worker that exits abruptly and Ctrl-C (SIGINT);
+each was probed against a disposable Playwright configuration with three workers. It does
+**not** run after `SIGKILL`, an out-of-memory kill or a lost container, and nothing here claims it does. Such a run
+may leave `E2E-` tickets until the next `./dev test:e2e` recovery sweep.
+
+Under the wrapper the teardown does nothing; the wrapper's post-run cleanup is what removes the tickets, so what
+happens depends on whether **the wrapper** survives:
+
+| Situation | Wrapper cleanup |
+|---|---|
+| Playwright fails (failed tests, a fixture error, a non-zero exit) | runs, as long as the wrapper is alive |
+| A Playwright worker fails or exits abruptly, and the wrapper is alive | runs after Playwright exits |
+| The wrapper itself is terminated (closed terminal, signal, `SIGKILL`), or the host or container is lost | **not guaranteed**: the cleanup step may never run, and whether Playwright stops with the wrapper has not been probed |
+
+After the last row, eligible leftovers (tickets and their files) stay until the **next** `./dev test:e2e`, whose
+recovery sweep removes them before it takes its baseline. That sweep runs only after the single-suite checks pass, so
+it will not start while a suite is still running in the container. A direct `npm run test:e2e` has no sweep at all;
+run `./dev test:e2e` afterwards.
+
+**One suite per database.** Two suites against one database can delete each other's tickets (the command is
+untargeted by design). The host lock and the container probe stop the common cases; they cannot see a suite on another
+machine or one started after the check, and the lock directory has two small windows of its own (between creating it
+and writing the owner's PID, and when two runs clear the same stale lock), so this is a supported constraint, not a
+guarantee. A ticket created by hand during a run shows up as a reconciliation mismatch.
+
+**Queued notifications.** Creating a ticket and replying both dispatch queued mail (`ShouldQueue`, Redis, a
+`queue:work` worker in the dev stack). A job that runs **after** its ticket was deleted used to fail with a
+`ModelNotFoundException` as the worker unpacked it: that error is raised immediately, before the notification runs, and
+the job is failed on the spot (no retry) into `failed_jobs`. `TicketCreatedNotification` and
+`TicketRepliedNotification` now carry `#[DeleteWhenMissingModels]` (Laravel 13.17, the installed version, honours it for
+queued notifications; verified, not assumed), so that one case, a missing ticket or reply, ends as a successful discard
+with no `failed_jobs` row. This is a production notification lifecycle change, limited to those two classes: it changes
+no queue worker, queue connection, recipient or message content. It is **owner-ratified 2026-10-09** (EPIC-017 §37).
+Nothing else changes. Any failure while the notification is being sent, a
+mail transport error included, still fails and is retried as before, and an existing ticket still sends. A deleted
+*notifiable* (the recipient user) is not affected by the attribute: the notifiable is queued as a collection, which
+restores empty, so that job already did nothing without it. The cleanup itself never touches Redis
+or `failed_jobs`, and nothing in the E2E tooling consumes a worker's queue. The hosted CI job does not start the queue
+worker, so nothing runs there. `TicketNotificationMissingModelTest` proves all of this with the real database queue and
+`queue:work --once` (a sync job cannot show whether `failed_jobs` was written), including a control that fails without
+the attribute.
+
 ## Guards against regression
 
 - `tests/Browser/session-isolation.spec.ts` — behavioral: an explicitly anonymous context really

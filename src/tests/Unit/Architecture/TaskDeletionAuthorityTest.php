@@ -30,6 +30,11 @@ const REVIEWED_DELETE_CALLS = [
     'Http/Controllers/ProjectMilestoneController.php' => ['$milestone->delete();'],
     // An invoice, which a project never cascades to.
     'Http/Controllers/Billing/InvoiceController.php' => ['$invoice->delete();'],
+    // EPIC-017 WP2 G3-A: a TICKET, never a task row. The E2E cleanup command deletes it inside one transaction
+    // that first locks the ticket row, re-checks its E2E title and seeded owner, and refuses it when a locking
+    // read finds any linked task or time entry (tasks.ticket_id is nullOnDelete, so that check is all that keeps
+    // the delete from detaching one). The call is a model delete of that locked ticket, not a query-builder delete.
+    'Console/Commands/CleanupE2eTickets.php' => ['$ticket->delete();'],
 ];
 
 /**
