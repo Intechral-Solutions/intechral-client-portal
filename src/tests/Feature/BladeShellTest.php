@@ -153,7 +153,6 @@ it('renders the canonical workspaces and context exactly as the server built the
     'operator, System roles' => ['operator', 'roles.index'],
     'operator, Directory people' => ['operator', 'crm.contacts.index'],
     'operator, Finance invoices' => ['operator', 'billing.invoices.index'],
-    'member, Helpdesk requests' => ['operational-member', 'tickets.index'],
     'member, Finance own invoices' => ['operational-member', 'billing.client.invoices.index'],
     'member, Resources' => ['operational-member', 'cms.index'],
 ]);
@@ -214,7 +213,7 @@ it('stamps the pre-paint inputs on the Blade root from the payload', function ()
 
 it('never renders a destination the server withheld from a member', function () {
     $member = bladeShellActor('operational-member');
-    $page = bladeShellPage($member, 'tickets.index');
+    $page = bladeShellPage($member, 'billing.client.invoices.index');
 
     $shellHrefs = array_map(
         fn (DOMElement $link) => $link->getAttribute('href'),
@@ -238,7 +237,7 @@ it('never renders a destination the server withheld from a member', function () 
 });
 
 it('keeps Resources off the operator rail, where System Pages replaces it', function () {
-    $labels = array_column(bladeShellLinks(bladeShellPage(bladeShellActor('operator'), 'tickets.index'), BLADE_RAIL), 'label');
+    $labels = array_column(bladeShellLinks(bladeShellPage(bladeShellActor('operator'), 'operator.tickets.index'), BLADE_RAIL), 'label');
 
     expect($labels)->not->toContain('Resources')
         ->and($labels)->toContain('System')

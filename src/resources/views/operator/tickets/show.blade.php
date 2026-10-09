@@ -174,6 +174,26 @@
             </div>
             @endif
 
+            {{--
+                N2 continuity (EPIC-017 WP2, owner-approved): the embedded tracker lives here, on the
+                operator-only route, because `/tickets/{id}` became the requester-safe page and carries no
+                time data. The same component, script and endpoints as before; it adds no authorization.
+                Starting ticket time is still refused server-side without `tickets.assign` and ticket
+                visibility (AccessibleTimeContext). TEMPORARY: WP3 replaces this with the React operator
+                ticket page's TimerControl and time summary, and then deletes this embed,
+                components/time-tracker (and /running), the timerStarted/timerStopped listeners in
+                shell/blade-timer.ts, and the tests that pin them. The COMPLETE removal list, and the
+                requester-side privacy tests that must stay, are in EPIC-017 section 37 (N2 continuity).
+            --}}
+            @can('time.log')
+            <x-time-tracker
+                context-type="ticket"
+                :context-id="$ticket->id"
+                :context-label="$ticket->ticket_number"
+                :context-url="route('operator.tickets.show', $ticket)"
+            />
+            @endcan
+
         </aside>
 
     </div>

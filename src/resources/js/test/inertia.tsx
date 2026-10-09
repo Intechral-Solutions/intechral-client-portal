@@ -11,7 +11,7 @@
  *
  * This module must not import `@inertiajs/react` (it is the mock of it).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 
@@ -170,6 +170,18 @@ export function setFormErrors(errors: Record<string, string>) {
     state.errors = errors;
 }
 
+const liveForms = new Set<(errors: Record<string, string>) => void>();
+
+/**
+ * Deliver errors to every `useForm()` that is already mounted, as the server's 422 does AFTER a visit:
+ * Inertia swaps the page's props first and the form learns of the errors afterwards, so a component the
+ * new props unmounted has already gone by then. (`setFormErrors` only seeds forms rendered later.) Wrap the
+ * call in `act`.
+ */
+export function emitFormErrors(errors: Record<string, string>) {
+    liveForms.forEach((set) => set(errors));
+}
+
 export function setFormProcessing(processing: boolean) {
     state.processing = processing;
 }
@@ -187,6 +199,7 @@ export function resetInertiaMock() {
     submissions.length = 0;
     optimisticSubmissions.length = 0;
     navigateListeners.length = 0;
+    liveForms.clear();
     state.props = {};
     state.url = '/';
     state.errors = {};
@@ -240,6 +253,14 @@ type FormSetter<T> = {
 function useForm<T extends Record<string, unknown>>(initial: T) {
     const [data, setDataState] = useState<T>(initial);
     const [errors, setErrors] = useState<Record<string, string>>(state.errors);
+
+    useEffect(() => {
+        liveForms.add(setErrors);
+
+        return () => {
+            liveForms.delete(setErrors);
+        };
+    }, []);
     // Keyed by a stable per-hook object: a callback set in one event handler must be visible to
     // the submit call in the same handler, before any re-render, so it cannot live in state.
     const [holder] = useState(() => ({}));

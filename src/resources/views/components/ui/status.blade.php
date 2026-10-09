@@ -9,7 +9,7 @@
     operator/cms/_state, ...) decides the `tone` and, where the domain has a specific shape, the `glyph`.
 
     - `tone`: `neutral` (default), `info`, `success`, `warning`, `danger`, `live`.
-    - `glyph`: `circle`, `half`, `dot`, `check`, `triangle`, `square`, `dashed`. Defaults to the tone's own
+    - `glyph`: `circle`, `half`, `dot`, `check`, `triangle`, `square`, `dashed`, `hourglass`. Defaults to the tone's own
       shape (neutral circle, info half, success check, warning triangle, danger square, live dot).
     - Statuses render inline, never as filled pills (pills are for tags and filter chips).
 
@@ -59,6 +59,7 @@
         'check' => '<circle cx="6" cy="6" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.9 6.2 5.4 7.7 8.2 4.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
         'triangle' => '<path d="M6 1.5 11 10.5H1z" fill="currentColor" stroke-linejoin="round"/>',
         'square' => '<rect x="2" y="2" width="8" height="8" rx="1" fill="currentColor"/>',
+        'hourglass' => '<path d="M3 1.75h6M3 10.25h6M3.9 1.75v1.2c0 1.3 2.1 2 2.1 3.05S3.9 7.75 3.9 9.05v1.2M8.1 1.75v1.2c0 1.3-2.1 2-2.1 3.05s2.1 1.75 2.1 3.05v1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
     ];
 
     if (! isset($tones[$tone])) {

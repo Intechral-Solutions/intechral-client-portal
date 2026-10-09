@@ -47,16 +47,16 @@ it('keeps a known status and ignores an unknown one', function () {
         ->and(RequesterTicketQuery::filters(Request::create('/tickets', 'GET', ['status' => "open' OR 1=1"]))['status'])->toBeNull();
 });
 
-// Array-valued parameters are refused by filters() (above). Over HTTP the Blade list view itself still
-// echoes the raw parameter into its search input and fails on an array, a pre-existing defect of a view
-// WP2 G2 replaces; the React page renders from the normalized filters instead.
+// Array-valued parameters are refused by filters() (above). Over HTTP the old Blade list echoed the raw
+// parameter into its search input and failed on an array; the React page renders from the normalized
+// `filters` prop instead (RequesterTicketPropsTest pins `?search[]=x`).
 it('answers malformed scalar filters on /tickets with the page, never an error', function (array $query, bool $listed) {
     $owner = ticketUser();
     ticketFor($owner, ['title' => 'Still listed']);
 
     $response = $this->actingAs($owner)->get(route('tickets.index', $query))->assertOk();
 
-    $listed ? $response->assertSee('Still listed') : $response->assertDontSee('Still listed');
+    expect(array_column(ticketOwnProps($response)['tickets']['data'], 'title'))->toBe($listed ? ['Still listed'] : []);
 })->with([
     'unknown status is ignored' => [['status' => 'archived'], true],
     'overlong search is capped, and matches nothing here' => [['search' => str_repeat('x', 5000)], false],
@@ -131,8 +131,8 @@ it('never matches internal-note text even when an operator is the requester', fu
 
     expect(requesterSearchTitles($agent, ['search' => 'zebra']))->toBe([]);
 
-    $this->actingAs($agent)->get(route('tickets.index', ['search' => 'zebra']))
-        ->assertOk()->assertDontSee('My own laptop');
+    $this->actingAs($agent)->get(route('tickets.index', ['search' => 'zebra']))->assertOk();
+    expect(ticketListedTitles($agent, ['search' => 'zebra']))->toBe([]);
 });
 
 // ── Ownership, order and the empty states ──────────────────────────────────

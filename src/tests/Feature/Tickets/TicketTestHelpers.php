@@ -8,6 +8,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Testing\Fakes\NotificationFake;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\Models\Role;
 
 /*
@@ -220,4 +221,67 @@ function ticketParseCsv(string $csv): array
     fclose($stream);
 
     return $rows;
+}
+
+/**
+ * The titles `/tickets` lists for an actor, from the page's props (what the browser receives), so a
+ * visibility test asserts on the data the customer is sent and not on markup.
+ *
+ * @param  array<string, mixed>  $query
+ * @return list<string>
+ */
+function ticketListedTitles(User $actor, array $query = []): array
+{
+    $response = test()->actingAs($actor)->get(route('tickets.index', $query))->assertOk();
+
+    return array_column(ticketOwnProps($response)['tickets']['data'], 'title');
+}
+
+/** The shared props every Inertia response carries; a page's OWN props are everything else. */
+const TICKET_SHARED_PROP_KEYS = ['errors', 'app', 'auth', 'shell', 'navigation', 'flash'];
+
+/**
+ * The Inertia page object of a response as a plain array (a JSON round trip, so it is exactly what
+ * the browser receives): `component`, `props`, `url`, ...
+ *
+ * @return array<string, mixed>
+ */
+function ticketPage(TestResponse $response): array
+{
+    return json_decode(json_encode($response->viewData('page')), true);
+}
+
+/**
+ * A page's own props, without the shared set. Pest loads every test file into one process, so this
+ * and its siblings carry the "ticket" prefix.
+ *
+ * @return array<string, mixed>
+ */
+function ticketOwnProps(TestResponse $response): array
+{
+    return array_diff_key(ticketPage($response)['props'], array_flip(TICKET_SHARED_PROP_KEYS));
+}
+
+/**
+ * Every key at any depth of a structure, dotted by path (a list's index is `*`), so an exact-key
+ * assertion sees nested props and not only the top level.
+ *
+ * @return list<string>
+ */
+function ticketKeyPaths(mixed $value, string $prefix = ''): array
+{
+    if (! is_array($value)) {
+        return [];
+    }
+
+    $paths = [];
+
+    foreach ($value as $key => $child) {
+        $segment = is_int($key) ? '*' : $key;
+        $path = $prefix === '' ? $segment : "{$prefix}.{$segment}";
+        $paths[] = $path;
+        array_push($paths, ...ticketKeyPaths($child, $path));
+    }
+
+    return array_values(array_unique($paths));
 }

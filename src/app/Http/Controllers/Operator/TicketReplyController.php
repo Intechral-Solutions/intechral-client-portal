@@ -36,6 +36,13 @@ class TicketReplyController extends Controller
             $request->file('attachments', []),
         );
 
+        // An Inertia reply is the requester's React page, which announces "Reply sent." and focuses the new
+        // entry itself; the shared flash would announce the same reply a second time (and cannot announce
+        // a repeat, because it dedupes identical text). A plain form post (the operator's Blade page) keeps it.
+        if ($request->header('X-Inertia')) {
+            return back();
+        }
+
         return back()->with('status', 'Reply added.');
     }
 }

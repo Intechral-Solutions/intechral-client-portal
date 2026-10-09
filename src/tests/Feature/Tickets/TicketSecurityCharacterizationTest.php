@@ -259,9 +259,8 @@ it('TARGET H2: attachment download follows Ticket, then parent reply, then attac
 it('TARGET H2: the ticket owner cannot fetch an internal-note attachment by guessing its id, and the refusal carries no file bytes', function () {
     $f = ticketWithAttachments();
 
-    $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))
-        ->assertOk()
-        ->assertDontSee('internal-secret.txt');
+    $page = $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
+    expect(json_encode(ticketOwnProps($page)))->not->toContain('internal-secret.txt');
 
     $response = $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f['internal']));
 
@@ -333,26 +332,23 @@ it('BASELINE H3: customer search matches public reply text on their own tickets 
     $f = ticketSearchFixture();
     ticketReply(ticketFor(ticketUser(), ['title' => 'Stranger ticket']), $f['operator'], false, 'PUBMARKERA7 elsewhere');
 
-    $response = $this->actingAs($f['owner'])->get(route('tickets.index', ['search' => 'PUBMARKERA7']));
+    $response = $this->actingAs($f['owner'])->get(route('tickets.index', ['search' => 'PUBMARKERA7']))->assertOk();
 
-    $response->assertOk()
-        ->assertSee('Printer offline')
-        ->assertDontSee('Mailbox quota')
-        ->assertDontSee('Stranger ticket');
-    expect($response->viewData('tickets')->total())->toBe(1);
+    expect(ticketListedTitles($f['owner'], ['search' => 'PUBMARKERA7']))->toBe(['Printer offline'])
+        ->and(ticketOwnProps($response)['tickets']['total'])->toBe(1);
 });
 
 it('TARGET H3: a term that exists only in a hidden internal note matches nothing for the customer, and the count shows it', function () {
     $f = ticketSearchFixture();
 
-    $response = $this->actingAs($f['owner'])->get(route('tickets.index', ['search' => 'INTMARKERB9']));
+    $response = $this->actingAs($f['owner'])->get(route('tickets.index', ['search' => 'INTMARKERB9']))->assertOk();
+    $own = ticketOwnProps($response);
 
-    $response->assertOk()
-        ->assertDontSee('Printer offline')
-        ->assertDontSee('Mailbox quota')
-        ->assertSee('No tickets found.')
-        ->assertDontSee('credit hold');
-    expect($response->viewData('tickets')->total())->toBe(0);
+    // Nothing matches, the count says so, and the note's text is nowhere in what the customer was sent.
+    expect($own['tickets']['data'])->toBe([])
+        ->and($own['tickets']['total'])->toBe(0)
+        ->and($own['hasRequests'])->toBeTrue()
+        ->and(json_encode($own))->not->toContain('credit hold');
 });
 
 it('TARGET H3: the search scope excludes internal notes unless the caller opts in', function () {

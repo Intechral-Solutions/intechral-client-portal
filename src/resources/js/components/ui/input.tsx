@@ -18,7 +18,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
         <input
             ref={ref}
             className={cn(
-                'flex w-full min-w-0 rounded-control border border-control-edge bg-surface px-3 text-sm text-text transition-[color,background-color,border-color] duration-motion-fast ease-motion placeholder:text-text-muted hover:border-text-muted aria-invalid:border-danger disabled:cursor-not-allowed disabled:border-rule-control disabled:bg-surface-sunken disabled:text-text-muted disabled:hover:border-rule-control',
+                'flex w-full min-w-0 rounded-control border border-control-edge bg-surface px-3 text-sm text-text transition-[color,background-color,border-color] duration-motion-fast ease-motion placeholder:text-text-muted hover:border-text-muted aria-invalid:border-danger disabled:cursor-not-allowed disabled:border-rule-control disabled:bg-surface-sunken disabled:text-text-muted disabled:hover:border-rule-control file:mr-3 file:border-0 file:bg-transparent file:py-0 file:text-sm file:font-medium file:text-text',
                 controlHeight.md,
                 focusRing,
                 className,

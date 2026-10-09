@@ -140,9 +140,11 @@ it('links each request to its own page and each module to its module', function 
     $props = customerHomeProps($user);
 
     expect($props['openRequests'][0]['href'])->toBe(route('tickets.show', $ticket))
-        ->and($props['openRequests'][0]['visit'])->toBe('document')
-        ->and($props['support'])->toBe(['href' => route('tickets.index'), 'visit' => 'document'])
-        ->and($props['newRequest'])->toBe(['href' => route('tickets.create'), 'visit' => 'document'])
+        // EPIC-017 WP2: every Helpdesk destination is a React page, so these are client visits; invoices
+        // are still Blade, which is why `visit` is per destination.
+        ->and($props['openRequests'][0]['visit'])->toBe('inertia')
+        ->and($props['support'])->toBe(['href' => route('tickets.index'), 'visit' => 'inertia'])
+        ->and($props['newRequest'])->toBe(['href' => route('tickets.create'), 'visit' => 'inertia'])
         ->and($props['invoices']['href'])->toBe(route('billing.client.invoices.index'))
         ->and($props['invoices']['visit'])->toBe('document')
         ->and($props['projects']['href'])->toBe(route('projects.index'))

@@ -18,7 +18,7 @@
  * It supersedes EPIC-016 WP3's `BladeThemeNormalizationTest` (a migration-completion check). That file's rules and
  * all of its fixtures live here now, plus the permanent rules it did not carry (B5, B7, A1-A5), and its known
  * gaps are closed: single-quoted and bound `style`, `white` / `black` with every colour-bearing prefix, and an
- * EXACT target membership instead of `>= 59`.
+ * EXACT target membership instead of `>= 59` (56 since EPIC-017 WP2 deleted the three customer ticket views).
  *
  * Each rule has fixtures it MUST catch and near-misses it must NOT, so no rule can be vacuous (EPIC-013 A13.13).
  */
@@ -95,9 +95,6 @@ function guardTargetInventory(): array
         'tickets/_overdue_status.blade.php',
         'tickets/_priority_badge.blade.php',
         'tickets/_status_badge.blade.php',
-        'tickets/create.blade.php',
-        'tickets/index.blade.php',
-        'tickets/show.blade.php',
     ];
 }
 
@@ -491,7 +488,7 @@ it('keeps the Level B target inventory exact, and says what to do when a view is
 
     expect($message)->toBe('')
         ->and($inventory)->toBe($discovered)
-        ->and(count($inventory))->toBe(59);
+        ->and(count($inventory))->toBe(56);
 });
 
 it('draws the inventory only from the §17.2 roots, and lists every file once', function () {
@@ -524,7 +521,7 @@ it('scans a meaningful Level A scope: all views except welcome, and React source
     $views = guardAllViews();
     $react = guardReactSource();
 
-    expect($views)->toContain('layouts/app.blade.php', 'cms/index.blade.php', 'tickets/show.blade.php')
+    expect($views)->toContain('layouts/app.blade.php', 'cms/index.blade.php', 'operator/tickets/show.blade.php')
         ->not->toContain('welcome.blade.php')
         ->and(count($react))->toBeGreaterThan(100)
         ->and(array_filter($react, fn (string $file) => str_contains($file, '.test.')))->toBe([]);
@@ -567,7 +564,7 @@ it('Level B: the target views carry no palette, literal colour, legacy variable,
 
 /**
  * EPIC-017 WP1: the Blade Focused frame's shell partials. `resources/views/layouts` is outside every
- * §17.2 Level B root, so the exact 59-view inventory above must NOT grow for them — and they must not
+ * §17.2 Level B root, so the exact 56-view inventory above must NOT grow for them — and they must not
  * escape the rules for that reason. They are held to every Level B rule here, by name, so a palette
  * class, literal colour, legacy variable or retired utility cannot enter the customer top bar.
  */
@@ -596,9 +593,9 @@ it('Level B: the Focused shell partials carry the same Direction D rules as the 
     }
 
     expect(implode("\n", $violations))->toBe('')
-        // They are scanned, never inventoried: the exact Level B membership stays 59.
+        // They are scanned, never inventoried: the exact Level B membership stays exact (56 after EPIC-017 WP2).
         ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
-        ->and(count(guardTargetInventory()))->toBe(59);
+        ->and(count(guardTargetInventory()))->toBe(56);
 });
 
 it('keeps every allowlist entry reasoned and still needed', function () {

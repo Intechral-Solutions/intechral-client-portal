@@ -9,6 +9,8 @@ use App\Models\TimeEntry;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 
+require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
+
 require_once __DIR__.'/../../Support/UiHtmlHelpers.php';
 
 /*
@@ -67,10 +69,10 @@ const SEM_TONE_CLASS = [
 // ── Mappings (EPIC-016 §9) ───────────────────────────────────────────────────
 
 dataset('ticket lifecycle', [
-    // status => [label, tone, glyph]   (§9.1; `dashed` is the recorded P6 substitute for the hourglass)
+    // status => [label, tone, glyph]   (§9.1; EPIC-017 §13 ended the P6 `dashed` substitute: Pending is the hourglass)
     'open' => ['open', 'Open', 'info', 'circle'],
     'in_progress' => ['in_progress', 'In Progress', 'info', 'half'],
-    'pending_user' => ['pending_user', 'Pending', 'neutral', 'dashed'],
+    'pending_user' => ['pending_user', 'Pending', 'neutral', 'hourglass'],
     'resolved' => ['resolved', 'Resolved', 'success', 'check'],
     'closed' => ['closed', 'Closed', 'neutral', 'check'],
 ]);
@@ -269,13 +271,17 @@ it('draws the operator ticket detail Overdue mark with the shared status and the
         ->and(uiClasses(uiOne($xpath, '//dt[normalize-space()="SLA Due"]/following-sibling::dd')))->toContain('text-danger');
 });
 
-it('draws the member ticket detail Overdue mark with the shared status', function () {
+// CONVERTED IN EPIC-017 WP2 (N5): Overdue is an operator-only signal (§13). The member's ticket page used to
+// draw it with the shared status; the React requester page is built without SLA or overdue at all, so even an
+// overdue ticket carries no trace of either.
+it('sends the member ticket page no Overdue signal, even for an overdue ticket', function () {
     $member = semActor('user');
     $ticket = Ticket::factory()->overdue()->for($member, 'user')->create();
 
-    $xpath = uiDom($this->actingAs($member)->get(route('tickets.show', $ticket))->assertOk()->getContent());
+    $props = ticketOwnProps($this->actingAs($member)->get(route('tickets.show', $ticket))->assertOk());
 
-    expect(semMark(uiOne($xpath, '//*[@data-overdue-status]')))->toMatchArray(['Overdue', 'text-danger', 'square']);
+    expect(json_encode($props))->not->toMatch('/overdue|sla_due|slaDue/i')
+        ->and(ticketKeyPaths($props))->not->toContain('ticket.sla_due_at', 'ticket.overdue');
 });
 
 it('draws an internal note as a dashed warning card with a lock marker, and a public reply without them', function () {
@@ -301,12 +307,13 @@ it('draws an internal note as a dashed warning card with a lock marker, and a pu
         ->and($html)->not->toMatch('/#fef3c7|#92400e|#d97706|#fffbeb/i');
 });
 
-it('draws the internal-note card with the same class string in both ticket views and in the browser gallery', function () {
+it('draws the internal-note card with the same class string in the operator ticket view and in the browser gallery', function () {
     // tests/Support/semantic_state_gallery.php (the browser spec's gallery) copies this one class string, so a
     // change to the cards must reach the gallery too, or the browser evidence would measure a stale card.
     $card = 'border-dashed border-warning-glyph bg-warning-soft';
 
-    foreach (['tickets/show', 'operator/tickets/show'] as $view) {
+    // EPIC-017 WP2 deleted `tickets/show` (the requester page is React); the operator page is the one Blade note card.
+    foreach (['operator/tickets/show'] as $view) {
         expect(file_get_contents(resource_path("views/{$view}.blade.php")))->toContain($card, "@include('tickets._internal_note_label')");
     }
 
@@ -550,10 +557,11 @@ it('renders the Stripe error region as a hidden danger alert whose script id and
 
 // ── The embedded ticket time tracker (EPIC-016 §9.9; WP1 review ruling A1.15 #2) ──
 
+// EPIC-017 WP2 (N2 continuity): the tracker is embedded on the operator ticket page, and only there.
 it('draws the stopped tracker with a secondary sm Start Timer button inside a data-hooked control row', function () {
-    $owner = semActor('user');
+    $owner = semActor('operator');
     $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
-    $html = $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()->getContent();
+    $html = $this->actingAs($owner)->get(route('operator.tickets.show', $ticket))->assertOk()->getContent();
     $xpath = uiDom($html);
 
     $controls = uiOne($xpath, '//*[@data-time-tracker-controls]');
@@ -567,11 +575,11 @@ it('draws the stopped tracker with a secondary sm Start Timer button inside a da
 });
 
 it('draws the running tracker with a live dot and label, and Stop as a non-destructive secondary sm button', function () {
-    $owner = semActor('user');
+    $owner = semActor('operator');
     $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
     $entry = TimeEntry::factory()->running()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id]);
 
-    $xpath = uiDom($this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()->getContent());
+    $xpath = uiDom($this->actingAs($owner)->get(route('operator.tickets.show', $ticket))->assertOk()->getContent());
     $running = uiOne($xpath, '//*[@data-time-tracker-controls]//*[@data-time-tracker-running]');
     $stop = uiOne($xpath, '//*[@data-time-tracker-controls]/button[@data-time-tracker-stop]');
 
@@ -587,9 +595,9 @@ it('draws the running tracker with a live dot and label, and Stop as a non-destr
 });
 
 it('ships the running state once as a server-rendered template, and the script builds no markup or colour', function () {
-    $owner = semActor('user');
+    $owner = semActor('operator');
     $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
-    $html = $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()->getContent();
+    $html = $this->actingAs($owner)->get(route('operator.tickets.show', $ticket))->assertOk()->getContent();
 
     // The <template> holds the same component markup the running state uses (live status + secondary Stop).
     preg_match('/<template data-time-tracker-running-template>(.*?)<\/template>/s', $html, $match);

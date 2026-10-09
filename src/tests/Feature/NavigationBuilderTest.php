@@ -436,8 +436,12 @@ it('routes a workspace to the only entry its capabilities permit', function () {
 
     $helpdesk = workspaces(navigationFor($queueOnly, 'dashboard'))['helpdesk'];
 
+    // EPIC-017 WP2: "My requests" is a React page, but this actor holds no `tickets.view`, so the workspace
+    // follows its first view, the Blade queue, and every entry it offers is a document visit.
     expect($helpdesk['href'])->toBe(route('operator.tickets.index'))
-        ->and(array_keys(contextItems($helpdesk)))->toBe(['helpdesk.queue', 'helpdesk.reports']);
+        ->and($helpdesk['visit'])->toBe('document')
+        ->and(array_keys(contextItems($helpdesk)))->toBe(['helpdesk.queue', 'helpdesk.reports'])
+        ->and(array_column(contextItems($helpdesk), 'visit'))->toBe(['document', 'document']);
 
     $reportsOnly = actorWithPermissions(['time.view_all']);
 
@@ -575,7 +579,9 @@ it('preserves the visit mode of every destination through the reshape', function
         'home' => 'inertia',
         'projects' => 'inertia',
         'tasks' => 'inertia',
-        'helpdesk' => 'document',
+        // EPIC-017 WP2: "My requests" is a React page, and the workspace follows its first view. The
+        // queue and reports, still Blade, keep `document` (asserted below).
+        'helpdesk' => 'inertia',
         'time' => 'inertia',
         'directory' => 'document',
         'finance' => 'document',
@@ -589,7 +595,9 @@ it('preserves the visit mode of every destination through the reshape', function
     // Contextual items carry their own mode: Time Reports is React, the ticket queue is Blade.
     expect(contextItems($navigation['time'])['time.reports']['visit'])->toBe('inertia')
         ->and(contextItems($navigation['time'])['time.allocation']['visit'])->toBe('inertia')
+        ->and(contextItems($navigation['helpdesk'])['helpdesk.requests']['visit'])->toBe('inertia')
         ->and(contextItems($navigation['helpdesk'])['helpdesk.queue']['visit'])->toBe('document')
+        ->and(contextItems($navigation['helpdesk'])['helpdesk.reports']['visit'])->toBe('document')
         ->and(contextItems($navigation['projects'])['projects.create']['visit'])->toBe('inertia')
         ->and(contextItems($navigation['system'])['system.users']['visit'])->toBe('document');
 

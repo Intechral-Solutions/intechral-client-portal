@@ -73,10 +73,9 @@ it('does not show internal notes to the ticket owner on the show page', function
         'is_internal' => true,
     ]);
 
-    $this->actingAs($owner)
-        ->get(route('tickets.show', $ticket))
-        ->assertOk()
-        ->assertDontSee('SECRET_INTERNAL_NOTE');
+    $page = $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk();
+
+    expect(json_encode(ticketOwnProps($page)))->not->toContain('SECRET_INTERNAL_NOTE');
 });
 
 it('shows internal notes to operators on the show page', function () {
@@ -125,4 +124,40 @@ it('validates reply body is required', function () {
     $this->actingAs($user)
         ->post(route('tickets.replies.store', $ticket), ['body' => ''])
         ->assertSessionHasErrors('body');
+});
+
+// EPIC-017 WP2 (independent review F3): the requester React page announces and focuses its own reply
+// ("Reply sent."), so an Inertia reply carries no shared flash that would announce the same reply a second
+// time. A plain form post (the operator's Blade page) keeps its "Reply added." flash.
+it('flashes "Reply added." for a plain form post and none for an Inertia reply', function () {
+    $user = ticketUser();
+    $ticket = ticketFor($user);
+
+    $this->actingAs($user)
+        ->post(route('tickets.replies.store', $ticket), ['body' => 'Plain post.'])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Reply added.');
+
+    $version = $this->actingAs($user)->get(route('tickets.index'))->viewData('page')['version'];
+
+    $this->actingAs($user)
+        ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])
+        ->post(route('tickets.replies.store', $ticket), ['body' => 'Inertia reply.'])
+        ->assertRedirect()
+        ->assertSessionMissing('status');
+
+    // Both replies are real: only the flash differs.
+    expect($ticket->replies()->pluck('body')->all())->toBe(['Plain post.', 'Inertia reply.']);
+});
+
+it('flashes nothing for a refused Inertia reply either, so only the field error is shown', function () {
+    $user = ticketUser();
+    $ticket = ticketFor($user);
+    $version = $this->actingAs($user)->get(route('tickets.index'))->viewData('page')['version'];
+
+    $this->actingAs($user)
+        ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])
+        ->post(route('tickets.replies.store', $ticket), ['body' => ''])
+        ->assertSessionHasErrors('body')
+        ->assertSessionMissing('status');
 });

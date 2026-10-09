@@ -11,8 +11,8 @@ import { settleTheme, type Theme } from './support/theme';
  * The customer is `e2e-customer@intechral.test` (role `user`, no operator capability), so every
  * page below is rendered in the Focused presentation: a 60px top bar, one centred column, no rail,
  * drawer, utility bar, breadcrumb or global timer. The routes cover both renderers on purpose:
- * `/dashboard`, `/profile` and `/projects` are React, while `/tickets`, `/my/invoices` and `/pages`
- * are Blade (the Helpdesk moves in the next package), and the Blade frame must be the same product.
+ * `/dashboard`, `/profile`, `/projects` and (EPIC-017 WP2) `/tickets` are React, while `/my/invoices` and
+ * `/pages` are Blade, and the Blade frame must be the same product.
  *
  * Signing out is owned by `auth-migration.spec.ts`: sessions are database-backed, so it destroys the
  * session this persona shares across the worker's tests.
@@ -35,7 +35,7 @@ const ROUTES = [
     { path: '/dashboard', renderer: 'react', current: 'Home' },
     { path: '/profile', renderer: 'react', current: null },
     { path: '/projects', renderer: 'react', current: 'Projects' },
-    { path: '/tickets', renderer: 'blade', current: 'Support' },
+    { path: '/tickets', renderer: 'react', current: 'Support' },
     { path: '/my/invoices', renderer: 'blade', current: 'Invoices' },
     { path: '/pages', renderer: 'blade', current: 'Resources' },
 ] as const;
@@ -237,7 +237,9 @@ for (const route of ROUTES) {
     });
 }
 
-for (const route of ['/dashboard', '/tickets'] as const) {
+// One React page and one Blade page: the sheet must behave the same in both renderers. (`/tickets` was the
+// Blade leg until EPIC-017 WP2 made it React; `/my/invoices` is the Blade leg now.)
+for (const route of ['/dashboard', '/my/invoices'] as const) {
     test(`the menu sheet is keyboard-complete on ${route}: opens, traps focus, closes on Esc and returns focus`, async ({
         page,
     }) => {
@@ -335,7 +337,7 @@ test('keyboard: the skip link is first, focus is visible, and a visit is announc
     await expect(page.locator('[data-shell-announcer]')).toHaveText('Projects');
 });
 
-for (const path of ['/dashboard', '/tickets']) {
+for (const path of ['/dashboard', '/my/invoices']) {
     test(`the account menu on ${path} opens below the avatar, is keyboard-operable and reaches the profile anchors`, async ({
         page,
     }) => {

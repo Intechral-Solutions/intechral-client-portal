@@ -16,7 +16,8 @@ import {
  * EPIC-013 WP5 — the Blade renderer of the Direction D shell, and renderer coexistence, in real
  * Chromium (§14, §25.3 flows 1, 6, 7, 8, 10, 12).
  *
- * Blade pages here are Helpdesk (`/operator/tickets`, `/tickets`) and Resources (`/pages`): both are
+ * Blade pages here are the Helpdesk queue (`/operator/tickets`), Finance (`/billing/invoices`, `/my/invoices`)
+ * and Resources (`/pages`) (EPIC-017 WP2 made `/tickets` a React page): all are
  * `document` destinations in the canonical contract, so every crossing below is a full page load.
  * Authentication comes from the shared per-worker persona sessions (support/auth.ts) — no test here
  * submits the login form.
@@ -100,17 +101,17 @@ test('React → Blade → React keeps theme, panel state, active state and histo
 
     // …cross a document boundary into Blade: React is unloaded and the Blade shell renders with the
     // server's active workspace and the same theme.
-    await railLink(page, 'Helpdesk').click();
-    await expect(page).toHaveURL(/\/tickets$/);
+    await railLink(page, 'Finance').click();
+    await expect(page).toHaveURL(/\/billing\/invoices$/);
     await expect(page.locator('#app')).toHaveCount(0);
     await expect(bladeShell(page)).toHaveCount(1);
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await expect(currentWorkspace(page)).toHaveText('Helpdesk');
-    await expect(page.getByRole('navigation', { name: 'Helpdesk views' })).toBeVisible();
+    await expect(currentWorkspace(page)).toHaveText('Finance');
+    await expect(page.getByRole('navigation', { name: 'Finance views' })).toBeVisible();
 
     // A choice made in Blade…
     await page.getByRole('button', { name: 'Collapse workspace views' }).click();
-    await expect(page.getByRole('navigation', { name: 'Helpdesk views' })).toBeHidden();
+    await expect(page.getByRole('navigation', { name: 'Finance views' })).toBeHidden();
     await expect(page.getByRole('button', { name: 'Show workspace views' })).toBeFocused();
 
     // …and back into React through an `inertia` destination on the Blade rail: React mounts, with
@@ -126,14 +127,14 @@ test('React → Blade → React keeps theme, panel state, active state and histo
         await page.evaluate(() =>
             JSON.parse(localStorage.getItem('shell.operational.panel') ?? '{}'),
         ),
-    ).toMatchObject({ projects: 'collapsed', helpdesk: 'collapsed' });
+    ).toMatchObject({ projects: 'collapsed', finance: 'collapsed' });
 
     // History works in both directions across the renderer boundary, with no stale shell.
     await page.goBack();
-    await expect(page).toHaveURL(/\/tickets$/);
+    await expect(page).toHaveURL(/\/billing\/invoices$/);
     await expect(bladeShell(page)).toHaveCount(1);
-    await expect(currentWorkspace(page)).toHaveText('Helpdesk');
-    await expect(page.getByRole('navigation', { name: 'Helpdesk views' })).toBeHidden();
+    await expect(currentWorkspace(page)).toHaveText('Finance');
+    await expect(page.getByRole('navigation', { name: 'Finance views' })).toBeHidden();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
     await page.goForward();
@@ -454,7 +455,7 @@ test.describe('as a member', () => {
         page,
     }) => {
         await page.setViewportSize(XL);
-        await signedIn(page, '/tickets');
+        await signedIn(page, '/my/invoices');
 
         await expect(bladeShell(page)).toHaveCount(1);
 
@@ -463,8 +464,8 @@ test.describe('as a member', () => {
         await expect(rail.getByRole('link', { name: 'System', exact: true })).toHaveCount(0);
         await expect(rail.getByRole('link', { name: 'Directory', exact: true })).toHaveCount(0);
         await expect(
-            page.getByRole('navigation', { name: 'Helpdesk views' }).getByRole('link'),
-        ).toHaveText(['My requests']);
+            page.getByRole('navigation', { name: 'Finance views' }).getByRole('link'),
+        ).toHaveText(['My invoices']);
 
         // The ninth workspace, a single Blade surface with no panel.
         await railLink(page, 'Resources').click();

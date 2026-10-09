@@ -142,7 +142,7 @@ it('projects the customer navigation: Home, Support, Projects, Invoices, Resourc
 
     expect(focusedNavLabels($navigation))->toBe(['Home', 'Support', 'Projects', 'Invoices', 'Resources'])
         ->and(array_column($navigation['workspaces'], 'href'))->toBe([route('dashboard'), route('tickets.index'), route('projects.index'), route('billing.client.invoices.index'), route('cms.index')])
-        ->and(array_column($navigation['workspaces'], 'visit'))->toBe(['inertia', 'document', 'inertia', 'document', 'document'])
+        ->and(array_column($navigation['workspaces'], 'visit'))->toBe(['inertia', 'inertia', 'inertia', 'document', 'document'])
         ->and(array_column($navigation['workspaces'], 'key'))->toBe(['home', 'helpdesk', 'projects', 'finance', 'resources']);
 
     foreach ($navigation['workspaces'] as $workspace) {

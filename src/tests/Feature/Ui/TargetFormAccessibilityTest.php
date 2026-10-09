@@ -75,18 +75,8 @@ function uiTargetPages(): array
 {
     return [
         // ── Helpdesk ─────────────────────────────────────────────────────────────
-        'tickets.index (member)' => function ($t) {
-            $member = uiActor('user');
-            uiOpenTicketFor($member);
-
-            return [uiGet($t, $member, route('tickets.index')), 2];
-        },
-        'tickets.create (member)' => fn ($t) => [uiGet($t, uiActor('user'), route('tickets.create')), 5],
-        'tickets.show (member)' => function ($t) {
-            $member = uiActor('user');
-
-            return [uiGet($t, $member, route('tickets.show', uiOpenTicketFor($member))), 2];
-        },
+        // The member Helpdesk pages (tickets.index/create/show) are React as of EPIC-017 WP2: their labels,
+        // error links and focus are pinned in pages/tickets/*.test.tsx, not by scanning Blade markup.
         'operator.tickets.index' => function ($t) {
             $operator = uiActor('operator');
             uiOpenTicketFor($operator);
@@ -194,13 +184,6 @@ it('renders errors/403 inside the shell with its actions named and no duplicate 
 function uiFailedForms(): array
 {
     return [
-        'tickets.create' => fn ($t) => uiFailedSubmission($t, uiActor('user'), route('tickets.create'), 'post', route('tickets.store'), []),
-        'tickets.show reply' => function ($t) {
-            $member = uiActor('user');
-            $ticket = uiOpenTicketFor($member);
-
-            return uiFailedSubmission($t, $member, route('tickets.show', $ticket), 'post', route('tickets.replies.store', $ticket), ['body' => '']);
-        },
         'operator.tickets.show reply' => function ($t) {
             $operator = uiActor('operator');
             $ticket = uiOpenTicketFor($operator);

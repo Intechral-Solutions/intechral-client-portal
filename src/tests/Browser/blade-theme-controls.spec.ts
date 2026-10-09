@@ -393,37 +393,13 @@ test.describe('Helpdesk as an operator', () => {
     });
 });
 
-test.describe('Helpdesk as a member', () => {
+test.describe('Finance as a member', () => {
     test.use({ persona: 'member' });
 
-    test('my requests and the new-ticket form', async ({ page }) => {
-        test.setTimeout(120_000);
-
-        for (const { theme, viewport } of MODES) {
-            let tokens = await visit(page, '/tickets', theme, viewport);
-
-            await expectInk(inMain(page).getByRole('link', { name: 'New Ticket' }), tokens);
-            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: 'New Ticket' }), viewport);
-            await expect(inMain(page).getByRole('searchbox', { name: 'Search tickets…' })).toBeVisible();
-            await expect(inMain(page).getByRole('combobox', { name: 'Status', exact: true })).toBeVisible();
-            await expectSecondary(inMain(page).getByRole('button', { name: 'Filter', exact: true }), tokens);
-            await expectControlContract(page, tokens);
-
-            tokens = await visit(page, '/tickets/create', theme, viewport);
-
-            await expect(inMain(page).getByLabel('Subject')).toBeVisible();
-            await expect(inMain(page).getByLabel('Category')).toBeVisible();
-            await expect(inMain(page).getByLabel('Priority')).toBeVisible();
-            // The description is the textarea named by its visible label, not a shell control whose name contains the word.
-            const description = inMain(page).getByLabel('Description');
-            await expect(description).toBeVisible();
-            await expect(description).toHaveAttribute('id', 'description');
-            expect(await description.evaluate((element) => element.tagName.toLowerCase() + ':' + element.getAttribute('name'))).toBe('textarea:description');
-            await expect(inMain(page).getByLabel('Attachments')).toBeVisible();
-            await expectInk(inMain(page).getByRole('button', { name: 'Submit Ticket' }), tokens);
-            await expectControlContract(page, tokens);
-        }
-    });
+    // CONVERTED IN EPIC-017 WP2: 'my requests and the new-ticket form' drew the member's Blade ticket pages
+    // against the Blade control contract. Those pages are React now (pages/tickets/*), whose controls are
+    // the Direction D primitives, held by `@shadcn/lint` and by pages/tickets/*.test.tsx, not by this Blade
+    // control scan. The member's remaining Blade Helpdesk-adjacent page is the invoice list below.
 
     test('my invoices', async ({ page }) => {
         test.setTimeout(60_000);
@@ -1059,11 +1035,11 @@ test.describe('Semantic state: every state, rendered by the production partials'
             const ds = await readDs(page, DS);
             const at = (name: string) => gallery.locator(`[data-case="${name}"]`);
 
-            // Ticket lifecycle (§9.1): label, tone, glyph. Pending uses the recorded P6 substitute.
+            // Ticket lifecycle (§9.1): label, tone, glyph. Pending is the hourglass (EPIC-017 §13).
             const tickets: [string, string, string, string][] = [
                 ['open', 'Open', 'info', 'circle'],
                 ['in_progress', 'In Progress', 'info', 'half'],
-                ['pending_user', 'Pending', 'neutral', 'dashed'],
+                ['pending_user', 'Pending', 'neutral', 'hourglass'],
                 ['resolved', 'Resolved', 'success', 'check'],
                 ['closed', 'Closed', 'neutral', 'check'],
             ];
@@ -1246,20 +1222,22 @@ test.describe('Semantic state on real Helpdesk pages (operator)', () => {
     });
 });
 
-// The seeded ticket TKT-E2E1 belongs to the operator persona, so its own request page (`/tickets/{id}`, the
-// only host of the embedded tracker) is reached as the operator, exactly as time-migration.spec.ts does.
-test.describe('Semantic state on the operator\'s own request page: the embedded time tracker', () => {
+// The embedded tracker's only host is the OPERATOR ticket page (`/operator/tickets/{id}`; EPIC-017 WP2 "N2
+// continuity" moved it there when `/tickets/{id}` became the requester-safe page), reached as the operator
+// through the queue, exactly as time-migration.spec.ts does.
+test.describe('Semantic state on the operator ticket page: the embedded time tracker', () => {
     test('the tracker is server-rendered with data hooks; the running state it clones is live and Stop is not destructive', async ({
         page,
     }) => {
         test.setTimeout(180_000);
 
-        // The request page's path, found once through the list as a user reaches it. Each mode then loads that
-        // path directly: following the link would reload the document and drop the theme `visit` applied.
-        await visit(page, '/tickets', 'light', XL);
+        // The ticket page's path, found once through the queue (searched by number) as an operator reaches it.
+        // Each mode then loads that path directly: following the link would reload the document and drop the
+        // theme `visit` applied.
+        await visit(page, '/operator/tickets?search=TKT-E2E1', 'light', XL);
         const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
         const requestPath = new URL(href ?? '', 'http://localhost').pathname;
-        expect(requestPath).toMatch(/^\/tickets\/\d+$/);
+        expect(requestPath).toMatch(/^\/operator\/tickets\/\d+$/);
 
         for (const { theme, viewport } of MODES) {
             const where = `${theme} ${viewport.width}`;
@@ -1267,8 +1245,8 @@ test.describe('Semantic state on the operator\'s own request page: the embedded 
             expect(await page.locator('html').getAttribute('data-theme'), `${where}: the theme is applied`).toBe(theme);
             const ds = await readDs(page, DS);
 
-            // The request page shows the same shared marks.
-            await expectMark(inMain(page).locator('[data-ticket-status]').first(), 'Open', 'info', 'circle', ds, `${where} request page status`);
+            // The ticket page shows the same shared marks.
+            await expectMark(inMain(page).locator('[data-ticket-status]').first(), 'Open', 'info', 'circle', ds, `${where} ticket page status`);
 
             // The tracker's own markup: one control row, one server-rendered template, no script-built markup.
             const controls = inMain(page).locator('[data-time-tracker-controls]');
@@ -1544,6 +1522,8 @@ async function expectNormalized(page: Page, path: string, label: string) {
 }
 
 test.describe('Theme normalization: Helpdesk, Finance, System as an operator', () => {
+    // EPIC-017 WP2: the operator's "request page" (`/tickets/{id}`, Blade) is gone; the embedded tracker it hosted is
+    // on the operator ticket page, which 'ticket' below already covers.
     test('queue, ticket, reports, invoices, users, roles and pages draw only Direction D colours', async ({ page }) => {
         test.setTimeout(420_000);
 
@@ -1551,17 +1531,9 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
         const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
         const ticketPath = new URL(href ?? '', 'http://localhost').pathname;
 
-        // The seeded ticket also has a request page (`/tickets/{id}`, which hosts the embedded time tracker); the
-        // operator owns it, so it is reached through their own list, the real production route (independent review Y2A).
-        await visit(page, '/tickets', 'light', XL);
-        const requestHref = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
-        const requestPath = new URL(requestHref ?? '', 'http://localhost').pathname;
-        expect(requestPath).toMatch(/^\/tickets\/\d+$/);
-
         for (const [label, path] of [
             ['queue', '/operator/tickets'],
             ['ticket', ticketPath],
-            ['request page', requestPath],
             ['reports', '/operator/tickets/reports'],
             ['invoices', '/billing/invoices'],
             ['invoice form', '/billing/invoices/create'],
@@ -1608,17 +1580,13 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
     });
 });
 
-test.describe('Theme normalization: Helpdesk and Finance as a member, and errors/403', () => {
+test.describe('Theme normalization: Finance as a member, and errors/403', () => {
     test.use({ persona: 'member' });
 
-    test('my requests, the new-ticket form, my invoices and the 403 page draw only Direction D colours', async ({ page }) => {
+    test('my invoices and the 403 page draw only Direction D colours', async ({ page }) => {
         test.setTimeout(300_000);
 
-        for (const [label, path] of [
-            ['my requests', '/tickets'],
-            ['new ticket', '/tickets/create'],
-            ['my invoices', '/my/invoices'],
-        ] as const) {
+        for (const [label, path] of [['my invoices', '/my/invoices']] as const) {
             await expectNormalized(page, path, label);
         }
 

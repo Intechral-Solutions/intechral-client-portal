@@ -44,7 +44,7 @@ const glyphColour: Record<StatusTone, string> = {
 };
 
 /** Shapes, so two tones never differ by colour alone. */
-export type StatusGlyph = 'circle' | 'half' | 'dot' | 'check' | 'triangle' | 'square' | 'dashed';
+export type StatusGlyph = 'circle' | 'half' | 'dot' | 'check' | 'triangle' | 'square' | 'dashed' | 'hourglass';
 
 const defaultGlyph: Record<StatusTone, StatusGlyph> = {
     neutral: 'circle',
@@ -121,6 +121,20 @@ function Glyph({ glyph, className }: { glyph: StatusGlyph; className: string }) 
             return (
                 <svg {...common}>
                     <rect x="2" y="2" width="8" height="8" rx="1" fill="currentColor" />
+                </svg>
+            );
+        case 'hourglass':
+            // Waiting on someone else (EPIC-017 §13): the shape for "the ball is in another court".
+            return (
+                <svg {...common}>
+                    <path
+                        d="M3 1.75h6M3 10.25h6M3.9 1.75v1.2c0 1.3 2.1 2 2.1 3.05S3.9 7.75 3.9 9.05v1.2M8.1 1.75v1.2c0 1.3-2.1 2-2.1 3.05s2.1 1.75 2.1 3.05v1.2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
                 </svg>
             );
     }

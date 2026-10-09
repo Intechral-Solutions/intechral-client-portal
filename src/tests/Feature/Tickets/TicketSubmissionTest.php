@@ -153,11 +153,7 @@ it('shows users their own tickets on the index', function () {
     Ticket::factory()->for($user, 'user')->create(['title' => 'My Ticket']);
     Ticket::factory()->create(['title' => 'Someone Elses Ticket']);
 
-    $this->actingAs($user)
-        ->get(route('tickets.index'))
-        ->assertOk()
-        ->assertSee('My Ticket')
-        ->assertDontSee('Someone Elses Ticket');
+    expect(ticketListedTitles($user))->toBe(['My Ticket']);
 });
 
 it('allows users to view their own ticket', function () {

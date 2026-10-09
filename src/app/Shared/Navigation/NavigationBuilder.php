@@ -226,7 +226,7 @@ final class NavigationBuilder
         $views = [];
 
         if ($user->can('tickets.view')) {
-            $views[] = $this->item('helpdesk.requests', 'My requests', route('tickets.index'), 'document', [
+            $views[] = $this->item('helpdesk.requests', 'My requests', route('tickets.index'), 'inertia', [
                 'tickets.index',
                 'tickets.show',
                 'tickets.create',

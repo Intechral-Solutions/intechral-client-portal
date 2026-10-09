@@ -84,11 +84,12 @@ test('multiple timers persist through Inertia and reconstruct across Blade docum
     await expectRunningTimers(page, 1);
     await page.keyboard.press('Escape');
 
-    // Projects is a React page as of EPIC-011E WP3, so the Blade-document leg of this journey moves
-    // to the Helpdesk workspace (still Blade until EPIC-011F); it needs no fixture (§21, C4).
-    // Helpdesk is a `document` destination, so this crosses the React -> Blade boundary.
-    await railLink(page, 'Helpdesk').click();
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Projects is a React page as of EPIC-011E WP3, so the Blade-document leg of this journey moved to the
+    // Helpdesk workspace; "My requests" is React as of EPIC-017 WP2, so it is Resources now (`/pages`, still
+    // Blade, a `document` destination the member reaches and which needs no fixture, §21, C4). This still
+    // crosses the React -> Blade boundary.
+    await railLink(page, 'Resources').click();
+    await expect(page).toHaveURL(/\/pages$/);
 
     // The SAME selector finds the SAME state on the other renderer: one timer, still running. The
     // retired strip is gone and no second affordance took its place.
@@ -233,18 +234,19 @@ test.describe('as an operator', () => {
         await page.goto('/time');
     await stopAllTimers(page);
 
-        // The embedded tracker's only remaining host is a ticket page (EPIC-011E WP7, §21: the
-        // project task page it used to also live on is React as of this work package). Tickets have
-        // no delete route and DevSeeder seeds none per run, so this uses the seeder's idempotent
-        // fixture ticket (`TKT-E2E1`) rather than creating one here; teardown removes only the timer
-        // entries this test creates, never the ticket.
-        await page.goto('/tickets');
+        // The embedded tracker's only remaining host is the OPERATOR ticket page (EPIC-011E WP7, §21; and
+        // EPIC-017 WP2 "N2 continuity": `/tickets/{id}` became the requester-safe page with no time data, so
+        // the tracker moved to `operator/tickets/show` until WP3 replaces it). Tickets have no delete route
+        // and DevSeeder seeds none per run, so this uses the seeder's idempotent fixture ticket (`TKT-E2E1`)
+        // rather than creating one here; teardown removes only the timer entries this test creates, never the
+        // ticket. The queue is searched by number, so the fixture is found whatever else the database holds.
+        await page.goto('/operator/tickets?search=TKT-E2E1');
         await page
             .getByRole('row')
             .filter({ hasText: 'TKT-E2E1' })
             .getByRole('link', { name: 'View' })
             .click();
-        await expect(page).toHaveURL(/\/tickets\/\d+$/);
+        await expect(page).toHaveURL(/\/operator\/tickets\/\d+$/);
         const ticketUrl = page.url();
 
         // Start from the Blade tracker (the request passes the hardened context validation). The
@@ -278,8 +280,23 @@ test.describe('as an operator', () => {
         await expect(page.getByRole('button', { name: /Start Timer/ })).toBeVisible();
         await expectRunningTimers(page, 0);
 
-        // E2eCleanup already recorded this timer's entry id from the `/time/timer/start` response
-        // and removes it in teardown; the fixture ticket itself has no delete route and is not
+        // The tracker's own in-place Stop (EPIC-017 WP2 review F7): start once more on the same page and stop
+        // with the tracker's button rather than through React. It reloads the page to refresh the totals, so
+        // what proves it worked is the reloaded tracker offering Start again with no timer left running.
+        const tracker = page.locator('[data-time-tracker-controls]');
+        await page.getByRole('button', { name: /Start Timer/ }).click();
+        await expectRunningTimers(page, 1);
+        await expect(tracker.getByText('Timer running')).toBeVisible();
+
+        await tracker.getByRole('button', { name: 'Stop', exact: true }).click();
+
+        await expect(page.getByRole('button', { name: /Start Timer/ })).toBeVisible();
+        await expect(page.getByText('Timer running')).toHaveCount(0);
+        await expectRunningTimers(page, 0);
+        await expect(timerTrigger(page)).toHaveAccessibleName('Start timer');
+
+        // E2eCleanup already recorded each timer's entry id from the `/time/timer/start` response
+        // and removes them in teardown; the fixture ticket itself has no delete route and is not
         // removed, so the next run's `firstOrCreate` finds it already there.
     });
 });
@@ -333,8 +350,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
     test('a full Blade page load paints no timer control until confirmed, and the shell never shifts', async ({
         page,
     }) => {
-        // The Blade twin of the test above, on `/tickets` (a Blade page the member reaches through the
-        // Helpdesk rail item). The partial used to server-render a visible "Start timer" and then grew
+        // The Blade twin of the test above, on `/pages` (a Blade page the member reaches through the
+        // Resources rail item; it was `/tickets` until EPIC-017 WP2 made that a React page). The partial used to server-render a visible "Start timer" and then grew
         // it into the running pill after its first read: 0.0010528120713305898, 1317,9,107,30 ->
         // 1117,8,307,32. The root now renders hidden and is revealed once that read has a final
         // result, so its becoming visible is the confirmation signal. Still the member's timers, still
@@ -346,7 +363,7 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await installShellShiftProbe(page);
 
         // Confirmed idle, on a genuine full-document load of a Blade page.
-        await page.goto('/tickets');
+        await page.goto('/pages');
         await expect(timerPill(page)).toBeVisible();
         await expectRunningTimers(page, 0);
         await expect(timerTrigger(page)).toHaveAccessibleName('Start timer');
@@ -359,7 +376,7 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await startTimer(page, 'Blade first paint regression with a long description');
         await expectRunningTimers(page, 1);
 
-        await page.goto('/tickets');
+        await page.goto('/pages');
         await expect(timerPill(page)).toBeVisible();
         await expectRunningTimers(page, 1);
         await expect(timerPill(page)).toContainText('Blade first paint regression');
@@ -390,8 +407,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await expect(page.locator('[data-shell-utility] [data-shell-timer]')).toHaveCount(1);
 
         // Blade, idle: the same single affordance, same hooks, same absent strip.
-        await railLink(page, 'Helpdesk').click();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await railLink(page, 'Resources').click();
+        await expect(page).toHaveURL(/\/pages$/);
         await expect(timerPill(page)).toHaveCount(1);
         await expectRunningTimers(page, 0);
         await expect(page.locator('[data-shell-utility] [data-shell-timer]')).toHaveCount(1);
@@ -416,8 +433,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await expect(elapsed).not.toHaveText(before ?? '', { timeout: 3000 });
 
         // ── React -> Blade, a full document navigation ──
-        await railLink(page, 'Helpdesk').click();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await railLink(page, 'Resources').click();
+        await expect(page).toHaveURL(/\/pages$/);
 
         await expectRunningTimers(page, 1);
         await expect(timerPill(page)).toContainText('Crossing timer');
@@ -441,7 +458,7 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
 
         // ── Back/Forward: the timer is server state, so history navigation cannot invent or lose it ──
         await page.goBack();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await expect(page).toHaveURL(/\/pages$/);
         await expectRunningTimers(page, 1);
         await page.goForward();
         await expect(page).toHaveURL(/\/time$/);
@@ -451,8 +468,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await timerStop(page).click();
         await expectRunningTimers(page, 0);
 
-        await railLink(page, 'Helpdesk').click();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await railLink(page, 'Resources').click();
+        await expect(page).toHaveURL(/\/pages$/);
         await expectRunningTimers(page, 0);
         await expect(timerTrigger(page)).toHaveAccessibleName('Start timer');
     });
@@ -570,8 +587,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await page.keyboard.press('Escape');
 
         // The edit was server state, so the Blade renderer shows it after a document navigation.
-        await railLink(page, 'Helpdesk').click();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await railLink(page, 'Resources').click();
+        await expect(page).toHaveURL(/\/pages$/);
         await expectRunningTimers(page, 1);
 
         const bladeTray = await openTimerTray(page);
@@ -636,7 +653,7 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await expectRunningTimers(page, 1);
 
         // Cross to a Blade document, where the pill is driven by `shell/blade-timer.ts`.
-        await page.goto('/tickets');
+        await page.goto('/pages');
         await expectRunningTimers(page, 1);
 
         const narrow = timerPill(page).locator('[data-timer-elapsed="narrow"]');
@@ -684,8 +701,8 @@ test.describe('the Direction D timer pill and tray (WP6)', () => {
         await startTimer(page, 'Stacking timer');
         await expectRunningTimers(page, 1);
 
-        await railLink(page, 'Helpdesk').click();
-        await expect(page).toHaveURL(/\/tickets$/);
+        await railLink(page, 'Resources').click();
+        await expect(page).toHaveURL(/\/pages$/);
 
         const tray = await openTimerTray(page);
         const box = (await tray.boundingBox())!;

@@ -119,9 +119,10 @@ test('a document destination leaves React and the Blade shell takes over', async
     await page.setViewportSize(XL);
     await signedIn(page);
 
-    // Helpdesk is `visit: document`, so this is a full page load, not a client visit.
-    await railLink(page, 'Helpdesk').click();
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Finance is `visit: document` (Helpdesk's "My requests" is React as of EPIC-017 WP2), so this is a
+    // full page load, not a client visit.
+    await railLink(page, 'Finance').click();
+    await expect(page).toHaveURL(/\/billing\/invoices$/);
 
     // React is gone — no Inertia root on this document — and the Blade renderer of the same
     // Direction D shell took over (WP5), with the server's active workspace.
@@ -131,7 +132,7 @@ test('a document destination leaves React and the Blade shell takes over', async
     ).toHaveCount(1);
     await expect(
         page.getByRole('navigation', { name: 'Workspaces' }).locator('[aria-current="page"]'),
-    ).toHaveText('Helpdesk');
+    ).toHaveText('Finance');
 
     // …and the theme survived the boundary, which is what the shared token layer exists for.
     await expect(page.locator('html')).toHaveAttribute('data-theme', /light|dark/);
@@ -463,7 +464,7 @@ test.describe('signing out', () => {
         // The Blade renderer's menu holds the same boundary (WP5), so the sign-out this test exists
         // for is taken from there; React's own sign-out stays covered by auth-migration.spec.ts.
         await page.keyboard.press('Escape');
-        await railLink(page, 'Helpdesk').click();
+        await railLink(page, 'Finance').click();
         await expect(page.locator('[data-shell-renderer="blade"]')).toHaveCount(1);
         await openAccountMenu(page);
 

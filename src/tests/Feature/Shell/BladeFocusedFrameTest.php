@@ -3,8 +3,8 @@
 /*
  * EPIC-017 WP1 (§9.3): the Blade Focused frame.
  *
- * A customer reaches Blade pages (the Helpdesk until WP2, own invoices, invoice payment, resources and
- * the 403 page) that would otherwise throw them back into the operator rail. `layouts/app.blade.php`
+ * A customer reaches Blade pages (own invoices, invoice payment, resources and the 403 page; the Helpdesk
+ * too until EPIC-017 WP2 made it React, whose Focused frame the React tests and `customer-shell.spec.ts` own) that would otherwise throw them back into the operator rail. `layouts/app.blade.php`
  * branches on the one resolver's answer and renders the customer top bar, fed the SAME Focused
  * navigation the React shell receives. This file owns the Blade half of the parity contract: same
  * labels, order, destinations and current item, same account menu, same landmarks, and no operator
@@ -110,8 +110,6 @@ it('renders the Focused navigation exactly as the server projected it, in the ba
         ->and(focusedFrameLinks($page, FOCUSED_FRAME_SHEET))->toBe($expected)
         ->and(array_column($expected, 'label'))->toBe(['Home', 'Support', 'Projects', 'Invoices', 'Resources']);
 })->with([
-    'the Helpdesk list' => ['tickets.index'],
-    'a new request' => ['tickets.create'],
     'own invoices' => ['billing.client.invoices.index'],
     'resources' => ['cms.index'],
 ]);
@@ -126,8 +124,6 @@ it('marks exactly the server current item, in the bar and the sheet', function (
         expect(array_values($marked))->toBe([$current]);
     }
 })->with([
-    'tickets' => ['tickets.index', 'Support'],
-    'new request' => ['tickets.create', 'Support'],
     'own invoices' => ['billing.client.invoices.index', 'Invoices'],
     'resources' => ['cms.index', 'Resources'],
 ]);
@@ -149,10 +145,10 @@ it('draws the customer frame and none of the operator chrome', function (string 
     expect($page->query('//nav[@aria-label="Breadcrumb"]')->length)->toBe(0)
         ->and($page->query('//nav[@aria-label="Workspaces"]')->length)->toBe(0)
         ->and($html)->not->toContain('Show workspace views');
-})->with(['tickets.index', 'tickets.create', 'billing.client.invoices.index', 'cms.index']);
+})->with(['billing.client.invoices.index', 'cms.index']);
 
 it('renders the Direction D customer landmarks with the skip link first', function () {
-    [, $page] = focusedFrameLoad(focusedFrameUser(), route('tickets.index'));
+    [, $page] = focusedFrameLoad(focusedFrameUser(), route('billing.client.invoices.index'));
 
     $focusable = $page->query('//body//*[self::a[@href] or self::button or self::input or self::select or self::textarea][not(ancestor::dialog)]');
 
@@ -169,7 +165,7 @@ it('renders the Direction D customer landmarks with the skip link first', functi
 });
 
 it('keeps the menu button and the account control in the bar, with the account outside the nav', function () {
-    [, $page] = focusedFrameLoad(focusedFrameUser(), route('tickets.index'));
+    [, $page] = focusedFrameLoad(focusedFrameUser(), route('billing.client.invoices.index'));
 
     $trigger = $page->query('//button[@data-shell-sheet-trigger]')->item(0);
 
@@ -187,7 +183,7 @@ it('keeps the menu button and the account control in the bar, with the account o
 it('renders the same personal account menu as the rail, anchored below a circular 34px trigger', function () {
     $actor = User::factory()->create(['name' => 'Grace Brewster Hopper']);
     $actor->assignRole('user');
-    [, $page] = focusedFrameLoad(User::findOrFail($actor->id), route('tickets.index'));
+    [, $page] = focusedFrameLoad(User::findOrFail($actor->id), route('billing.client.invoices.index'));
 
     $trigger = $page->query('//button[@data-shell-account]')->item(0);
 
@@ -226,7 +222,7 @@ it('renders the same personal account menu as the rail, anchored below a circula
 it('names every anchor target of the account menu on the profile page it links to', function () {
     // The Blade menu links to /profile#security, #connected-accounts and #sessions (N6); the React
     // profile page owns the ids (its Vitest pins them). Here: the links the Blade frame emits.
-    [, $page] = focusedFrameLoad(focusedFrameUser(), route('tickets.index'));
+    [, $page] = focusedFrameLoad(focusedFrameUser(), route('billing.client.invoices.index'));
 
     $hrefs = array_map(
         fn (DOMElement $link) => $link->getAttribute('href'),
@@ -253,10 +249,10 @@ it('never renders an operator, admin, CRM or organization destination outside th
     }
 
     expect(count(focusedFrameLinks($page, FOCUSED_FRAME_BAR)))->toBeLessThanOrEqual(5);
-})->with(['tickets.index', 'billing.client.invoices.index', 'cms.index']);
+})->with(['billing.client.invoices.index', 'cms.index']);
 
 it('stamps no panel on the root and inlines the one shared pre-paint bootstrap before any stylesheet', function () {
-    [$html, $page] = focusedFrameLoad(focusedFrameUser(), route('tickets.index'));
+    [$html, $page] = focusedFrameLoad(focusedFrameUser(), route('billing.client.invoices.index'));
     $root = $page->query('/html')->item(0);
     $body = trim((string) preg_replace('#^/\*.*?\*/\s*#s', '', (string) file_get_contents(resource_path('js/shell/bootstrap.js'))));
     $stylesheet = strpos($html, 'rel="stylesheet"');
@@ -269,7 +265,7 @@ it('stamps no panel on the root and inlines the one shared pre-paint bootstrap b
 });
 
 it('draws the brand once, as a labelled mark with a hidden wordmark', function () {
-    [, $page] = focusedFrameLoad(focusedFrameUser(), route('tickets.index'));
+    [, $page] = focusedFrameLoad(focusedFrameUser(), route('billing.client.invoices.index'));
 
     expect($page->query('//header//svg[contains(@class, "brand-mark")][@aria-label="Intechral"]')->length)->toBe(1)
         ->and($page->query('//header//span[@aria-hidden="true"][normalize-space()="Intechral"]')->length)->toBe(1);
@@ -308,7 +304,7 @@ it('renders an own invoice inside the customer frame', function () {
 });
 
 it('leaves the Operational frame to anyone who holds an operator-surface capability', function (string $role, array $permissions) {
-    [, $page] = focusedFrameLoad(focusedFrameUser($role, $permissions), route('tickets.index'));
+    [, $page] = focusedFrameLoad(focusedFrameUser($role, $permissions), route('billing.client.invoices.index'));
 
     expect($page->query('//*[@data-shell="operational"][@data-shell-renderer="blade"]')->length)->toBe(1)
         ->and($page->query('//*[@data-shell="focused"]')->length)->toBe(0)
