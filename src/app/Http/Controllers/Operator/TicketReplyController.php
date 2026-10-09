@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
+use App\Rules\AllowedTicketAttachment;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
 
@@ -17,8 +18,7 @@ class TicketReplyController extends Controller
         $validated = $request->validate([
             'body' => ['required', 'string'],
             'is_internal' => ['boolean'],
-            'attachments' => ['nullable', 'array', 'max:10'],
-            'attachments.*' => ['file', 'max:20480'],
+            ...AllowedTicketAttachment::rules(),
         ]);
 
         $isInternal = (bool) ($validated['is_internal'] ?? false);

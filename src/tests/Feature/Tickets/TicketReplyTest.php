@@ -3,9 +3,10 @@
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\TicketRepliedNotification;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+
+require_once __DIR__.'/TicketTestHelpers.php';
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -101,7 +102,9 @@ it('accepts attachments on replies', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
     $ticket = Ticket::factory()->open()->for($user, 'user')->create();
-    $file = UploadedFile::fake()->create('reply-doc.pdf', 256, 'application/pdf');
+    // EPIC-017 WP2: the attachment rule reads the type from the bytes (§20.1), so the fixture is a
+    // real PDF; a zero-filled fake()->create('*.pdf') is, correctly, not one.
+    $file = ticketUpload('reply-doc.pdf');
 
     $this->actingAs($user)
         ->post(route('tickets.replies.store', $ticket), [

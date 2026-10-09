@@ -6,7 +6,9 @@ use App\Models\CrmCompany;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
+use App\Queries\RequesterTicketQuery;
 use App\Rules\AccessibleCrmCompany;
+use App\Rules\AllowedTicketAttachment;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,16 +22,10 @@ class TicketController extends Controller
         /** @var User $user */
         $user = auth()->user();
 
-        // Own Tickets only: the same universe TicketPolicy::view grants a customer. Company
-        // membership grants no Ticket visibility (EPIC-010D D1, H4).
-        $includeInternal = $user->can('viewInternal', Ticket::class);
-
-        $tickets = Ticket::forUser($user)
-            ->when($request->filled('search'), fn ($q) => $q->search($request->search, $includeInternal))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
-            ->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
+        // Own Tickets only, searched over public text only (RequesterTicketQuery): the same
+        // universe TicketPolicy::view grants a customer. Company membership grants no Ticket
+        // visibility (EPIC-010D D1, H4), and internal notes never steer the requester list.
+        $tickets = RequesterTicketQuery::paginate($user, RequesterTicketQuery::filters($request));
 
         return view('tickets.index', compact('tickets'));
     }
@@ -59,8 +55,7 @@ class TicketController extends Controller
             'category' => ['required', 'string', 'in:'.implode(',', self::CATEGORIES)],
             'priority' => ['required', 'in:low,medium,high,critical'],
             'company_id' => ['nullable', new AccessibleCrmCompany],
-            'attachments' => ['nullable', 'array', 'max:10'],
-            'attachments.*' => ['file', 'max:20480'], // 20 MB each
+            ...AllowedTicketAttachment::rules(),
         ]);
 
         // Auto-assign single-org users so they never need to pick

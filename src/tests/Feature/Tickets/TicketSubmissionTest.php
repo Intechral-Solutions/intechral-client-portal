@@ -7,6 +7,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
+require_once __DIR__.'/TicketTestHelpers.php';
+
 beforeEach(function () {
     $this->seedRolesAndPermissions();
     Notification::fake();
@@ -97,7 +99,9 @@ it('accepts file attachments on ticket submission', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
-    $file = UploadedFile::fake()->create('document.pdf', 512, 'application/pdf');
+    // EPIC-017 WP2: the attachment rule reads the type from the bytes (§20.1), so the fixture is a
+    // real PDF; a zero-filled fake()->create('*.pdf') is, correctly, not one.
+    $file = ticketUpload('document.pdf');
 
     $this->actingAs($user)->post(route('tickets.store'), [
         'title' => 'Ticket with attachment',
@@ -116,7 +120,9 @@ it('rejects attachments larger than 20 MB', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
-    $file = UploadedFile::fake()->create('huge.zip', 21_000, 'application/zip');
+    // EPIC-017 WP2: a REAL PDF just over the limit, so the refusal can only be the size rule (a
+    // zero-filled fake would now also fail the type rule and prove nothing about size).
+    $file = UploadedFile::fake()->createWithContent('huge.pdf', ticketFileBytes('pdf').str_repeat('0', 20_481 * 1024));
 
     $this->actingAs($user)->post(route('tickets.store'), [
         'title' => 'Big file',
@@ -124,7 +130,10 @@ it('rejects attachments larger than 20 MB', function () {
         'category' => 'General',
         'priority' => 'low',
         'attachments' => [$file],
-    ])->assertSessionHasErrors('attachments.*');
+    ])->assertSessionHasErrors(['attachments.0' => 'The attachments.0 field must not be greater than 20480 kilobytes.']);
+
+    expect(Ticket::count())->toBe(0)
+        ->and(Storage::disk('local')->allFiles())->toBe([]);
 });
 
 it('validates required fields on ticket creation', function () {

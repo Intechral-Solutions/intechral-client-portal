@@ -43,7 +43,8 @@ it('BASELINE H1: the owner can reply with an attachment, and only the assignee i
     $this->actingAs($owner)
         ->post(route('tickets.replies.store', $ticket), [
             'body' => 'More detail from the owner.',
-            'attachments' => [UploadedFile::fake()->create('owner.pdf', 12, 'application/pdf')],
+            // EPIC-017 WP2: real PDF bytes (the attachment rule reads the type from the content).
+            'attachments' => [ticketUpload('owner.pdf')],
         ])
         ->assertRedirect()
         ->assertSessionHas('status', 'Reply added.');
@@ -84,7 +85,8 @@ it('BASELINE H1: an operator internal note is stored internal with its attachmen
         ->post(route('operator.tickets.replies.store', $ticket), [
             'body' => 'Internal only.',
             'is_internal' => '1',
-            'attachments' => [UploadedFile::fake()->create('internal.txt', 1, 'text/plain')],
+            // EPIC-017 WP2: real text bytes (the attachment rule reads the type from the content).
+            'attachments' => [ticketUpload('internal.txt', 'text')],
         ])
         ->assertRedirect();
 

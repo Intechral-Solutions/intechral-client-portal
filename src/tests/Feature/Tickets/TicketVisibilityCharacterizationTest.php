@@ -3,6 +3,7 @@
 use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
+use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
@@ -203,7 +204,10 @@ it('TARGET H9: the agent opens the user show page and every attachment linked fr
     $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertOk();
 });
 
-it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to them; a customer still cannot use a foreign ticket', function () {
+// FLIPPED IN EPIC-017 WP2 (O1, N1): the ticket's OWNER used to be allowed to time it (`TicketPolicy::view`
+// was the whole rule). Ticket-context time is now operator work, so the owner is refused like any other
+// customer, with nothing written. The agent half is unchanged.
+it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to them; no customer, the owner included, may time a ticket', function () {
     $f = ticketRoleFixture();
 
     $this->actingAs($f['agent'])
@@ -222,7 +226,10 @@ it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to
 
     $this->actingAs($f['owner'])
         ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
-        ->assertSuccessful();
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ticket_id');
+
+    expect(TimeEntry::where('ticket_id', $f['ticket']->id)->where('user_id', '!=', $f['agent']->id)->exists())->toBeFalse();
 });
 
 it('BASELINE H9: dashboard and navigation already key on tickets.assign, so the agent gets the queue and operator links', function () {

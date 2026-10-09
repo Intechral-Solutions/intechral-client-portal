@@ -796,6 +796,21 @@ These are the first product slices on the new shell. They exercise the design sy
 
 **Depends on:** shell (global presence); best delivered with or right after the Tasks overhaul.
 
+### Administrative active timer oversight
+
+**Class:** Future enhancement (backlog, **C**; recorded 2026-10-08). **Not an EPIC-017 release blocker and not designed.** It follows from the approved N1 existing-entry exception ([EPIC-017 §37](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#37-owner-decisions)), which accepts that an abandoned timer can accumulate excessive duration because only its owner can stop it today.
+
+Future scope, to be planned in its own epic:
+- authorized platform administrators can inspect active timers that belong to other users;
+- administrators can stop those timers without impersonation;
+- a central management overview, plus contextual access from individual user management;
+- explicit authorization and audit attribution (who stopped whose timer);
+- concurrency-safe stopping;
+- identification and review of long-running timers;
+- preservation of the billing-integrity controls (billed and invoice locks).
+
+**Depends on:** the EPIC-011D server timer contracts; best planned with [Timer UX improvement](#timer-ux-improvement).
+
 ### Projects UX expansion
 
 **Class:** Product functionality. Redesign the project workspace around Planning / Execution / Monitoring using data that exists or is cheap to add: milestones, tasks, members, time, budget. Add list view alongside the board; a first project-health/monitoring summary; stakeholder-friendly presentation. Outcomes, SOW linkage, baselines, and change control are [Advanced Projects](#later--advanced-projects).

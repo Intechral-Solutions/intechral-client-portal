@@ -1279,7 +1279,8 @@ This follows EPIC-016's practice, confirmed from git history: WP0 as a docs comm
 - the in-app notification centre and preferences;
 - global search;
 - the "Ask for help" top-bar action;
-- user-selectable shell presentation (EPIC-013 §31.1).
+- user-selectable shell presentation (EPIC-013 §31.1);
+- administrative active timer oversight ([roadmap](../product/product-roadmap.md#administrative-active-timer-oversight); not an EPIC-017 release blocker).
 
 **Directory:**
 - `company_id` / organization context;
@@ -1345,6 +1346,15 @@ These design decisions were taken by this gate and **approved by the owner (2026
 - Any other mechanism requires an explicit owner ruling ([§11](#11-email-and-notifications)).
 
 **New owner decisions raised by the remediation pass: none.**
+
+**N1 existing-entry exception — APPROVED (2026-10-08, after the independent WP2 G1 closure review; to be carried into Amendment 2).** This refines the O1 contract for records that already exist; it does not reopen O1.
+- An owner may, without requalifying for `tickets.assign` or ticket visibility, do these four things to an **existing** ticket-linked time entry: **stop** it if it is a running timer, **edit the description** of a running timer, **delete** it, or **move it out of ticket context**.
+- Existing time permissions, ownership requirements and billing locks remain enforced on all four paths.
+- Stopping a running timer records the accumulated elapsed duration against its existing ticket and **retains the entry's `billable` designation**.
+- None of this authorizes creating or re-establishing a ticket association. Starting a timer, logging an entry, or moving or editing an entry onto a ticket still requires `tickets.assign` **and** ticket visibility (`AccessibleTimeContext`, `TimeEntryController::update`).
+- The owner **accepts the bounded edge case of an abandoned timer accumulating excessive duration** (a pre-existing ticket timer left running is stored in full when stopped).
+- No further G1 behaviour change is required. The four paths are pinned as `PRESERVED` in `TicketTimeEligibilityTest`; changing one is an explicit owner act.
+- Related future work, not a release blocker: [Administrative active timer oversight](../product/product-roadmap.md#administrative-active-timer-oversight).
 
 **Not raised as owner decisions** (settled by evidence or existing rulings):
 - the routing topology;
