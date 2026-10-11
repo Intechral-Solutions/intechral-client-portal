@@ -28,7 +28,7 @@
 | Label | Meaning |
 |---|---|
 | **Ratified** | Approved by the owner on the date shown. Binding. Changing it is an explicit, dated owner act. |
-| **Owner-directed** | Recorded at the owner's instruction, on the date shown. It corrects an earlier assumption or sets sequencing. Its mechanism may still be open. |
+| **Owner-directed** | A design correction or process direction recorded at the owner's instruction, on the date shown. It corrects an earlier assumption or sets sequencing. It is **not** a formal policy ratification and is not in the ratified table. Its mechanism may still be open. |
 | **Recommended** | Proposed by the readiness assessment or the independent review. **Not** ratified. It may change before ratification. |
 | **Open** | A decision no one has made. |
 
@@ -43,7 +43,7 @@ Nothing below is ratified unless it is in [§2](#2-ratified-decision-ledger) as 
 | **H3** | Account suspension | **Ratified** | Nullable `users.disabled_at`; reversible suspension; sessions and remember tokens revoked; login and continued authenticated access denied; disabled users excluded from the relevant assignment and membership candidate lists; ordinary product notifications to disabled accounts suppressed; historical business records preserved; **the last active operator cannot be suspended or demoted, including under concurrent modification.** Implementation details remain subject to review. |
 | **H4** | Code-owned built-in roles | **Ratified** | Built-in roles are owned by the application. Ordinary UI editing of built-in role definitions is prohibited. Custom roles are the customization mechanism. Production permission synchronization is deterministic and idempotent, offers a dry-run/preview, and revokes existing grants only with explicit authorization, never incidentally. `RoleSeeder` is not an uncontrolled production synchronization mechanism. |
 
-**Owner-directed corrections** recorded when the gate closed. They are binding statements of direction; their mechanisms are specified in the sections cited.
+**Design corrections (owner-directed)** incorporated into the gate when it closed. They correct earlier assumptions and are **not additional formal policy ratifications**: H1 to H4 are the only decisions in this document ratified by the owner. Each correction's mechanism is specified in the section cited and, like any design, remains subject to review and rehearsal.
 
 | # | Correction | Where |
 |---|---|---|
@@ -56,7 +56,7 @@ Nothing below is ratified unless it is in [§2](#2-ratified-decision-ledger) as 
 
 ### 2.1 EPIC-017 sequencing dispositions (owner-directed, 2026-10-11)
 
-Stated by the owner when the WP2 closure (Amendment 2) was accepted. They are sequencing and process statements, not data-architecture decisions, and they do not alter H1 to H4.
+Stated by the owner when the WP2 closure (Amendment 2) was accepted. They are sequencing and process directions: not data-architecture decisions, not formal policy ratifications, and they do not alter H1 to H4.
 
 | # | Disposition | Where |
 |---|---|---|
