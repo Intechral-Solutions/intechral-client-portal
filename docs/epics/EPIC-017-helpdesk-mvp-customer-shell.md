@@ -8,6 +8,7 @@
 
 No implementation has started, and no implementation branch exists.
 **Update (2026-10-08):** WP1 (the customer shell foundation) is implemented on `feature/epic-017-helpdesk-mvp-customer-shell`, uncommitted and awaiting independent review ([Amendment 1](#amendment-1-wp1-customer-shell-foundation-pr-1)). The status stays **Planned** until PR 1 merges; nothing has been pushed and hosted CI has not run. The sentence above describes the design-gate baseline.
+**Update (2026-10-11):** WP1 and WP2 are implemented and committed **locally** on `feature/epic-017-helpdesk-mvp-customer-shell`, in five commits on top of `main` (`6058dc1` WP1, `67d1f9d` G1, `1ff93f4` G2, `8220deb` G3-A, `56cad95` G3-B). [Amendment 2](#amendment-2-wp2-customer-helpdesk-in-react-pr-2) is the WP2 evidence ledger and closes WP2 locally. **Nothing has been pushed, no PR exists, and hosted CI has not run for any of it.** The status stays **Planned**: WP3 (operator ticket workspace), WP4 (operator queue, bulk and reports) and WP5 (notification hardening and closeout) are not started, and the "uncommitted, awaiting independent review" wording in the 2026-10-08 update above is historical.
 **Class:** Product functionality + UX foundation (Product Roadmap [Release 1 → Helpdesk](../product/product-roadmap.md#helpdesk-release-1) and [Customer product and customer shell](../product/product-roadmap.md#customer-product-and-customer-shell); Release 1 Phase 2)
 **Renderer record:** This is the implementation contract for [EPIC-011 Phase F (Tickets)](./EPIC-011-react-frontend-migration.md#phase-f-tickets). No separate EPIC-011F document is created.
 **Design contract:** [Direction D](../design/direction-d-design-system.md): §7 customer shell, §10.4 ticket statuses, §13 account menu, §14 focus and keyboard, §15 states.
@@ -1689,3 +1690,226 @@ None of the following entered the tree: React ticket list/create/detail; request
 ### A1.22 Lifecycle
 
 EPIC-017 stays **Planned**; WP1 is implemented, uncommitted and awaiting independent review; WP2–WP5 are not started; hosted CI has not run. Entering WP2 needs WP1 reviewed, committed, merged and green on `main`.
+
+---
+
+## Amendment 2: WP2 Customer Helpdesk in React (PR 2)
+
+> **Status (2026-10-11): WP2 is implemented and committed locally on `feature/epic-017-helpdesk-mvp-customer-shell` as G1 (`67d1f9d`), G2 (`1ff93f4`), G3-A (`8220deb`) and G3-B (`56cad95`), on top of WP1 (`6058dc1`). This amendment is G3-C, the WP2 evidence ledger; it closes WP2 *locally*.** Nothing has been pushed, no PR exists, and **hosted CI has not run for any EPIC-017 code**: it is claimed nowhere here. EPIC-017 stays **Planned**. WP3, WP4 and WP5 are not started and none of their work is in the tree. No owner ruling (O1–O3) or plan choice (P1–P6) was reopened. **The owner reviewed this amendment and accepted WP2's local closure on 2026-10-11** (the confirmed dispositions are marked *Owner-confirmed* below): the keyboard and viewport assignment (A2.10 follow-up 1), F5, F6, D-4, the PR packaging (D-1), the deferral of WP3/WP4 from the Release 0.9 critical path and the scope retained by WP5 (A2.14).
+
+### A2.1 Starting point, method and evidence classes
+
+- **Starting point.** HEAD `56cad95ae23f4209069967f5475e0706f3ca3865`; its parent chain is `8220deb`, `1ff93f4`, `67d1f9d`, `6058dc1`, then `8658960` = `main` = `origin/main`. The branch has **no remote ref**. Working tree clean at the start. The protected stash `663d0d6fd1afd544865074e61f82d2722f6d614e` was preserved.
+- **Method.** Read-only inspection of the four WP2 commits and the tree; the ledger below is reconciled from them, from §37, from `docs/testing/e2e-browser-suite.md` and from the code. Focused checks were run (A2.11). The G3-B spec was run once unmodified as a control and then against six deliberate product mutations (A2.9); every mutated product file was restored with `git checkout` and `git diff -- src/app` was empty after each probe. **No product, test or configuration file changed in G3-C**; the only edits are documentation.
+- **Evidence classes.** Every figure in this amendment is one of three, and is labelled:
+  - **Verified in G3-C:** run or measured on 2026-10-11 against the committed tree.
+  - **Reported:** measured by an earlier gate on the G3-B tree (identical in content to `56cad95`) and *not re-run here*.
+  - **Outstanding:** requires hosted CI or a different machine; nothing in this amendment claims it.
+- **Counts.** A number beside a Pest file name is its count of `it()` declarations; datasets expand some of them, so a run reports more. Run totals are quoted as run.
+
+### A2.2 Gate map
+
+| Gate | Commit | Scope | Independent review | Owner acts |
+|---|---|---|---|---|
+| WP1 | `6058dc1` | Customer shell foundation (Amendment 1) | recorded in Amendment 1 | none |
+| **G1** | `67d1f9d` | Server contracts and security, no UI: N1 ticket-time eligibility, the attachment rule and atomic uploads, the O2 reply lifecycle under a row lock, requester search | WP2 G1 closure review (2026-10-08) | N1 existing-entry exception (2026-10-08) |
+| **G2** | `1ff93f4` | Requester React pages, the presenter, P2, N2 continuity, deletion of the three customer Blade pages, the requester import boundary, the Inertia "Reply sent." contract | WP2 G2 review (2026-10-09): no Critical, High or Medium; F5–F9 and D-2 carried | N2 continuity (2026-10-08); F5 disposition |
+| **G3-A** | `8220deb` | `e2e:cleanup-tickets`, `./dev test:e2e` lock, sweep, hand-off and reconciliation, `globalTeardown`, `#[DeleteWhenMissingModels]` | G3-A safety review: 1 High, 2 Medium, 3 Low, all corrected | G3-A rulings 1–8, Option A and Option C (2026-10-09) |
+| **G3-B** | `56cad95` | `customer-helpdesk.spec.ts`: journeys 3–8, 3b, 5b and the stale closed-reply regression; the E2E doc | Opus 5.5 independent review: **SAFE TO COMMIT**, no remediation; 2 Low and 5 Info | none |
+| **G3-C** | this amendment | Evidence ledger and WP2 closure; no product change | — | the three confirmations above |
+
+### A2.3 WP2 completion matrix
+
+Each row is a bullet of WP2's scope in §31. *Verified* is G3-C; *Browser* names the real-Chromium coverage, if any.
+
+| WP2 scope | Where it lives | Evidence |
+|---|---|---|
+| React `pages/tickets/{index,create,show}` | `resources/js/pages/tickets/*.tsx`, `components/helpdesk/*` | Vitest requester set (A2.11); **Browser:** journeys 3–8, 3b, 5b, stale reply |
+| Requester resources | `RequesterTicketPresenter` (every key written out), `RequesterTicketQuery` | `RequesterTicketPropsTest` (25: exact-key and sentinel allowlists, and the list and detail query budgets of §26) |
+| Reply with attachments | `reply-section.tsx`, `attachment-input.tsx`; `AllowedTicketAttachment` on create and both reply routes | `TicketAttachmentPolicyTest` (16), `TicketReplyLifecycleTest` (18), `pages/tickets/show.test.tsx`. **Not exercised in a browser** (accepted gap, A2.12) |
+| Customer status labels | `RequesterTicketPresenter::STATUS_LABELS`, `ticket-status.tsx` | props test, `ticket-status.test.tsx`; **Browser:** "Open", "Waiting on you", "In progress" (J4, 5b) |
+| The hourglass in both renderers | `components/ui/status.tsx`, `components/ui/status.blade.php`, `tickets/_status_badge` | `status.test.tsx`; `blade-theme-controls.spec.ts` pins `hourglass` for `pending_user` |
+| Search contract and F-4 | `RequesterTicketQuery`: own tickets, public text only, LIKE wildcards escaped (the operator queue too), a two-query page | `RequesterTicketSearchTest` (12); **Browser:** J4 (search and filter), J7 (an internal sentinel finds nothing), J8 |
+| Exact attachment allowlist and atomic uploads (F-7) | `AllowedTicketAttachment` (extension + type detected from the bytes); `TicketService::storeAttachments` (written inside the transaction, deleted on rollback, notify after commit) | `TicketAttachmentPolicyTest` with real-byte fixtures; **Browser:** J3 (accepted), 3b (an HTML file named `notes.txt` refused, nothing created) |
+| Company selector removal | `create.tsx`; `store()` still validates a forged `company_id` and never stores it | `create.test.tsx`, `TicketSubmissionTest`; **Browser:** J3 (no company field) |
+| N1 closed on the server | `AccessibleTimeContext::canTimeTicket` (`tickets.assign` **and** `view`), `TimeEntryController::ensureTicketTimeEligible`; the presenter has no time key | `TicketTimeEligibilityTest` (17, including the four PRESERVED existing-entry paths and the billing-lock test), the flipped H9 tests (A2.6), exact-key props tests |
+| N5 gone | the presenter carries no SLA or overdue key | "sends the member ticket page no Overdue signal, even for an overdue ticket" |
+| O2 lifecycle | `TicketService::addReply`, `CUSTOMER_REPLY_TRANSITIONS`, row lock; a closed-ticket reply refused before any write | `TicketReplyLifecycleTest` (18), `TicketReplyRaceTest` (2, real multi-process); **Browser:** J5, 5b (`pending_user` → `in_progress`), stale closed reply. `resolved` → `open` is Pest only |
+| P2 | `TicketController::show`: `authorize('view')` first, then `Inertia::location` to the operator page for a non-owner | `RequesterTicketPropsTest` (302 for an operator, 403 *without* a `Location` header for a stranger), the converted H9 tests. Reached in a browser only incidentally (A2.12 D-4) |
+| Deletion of the customer Blade pages and customer-only partials | `tickets/{index,create,show}.blade.php` deleted in G2. The four `tickets/_*.blade.php` partials **remain**: the operator pages still include each, so none is customer-only | **Verified:** directory listing and `grep`; `BladeThemeGuardTest` |
+| Guard inventory update | `BladeThemeGuardTest`, `BladeControlAdoptionTest`, `SemanticComponentsTest` | **Verified:** `BladeThemeGuardTest` green |
+| The locked E2E cleanup command | G3-A | A2.7 |
+| *Also in G2:* N2 continuity, "My requests" as an Inertia visit, the requester import boundary | `operator/tickets/show.blade.php`, `NavigationBuilder`, `eslint/requester-boundary.js` | `TicketEmbeddedTimeTrackerTest`, `NavigationBuilderTest`, `requester-import-guard*.test.ts` |
+
+### A2.4 Exit criteria
+
+**WP2's own exit criteria (§31).**
+
+| Criterion | Status |
+|---|---|
+| No customer Helpdesk Blade view remains | **Met** (verified). The operator Blade pages and their four shared partials remain by design until WP3/WP4 |
+| Every EPIC-010D target test is green, converted or kept | **Met locally.** The converted tests are named in A2.6; `tests/Feature/Tickets` and `tests/Feature/Console` passed in G3-C and the full Pest run (2,905) is reported |
+| N1 is closed on the server and N5 is gone | **Met** (A2.3) |
+| E2E runs return the tracked `tickets` count to baseline | **Met locally**: reconciled in every G3-C run (A2.9) and in the reported full run. **Hosted: Outstanding** |
+
+**EPIC-017 §33 as WP2 leaves it.** WP2 does not complete any §33 criterion alone; this records what it contributed and who owns the rest.
+
+| §33 | WP2's part | Remaining owner |
+|---|---|---|
+| 1 customers complete the flows keyboard-only at 390/768/1280, both themes | O2 lifecycle proven by Pest ✓. Flows work with a pointer; **keyboard-only and the width matrix for `/tickets/create` and `/tickets/{id}` are not browser-tested** | **WP5**, by the A2.10 assignment |
+| 2 operators triage, work, time and report in React | none | WP3, WP4 |
+| 3 no Helpdesk Blade view remains | customer pages deleted ✓ | WP3 (`operator/tickets/show`), WP4 (queue, reports) |
+| 4 every EPIC-010D contract holds, none dropped | own-ticket visibility, internal-note boundaries, reply authorization first and ticket numbers kept or converted (A2.6) | WP3/WP4 for the operator-side contracts |
+| 5 customer props carry no internal content, SLA, time, history actors or `company_id` | **Met** by the exact-key allowlists; the flipped H9 test is recorded | — |
+| 6, 7 resolver, drift guard, Focused navigation | WP1 | — |
+| 8 mail: per-recipient links, F-3, O3 | not started | **WP5** |
+| 9 query budgets | customer list and detail ✓ (`RequesterTicketPropsTest`, `RequesterTicketSearchTest`) | WP3/WP4 (queue, workspace) |
+| 10 `@shadcn/lint` clean, no growth | **Met**: `npm run lint` clean; `eslint-suppressions.json` byte-identical (15 files / 31, SHA-256 `5bf90c80…bfbe688`) | — |
+| 11 NVDA pass recorded | not started | **WP5** |
+| 12 `./dev check` and hosted CI green; counts return to baseline | local ✓. **Hosted: Outstanding** | WP5 (the hosted Playwright run) |
+| 13 roadmap, index, EPIC-011 Phase F note, E2E identity docs | the E2E docs are updated; the roadmap and epics index carry a status note only | **WP5** closeout |
+
+### A2.5 Owner rulings and ratifications carried
+
+All are recorded in §37; this is the index, not a restatement.
+
+| Item | Date | Where it is enforced |
+|---|---|---|
+| O1, O2, O3, P1–P6 | 2026-10-07 | §36, §37 |
+| **N1 existing-entry exception** (stop, running-timer description, delete, move out) | 2026-10-08 | `TicketTimeEligibilityTest`, four `PRESERVED` paths; the owner also accepts the abandoned-timer edge case |
+| **N2 continuity** (embedded tracker on the operator page until WP3; removal list in §37) | 2026-10-08 | `operator/tickets/show.blade.php`, `TicketEmbeddedTimeTrackerTest`, `RequesterTicketPropsTest` |
+| **G2 F5 disposition** (preserve the requester-safe interface; record the edge persona) | 2026-10-09 | A2.12 F5 |
+| **G3-A rulings 1–8** (suite-level cleanup, eligibility, no targeting, linked records refused, files first, recovery sweep, session isolation unchanged, EPIC-015 time unchanged) | 2026-10-09 | `CleanupE2eTickets`, `./dev test:e2e`, `globalTeardown` |
+| **Option A**: the wrapper runs the cleanup as `portal` | 2026-10-09 | `scripts/dev/commands.sh`, `global-teardown.ts` |
+| **Option C**: `#[DeleteWhenMissingModels]` on `TicketCreatedNotification` and `TicketRepliedNotification` | 2026-10-09 | `TicketNotificationMissingModelTest` |
+
+### A2.6 Test-conversion ledger
+
+Every replaced or renamed test is named (the §34 mitigation for "converting HTML assertions silently drops coverage"). Most are marked `FLIPPED` or `CONVERTED IN EPIC-017 WP2` in source. None was deleted without a named replacement.
+
+| Test | Change |
+|---|---|
+| `TicketVisibilityCharacterizationTest` "TARGET H9: the agent opens the user show page and every attachment…" → "…reaches the ticket (P2: the operator page) and every attachment linked from it" | **P2.** A non-owner agent is redirected from `/tickets/{id}` to the operator page, which opens; both attachments still download |
+| same, "…internal-note visibility no longer depends on the route…" → "…follows the capability; every operator sees notes on the operator page, the requester page never carries them" | **P2.** Operators see the note on the operator page; the owner's props are asserted note-free |
+| same, "…the agent starts a timer on…; a customer still cannot use a foreign ticket" → "…no customer, the owner included, may time a ticket" (G1) | **FLIPPED, O1/N1 (the H9 test of §25.3 and §33.5).** The owner used to be allowed; now 422 on `ticket_id` with nothing written. The agent half is unchanged |
+| `TicketAssignmentCharacterizationTest` "TARGET H9: an agent assignee can follow the reply mail link" | **P2.** The mail link stays `/tickets/{id}` and lands on the operator page (per-recipient links are WP5) |
+| `TimeTrackingTest` "allows authorized embedded task and ticket timer contexts" | **FLIPPED.** The ticket half uses a user holding `tickets.assign`; the plain owner's refusal is asserted with nothing written; the task half is unchanged |
+| `TimeTrackingTest` "identifies the context record by id on every timer context DTO" | The actor also holds `tickets.assign`; every DTO assertion is unchanged |
+| `SemanticStateMappingTest` "draws the member ticket detail Overdue mark…" → "sends the member ticket page no Overdue signal, even for an overdue ticket" | **CONVERTED, N5.** The requester page is built without SLA or overdue |
+| same, "draws the internal-note card with the same class string in both ticket views…" → "…in the operator ticket view…" | One of the two views no longer exists |
+| `TargetAccessibleNamesTest` "names the status filters on the member ticket list and the invoice list" → "…on the invoice list" | The ticket list names ("Search requests", "Status") are pinned in `pages/tickets/index.test.tsx` |
+| same, "names the new-ticket form fields, including the attachments input" | Removed; the field names and the attachment hint tie are pinned in `pages/tickets/{create,show}.test.tsx` |
+| `TargetFormAccessibilityTest` dataset rows `tickets.index`, `tickets.create`, `tickets.show` (member) and the two failed-submission rows `tickets.create` and `tickets.show reply` | Removed from the Blade markup scan (those pages are React); labels, error links and focus are pinned in `pages/tickets/*.test.tsx` |
+| same, "keeps the embedded ticket time tracker Start Timer name…" → "…on the operator ticket page" | Location only (N2) |
+| `TicketEmbeddedTimeTrackerTest` "leaves the ticket time panel untouched…" → three **TEMPORARY (N2)** operator-page tests, plus the **permanent** "does not give the tracker to the requester… (G1)" | The temporary three are on the §37 removal list; the permanent one stays after WP3 |
+| `TicketReplyTest` | **New:** a plain form post flashes "Reply added."; an Inertia reply flashes nothing, nor does a refused one |
+| Playwright `blade-theme-controls.spec.ts` "my requests and the new-ticket form", "my requests, the new-ticket form, my invoices and the 403 page…" (narrowed to invoices and 403) | Those pages are React and held by `@shadcn/lint` and `pages/tickets/*.test.tsx`; the operator tracker tests moved to `/operator/tickets/{id}`; the status gallery now expects `hourglass` |
+| Playwright `blade-shell`, `customer-shell`, `shell`, `projects-drawer` | The Blade-document leg moved from `/tickets` to `/my/invoices`, `/pages` or `/operator/tickets`; `/tickets` became a React leg of the Focused-frame matrix |
+| Playwright `time-migration.spec.ts` | Reaches the fixture through `/operator/tickets?search=TKT-E2E1`; **adds** the F7 step (the tracker's own **Stop** is clicked). Both are on the §37 removal list |
+| **New** | `RequesterTicketPropsTest` 25 · `RequesterTicketSearchTest` 12 · `TicketAttachmentPolicyTest` 16 · `TicketReplyLifecycleTest` 18 · `TicketReplyRaceTest` 2 · `TicketTimeEligibilityTest` 17 · `CleanupE2eTicketsTest` 39 · `CleanupE2eTicketsConcurrencyTest` 2 · `TicketNotificationMissingModelTest` 8 · Vitest `pages/tickets/{index,create,show}`, `components/helpdesk/*`, `requester-import-guard*` · `customer-helpdesk.spec.ts` 9 |
+
+### A2.7 G3-A: cleanup infrastructure and its operational smoke
+
+The rulings, the six review findings and the accepted limitations are in §37 and are not repeated. What G3-C adds:
+
+- **Verified in G3-C.** `CleanupE2eTicketsTest`, `CleanupE2eTicketsConcurrencyTest`, `TicketNotificationMissingModelTest` and the task-deletion architecture guard pass (A2.11). `./dev test:e2e` was run seven times in G3-C (A2.9); every run swept first (0 eligible), cleaned once afterwards as `portal`, and **reconciled the `tickets` count (2 → 2) and the attachment-directory count (0 → 0)**. The mutated run that accepted an HTML upload (M4) created a fourth ticket and a second attachment directory and was cleaned the same way.
+- **Reported, G3-A operational smoke (passed, with limitations).** The real wrapper hand-off was exercised end to end: tickets created inside a suite and deleted after it, database and attachment baselines restored.
+- **The different-UID path is NOT verified.** Measured in G3-C: the host user is `1000:1000` and `portal` is `1000:1000` in the container, so the smoke test and every G3-C run executed with Playwright's UID equal to `portal`'s. What the smoke therefore proved is the *hand-off and the cleanup as `portal`*, not the situation of a hosted runner, whose UID differs and cannot read the `0700` attachment directories. The HIGH-1 scenario (the command run as a different UID refuses with exit 1 and keeps the row and file) *was* exercised in a disposable probe, but the wrapper hand-off in that configuration was not. See A2.13.
+
+### A2.8 G3-B: browser journeys 3–8
+
+`customer-helpdesk.spec.ts` (717 lines, 9 tests) is described in `docs/testing/e2e-browser-suite.md`, including what is browser-proven and what stays with Pest and Vitest. In brief: journeys 3–8 run serially on one disposable ticket; 3b, 5b and the stale closed-reply regression are independent. Every ticket is `E2E-` plus 16 random hex characters, addressed by the redirect URL or that title, never by position or id; there is no cleanup in the spec, and no time entry or task is linked. The spec reaches the existing seeded personas only (`customer`, `customerOther`, `operator`). **Verified in G3-C:** a control run of the unmodified spec passed 9/9 (A2.9). **Reported:** 9/9, 45/45 with `--repeat-each=5`, 76/76 related specs, 192/192 full.
+
+### A2.9 Mutation and non-vacuity evidence (G3-C re-execution)
+
+**Why this exists.** G3-B reported "six deliberate product mutations caught" but did not keep the list, and the E2E doc records only the refusal-focus probe. So G3-C did not reconstruct the original six from memory: it ran a **control** and then **six product mutations** against the committed spec, on one worker (`./dev test:e2e --workers=1 tests/Browser/customer-helpdesk.spec.ts`), 100 s apart so Fortify throttling could not be the cause of any result. Each mutation was a single temporary edit under `src/app`, restored with `git checkout`, with `git diff -- src/app` empty afterwards (and after the last run). The failure reason was read from each run's output; none is inferred.
+
+**Control (unmutated, `56cad95`): 9/9 passed in 32.8 s.** The wrapper swept first (0 eligible), then deleted 3 tickets and 2 attachment files (1 directory) after the suite, and reported tickets 2 → 2 and attachment directories 0 → 0. So each failure below is the mutation, not the environment.
+
+| # | Mutation | Test | Assertion that failed | Result |
+|---|---|---|---|---|
+| M1 | `TicketPolicy::view` returns `true` for every user | 8 (other customer) | spec line 516: the **public attachment** is `403` for the other customer | received `200`. The ticket-URL line (515) **still passed** with the policy broken, because P2 redirects the non-owner to the operator route, whose `can:tickets.assign` middleware answers 403 (A2.12 D-4) |
+| M2 | `downloadAttachment` no longer checks internal visibility | 7 (internal note) | line 484: the **internal attachment** is `403` for the customer | received `200` |
+| M3 | the requester detail serves internal replies (the controller's `is_internal = false` query and the presenter's filter both removed) | 7 | line 451: the customer's **"Attached files"** list holds exactly one link | received `2`: the internal note's file was listed. The test stops at its first failure, so the sentinel, serialized-props and Inertia-response assertions after it were not reached in this run |
+| M4 | the attachment allowlist accepts every file | 3b (refused upload) | line 591: the **error under the attachments field** names `notes.txt` | element not found: the HTML file was accepted and a ticket created (the wrapper cleaned 4 tickets and 3 files in 2 directories, not 3 and 2) |
+| M5 | O2: a customer reply on `pending_user` no longer moves the ticket | 5b | line 635: the header reads **"In progress"** after the reply | still "Waiting on you" |
+| M6 | O2: a customer reply on a closed ticket is no longer refused | stale closed reply | line 682: the **"Reply refused"** group is visible | not found: the reply was accepted |
+
+Every run: the intended test failed, the other tests behaved as expected (journey 8 did not run after M2/M3, as it follows 7 in the serial group), the cleanup exit and both reconciliations were `ok`, and there was no `429`. **Not repeated:** the refusal-focus `useEffect` removal, recorded in the E2E doc, because it needs an asset rebuild; it remains the seventh probe of record. **Not probed:** the P2 redirect and `resolved` → `open` (Pest-only, A2.3), and journey 4's Back restoration.
+
+
+
+### A2.10 G3-B review follow-ups
+
+| # | Follow-up | Disposition |
+|---|---|---|
+| 1 | **Keyboard-only Helpdesk flows and 390/768 viewport coverage** | **Assigned to WP5 (closeout), as the browser proof of §33.1, and tracked against §16 and §17.1.** Scope: (a) a keyboard-only journey (sign in → create with an attachment → list → search → open → reply → sign out) with Tab order matching visual order and visible focus; (b) `/tickets/create` and `/tickets/{id}` at 390, 768 and 1280 in both themes: no document overflow, the primary action ("New request", "Send reply") visible without horizontal scroll, one `h1`, a predictable `<title>`, no operator affordance. **Today:** `customer-shell.spec.ts` covers the Focused frame, overflow and the menu sheet for `/tickets` (the list) only; `customer-helpdesk.spec.ts` drives the pages with a pointer (one `Enter` on the search box). WP2 did not own it: §31 lists "Playwright journeys 3–8" as its key tests, and WP3/WP4 are operator-only. **Until WP5 delivers it, §33.1 is not met.** **Owner-confirmed (2026-10-11):** the checks belong to the **Release 0.9 customer-readiness scope**, associated with WP5 and with the existing EPIC-017 exit criteria (§33.1). (When this amendment was written "Release 0.9" was not yet defined in the repository documents; the Release 0.9 architecture document now carries it.) |
+| 2 | **All six mutation probes, and the assertion that caught each** | **Done in G3-C** (A2.9). The G3-B handoff reported six probes; its individual list was **not retained** in the repository, the E2E doc (which records only the refusal-focus probe) or the session records available to G3-C, so the original six cannot be reproduced from evidence. The set in A2.9 was *re-executed* here against the committed spec. The refusal-focus `useEffect` removal is recorded in the E2E doc and was not repeated (it needs an asset rebuild) |
+| 3 | **Fortify login throttling for repeated browser runs** | **Accepted limitation, recorded (owner-confirmed 2026-10-11); authentication rate limiting is unchanged and must stay so** (A2.12 L-1). Documented in `e2e-browser-suite.md` ("The ceiling is per minute, not per run") |
+| 4 | **Hosted-CI cleanup across different filesystem UIDs** | **Kept open** (A2.13) |
+
+### A2.11 Validation evidence
+
+**Verified in G3-C (2026-10-11, committed tree `56cad95`, documentation edits only).**
+
+- **Focused Pest** (testing DB): `tests/Feature/Tickets`, `tests/Feature/Console`, `BladeThemeGuardTest` and `TaskDeletionAuthorityTest`: **529 passed, 1,824 assertions** (138 s).
+- **Vitest, requester set** (`pages/tickets`, `components/helpdesk`, both requester import-guard tests, `status.test.tsx`): **8 files, 111 tests passed**.
+- **Vitest, full suite: 109 files, 1,847 tests.** Passed in **3 of 4** runs. **The first run reported 7 failed and 1,840 passed**; it started seconds after the Playwright probes ended with the machine's load average near 21, and its failing test names were not captured. It did not recur in three consecutive reruns (1,847 / 1,847 each). **Cause not established**; recorded as an observed intermittent (A2.12 L-2), not diagnosed here. Three clean reruns do not show what the cause was, and no explanation (including the machine load noted above, which is circumstance, not a finding) is claimed.
+- **`npm run lint`** (`--max-warnings=0`) clean; `eslint-suppressions.json` byte-identical (15 files / 31 suppressions, SHA-256 `5bf90c80…bfbe688`). Strict `tsc` and Prettier are clean on `customer-helpdesk.spec.ts` (the browser specs are outside `npm run lint`, `typecheck` and `format:check`, so `./dev check` says nothing about them).
+- **Playwright:** `--list` shows 192 tests in 26 files (183 + 9). The **control run, 9/9**, and the six probes (A2.9), seven `./dev test:e2e` runs in all, each reconciled to the `tickets` (2) and attachment-directory (0) baselines.
+- **Scope and contract checks** (A2.3, A2.4, A2.15): directory listings, `grep` and `git diff`.
+- **`git diff --check`:** clean on the final documentation edits.
+
+**Reported by the G3-A and G3-B gates, not re-run here** (no product, test or configuration file has changed since; `56cad95` is the reviewed tree): full Playwright **192/192**, 3 workers, 7.6 minutes via `./dev test:e2e`; `customer-helpdesk.spec.ts` 9/9 and **45/45** with `--repeat-each=5`; related existing specs 76/76; full Pest **2,905 passed**; the full `./dev check`; the G3-A operational smoke test (passed, with the limitation in A2.7). No fresh full Pest or Playwright run was made: nothing those suites exercise has changed since the reported runs, and the EPIC names no WP2 closure gate that requires one beyond the hosted run below.
+
+**Outstanding:** hosted CI (A2.13). It is the authoritative complete browser gate (§25.3).
+
+
+
+### A2.12 Findings, discrepancies and accepted limitations
+
+**Discrepancies and items for the owner (none blocks WP2's local closure).**
+
+| # | Item | Disposition |
+|---|---|---|
+| D-1 | **PR packaging.** §32 says one PR per work package, and A1.22 says entering WP2 needs WP1 "merged and green on `main`". WP1 was never pushed or merged: WP1 and WP2 are five stacked commits on one unpushed branch | **Owner-confirmed (2026-10-11):** no push or PR is needed for WP2's local closure. When packaging becomes necessary, prefer **one integrated WP1+WP2 PR** to artificial stacked PRs. That is a **process exception to §32** (one PR per work package) and the PR description must say so. The first hosted CI run will cover both packages at once |
+| F5 | **An operator who is also the requester** sees the customer composer's notice ("Replying reopens this request" on `resolved`, no composer on `closed`) while the operator contract applies no implicit transition and accepts a reply on any status | **Known edge-persona discrepancy; the documented G2 resolution is retained (owner-confirmed 2026-10-11):** the requester-safe interface and the server behaviour are unchanged. Option (b), making `reply.notice` depend on the viewer's `tickets.assign`, remains available to a later owner decision |
+| F6 | **List page title.** §19.1 says `Title: "Support"`, `h1` "Your requests"; the page sets `<Head title="Your requests">` | **Resolved: the owner accepts the existing "Support" navigation label and the "Your requests" page `h1` and document `<title>` (2026-10-11).** No code change. This agrees with P3, which assigns "Support" to the customer label and "Your requests" to the page `h1`. §19.1's text is unchanged; its "Title" is read as the navigation label |
+| D-2 | `import.meta.glob()` is not inspected by the requester import boundary | Optional hardening carried unchanged; no requester module uses it |
+| F8, F9 | The list's exact-key test is not recursive (the row is flat); an actor with `tickets.assign` but not `tickets.view` is refused 403 by route middleware before the P2 redirect | Accepted as recorded in §37 |
+| D-3 | The "Pending" label and the clock glyph remain on the Blade operator pages (the Blade spec pins "Pending" with the hourglass) | **Not a WP2 gap.** P4's operator label and the clock glyph are WP3 scope (§31) |
+| D-4 | P2's redirect is not a browser journey. In G3-C probe M1 the ticket-URL assertion of journey 8 stayed green with `TicketPolicy::view` broken, because the 302 to the operator page lands on the operator route's `can:tickets.assign` middleware, which answers 403; the next line (the public attachment, 403 vs 200) caught it | **Informational test limitation (owner-confirmed 2026-10-11).** The direct `TicketPolicy::view` behaviour is covered by focused server tests (`RequesterTicketPropsTest`: 403 *without* a `Location` header for a stranger; the visibility characterization tests). **The redirect-based browser assertion in journey 8 does not independently detect every `TicketPolicy::view` regression and must not be cited as if it did.** `page.request.get(url, { maxRedirects: 0 })` would assert the policy's own answer if a browser pin is ever wanted; the reviewed spec is unchanged |
+| D-5 | **The G3-B review's other findings.** *L-1* no keyboard or width coverage (follow-up 1). *L-2* a failed test restarts its worker, which logs its persona in again, so several failing units on one persona can exceed the Fortify bucket in one badly broken run (limitation L-1 below). *I-1* `E2E-<random per ticket>` is stricter than §25.3's `E2E-{runId}` and satisfies the cleanup contract, which needs only the `E2E-` prefix. *I-2* comment and selector hygiene (the J5 comment says "in order after the description" but asserts the first entry; the operator-side `div.rounded-lg` selectors depend on Blade classes WP3 replaces). *I-3* `support/auth.ts` still says `customerOther` is "first used … in the next package". *I-4* no mail coverage (CI starts neither the queue nor Mailpit). *I-5* the wrapper's reconciliation cannot independently show that 3b created nothing; 3b's own assertions do | Recorded; no remediation was required. I-2 and I-3 are hygiene, and the Blade selectors go with the operator page in WP3 |
+
+**Accepted limitations.**
+
+- **L-1, login throttling.** Fortify allows 5 `POST /login` per minute per email and IP. A single run keeps every persona within its worker cap (≤ 3). Runs started back to back share the limiter, and a failing test restarts its worker, which logs its persona in again, so a red run is the one most likely to be followed by a throttled one; a `429` from `mintSession` that disappears after a pause is this, not flakiness. Hosted CI starts from a fresh Redis and runs the suite once, so it is not exposed. **Mitigation is operational** (leave about a minute between `./dev test:e2e` invocations; the G3-C probes used 100 s). **Authentication rate limiting is not weakened and must not be.** Verified in G3-C: seven single-worker runs, spaced by 100 s, saw no throttling.
+- **L-2, an intermittent full-Vitest failure under load** (A2.11): 7 failures in one of four full runs, not reproduced, names not captured, cause not established. It belongs with the known timing debt carried to Release 1 hardening (§28, §35); hosted CI will show whether it recurs.
+- The G3-A limitations in §37 (non-transactional filesystem, single-suite constraint, interruption, lock waits, command and disk belong together, permission tests skipped as root) stand unchanged.
+- Customer reply **attachments**, `resolved` → `open`, `closed` opened fresh, pagination past 20, the P2 redirect, writes by the other customer, mail content and the truly empty list are covered by Pest or Vitest only (the E2E doc lists them).
+
+### A2.13 Outstanding hosted-CI obligations
+
+Hosted CI has not run for WP1 or WP2, and nothing here substitutes for it.
+
+1. **The first hosted `./dev test:e2e` over the whole branch** (192 tests locally). Compare the `tickets` and attachment-directory counts before and after.
+2. **The different-UID cleanup (follow-up 4).** On a hosted runner Playwright runs as the runner's UID, the private attachment directories are `portal`'s `0700`, and the wrapper must run the cleanup as `portal` after Playwright exits. `customer-helpdesk.spec.ts` is the **first spec to create attachment directories in CI**: J3 and J7 create two files in one directory per run, so this is the first hosted exercise of the hand-off. Expected: the wrapper reports "Tickets deleted: 3", "Attachment files removed: 2 (in 1 directory)" and both baselines restored; any other result fails the run by design (nothing is deleted to make it pass). Do not push merely to learn this; it rides on the PR the owner decides in D-1.
+3. **Timing of the heaviest tests** (journey 7 and the stale-reply test, which use the default 30 s timeout) on the hosted runner.
+4. The existing note in `ci.md` that hosted CI is the authoritative leak check stands.
+
+### A2.14 Deferred work (not cancelled)
+
+**Owner-confirmed (2026-10-11):** WP3 and WP4 are **deferred from the Release 0.9 critical path, not cancelled**. WP5 **retains the essential early-access notification, security and accessibility work**; it is not deferred with them.
+
+- **WP3, operator ticket workspace:** `pages/operator/tickets/show`, the Reply/Internal-note composer, status and assignment, the `TimerControl` and ticket-time summary (N2), the clock glyph, `ConfirmationDialog` for close, operator labels (P4), deletion of `operator/tickets/show` and `components/time-tracker` under the **§37 removal inventory** (which must pass unchanged where it says "Keep"), re-homing the `time-migration.spec.ts` ticket-timer test, journey 10. The F5 option (b) is available here.
+- **WP4, operator queue, bulk and reports:** the queue with filters and bulk, reports and the CSV export, journey 9.
+- **WP5, notification hardening and closeout:** per-recipient links, F-3 escaping, O3 (the "Waiting on you" and "Resolved" emails and the new-ticket alert to `HELPDESK_NOTIFY_ADDRESS`, with the RE-H13 production requirement), the cross-cutting route authorization review, search volume measurement, the NVDA + Firefox pass, **the keyboard-only and 390/768/1280 customer Helpdesk journeys (follow-up 1)**, the hosted Playwright run, and the docs closeout (roadmap, epics index, EPIC-011 Phase F note, `e2e-browser-suite.md`).
+- **Optional hardening:** D-2; F5 (b) by owner act.
+
+### A2.15 Scope integrity
+
+Verified in G3-C. **No WP3–WP5 code is in the tree:** there is no React operator ticket page and no `ConfirmationDialog` use in tickets; `HELPDESK_NOTIFY_ADDRESS` is absent from `app/`, `config/` and `.env.example`; the only notification classes are the two existing ticket notifications (which G3-A touched for `#[DeleteWhenMissingModels]` only) and `InvitationNotification`; the embedded `x-time-tracker` is still on the operator page, as N2 continuity requires. **No schema change** (no migration since `main`), and none of `routes/`, `app/Policies`, `config/` or the permission catalogue changed in WP2. The only Time-module code touched is the N1 server rule (`AccessibleTimeContext`, `TimeEntryController`). No dependency was added.
+
+### A2.16 Lifecycle and disposition
+
+**WP2 is complete and closed locally**, with the limitations above, and with hosted CI and the different-UID cleanup still to come (A2.13). The owner accepted the local closure on 2026-10-11. EPIC-017 is **not** complete and stays **Planned**; WP3 and WP4 are deferred from the Release 0.9 critical path, not cancelled, and WP5 keeps its essential early-access notification, security and accessibility work (A2.14). G3-C changes documentation only and is committed locally. Nothing is pushed; no PR exists.

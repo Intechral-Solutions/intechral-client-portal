@@ -177,6 +177,8 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   runs as the runner's UID and cannot see the `0700` private files) and **fails** when the `tickets` count or the
   number of attachment directories does not return to its baseline (EPIC-017 §25.3;
   [E2E ticket cleanup](e2e-browser-suite.md#e2e-ticket-cleanup)).
+  The runner-UID versus `portal` path has not yet run on hosted CI (locally both are UID 1000); the first hosted run of
+  the EPIC-017 branch is its first exercise (EPIC-017 A2.13).
   A test whose project-create redirect times out before the id is registered with
   `cleanup.trackProject` also leaves that project behind (EPIC-015 A2.12 #5, A4.12 #6, A5.11): under a
   contended local machine this has happened several times. Hosted CI starts from an empty database and

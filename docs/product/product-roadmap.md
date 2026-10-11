@@ -89,6 +89,8 @@ Each item becomes one or more implementation epics before work begins, consisten
 > - No implementation branch exists yet.
 > - The checkpoint table below is otherwise unchanged and remains the record of the EPIC-016 close.
 
+> **Forward note (2026-10-11, EPIC-017 WP2 implemented locally).** The "No implementation branch exists yet" line above is historical. `feature/epic-017-helpdesk-mvp-customer-shell` now carries WP1 (customer shell) and WP2 (customer Helpdesk in React), committed locally and **not pushed**: no PR exists and hosted CI has not run for either. [EPIC-017 Amendment 2](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#amendment-2-wp2-customer-helpdesk-in-react-pr-2) is the WP2 evidence ledger, with the accepted limitations and the hosted-CI obligations that remain open. WP3–WP5 are not started and the epic is **Planned**, not Done.
+
 > **EPIC-016 IS DONE (2026-10-07).** Release 1 Phase 1's epic is complete and merged. The immediate next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP. Development may pause between epics by owner choice; no product or technical blocker is implied. The owner rulings D1–D4 are locked ([Owner rulings D1–D4](#owner-rulings-d1d4)). Nothing needs owner input before work resumes.
 
 **Checkpoint (2026-10-07, EPIC-016 Done).** The 2026-10-06 pause checkpoint (integrated at `88e15d7`, WP2–WP4 not started) is superseded by this one; it remains in the git history.

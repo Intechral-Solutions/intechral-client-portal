@@ -90,6 +90,11 @@ suite repeatedly by hand, leave about a minute between `./dev test:e2e` invocati
 restarts its worker, which mints the persona again and spends one more login, so a red run is the one
 most likely to be followed by a throttled one.)
 
+This is an **accepted limitation of repeated local runs, not a CI risk**: hosted CI starts from a fresh Redis and runs
+the suite once, so a passing run stays within the worker caps in the table. The remedy is to wait, never to loosen
+authentication rate limiting, the worker cap or the sign-in flow to suit the tests
+([EPIC-017 A2.12 L-1](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a212-findings-discrepancies-and-accepted-limitations)).
+
 Adding a spec file that only uses the `operator`/`member` personas does not change this table: a
 worker mints each persona at most once however many files it runs, so the per-persona bound stays the
 worker cap. `blade-shell.spec.ts` (EPIC-013 WP5) is such a file — it adds ten flows and no login. Its
@@ -156,12 +161,33 @@ before its job runs is discarded by `#[DeleteWhenMissingModels]` (see above), an
 - Reply **attachments** from the customer composer, `resolved` → `open`, a `closed` ticket opened fresh
   (no composer), pagination past 20 requests, the P2 redirect of a non-owner operator, and writes by the
   other customer (reply or create-as): Pest/Vitest only.
-- Widths other than 1280×900 for these pages (the Focused frame at 390/768/1280, both themes, is
-  `customer-shell.spec.ts`'s `/tickets` route), and keyboard-only operation of the composer and filters.
+- Widths other than 1280×900 for these pages, and keyboard-only operation of the composer and filters. The Focused
+  frame at 390/768/1280 in both themes is `customer-shell.spec.ts`'s `/tickets` (list) route only; `/tickets/create`
+  and `/tickets/{id}` are in no width matrix, and this spec drives them with a pointer. **Owned by EPIC-017 WP5**, as the
+  browser proof of exit criterion §33.1 (§16 widths, §17.1 keyboard), within the Release 0.9 customer-readiness scope
+  (owner-confirmed 2026-10-11); until it exists §33.1 is not met
+  ([EPIC-017 A2.10](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a210-g3-b-review-follow-ups)).
 - Email content and delivery, and the manual NVDA + Firefox pass (§25.3), which stays a manual release check.
 - The truly-empty list ("You haven't raised any requests yet.") for a customer with none: whether an E2E
   customer has requests depends on what else is seeded or running, so the browser spec does not assert it
   (journey 8 passes for either empty state because it checks status codes and absence); Vitest owns it.
+
+**Non-vacuity (EPIC-017 G3-C, 2026-10-11).** The spec was run unmodified (9/9), then against six one-line product
+mutations on a single worker, 100 s apart. Each was restored afterwards; each failed the intended test at the
+assertion shown, and every run reconciled the `tickets` and attachment-directory baselines.
+
+| Mutation | Test | Failing assertion |
+|---|---|---|
+| `TicketPolicy::view` admits everyone | 8 | the other customer's request for the public attachment returns 403 (got 200). The ticket-URL 403 stays green because P2's redirect reaches the operator route's `tickets.assign` middleware; Pest pins the policy layer |
+| `downloadAttachment` skips the internal-note check | 7 | the customer's request for the internal attachment returns 403 (got 200) |
+| requester detail serves internal replies | 7 | the "Attached files" list has exactly one link (got 2) |
+| the attachment allowlist accepts every file | 3b | the error under the attachments field names `notes.txt` (not found; a ticket was created) |
+| a customer reply on `pending_user` no longer reopens the work | 5b | the header reads "In progress" (still "Waiting on you") |
+| a customer reply on a closed ticket is no longer refused | stale reply | the "Reply refused" group is visible (not found) |
+
+The refusal-focus probe (removing the `useEffect` that focuses the refusal fails the focus assertion) is recorded
+above and was not repeated, because it needs an asset rebuild. The original G3-B list of six was not retained, so this
+table is a re-execution, not a transcription ([EPIC-017 A2.9](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a29-mutation-and-non-vacuity-evidence-g3-c-re-execution)).
 
 ## Shared records: never select by position
 
@@ -293,6 +319,14 @@ the maintainers' machines but is the runner's own UID on a hosted runner, and a 
 `portal` from inside the container. So `globalTeardown` runs under an identity that may not see the files, and the only
 place a `portal` invocation is available is the wrapper's `docker compose exec -u portal`. Hence the hand-off. The
 files' permissions are not relaxed, and the hosted runner's UID is not assumed.
+
+**Not yet verified: the different-UID path.** On the maintainers' machines the host user and `portal` are both UID
+`1000` (measured 2026-10-11), so every local run, the G3-A smoke test included, proved the hand-off and the cleanup as
+`portal`, not a runner whose UID differs. That scenario is first exercised by a hosted run, which is also the first to
+create attachment directories (`customer-helpdesk.spec.ts` journeys 3 and 7). It stays open until a hosted run shows
+the wrapper deleting the run's tickets and files and both baselines restored
+([EPIC-017 A2.13](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a213-outstanding-hosted-ci-obligations)). Nothing is
+pushed merely to find out.
 
 **A suite started by hand** (`npm run test:e2e` from `./dev shell` or elsewhere) has no wrapper, so there is no
 hand-off variable and **`globalTeardown` is responsible**: it runs the command as the current user, after every
