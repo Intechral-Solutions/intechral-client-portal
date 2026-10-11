@@ -24,6 +24,13 @@ No implementation has started, and no implementation branch exists.
 
 **Historical planning baseline (2026-10-07/08).** WP0 was written against `main` @ `2fd0918e17f6378442d566cd6b0703ec1c7a3ff9` (the merge of PR #28; `main` CI run 37694314651 green), **while PR #29 was still open**. It was re-verified as still open on 2026-10-08 00:10 UTC during the owner-review remediation, before it merged at 00:34 UTC. The sections below that mention PR #29 as open are marked as that historical baseline.
 
+**Release 0.9 sequencing addendum (2026-10-10, reconciled 2026-10-11).** A Release 0.9 early-access release on durable production data is planned ahead of Release 1 ([Release 0.9: Scope and Architecture Gate](../product/release-0.9-scope-and-architecture.md)). For sequencing only:
+- WP3 and WP4 are **deferred from the Release 0.9 critical path**. They are not cancelled and remain this epic's scope for Release 1.
+- **WP5 retains the essential early-access notification, security and accessibility work** (owner-confirmed 2026-10-11, [A2.14](#a214-deferred-work-not-cancelled)). It is neither cancelled nor deferred with WP3/WP4. Which items form that essential slice is not yet specified or ratified.
+- The keyboard-only and 390/768 customer Helpdesk checks ([A2.10](#a210-g3-b-review-follow-ups), follow-up 1) are in the Release 0.9 customer-readiness scope, associated with WP5 and exit criterion §33.1 (owner-confirmed 2026-10-11).
+- The work packages, requirements, owner rulings and exit criteria of this epic are otherwise unchanged, and [Amendment 2](#amendment-2-wp2-customer-helpdesk-in-react-pr-2) stands as the WP2 ledger.
+- The row in §3 stating that development tickets are disposable describes development data. Release 0.9 production data, ticket numbers included, is authoritative from its first record.
+
 ---
 
 ## Contents
