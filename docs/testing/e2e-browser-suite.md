@@ -46,8 +46,8 @@ spec files need that persona or how many cores the machine has. `playwright.conf
 | `e2e-login-flow@intechral.test` | user | `auth-migration.spec.ts` (invalid credentials, valid login, logout, password confirmation) | The test's subject is the login form itself, not a permission; using the reusable operator email would add this file's login churn to the same Fortify bucket every worker's own operator login already shares |
 | `e2e-profile-mutation@intechral.test` | user | `inertia-coexistence.spec.ts` (account-mutation test) | Edits its own name/email; a failure part-way must never leave the *shared* operator account looking like a different person for every later run |
 | `e2e-signout@intechral.test` | operator (all permissions) | `shell.spec.ts` (sign-out test) | Sessions are database-backed, so signing out destroys the session row presented; the test's assertion (no admin item leaks into a fully-permissioned account's menu) holds for any fully-permissioned account, not specifically the shared one |
-| `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TKT-E2E2` request that is waiting on it |
-| `e2e-customer-other@intechral.test` | user (minimal) | none in EPIC-017 WP1; `persona: 'customerOther'` | A second, unrelated customer, seeded for the Helpdesk isolation journey of the next package (it must be unable to see `e2e-customer`'s tickets). Costs no login until a spec uses it |
+| `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`, `customer-helpdesk.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop) and the Helpdesk journeys 3–8 (below). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TKT-E2E2` request that is waiting on it, and **every** disposable `E2E-…` ticket the Helpdesk spec raises, which is what makes those tickets eligible for the suite-level cleanup |
+| `e2e-customer-other@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 8); `contextFor('customerOther')` | A second, unrelated customer, used only to prove isolation: it is refused `e2e-customer`'s ticket and attachments and never lists them. It creates no ticket |
 | `e2e-operational-member@intechral.test` | user + `projects.manage` (direct) | `shell.spec.ts`, `blade-shell.spec.ts`, `time-migration.spec.ts`, `tasks-migration.spec.ts`; `persona: 'operationalMember'` | A customer-scoped actor that still gets the **Operational** shell (`projects.manage` is an operator-surface capability), for specs whose subject is the rail, drawer, breadcrumb or timer pill and tray, which a plain customer no longer sees. It is the single owner of the member active-timer set that `time-migration.spec.ts` documents |
 | dynamically created manager (`e2e-wp3-manager-<timestamp>@intechral.test`) | user + `projects.manage` | `projects-migration.spec.ts` (membership test) | Created by the test itself to prove a *specific* non-admin manager's read-only membership view; a fresh, explicitly anonymous context (`contextFor('anonymous')`) is required so it doesn't inherit the project's authenticated `storageState` |
 
@@ -68,24 +68,100 @@ Fortify's limiter key is email + IP, 5 requests/minute. With `workers: 3`:
 
 | Identity / category | Max `POST /login` per normal run | Why |
 |---|---:|---|
-| `operator@intechral.test` (fixture) | ≤ 3 | One worker mints it at most once; at most 3 workers exist |
+| `operator@intechral.test` (fixture) | ≤ 3 | One worker mints it at most once; at most 3 workers exist. `customer-helpdesk.spec.ts` reaches it with `contextFor('operator')`, which reuses the worker's memoized session: no extra login |
 | `user@intechral.test` (fixture) | ≤ 3 | Same reasoning |
 | `e2e-login-flow@intechral.test` | ≤ 3 | One file, one worker, sequential tests: 1 (invalid) + 1 (valid) + 1 (password confirmation) |
 | `e2e-profile-mutation@intechral.test` | 1 | One test, one login |
 | `e2e-signout@intechral.test` | 1 | One test, one login |
-| `e2e-customer@intechral.test` | ≤ 3 | A worker mints it at most once; one spec file uses it |
-| `e2e-customer-other@intechral.test` | 0 | Seeded, not yet used by any spec |
+| `e2e-customer@intechral.test` | ≤ 3 | A worker mints it at most once, however many spec files (`customer-shell`, `customer-helpdesk`) it runs |
+| `e2e-customer-other@intechral.test` | ≤ 3 | A worker mints it at most once, the first time one of its tests calls `contextFor('customerOther')` |
 | `e2e-operational-member@intechral.test` | ≤ 3 | A worker mints it at most once; at most 3 workers exist |
 | dynamically created manager | 1 per run, unique email every time | Never shares a bucket with any other run or test |
 
 Every bucket stays at least 2 attempts below the 5/minute ceiling, without depending on exact
 scheduling within the run.
 
+**The ceiling is per minute, not per run.** The bound above holds for one run. Wrapper runs started
+back to back add up: on 2026-10-09 a three-worker run started within a minute of two earlier runs
+hit `429` on its `customer` logins, and the minting worker fails loudly by design
+(`waitOutThrottle: false`). That is not a product or test defect. When running the
+suite repeatedly by hand, leave about a minute between `./dev test:e2e` invocations; a `429` from
+`mintSession` that goes away on a rerun after a pause is this, not flakiness. (A failing test also
+restarts its worker, which mints the persona again and spends one more login, so a red run is the one
+most likely to be followed by a throttled one.)
+
 Adding a spec file that only uses the `operator`/`member` personas does not change this table: a
 worker mints each persona at most once however many files it runs, so the per-persona bound stays the
 worker cap. `blade-shell.spec.ts` (EPIC-013 WP5) is such a file — it adds ten flows and no login. Its
 sign-out coverage rides on `shell.spec.ts`'s existing single `e2e-signout` login, which now signs out
 from the Blade account menu.
+
+## Customer Helpdesk journeys (`customer-helpdesk.spec.ts`)
+
+EPIC-017 §25.3 journeys 3–8, plus two scenarios the epic's rulings add, in real Chromium against the
+React customer pages (`/tickets`, `/tickets/create`, `/tickets/{id}`) and the existing Blade operator
+page (`/operator/tickets/{id}`). It adds browser-level integration coverage only; every rule below is
+owned by Pest and Vitest (EPIC-017 §25.1, §25.2) and is asserted here only as far as the browser makes
+it observable.
+
+| # | Test | What the browser proves |
+|---|---|---|
+| 3 | Create with an attachment | Submit through the real form; redirect to the detail page; the flash "Request TKT-… received." is announced in a status region; the ticket number is on the page; the attachment is listed with name and size; a real browser download and a direct request both return the uploaded bytes with `Content-Disposition: attachment`; no company field, no status/assignee/internal/timer controls |
+| 3b | Refused upload | An HTML document named `notes.txt` is refused by content, with the server's message under the attachments field and focus moved to it; the customer's input survives; the unique title then finds **no** ticket by list search, so nothing was created. It does not repeat the per-type matrix (`TicketAttachmentPolicyTest`) |
+| 4 | List, search, filter | Search by the unique title and a status filter put `search` and `status` in the URL; opening the match and pressing **Back** restores the URL, the search box, the status select and the row; a status the ticket does not have shows the filtered-empty state (the customer has other requests, so it is not "no requests yet"); widening finds it again; **All requests** on the detail page deliberately returns to the unfiltered `/tickets` |
+| 5 | Customer reply | An Inertia XHR (`X-Inertia`) submits the reply; it renders with the customer as author; "Reply sent." is announced; the new entry has focus; the composer, Send button state and file input are cleared; the status stays `open`; a reload still has it |
+| 5b | `pending_user` → `in_progress` | On its own ticket the operator sets Waiting on customer; the customer sees the "sends this request back" notice and the "Waiting on you" label, replies, and the page shows "In progress" and the history line, with the reply focused and announced |
+| 6 | Operator public reply | The Blade operator form posts a public reply; the customer sees it with the operator's display name, no internal marker, and serialized props of exactly the requester entry shape (author is `{name}` only; no `is_internal`, no operator email) |
+| 7 | Internal note privacy | An operator internal note with a unique sentinel and an attached file. For the customer, the sentinel and file name are absent from the rendered DOM (`page.content()`), from the document's serialized Inertia page, and from a real Inertia visit's JSON response; the note's attachment URL returns **403** (while the operator gets 200 on it and the customer still downloads the public attachment); searching the sentinel finds nothing; the public replies remain visible. The 403 is asserted on the status code, not on how a page looks |
+| 8 | Other customer | `customerOther` gets **403** on the ticket URL (request and browser), on the public attachment, on the internal attachment and on the operator route; the refusal page names neither title nor number; the ticket is absent from their list and a search for its unique title returns none (checked in the DOM and in the served props) |
+| – | Stale closed reply (G2 focus fix) | The customer types a draft, the operator closes the same ticket from another session, the customer sends the stale reply over the real Inertia path. The "Reply refused" group is visible and **focused**; the draft is preserved in "Your message was not sent"; there is no "Reply sent." announcement; the closed notice and its New request link stand and the composer is gone; a reload and the operator's thread show no reply. Removing the `useEffect` that focuses the refusal fails this test at the focus assertion |
+
+**Personas.** `customer` (the page; owner of every ticket), `operator` via `contextFor('operator')`
+(Blade operator actions), `customerOther` via `contextFor('customerOther')` (isolation). No account is
+created or seeded for this spec. Extra contexts are always opened with `contextFor` and closed in a
+`finally`; a bare `browser.newContext()` would already be signed in.
+
+**Fixture ownership.** Every ticket is created by a test in this file through the real form, titled with
+the literal prefix `E2E-` plus 16 hex characters of per-ticket randomness. It is therefore eligible for
+the cleanup command (`E2E-` title and a seeded E2E customer as requester) and can never collide with
+another attempt, worker or run. Tests find their ticket by the URL captured from the create redirect or
+by that unique title: never by list position, row order or id arithmetic. `TKT-E2E1` and `TKT-E2E2` are
+never touched (the Home tests rely on `TKT-E2E2` staying `pending_user`). No time entry or task is
+created or linked, which the cleanup command would refuse. Attachments are small in-memory `.txt`
+buffers, so there is nothing on disk for the test to manage; the server-side files are removed with
+their ticket.
+
+**Serial group, and why.** Journeys 3–8 share one ticket, so they run as `describe.serial`, in one
+worker, in order. Journey 3 resets and then sets the module-level `primary`; later steps call
+`primaryTicket()`, which fails by name if journey 3 did not leave a ticket. Playwright retries a failed
+serial group from its first test in a fresh worker, where the module is evaluated again, and journey 3
+then creates a *new* ticket with a new random title, so a retry cannot bind to an earlier attempt's
+ticket. Everything else (3b, 5b, the stale-closed scenario) is an independent test with its own ticket,
+so one failing does not hide the rest. No state is shared across workers: two workers running this
+spec at once each own their own tickets (`--repeat-each=5` with three workers passes).
+
+**Cleanup.** None in the spec, deliberately. It does not use the `cleanup` fixture of
+`support/e2e-fixtures.ts` (which is about time entries, projects and tasks), and it does not call
+`e2e:cleanup-tickets`. Tickets and their `tickets/{id}/` files are removed once, after the whole run:
+by `./dev test:e2e` as the web-server user (whose reconciliation checks the `tickets` count and the
+attachment-directory count return to their baselines and fails the run if not), or, for a hand-started
+run, by `globalTeardown`. After a hard kill the leftovers wait for the next `./dev test:e2e` recovery
+sweep. Disposable tickets also queue the usual notification mails (Mailpit locally); a ticket deleted
+before its job runs is discarded by `#[DeleteWhenMissingModels]` (see above), and no test asserts mail.
+
+**What it does not cover** (remaining gaps, by design or by ownership):
+
+- Operator Helpdesk journeys 9 and 10 (queue, bulk, workspace, ticket timer): WP3/WP4, which replace the
+  Blade operator pages these tests only drive.
+- Reply **attachments** from the customer composer, `resolved` → `open`, a `closed` ticket opened fresh
+  (no composer), pagination past 20 requests, the P2 redirect of a non-owner operator, and writes by the
+  other customer (reply or create-as): Pest/Vitest only.
+- Widths other than 1280×900 for these pages (the Focused frame at 390/768/1280, both themes, is
+  `customer-shell.spec.ts`'s `/tickets` route), and keyboard-only operation of the composer and filters.
+- Email content and delivery, and the manual NVDA + Firefox pass (§25.3), which stays a manual release check.
+- The truly-empty list ("You haven't raised any requests yet.") for a customer with none: whether an E2E
+  customer has requests depends on what else is seeded or running, so the browser spec does not assert it
+  (journey 8 passes for either empty state because it checks status codes and absence); Vitest owns it.
 
 ## Shared records: never select by position
 
@@ -346,3 +422,9 @@ Full suite, normal parallel configuration (`workers: 3`, no flag override):
   red, not re-run until green. Hosted figures at the WP5 merge: **141/141 passed, 3 workers, 7.7 minutes**
   (PR #20, head `451c74d`) and **141/141, 3 workers, 4.6 minutes** (PR #21, head `c21fa12`), each with
   the tracked product-data counts 0/0/0 before and after ([EPIC-015 A5.14, A5.15, A5.16](../epics/EPIC-015-projects-ux-expansion.md#amendment-5-wp5-optional-project-workspace-enhancements)).
+- After EPIC-017 WP2 G3-B (2026-10-09), with `customer-helpdesk.spec.ts` added: **192/192 passed, 3 workers,
+  7.6 minutes** via `./dev test:e2e` (183 before, plus 9). The wrapper deleted the run's 3 tickets and 2
+  attachment files; the `tickets` count returned to its baseline of 2 (the seeded `TKT-E2E1` and
+  `TKT-E2E2`) and the attachment-directory count to 0. The new spec alone: 9/9, and 45/45 with
+  `--repeat-each=5` on three workers (15 tickets, 10 files in 5 directories, all reconciled). The one
+  `✘` the list reporter prints is `e2e-cleanup.spec.ts`'s deliberate `test.fail`.
