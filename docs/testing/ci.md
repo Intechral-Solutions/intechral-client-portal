@@ -52,8 +52,17 @@ the app and building the image would only add minutes. The environment follows t
   host `db`, as the app container does. CI adds `127.0.0.1 db` to the runner's `/etc/hosts` rather
   than changing them.
 - **`src/.env`** is a copy of `.env.example` with a generated key, as `npm run setup` makes it. Pest
-  does not read it (`APP_ENV=testing` uses `.env.testing` and `phpunit.xml`). No Redis is started:
-  none of these gates touches it.
+  does not read it (`APP_ENV=testing` uses `.env.testing` and `phpunit.xml`).
+- **Redis (R0.9-1D integration).** The `checks` job starts the Compose `redis` service beside `db` and installs the PHP
+  `redis` extension, because the permission-cache security tests (R0.9-1C M-1, R0.9-1D) need a shared store outside the
+  database transaction and skip themselves when none is reachable. A dedicated step runs
+  `tests/Feature/Admin/PermissionCacheCommitOrderTest.php` with `REDIS_HOST=127.0.0.1` and `--fail-on-skipped`, so a missing
+  server, extension or address **fails** the job instead of quietly shrinking the count (a skip is not a pass). The whole
+  suite then runs with Redis reachable too. Everything else uses the array cache, so no other gate touches Redis.
+- **Provisioning check.** A step lists the databases the `portal` account can see and fails, naming the missing one, unless
+  `intechral_client_portal_testing`, `..._rehearsal` and `..._rehearsal_restore` exist. A fresh runner builds a fresh
+  volume, so `init-testing.sql` and `init-rehearsal.sql` must have run; a gap is reported as a provisioning failure, not as
+  an unrelated test failure.
 - **`git diff --check`** locally inspects uncommitted changes. A clean checkout has none, so CI
   checks what the change introduces: on a PR, `HEAD` is GitHub's merge commit and `HEAD^1` is `main`.
   (The tree as a whole is not whitespace-clean — some older docs and one Blade view — so a whole-tree
@@ -112,6 +121,22 @@ stack's own nginx and php-fpm.
 
 The two jobs are separate so that the full Vitest and full Playwright suites never share a machine
 (A13.18: run concurrently, both report false failures).
+
+## First hosted run of the Release 0.9 foundations (2026-10-12)
+
+[run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30, head `3c78fb9` (the first CI of EPIC-017 WP1/WP2 and R0.9-0 to R0.9-1D; the PR is a draft and **Release 0.9 is not
+release-ready**). Recorded as evidence, not as approval:
+
+| Gate | Result |
+|---|---|
+| Testing and both rehearsal databases provisioned on a fresh runner | Passed (all three visible to `portal`) |
+| `git diff --check`, Pint, `npm run check` (typecheck, lint, format, Vitest, build) | Passed |
+| Permission-cache security tests on Redis, `--fail-on-skipped` | 9 passed, **0 skipped** |
+| Full Pest (rehearsal, schema-preservation and real-process concurrency tests included) | 3,288 passed (18,541 assertions), **0 skipped**, about 9.7 minutes |
+| Playwright (`./dev test:e2e`, whole suite, `workers: 3`) | 195 passed (5.6 minutes); cross-UID cleanup restored the ticket and attachment-directory baselines |
+| CLI self-tests | 381 passed, **1 failed**: the shellcheck lint (SC2034, an unused loop variable in `scripts/dev/lib.sh`). Shellcheck is "only if installed": hosted runners have it, the development machine does not. Fixed afterwards by a one-token change; the verifying run is on the PR |
+
+The `checks` job took about 13 minutes against its 30-minute limit, so no timeout change was needed.
 
 ## Constraints this workflow keeps
 
@@ -177,8 +202,9 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   runs as the runner's UID and cannot see the `0700` private files) and **fails** when the `tickets` count or the
   number of attachment directories does not return to its baseline (EPIC-017 §25.3;
   [E2E ticket cleanup](e2e-browser-suite.md#e2e-ticket-cleanup)).
-  The runner-UID versus `portal` path has not yet run on hosted CI (locally both are UID 1000); the first hosted run of
-  the EPIC-017 branch is its first exercise (EPIC-017 A2.13).
+  The runner-UID versus `portal` path ran on hosted CI for the first time in [run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30: Playwright as `1001:1001`, php-fpm
+  and the cleanup as `portal` `1000:1000`; the wrapper reported 3 tickets and 2 attachment files (1 directory) removed and
+  both baselines restored (EPIC-017 A2.13). One run is evidence, not a guarantee: it stays the authoritative leak check.
   A test whose project-create redirect times out before the id is registered with
   `cleanup.trackProject` also leaves that project behind (EPIC-015 A2.12 #5, A4.12 #6, A5.11): under a
   contended local machine this has happened several times. Hosted CI starts from an empty database and

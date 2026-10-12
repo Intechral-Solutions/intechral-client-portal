@@ -221,5 +221,5 @@ open owner question.
   the post-commit invalidation keeps a revoked permission until the cache expires (24 hours by default). It is not conclusively
   fixed and is a security-hardening obligation before production permission revocations are relied upon; a one-time deployment
   cache reset does not cover concurrent changes. See [Role Governance](./role-governance.md#residual-permission-cache-risk-inherited-from-r09-1c-not-fixed-here).
-- Hosted CI has not yet verified R0.9-1C. The Redis variant of the M-1 test needs a reachable Redis server, which the
-  hosted CI Pest job does not start, so it is skipped there; the file-store variant covers the same interleaving.
+- Hosted CI ran R0.9-1C in its first run ([run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30). The hosted job now starts Redis and a dedicated step fails on any
+  skip: the Redis variants of the M-1 test ran there (9 passed, 0 skipped). That does not close the residual cache race above.

@@ -3,7 +3,7 @@
 **Authority:** Release 0.9 decision H4 ([§5.4](../product/release-0.9-scope-and-architecture.md#54-h4-code-owned-built-in-roles)),
 owner-ratified: built-in roles are code-owned; custom roles are the customization mechanism; production permission
 synchronization is deterministic, idempotent and previewable, and revokes only under an explicit approval.
-**Status:** implemented in R0.9-1D; independent review (Opus 5.5): **SAFE TO COMMIT**; committed locally on the feature branch; hosted CI outstanding.
+**Status:** implemented in R0.9-1D; independent review (Opus 5.5): **SAFE TO COMMIT**; committed on the feature branch; first hosted run recorded in the CI doc (draft PR #30); release approval and the open obligations below are unchanged.
 **Companions:** [RBAC Design](./rbac-design.md) · [Account Lifecycle](./account-lifecycle.md) ·
 [Release 0.9 scope](../product/release-0.9-scope-and-architecture.md)
 
@@ -261,8 +261,9 @@ use a custom role carrying the same permissions (`LastAccountAdministratorTest`)
 - A custom role that holds a permission later removed from the catalogue keeps the stored row; nothing reconciles it.
 - The bootstrapped account's email is not marked verified (the application does not require verification anywhere).
 - The inherited permission-cache repopulation race ([above](#residual-permission-cache-risk-inherited-from-r09-1c-not-fixed-here)) is open and must be hardened before production permission revocations are relied upon.
-- Hosted CI has not run this package. Its Pest job has no Redis, so the Redis variants of the cache tests skip there; the
-  file-store variants cover the same interleaving.
+- Hosted CI ran this package once ([run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30): the full Pest suite passed with 0 skipped, and the Redis variants of the cache
+  tests ran on a real Redis server (a dedicated step fails on any skip). It is evidence, not release approval, and does not
+  address the residual cache race above.
 - Not in this package: email normalization on write, removing `client_id` from mass assignment, invitation-token handling
   (H10), and project and company delete policy (H6). They remain in the [§11](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery)
   row for R0.9-1D and need a decision on whether they follow in this package.
