@@ -54,6 +54,7 @@ services:
       - dbdata:/var/lib/mysql
       - ./.docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ./.docker/mysql/init-testing.sql:/docker-entrypoint-initdb.d/init-testing.sql:ro
+      - ./.docker/mysql/init-rehearsal.sql:/docker-entrypoint-initdb.d/init-rehearsal.sql:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s

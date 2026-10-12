@@ -1,6 +1,6 @@
 # Release 0.9: Scope and Architecture Design Gate (R0.9-0)
 
-**Status:** **Design gate closed (2026-10-10)** by owner ratification of decisions H1 to H4. Nothing is implemented. This document adds no code, migration, test, release flag or deployment infrastructure.
+**Status:** **Design gate closed (2026-10-10)** by owner ratification of decisions H1 to H4. The gate itself implemented nothing (R0.9-1A, the first package, is recorded in [§11](#11-work-packages-and-parallel-hosting-discovery)). This document adds no code, migration, test, release flag or deployment infrastructure.
 **Reconciled (2026-10-11)** with the EPIC-017 WP2 closure ([Amendment 2](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#amendment-2-wp2-customer-helpdesk-in-react-pr-2)); see [§2.1](#21-epic-017-sequencing-dispositions-owner-directed-2026-10-11).
 **Class:** Release scope and data architecture. It is a planning record, not an epic.
 **Inputs:** the Release 0.9 readiness assessment, the R0.9-0 scope and architecture gate, and the independent data architecture review of 2026-10-10 (Opus 5.5).
@@ -234,7 +234,7 @@ Neither rewrite is designed or ratified here. These are the constraints Release 
 
 ## 11. Work packages and parallel hosting discovery
 
-**Status: Recommended sequence, not ratified.** Boundaries are proposed here and are finalized in the planning of each package. R0.9-1A is **not started**.
+**Status: Recommended sequence, not ratified.** Boundaries are proposed here and are finalized in the planning of each package. **R0.9-1A is implemented** (the migration rehearsal harness, [documented here](../testing/migration-rehearsal.md)) and its independent review (Opus 5.5) concluded **SAFE TO COMMIT**, with follow-ups recorded in the [rehearsal documentation](../testing/migration-rehearsal.md#review-follow-ups). **Hosted CI has not yet verified it.** **R0.9-1B has not started.**
 
 **Execution mode (owner-directed, [E6](#21-epic-017-sequencing-dispositions-owner-directed-2026-10-11)).** Development runs as one sequential track. The "Depends on" column and the remark below about 1D show what the dependencies *permit*, not how the work is run: unless the owner says otherwise, the packages are done in turn, on the working branch.
 

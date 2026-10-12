@@ -733,6 +733,159 @@ grep -q 'playwright-core@${PW_VERSION}' "$DF" && ok || bad "Dockerfile does not 
 if grep -E 'playwright(-core)?@[0-9]' "$DF" >/dev/null; then bad "Dockerfile hard-codes a Playwright version"; else ok; fi
 grep -q 'src/package-lock.json' "$DF" && ok || bad "Dockerfile does not derive the version from src/package-lock.json"
 
+# ── migration rehearsal (R0.9-1A) ──────────────────────────────────────────────
+begin "rehearse commands are registered and listed in help"
+dev_run -- help
+assert_out "rehearse:provision"
+assert_out "rehearse:clean"
+assert_out "rehearse "
+
+begin "rehearse runs rehearsal:run as the host user, environment pinned, after resolving the dev target"
+dev_run -- rehearse
+assert_rc 0
+assert_log "php -- dev"
+assert_log "-u $UIDGID"
+assert_log "APP_ENV=local DB_HOST=db php artisan rehearsal:run --no-interaction"
+assert_out "this is NOT touched"
+assert_log_lacks "migrate"
+assert_log_lacks "-u 0"
+assert_log_lacks "root"
+
+begin "rehearse passes only allow-listed options through"
+dev_run -- rehearse --no-restore --keep-backup --json --candidate=2026_10_12_000001_example_migration
+assert_rc 0
+assert_log "rehearsal:run --no-restore --keep-backup --json --candidate=2026_10_12_000001_example_migration --no-interaction"
+
+begin "rehearse refuses anything that could aim it elsewhere, before touching Docker"
+for bad in --env=production --database=portal --connection=mysql --candidate=all '--candidate=../../x' '--candidate=2026_10_12_000001_x;rm' --candidate= --force --path=/etc plain; do
+    dev_run -- rehearse "$bad"
+    assert_rc 2
+    assert_out "REFUSING"
+    assert_log_lacks "rehearsal:run"
+done
+dev_run -- rehearse --no-restore --env=production
+assert_rc 2
+assert_log_lacks "php -- dev"
+
+begin "rehearse refuses a production-like or non-dev target and runs nothing"
+export STUB_RESOLVE_DEV='env=production\nconnection=mysql\ndatabase=portal\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_out "REFUSING"
+assert_log_lacks "rehearsal:run"
+export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=intechral_client_portal_testing\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_log_lacks "rehearsal:run"
+export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=portal\nhost=db.example.com\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_log_lacks "rehearsal:run"
+
+begin "rehearse needs the stack running"
+export STUB_RUNNING='nginx'
+dev_run -- rehearse
+assert_rc 1
+assert_out "is not running"
+assert_log_lacks "rehearsal:run"
+
+begin "rehearse propagates the harness exit code (1 failed, 2 refused)"
+dev_run -- rehearse
+assert_rc 0
+# The stub exits 0 for artisan; the wrapper must not mask a non-zero status. Prove it with a failing stub.
+mkdir -p "$WORK/failbin"
+cat >"$WORK/failbin/docker" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$STUB_LOG"
+case "$*" in
+    "info"*) exit 0 ;;
+    "compose version"*) echo "v5.2.0"; exit 0 ;;
+    *"ps --services --status running"*) printf 'app\ndb\nnginx\n'; exit 0 ;;
+    *"php -- dev"*) cat >/dev/null; printf '%b\n' "$STUB_RESOLVE_DEV"; exit 0 ;;
+    *"printenv MYSQL_DATABASE"*) echo portal; exit 0 ;;
+    *"rehearsal:run"*) exit "${STUB_REHEARSAL_RC:-0}" ;;
+esac
+exit 0
+STUB
+chmod +x "$WORK/failbin/docker"
+for code in 1 2; do
+    OUT="$(env PATH="$WORK/failbin:$PATH" STUB_LOG="$WORK/docker.log" STUB_RESOLVE_DEV="$DEV_OK" STUB_REHEARSAL_RC=$code NO_COLOR=1 "$ROOT/dev" rehearse 2>&1)"
+    RC=$?
+    assert_rc $code
+done
+
+begin "rehearse:clean resolves the dev target, then cleans rehearsal resources only"
+dev_run -- rehearse:clean
+assert_rc 0
+assert_log "php -- dev"
+assert_log "APP_ENV=local DB_HOST=db php artisan rehearsal:clean --no-interaction"
+assert_log "-u $UIDGID"
+export STUB_RESOLVE_DEV='env=production\nconnection=mysql\ndatabase=portal\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse:clean
+assert_rc 1
+assert_log_lacks "rehearsal:clean"
+
+begin "rehearse:provision pipes the checked SQL file to the DB root login inside the db container"
+dev_run -- rehearse:provision
+assert_rc 0
+assert_log "exec -T db sh -c"
+assert_log 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot'
+assert_out_lacks "root_password"
+assert_out_lacks "MYSQL_ROOT_PASSWORD="
+assert_log_lacks "-u 0"
+
+begin "rehearse:provision needs only the db service"
+export STUB_RUNNING='db'
+dev_run -- rehearse:provision
+assert_rc 0
+export STUB_RUNNING='app'
+dev_run -- rehearse:provision
+assert_rc 1
+assert_log_lacks "mariadb -uroot"
+
+begin "the provisioning SQL is limited to the two rehearsal databases"
+sql_check() { ( DEV_ROOT="$ROOT"; source "$ROOT/scripts/dev/lib.sh"; source "$ROOT/scripts/dev/commands.sh"; rehearsal_sql_violations "$1" ); }
+V="$(sql_check "$ROOT/.docker/mysql/init-rehearsal.sql")"
+[[ -z $V ]] && ok || bad "the real provisioning SQL was rejected: $V"
+grep -qF 'intechral\_client\_portal\_rehearsal' "$ROOT/.docker/mysql/init-rehearsal.sql" && ok || bad "grants must escape the underscores"
+check_sql() { # <label> <sql>
+    printf '%s' "$2" >"$WORK/prov.sql"
+    [[ -n "$(sql_check "$WORK/prov.sql")" ]] && ok || bad "$1 was accepted"
+}
+RG='GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `portal`@`%`;'
+check_sql "a global grant" 'GRANT ALL PRIVILEGES ON *.* TO `portal`@`%`;'
+check_sql "an unescaped (wildcard) grant" 'GRANT ALL PRIVILEGES ON `intechral_client_portal_rehearsal`.* TO `portal`@`%`;'
+check_sql "a grant on the dev database" 'GRANT ALL PRIVILEGES ON `portal`.* TO `portal`@`%`;'
+check_sql "a grant on the testing database" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_testing`.* TO `portal`@`%`;'
+check_sql "a grant with grant option" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `portal`@`%` WITH GRANT OPTION;'
+check_sql "a grant to another account" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `root`@`%`;'
+check_sql "a drop" 'DROP DATABASE `intechral_client_portal_rehearsal`;'
+check_sql "a DROP hidden after a valid grant" "$RG DROP DATABASE portal;"
+check_sql "a trailing statement with no semicolon" "$RG DROP DATABASE portal"
+check_sql "a shell escape" "$RG \\! id;"
+[[ -n "$(sql_check "$WORK/does-not-exist.sql")" ]] && ok || bad "a missing file was accepted"
+
+begin "rehearse:provision refuses a SQL file that is not limited to the rehearsal databases"
+# Run a copy of the repo scripts whose SQL file has been tampered with.
+mkdir -p "$WORK/tampered/.docker/mysql" "$WORK/tampered/scripts"
+cp -R "$ROOT/scripts/dev" "$WORK/tampered/scripts/dev"
+cp "$ROOT/dev" "$WORK/tampered/dev"
+printf 'GRANT ALL PRIVILEGES ON *.* TO `portal`@`%%`;\n' >"$WORK/tampered/.docker/mysql/init-rehearsal.sql"
+: >"$WORK/docker.log"
+OUT="$(env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" NO_COLOR=1 "$WORK/tampered/dev" rehearse:provision 2>&1)"
+RC=$?
+LOG="$(cat "$WORK/docker.log")"
+assert_rc 1
+assert_out "REFUSING"
+assert_log_lacks "mariadb -uroot"
+
+begin "rehearsal scripts never name the dev or testing database as a target"
+# The rehearsal block of commands.sh may mention only the two rehearsal databases.
+BLOCK="$(sed -n '/^# ── Migration rehearsal/,/^# ── Tests/p' "$ROOT/scripts/dev/commands.sh")"
+if grep -nE '\bportal\b.*(DROP|TRUNCATE|DELETE)|DB_DATABASE|\$DEV_DB\b|\$TEST_DB\b|migrate:|db:wipe' <<<"$BLOCK" | grep -v 'portal\`@' >"$WORK/grep.out"; then
+    bad "the rehearsal block references a non-rehearsal database or destructive primitive: $(cat "$WORK/grep.out")"
+else ok; fi
+
 begin "restart is registered, documented and runs down then up without volumes or builds"
 dev_run -- help
 assert_out "restart"

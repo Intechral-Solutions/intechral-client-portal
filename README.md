@@ -46,6 +46,9 @@ See [docs/architecture/docker-setup.md](docs/architecture/docker-setup.md) for f
 | `./dev db:migrate` | Show pending, back up, ask for `yes`, run `php artisan migrate`, show status | **development** |
 | `./dev test:php [pest args]` | Pest, e.g. `./dev test:php --filter=ProjectAuthorizationMatrixTest` | **testing** (`intechral_client_portal_testing`) |
 | `./dev test:e2e [playwright args]` | Playwright (Chromium baked into the image) in `portal_app`, as your host user | **development**, see below |
+| `./dev rehearse:provision` | Create the two rehearsal databases and grant `portal` on them only (the one step using the DB root login; checks the SQL first) | rehearsal DBs |
+| `./dev rehearse [options]` | Migration rehearsal (R0.9-1A): deterministic fixtures, snapshot, approved `--candidate=<name>` migrations, comparison, backup/restore round trip; see [`docs/testing/migration-rehearsal.md`](docs/testing/migration-rehearsal.md) | **rehearsal** (`intechral_client_portal_rehearsal[_restore]`), never `portal` or testing |
+| `./dev rehearse:clean` | Empty both rehearsal databases; delete rehearsal files and retained backups | rehearsal only |
 | `./dev check [--no-php]` | CLI self-tests, `git diff --check`, Pint, `npm run check` (wayfinder, tsc, eslint, prettier, vitest, build), then the full Pest suite (~4 min; `--no-php` skips it) | testing (Pest only) |
 
 **Safety.** Nothing trusts the command name to say which database it touches. Before acting, `./dev` boots Laravel inside the container and reads the database it actually resolves, then refuses (exit 1, nothing changed) unless it matches the contract:

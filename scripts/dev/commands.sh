@@ -24,6 +24,10 @@ DEV_COMMANDS=(
     'db:status||Migration status of the development DB (read-only)'
     'db:migrate||Show pending, back up, ask for "yes", then run "php artisan migrate" (never fresh)'
     'db:backup||Dump the development DB to backups/dev/<db>-<timestamp>.sql'
+    '#Migration rehearsal (R0.9-1A; two dedicated rehearsal databases, never "portal" or the testing DB)'
+    'rehearse:provision||Create the two rehearsal databases and grant the app account on them ONLY. Idempotent; the one step that uses the DB root login'
+    'rehearse|[options]|Rehearse in the rehearsal DBs: fixtures, snapshot, approved --candidate=NAME migrations, compare, backup/restore (also --no-restore --keep-backup --json). Removes its own backup when it passes'
+    'rehearse:clean||Empty both rehearsal databases and delete rehearsal files and any retained backups (rehearsal resources only)'
     '#Tests and checks'
     'test:php|[pest args]|Pest against the TESTING DB (intechral_client_portal_testing); refuses otherwise'
     'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; sweeps and cleans up E2E tickets; prints before/after counts'
@@ -163,6 +167,93 @@ cmd_db_migrate() {
     say
     head_line "Migration status after migrating"
     app_exec php artisan migrate:status
+}
+
+# ── Migration rehearsal (R0.9-1A) ──────────────────────────────────────────────
+# These commands are thin on purpose. WHAT may be destroyed is decided inside Laravel, by
+# App\Support\Rehearsal\TargetGuard, against fixed database names and a marker the harness wrote itself. This
+# layer only (a) refuses to run unless the stack resolves to the normal development target, so nothing is
+# redirected, (b) pins the environment, and (c) passes on a short allow-list of options, so no flag (--env,
+# --database, a path) can aim the harness elsewhere. Docs: docs/testing/migration-rehearsal.md.
+readonly REHEARSAL_SQL_FILE='.docker/mysql/init-rehearsal.sql'
+
+# rehearsal_sql_violations <file> - prints one line per statement that is not one of the three the rehearsal
+# provisioning may run. The file is run as the database ROOT, so it is held to: CREATE DATABASE IF NOT EXISTS
+# for exactly the two rehearsal databases, GRANT ALL on exactly those two (never *.*), and FLUSH PRIVILEGES.
+rehearsal_sql_violations() {
+    local statement db='intechral_client_portal_rehearsal' dbesc='intechral\\_client\\_portal\\_rehearsal'
+    local create="^CREATE DATABASE IF NOT EXISTS \`${db}(_restore)?\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci\$"
+    local grant="^GRANT ALL PRIVILEGES ON \`${dbesc}(\\\\_restore)?\`\\.\\* TO \`portal\`@\`%\`\$"
+    [[ -r $1 ]] || { printf 'cannot read %s\n' "$1"; return 0; }
+    while IFS= read -r -d ';' statement || [[ -n $statement ]]; do
+        statement="$(printf '%s' "$statement" | grep -v '^[[:space:]]*--' | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+        [[ -n $statement ]] || continue
+        if [[ $statement =~ $create || $statement =~ $grant || $statement == 'FLUSH PRIVILEGES' ]]; then continue; fi
+        printf 'unexpected statement: %s\n' "$statement"
+    done <"$1"
+}
+
+# rehearsal_args_violations <args...> - prints one line per argument that is not on the allow-list.
+rehearsal_args_violations() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --no-restore | --keep-backup | --json) ;;
+            --candidate=*)
+                [[ ${arg#--candidate=} =~ ^[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[a-z0-9_]+$ ]] || printf 'not a migration name: %s\n' "$arg"
+                ;;
+            *) printf 'option not allowed: %s\n' "$arg" ;;
+        esac
+    done
+}
+
+# rehearsal_preflight - the stack must resolve to the normal development target. Nothing is touched; this
+# proves the app is not pointed somewhere unexpected before the harness's own (stricter) guard runs.
+rehearsal_preflight() {
+    require_docker
+    require_running "$SVC_APP" "$SVC_DB"
+    resolve_or_die dev
+    head_line "Rehearsal (dedicated databases only)"
+    say "  The application resolves to: $R_ENV / $R_DB on $R_HOST:$R_PORT (this is NOT touched)."
+    say "  Rehearsal databases: intechral_client_portal_rehearsal, intechral_client_portal_rehearsal_restore"
+    enforce_contract dev
+    say
+}
+
+# rehearsal_artisan <artisan args...> - as the host user, with the environment pinned like db:migrate does.
+rehearsal_artisan() {
+    app_exec env "APP_ENV=$DEV_ENV" "DB_HOST=$DEV_DB_HOST" php artisan "$@" --no-interaction
+}
+
+cmd_rehearse_provision() {
+    local violations file="$DEV_ROOT/$REHEARSAL_SQL_FILE"
+    require_docker
+    require_running "$SVC_DB"
+    violations="$(rehearsal_sql_violations "$file")"
+    if [[ -n $violations ]]; then
+        printf '%sREFUSING:%s %s is not limited to the two rehearsal databases.\n%s\nNothing was run.\n' "$C_RED" "$C_RST" "$REHEARSAL_SQL_FILE" "$violations" >&2
+        exit 1
+    fi
+    head_line "Provisioning the rehearsal databases (database root login, $REHEARSAL_SQL_FILE)"
+    # The password is read inside the container from its own environment; it never reaches this shell or the output.
+    dc exec -T "$SVC_DB" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot' <"$file" || die "provisioning failed."
+    say "Done. The application account has ALL on the two rehearsal databases only. Run ./dev rehearse."
+}
+
+cmd_rehearse() {
+    local violations
+    violations="$(rehearsal_args_violations "$@")"
+    if [[ -n $violations ]]; then
+        printf '%sREFUSING:%s unsupported rehearse arguments (allowed: --candidate=<migration name>, --no-restore, --keep-backup, --json).\n%s\nNothing was run.\n' "$C_RED" "$C_RST" "$violations" >&2
+        exit 2
+    fi
+    rehearsal_preflight
+    rehearsal_artisan rehearsal:run "$@"
+}
+
+cmd_rehearse_clean() {
+    rehearsal_preflight
+    rehearsal_artisan rehearsal:clean
 }
 
 # ── Tests ──────────────────────────────────────────────────────────────────────
