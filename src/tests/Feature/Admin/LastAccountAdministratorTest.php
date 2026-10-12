@@ -148,46 +148,58 @@ describe('demotion through a user\'s roles', function () {
     });
 });
 
+/**
+ * A CUSTOM role carrying every permission the operator role does, and a user who is an administrator through it alone.
+ * Built-in roles are owned by the application and refuse ordinary edits (R0.9-1D, H4), so a role-permission change that
+ * could demote an administrator can only be made on a custom role.
+ */
+function customAdministratorRole(): array
+{
+    $role = Role::create(['name' => 'custom-administrators', 'guard_name' => 'web'])
+        ->syncPermissions(Role::findByName('operator', 'web')->permissions()->pluck('name')->all());
+    $holder = User::factory()->create();
+    $holder->assignRole($role);
+
+    return [$role, $holder];
+}
+
 describe('demotion through a role\'s permissions', function () {
     it('refuses removing users.manage from the role every administrator holds it through, and keeps the role intact', function () {
-        $last = accountAdministrator();
-        $operator = Role::findByName('operator', 'web');
-        $permissionsBefore = $operator->permissions()->pluck('name')->sort()->values()->all();
+        [$role, $last] = customAdministratorRole();
+        $permissionsBefore = $role->permissions()->pluck('name')->sort()->values()->all();
         $without = array_values(array_diff($permissionsBefore, ['users.manage']));
 
         $this->actingAs($last)
-            ->from(route('roles.edit', $operator))
-            ->put(route('roles.update', $operator), ['permissions' => $without])
-            ->assertRedirect(route('roles.edit', $operator))
+            ->from(route('roles.edit', $role))
+            ->put(route('roles.update', $role), ['permissions' => $without])
+            ->assertRedirect(route('roles.edit', $role))
             ->assertSessionHasErrors(['account' => LastAccountAdministratorException::MESSAGE]);
 
-        expect(Role::findByName('operator', 'web')->permissions()->pluck('name')->sort()->values()->all())->toBe($permissionsBefore)
+        expect(Role::findByName('custom-administrators', 'web')->permissions()->pluck('name')->sort()->values()->all())->toBe($permissionsBefore)
             ->and($last->fresh()->can('users.manage'))->toBeTrue();
 
         // The edit page shows the refusal (seeded in the session's stored form; see flashedAccountError()).
-        $this->actingAs($last)->withSession(flashedAccountError())->get(route('roles.edit', $operator))
+        $this->actingAs($last)->withSession(flashedAccountError())->get(route('roles.edit', $role))
             ->assertSee(LastAccountAdministratorException::MESSAGE);
     });
 
     it('refuses removing users.view the same way', function () {
-        $last = accountAdministrator();
-        $operator = Role::findByName('operator', 'web');
-        $without = array_values(array_diff($operator->permissions()->pluck('name')->all(), ['users.view']));
+        [$role, $last] = customAdministratorRole();
+        $without = array_values(array_diff($role->permissions()->pluck('name')->all(), ['users.view']));
 
-        $this->actingAs($last)->put(route('roles.update', $operator), ['permissions' => $without])
+        $this->actingAs($last)->put(route('roles.update', $role), ['permissions' => $without])
             ->assertSessionHasErrors('account');
 
-        expect(Role::findByName('operator', 'web')->hasPermissionTo('users.view'))->toBeTrue();
+        expect(Role::findByName('custom-administrators', 'web')->hasPermissionTo('users.view'))->toBeTrue();
     });
 
     it('allows it when another administrator holds the access some other way', function () {
-        $viaRole = accountAdministrator();
+        [$role, $viaRole] = customAdministratorRole();
         $direct = User::factory()->create();
         $direct->givePermissionTo(['users.view', 'users.manage']);
-        $operator = Role::findByName('operator', 'web');
-        $without = array_values(array_diff($operator->permissions()->pluck('name')->all(), ['users.manage']));
+        $without = array_values(array_diff($role->permissions()->pluck('name')->all(), ['users.manage']));
 
-        $this->actingAs($viaRole)->put(route('roles.update', $operator), ['permissions' => $without])->assertSessionHasNoErrors();
+        $this->actingAs($viaRole)->put(route('roles.update', $role), ['permissions' => $without])->assertSessionHasNoErrors();
 
         expect($this->admins->ids()->all())->toBe([$direct->id]);
     });

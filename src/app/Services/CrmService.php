@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\CompanyHasProjectsException;
 use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CrmService
@@ -37,9 +40,33 @@ class CrmService
         return $company->fresh();
     }
 
+    /**
+     * Delete a company that no project refers to. The `project_company` association is protected by the database
+     * (ON DELETE RESTRICT, R0.9-1B): the pre-check gives the operator a business-level refusal instead of a database
+     * error, and the engine remains the arbiter. A project linked between the check and the delete (a stale check)
+     * makes the delete itself fail, and that failure is translated into the same refusal. Nothing else is touched
+     * before the delete, so a refusal has no side effects. Not a company archival or project policy (H6).
+     *
+     * @throws CompanyHasProjectsException
+     */
     public function deleteCompany(CrmCompany $company): void
     {
-        $company->delete();
+        $linked = fn (): int => DB::table('project_company')->where('crm_company_id', $company->getKey())->count();
+
+        if (($projects = $linked()) > 0) {
+            throw new CompanyHasProjectsException($company->name, $projects);
+        }
+
+        try {
+            $company->delete();
+        } catch (QueryException $e) {
+            // MariaDB/MySQL 1451: a row in another table still refers to this one (here, a project linked just now).
+            if (($e->errorInfo[1] ?? null) === 1451 && ($projects = $linked()) > 0) {
+                throw new CompanyHasProjectsException($company->name, $projects);
+            }
+
+            throw $e;
+        }
     }
 
     // ── Contacts ──────────────────────────────────────────

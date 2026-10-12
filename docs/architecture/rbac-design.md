@@ -92,12 +92,18 @@ settings.manage
   - `cms.view`
 - Intended for the service provider's clients
 
+**Built-in roles are code-owned (Release 0.9, decision H4).** Their names and permissions are defined in
+`App\Shared\Permissions\BuiltInRoles` (from the permission catalogue), the Roles screens show them read-only, and their
+stored grants change only through the reviewed `php artisan roles:sync`. See [Role Governance](./role-governance.md).
+
 ## Custom Roles
 
 Any number of custom roles can be created. Custom roles:
 - Have any combination of permissions from the catalogue
 - Can be assigned to any user
 - Can be deleted only if no users are currently assigned to them
+- Cannot take a built-in role's name (`operator`, `user`, in any letter case)
+- Are never touched by the built-in role synchronization
 
 ## Last Active Account Administrator (Release 0.9, H3)
 
@@ -215,8 +221,8 @@ EPIC-015 added **no permission** and changed no role; it introduced named seams 
 
 ## Seeding
 
-Permissions are seeded from `database/seeders/PermissionSeeder.php`, which reads from a central permissions catalogue in `app/Shared/Permissions/PermissionCatalogue.php`. Each module registers its permissions there.
+Permissions are seeded from `database/seeders/PermissionSeeder.php`, which reads from a central permissions catalogue in `app/Shared/Permissions/PermissionCatalogue.php`. Each module registers its permissions there. The seeder only creates what is missing.
 
-Built-in roles are seeded in `database/seeders/RoleSeeder.php` and called from `DatabaseSeeder.php`.
+Built-in roles are defined in `app/Shared/Permissions/BuiltInRoles.php`. `database/seeders/RoleSeeder.php` resets them to that definition **in local and testing environments only** (it refuses anywhere else); production and any data that matters uses `php artisan roles:sync`, a previewed, fingerprint-approved synchronization that revokes only on an explicit approval ([Role Governance](./role-governance.md)). A new permission therefore needs: a constant and an `all()` entry in the catalogue (plus `userDefaults()` if the `user` role should have it), then `roles:sync` on each environment.
 
 Organization membership roles are stored on the pivot and are not seeded as Spatie roles.

@@ -3,11 +3,14 @@
 use App\Models\User;
 use App\Services\AccountAdministrators;
 use App\Services\AccountLifecycleService;
+use App\Services\BuiltInRoleSynchronizer;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Process\Process;
+
+require_once __DIR__.'/../../Support/committed_installation.php';
 
 /*
  * Release 0.9 (H3, R0.9-1C): the last-active-administrator protection holds under concurrent changes, on real MariaDB.
@@ -122,9 +125,9 @@ function committedAdministratorPair(): array
  * Exactly one worker won and one was refused; they genuinely contended (the second asked for the lock while the first
  * held it) and were serialized (the second got the lock only after the first released it).
  */
-function expectSerializedWinnerAndRefusal(array $results): void
+function expectSerializedWinnerAndRefusal(array $results, string $refusal = 'refused'): void
 {
-    expect(collect($results)->pluck('outcome')->sort()->values()->all())->toBe(['ok', 'refused'], json_encode($results));
+    expect(collect($results)->pluck('outcome')->sort()->values()->all())->toBe(collect(['ok', $refusal])->sort()->values()->all(), json_encode($results));
 
     [$first, $second] = collect($results)->sortBy('lockedAt')->values()->all();
     $hold = ACCOUNT_RACE_HOLD_MS / 1000;
@@ -199,5 +202,83 @@ it('lets only one of two role-permission edits through when each would demote on
         expect(app(AccountAdministrators::class)->ids()->count())->toBe(1);
     } finally {
         $cleanup();
+    }
+});
+
+/*
+ * R0.9-1D: the built-in role synchronization and the first-operator bootstrap take the same lock as every other grant
+ * mutation, so they too run one at a time against the last-administrator guard and against each other.
+ */
+
+it('serializes a reviewed synchronization against a demotion that races to remove both administrators', function () {
+    $cleanup = committedSynchronizedInstallation();
+    $x = User::factory()->create(['name' => 'Race Admin X'])->assignRole('user');
+    $y = User::factory()->create(['name' => 'Race Admin Y']);
+    $y->assignRole(Role::create(['name' => 'race-admin-y', 'guard_name' => 'web'])->givePermissionTo(['users.view', 'users.manage']));
+    Role::findByName('user', 'web')->givePermissionTo(['users.view', 'users.manage']); // drift: X is an administrator through `user`
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    try {
+        $plan = app(BuiltInRoleSynchronizer::class)->plan();
+        expect($plan->administratorsBefore)->toBe([$x->id, $y->id])
+            ->and($plan->administratorsAfter)->toBe([$y->id], 'the reviewed plan removes only X');
+
+        $results = runAccountAdminWorkers([
+            ['op' => 'sync_builtin_roles', 'fingerprint' => $plan->fingerprint(), 'allowRevocations' => true],
+            ['op' => 'sync_user_roles', 'target' => $y->id, 'roles' => []],
+        ]);
+
+        // Whoever takes the lock first wins and the other never sees the state it was planned against: the demotion is
+        // refused if the synchronization went first, the synchronization is stale if the demotion did.
+        $outcomes = collect($results)->pluck('outcome')->sort()->values()->all();
+        expect($outcomes)->toBeIn([['ok', 'refused'], ['ok', 'stale']], json_encode($results));
+        [$first, $second] = collect($results)->sortBy('lockedAt')->values()->all();
+        $hold = ACCOUNT_RACE_HOLD_MS / 1000;
+        expect($first['outcome'])->toBe('ok')
+            ->and($second['requestedAt'])->toBeLessThan($first['lockedAt'] + $hold, 'the second asked while the first held the lock')
+            ->and($second['lockedAt'])->toBeGreaterThanOrEqual($first['lockedAt'] + $hold * 0.9, 'the second waited for the first')
+            ->and(app(AccountAdministrators::class)->ids()->count())->toBe(1, 'one active administrator always remains');
+    } finally {
+        $cleanup([$x->id, $y->id]);
+    }
+});
+
+it('lets one of two identical reviewed synchronizations apply and refuses the other as stale', function () {
+    $cleanup = committedSynchronizedInstallation();
+    Role::findByName('user', 'web')->permissions()->detach(Permission::findByName('tickets.view')->id);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    try {
+        $plan = app(BuiltInRoleSynchronizer::class)->plan();
+        $results = runAccountAdminWorkers([
+            ['op' => 'sync_builtin_roles', 'fingerprint' => $plan->fingerprint()],
+            ['op' => 'sync_builtin_roles', 'fingerprint' => $plan->fingerprint()],
+        ]);
+
+        expectSerializedWinnerAndRefusal($results, 'stale');
+        expect(app(BuiltInRoleSynchronizer::class)->plan()->isEmpty())->toBeTrue()
+            ->and(DB::table('activity_log')->where('description', 'synchronized built-in roles')->count())->toBe(1, 'one committed outcome, one audit entry');
+    } finally {
+        $cleanup();
+    }
+});
+
+it('creates exactly one operator when two first-operator bootstraps race', function () {
+    $cleanup = committedSynchronizedInstallation();
+    $emails = ['first@example.com', 'second@example.com'];
+
+    try {
+        $results = runAccountAdminWorkers(array_map(
+            fn ($email) => ['op' => 'bootstrap_operator', 'email' => $email, 'password' => 'Race-Bootstrap-Passw0rd!7'],
+            $emails,
+        ));
+
+        expectSerializedWinnerAndRefusal($results);
+        expect(User::whereIn('email', $emails)->count())->toBe(1)
+            ->and(User::role('operator')->count())->toBe(1)
+            ->and(app(AccountAdministrators::class)->ids()->count())->toBe(1)
+            ->and(DB::table('activity_log')->where('description', 'bootstrapped first operator')->count())->toBe(1);
+    } finally {
+        $cleanup([], $emails);
     }
 });

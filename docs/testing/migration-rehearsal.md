@@ -149,7 +149,7 @@ Still open:
 | **Before data-transforming migrations** | J-5 | Make a `data` declaration unable to hide unexpected row disappearance: today it skips both the row-count and the per-row check for that table. Not needed for the tightening migrations of R0.9-1B (they declare no `data` tables). |
 | Rehearsal harness (from the R0.9-1B review) | L3 | Detect foreign-key and index **name** changes and a duplicate index on the same columns. The snapshot compares foreign keys and indexes by their columns only. For M2 and M3, their own post-migration `verify()` and `PreservationSchemaTest` check the names. |
 
-The independent review (Opus 5.5) of R0.9-1B concluded **SAFE TO COMMIT**, with no Critical, High or Medium findings. Its two application findings are carried by the Release 0.9 plan, not by the harness: **L1** (an attempted Eloquent user deletion strips roles and permissions before the database refuses it; R0.9-1C) and **L2** (a CRM company delete with linked projects ends in HTTP 500; R0.9-1D). See the [Release 0.9 status](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery).
+The independent review (Opus 5.5) of R0.9-1B concluded **SAFE TO COMMIT**, with no Critical, High or Medium findings. Its two application findings are carried by the Release 0.9 plan, not by the harness: **L1** (an attempted Eloquent user deletion strips roles and permissions before the database refuses it; R0.9-1C) and **L2** (a CRM company delete with linked projects ends in HTTP 500; addressed in R0.9-1D, which is implemented and passed independent review, SAFE TO COMMIT). See the [Release 0.9 status](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery).
 
 Informational findings, accepted and not expanding this package:
 
@@ -178,7 +178,7 @@ Three candidate migrations implement the schema decisions of the [Release 0.9 ga
 **Consequences for the application, left deliberately to later packages:**
 
 - No application path deletes a user, so M2 changes no user-facing behaviour. A future offboarding path must suspend (H3, R0.9-1C), not delete, and must not call `$user->delete()` on a user who owns records: the permission library's `deleting` hook detaches the user's roles and permissions *before* the `DELETE` that the database then refuses.
-- The CRM company delete route (`DELETE /crm/companies/{company}`) has no object-level guard. After M3 the database refuses to delete a company that projects still reference, so that route fails with a database error instead of destroying the associations. The friendly refusal belongs with the H6 project and company delete guards in R0.9-1D; nothing else is lost in the meantime.
+- The CRM company delete route (`DELETE /crm/companies/{company}`) has no object-level guard. After M3 the database refuses to delete a company that projects still reference, so that route fails with a database error instead of destroying the associations. R0.9-1D adds the friendly refusal for this route (HTTP 409 for JSON, back with an error for a browser; [Role Governance](../architecture/role-governance.md#crm-company-deletion-safeguard)). It is only the refusal; the broader H6 project and company delete policy is not ratified.
 - Tests that committed users and relied on the cascade to clean up now delete what they created first, through `Tests\Support\CommittedUsers`, which is scoped to the given user ids and fails loudly on a leftover rather than skipping it.
 
 ## How a later package uses it

@@ -8,6 +8,10 @@
         <h1 class="mt-2 text-2xl font-semibold text-text">Edit Company</h1>
     </div>
 
+    @error('company')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
+
     <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('crm.companies.update', $company) }}" class="space-y-4">
             @csrf @method('PUT')

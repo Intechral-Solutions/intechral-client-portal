@@ -41,6 +41,11 @@ const REVIEWED_DELETE_CALLS = [
     // pointers are SET NULL, and only membership and credential rows cascade. The file is task-aware only because
     // User declares its `projects()` relation.
     'Models/User.php' => ['return $this->getConnection()->transaction(fn () => parent::delete());'],
+    // Release 0.9 R0.9-1D (R0.9-1B finding L2): a CRM COMPANY and a CRM contact, never a task or project row.
+    // deleteCompany() refuses first when project_company still references the company (that key is RESTRICT, so the
+    // database refuses it too and nothing cascades into a project); a project is never a child of a company. The file is
+    // task-aware only because that refusal counts the linked projects.
+    'Services/CrmService.php' => ['$company->delete();', '$contact->delete();'],
 ];
 
 /**

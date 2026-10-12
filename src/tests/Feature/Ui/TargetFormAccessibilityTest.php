@@ -212,7 +212,8 @@ function uiFailedForms(): array
         },
         'roles.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('roles.create'), 'post', route('roles.store'), ['name' => '', 'permissions' => ['no.such.permission']]),
         'roles.edit' => function ($t) {
-            $role = Role::findByName('user');
+            // A custom role: a built-in role's edit request is refused before it is validated (R0.9-1D, H4).
+            $role = Role::create(['name' => 'ui-failed-form', 'guard_name' => 'web']);
 
             return uiFailedSubmission($t, uiActor('operator'), route('roles.edit', $role), 'put', route('roles.update', $role), ['permissions' => ['no.such.permission']]);
         },

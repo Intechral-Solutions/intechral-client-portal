@@ -70,6 +70,19 @@ final class AccountAdministrators
             ->map(fn ($id) => (int) $id);
     }
 
+    /**
+     * Whether any account, suspended or not, holds both permissions. The first-operator bootstrap (R0.9-1D) uses it to
+     * tell a new installation from one whose administrators are merely suspended or locked out, which is a recovery
+     * case it does not handle.
+     */
+    public function anyExist(): bool
+    {
+        return DB::table('users')
+            ->where($this->holds(PermissionCatalogue::USERS_VIEW))
+            ->where($this->holds(PermissionCatalogue::USERS_MANAGE))
+            ->exists();
+    }
+
     private function lock(): void
     {
         DB::table(config('permission.table_names.permissions'))

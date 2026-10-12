@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Services\AccessGrants;
+use App\Services\BuiltInRoleSynchronizer;
 use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\Events\TransactionCommitting;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +14,8 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Process\Process;
+
+require_once __DIR__.'/../../Support/committed_installation.php';
 
 /*
  * R0.9-1C review finding M-1: a role-permission change or role deletion clears the shared permission cache only once
@@ -227,3 +230,29 @@ it('clears the cache when the caller\'s outer transaction rolls back after reloa
     app(PermissionRegistrar::class)->clearPermissionsCollection(); // read the shared store afresh, as the next request does
     expect(User::findOrFail($user->id)->hasPermissionTo($permission))->toBeTrue();
 });
+
+it('does not let a reader that reloads the cache before the commit keep a permission the built-in role synchronization revoked', function (array $store) {
+    useSharedPermissionCache($store);
+    $cleanup = committedSynchronizedInstallation();
+    $member = User::factory()->create()->assignRole('user');
+    $userRole = Role::findByName('user', 'web');
+    $operatorRole = Role::findByName('operator', 'web');
+    $userRole->givePermissionTo('billing.admin'); // committed drift: the plan revokes it
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    try {
+        expect(readPermissionCacheElsewhere($store, 'billing.admin', $member->id))->toBe(['roles' => [$operatorRole->id, $userRole->id], 'has' => true]);
+
+        $synchronizer = app(BuiltInRoleSynchronizer::class);
+        $plan = $synchronizer->plan();
+        reloadPermissionCacheJustBeforeCommit($store, 'billing.admin', $member->id, $observed);
+        $synchronizer->apply($plan->fingerprint(), allowRevocations: true);
+
+        expect($observed)->toBe(['roles' => [$operatorRole->id, $userRole->id], 'has' => true], 'the reader reloaded the OLD mapping just before the commit')
+            ->and(DB::table('role_has_permissions')->where('role_id', $userRole->id)->where('permission_id', Permission::findByName('billing.admin')->id)->exists())->toBeFalse()
+            ->and(readPermissionCacheElsewhere($store, 'billing.admin', $member->id))->toBe(['roles' => [$operatorRole->id], 'has' => false], 'a fresh reader after the commit');
+    } finally {
+        $cleanup([$member->id]);
+        forgetSharedPermissionCache($store);
+    }
+})->with('shared permission cache stores');

@@ -85,7 +85,9 @@ permission cache).
   under the lock so a concurrent assignment cannot slip in between the check and the delete.
 
 `App\Services\AccessGrants` is the one guarded path for each grant mutation. No application path changes a user's
-direct permissions. Seeders (`RoleSeeder`, decision H4, R0.9-1D) are not application paths and are out of scope.
+direct permissions. The built-in role synchronization (`roles:sync`, decision H4, R0.9-1D) runs through the same guard and lock
+(`AccessGrants::guardedGrantChange`), and the first-operator bootstrap takes the same lock; see
+[Role Governance](./role-governance.md). `RoleSeeder` now refuses outside local and testing environments.
 
 Through the operator action, the actor is always an active account administrator and cannot be the target, so a
 single suspension cannot remove the last one; the refusal matters for concurrent changes (two administrators
@@ -210,9 +212,14 @@ open owner question.
 ## Known limitations and open obligations
 
 - Inviting the email address of a suspended account is not refused at send time; acceptance is refused.
-- `RoleSeeder` (decision H4, R0.9-1D) is not guarded. It does not remove `users.view` or `users.manage` from the
-  `operator` role, but it resets the `user` role to the catalogue defaults. Re-running it against production is
-  already forbidden by the release gate.
+- `RoleSeeder` (decision H4) is no longer a production mechanism. R0.9-1D (implemented; independent review SAFE TO COMMIT)
+  makes it refuse outside local and testing environments and moves production synchronization to `roles:sync`, which is
+  guarded ([Role Governance](./role-governance.md)).
 - The deployment and rollback requirements [above](#release-09-deployment-and-rollback-requirements), and Info-5.
+- Residual permission-cache race (recorded by the R0.9-1D review; inherited from M-1's fix, which closed the in-transaction clear but not this window):
+  a reader that loads the old permissions from the database before a commit and stores them in the shared cache after
+  the post-commit invalidation keeps a revoked permission until the cache expires (24 hours by default). It is not conclusively
+  fixed and is a security-hardening obligation before production permission revocations are relied upon; a one-time deployment
+  cache reset does not cover concurrent changes. See [Role Governance](./role-governance.md#residual-permission-cache-risk-inherited-from-r09-1c-not-fixed-here).
 - Hosted CI has not yet verified R0.9-1C. The Redis variant of the M-1 test needs a reachable Redis server, which the
   hosted CI Pest job does not start, so it is skipped there; the file-store variant covers the same interleaving.

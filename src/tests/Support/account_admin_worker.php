@@ -11,13 +11,19 @@
  * "before" state. `requestedAt` (just before the mutation) and `lockedAt` let the test prove the second asked for
  * the lock while the first held it, and got it only afterwards.
  *
+ * Operations: suspend, sync_user_roles, sync_role_permissions (R0.9-1C), sync_builtin_roles, bootstrap_operator (R0.9-1D).
+ *
  * Usage: php account_admin_worker.php <startAtMicrotime> <holdMs> <operation-json>
  */
 
 use App\Exceptions\LastAccountAdministratorException;
+use App\Exceptions\OperatorBootstrapRefused;
+use App\Exceptions\RoleSyncRefused;
 use App\Models\User;
 use App\Services\AccessGrants;
 use App\Services\AccountLifecycleService;
+use App\Services\BuiltInRoleSynchronizer;
+use App\Services\OperatorBootstrap;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
@@ -55,10 +61,21 @@ try {
             ->syncUserRoles(User::findOrFail($operation['target']), $operation['roles']),
         'sync_role_permissions' => $app->make(AccessGrants::class)
             ->syncRolePermissions(Role::findOrFail($operation['role']), $operation['permissions']),
+        // R0.9-1D: the built-in role synchronization applying a plan reviewed earlier, and the first-operator bootstrap.
+        'sync_builtin_roles' => $app->make(BuiltInRoleSynchronizer::class)
+            ->apply($operation['fingerprint'], $operation['allowRevocations'] ?? false),
+        'bootstrap_operator' => $app->make(OperatorBootstrap::class)->provision([
+            'name' => 'Race Operator',
+            'email' => $operation['email'],
+            'password' => $operation['password'],
+            'password_confirmation' => $operation['password'],
+        ]),
     };
     $outcome = 'ok';
-} catch (LastAccountAdministratorException) {
+} catch (LastAccountAdministratorException|OperatorBootstrapRefused) {
     $outcome = 'refused';
+} catch (RoleSyncRefused $e) {
+    $outcome = str_contains($e->getMessage(), 'stale') ? 'stale' : 'error: '.$e->getMessage();
 } catch (Throwable $e) {
     $outcome = 'error: '.get_class($e).': '.$e->getMessage();
 }
