@@ -275,9 +275,9 @@ e2e_suite_running() {
 
 # acquire_e2e_lock - dies if another ./dev test:e2e holds the lock; clears a lock whose owner is gone.
 acquire_e2e_lock() {
-    local owner attempt lock
+    local owner lock
     lock="$(e2e_lock_dir)"
-    for attempt in 1 2; do
+    for _ in 1 2; do
         if mkdir "$lock" 2>/dev/null; then
             printf '%s\n' "$$" >"$lock/pid"
             return 0
