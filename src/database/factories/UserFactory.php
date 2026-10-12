@@ -42,4 +42,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Release 0.9 (H3): a suspended account.
+     */
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'disabled_at' => now(),
+        ]);
+    }
 }

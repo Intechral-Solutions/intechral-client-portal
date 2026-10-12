@@ -160,11 +160,14 @@ export function TaskEditDialog({
                     aria-describedby={errors.assignee_id ? `${id('assignee_id')}-error` : undefined}
                 >
                     <option value="">Unassigned</option>
-                    {options.members.map((member) => (
-                        <option key={member.id} value={member.id}>
-                            {member.name}
-                        </option>
-                    ))}
+                    {/* A suspended member (Release 0.9, H3) is never a new choice, only the current holder. */}
+                    {options.members
+                        .filter((member) => !member.suspended || member.id === task.assignee?.id)
+                        .map((member) => (
+                            <option key={member.id} value={member.id}>
+                                {member.suspended ? `${member.name} (suspended)` : member.name}
+                            </option>
+                        ))}
                     {departedAssignee ? (
                         <option value={departedAssignee.id}>
                             {departedAssignee.name} (no longer a project member)

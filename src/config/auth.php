@@ -62,8 +62,10 @@ return [
     */
 
     'providers' => [
+        // Release 0.9 (H3): Eloquent, resolving ACTIVE accounts only (App\Auth\ActiveUserProvider, registered in
+        // AppServiceProvider). The guard and the password broker both use it.
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'active-eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AccessGrants;
+use App\Services\AccountLifecycleService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
@@ -11,6 +14,11 @@ use Spatie\Permission\PermissionRegistrar;
 
 class UserController extends Controller
 {
+    public function __construct(
+        private readonly AccessGrants $grants,
+        private readonly AccountLifecycleService $lifecycle,
+    ) {}
+
     public function index(Request $request)
     {
         $users = User::with('roles')
@@ -31,6 +39,7 @@ class UserController extends Controller
         $activity = Activity::causedBy($user)
             ->orWhere('subject_type', User::class)
             ->where('subject_id', $user->id)
+            ->with('causer')
             ->latest()
             ->take(20)
             ->get();
@@ -48,7 +57,8 @@ class UserController extends Controller
         $oldRoles = $user->getRoleNames()->toArray();
         $newRoles = $validated['roles'] ?? [];
 
-        $user->syncRoles($newRoles);
+        // Release 0.9 (H3): refused if it would demote the last active account administrator.
+        $this->grants->syncUserRoles($user, $newRoles);
 
         // Invalidate permission cache for this user
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -72,5 +82,33 @@ class UserController extends Controller
         }
 
         return back()->with('status', 'Roles updated for '.$user->name.'.');
+    }
+
+    /** Release 0.9 (H3): suspend an account. Refused for one's own account and for the last account administrator. */
+    public function suspend(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $suspended = $this->lifecycle->suspend($user, $request->user(), $validated['reason']);
+
+        return back()->with('status', $suspended
+            ? $user->name.' has been suspended and signed out everywhere.'
+            : $user->name.' is already suspended.');
+    }
+
+    /** Release 0.9 (H3): reactivate a suspended account. Grants nothing; the user signs in afresh. */
+    public function reactivate(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $reactivated = $this->lifecycle->reactivate($user, $request->user(), $validated['reason'] ?? null);
+
+        return back()->with('status', $reactivated
+            ? $user->name.' has been reactivated. They can sign in again.'
+            : $user->name.' is already active.');
     }
 }

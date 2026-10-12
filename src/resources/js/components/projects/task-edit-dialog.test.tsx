@@ -118,3 +118,30 @@ it('closes after a successful save', async () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
 });
+
+it('keeps a suspended holder as a labelled current value and never offers another suspended member', () => {
+    // Release 0.9 (H3): the server flags suspended members; they are never new candidates.
+    render(
+        <TaskEditDialog
+            open
+            onOpenChange={vi.fn()}
+            projectId={7}
+            task={task({ assignee: { id: 11, name: 'Sid Suspended' }, assigneeIsMember: true })}
+            options={{
+                ...options,
+                members: [
+                    ...options.members,
+                    { id: 11, name: 'Sid Suspended', suspended: true },
+                    { id: 12, name: 'Sue Suspended', suspended: true },
+                ],
+            }}
+        />,
+    );
+
+    expect(screen.getByLabelText('Assignee')).toHaveValue('11');
+    expect(screen.getByRole('option', { name: 'Sid Suspended (suspended)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Sue Suspended/ })).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('option', { name: /no longer a project member/ }),
+    ).not.toBeInTheDocument();
+});

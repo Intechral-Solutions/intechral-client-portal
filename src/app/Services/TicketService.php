@@ -227,9 +227,10 @@ class TicketService
 
     /**
      * The one assignment-eligibility rule (EPIC-010D H5): a Ticket may be assigned only to a user
-     * who currently holds `tickets.assign`. Unassigning (null) is always allowed. There is no
-     * exemption for the current assignee, so a stale assignee who lost the capability cannot be
-     * re-selected. Bulk callers run this before touching any Ticket.
+     * who currently holds `tickets.assign` and whose account is active (Release 0.9, H3). Unassigning
+     * (null) is always allowed. There is no exemption for the current assignee, so a stale assignee
+     * who lost the capability, or was suspended, cannot be re-selected. Bulk callers run this before
+     * touching any Ticket.
      *
      * @throws ValidationException
      */
@@ -239,7 +240,9 @@ class TicketService
             return;
         }
 
-        if (! User::find($assigneeId)?->can('tickets.assign')) {
+        $assignee = User::find($assigneeId);
+
+        if ($assignee === null || $assignee->isSuspended() || ! $assignee->can('tickets.assign')) {
             throw ValidationException::withMessages([
                 'assignee_id' => 'The selected assignee cannot be assigned tickets.',
             ]);
@@ -255,8 +258,9 @@ class TicketService
 
     /**
      * Who is emailed about a reply: nobody for an internal note; otherwise the owner and the
-     * assignee, except the author, only users who can currently view the Ticket (a stale assignee
-     * who lost `tickets.assign` cannot, so receives no preview), and each user at most once.
+     * assignee, except the author and any suspended account (Release 0.9, H3), only users who can
+     * currently view the Ticket (a stale assignee who lost `tickets.assign` cannot, so receives no
+     * preview), and each user at most once.
      *
      * @return Collection<int, User>
      */
@@ -270,6 +274,7 @@ class TicketService
             ->filter()
             ->reject(fn (User $recipient) => $recipient->is($author))
             ->unique('id')
+            ->reject(fn (User $recipient) => $recipient->isSuspended())
             ->filter(fn (User $recipient) => Gate::forUser($recipient)->allows('view', $ticket))
             ->values();
     }

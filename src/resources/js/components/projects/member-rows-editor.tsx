@@ -113,7 +113,8 @@ export function MemberRowsEditor({
                         const options = candidates.filter(
                             (candidate) =>
                                 candidate.id !== owner?.id &&
-                                (candidate.id === row.user_id || !taken.has(candidate.id)),
+                                (candidate.id === row.user_id ||
+                                    (!taken.has(candidate.id) && !candidate.suspended)),
                         );
 
                         return (
@@ -145,6 +146,7 @@ export function MemberRowsEditor({
                                         {options.map((candidate) => (
                                             <option key={candidate.id} value={candidate.id}>
                                                 {candidate.name} ({candidate.email})
+                                                {candidate.suspended ? ' (suspended)' : ''}
                                             </option>
                                         ))}
                                     </NativeSelect>

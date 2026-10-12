@@ -110,7 +110,9 @@ class SocialiteController extends Controller
             ->with('user')
             ->first();
 
-        if (! $account) {
+        // Release 0.9 (H3): this signs the user in directly, not through the user provider, so it checks suspension
+        // itself. A suspended account gets the unlinked-identity answer: nothing discloses its existence or state.
+        if (! $account || $account->user->isSuspended()) {
             return redirect()->route('login')
                 ->withErrors(['email' => 'That provider account is not linked to a portal account.'])
                 ->with('error', 'That provider account is not linked to a portal account.');

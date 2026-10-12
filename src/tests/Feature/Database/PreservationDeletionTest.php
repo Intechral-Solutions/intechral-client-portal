@@ -110,6 +110,8 @@ it('still clears a nullable pointer to a deleted user and keeps the record', fun
 it('still lets the browser suite delete the throwaway members it creates (role, direct permission, project membership)', function () {
     // tests/Browser/projects-migration.spec.ts creates two users, makes them members of a project, lets one rename it,
     // and deletes both by email afterwards. They own no durable record, so the new keys do not touch that teardown.
+    // Since R0.9-1C it deletes them through Eloquent, one model at a time, so their role and permission rows go too
+    // (the earlier query-builder delete fired no model events and left those pivot rows orphaned).
     $project = Project::factory()->create();
     $role = Role::findOrCreate('user', 'web');
     $manager = User::factory()->create(['email' => 'e2e-wp3-manager@intechral.test']);
@@ -123,17 +125,25 @@ it('still lets the browser suite delete the throwaway members it creates (role, 
     }
     DB::table('projects')->where('id', $project->id)->update(['name' => 'E2E WP3 renamed by manager']);
 
-    User::whereIn('email', ['e2e-wp3-manager@intechral.test', 'e2e-wp3-hostile@intechral.test'])->delete();
+    User::whereIn('email', ['e2e-wp3-manager@intechral.test', 'e2e-wp3-hostile@intechral.test'])->get()->each->delete();
 
-    expect(DB::table('users')->whereIn('id', [$manager->id, $hostile->id])->exists())->toBeFalse()
-        ->and(DB::table('project_members')->where('project_id', $project->id)->whereIn('user_id', [$manager->id, $hostile->id])->exists())->toBeFalse()
+    $ids = [$manager->id, $hostile->id];
+    expect(DB::table('users')->whereIn('id', $ids)->exists())->toBeFalse()
+        ->and(DB::table('project_members')->where('project_id', $project->id)->whereIn('user_id', $ids)->exists())->toBeFalse()
+        ->and(DB::table('model_has_roles')->where('model_type', User::class)->whereIn('model_id', $ids)->exists())->toBeFalse()
+        ->and(DB::table('model_has_permissions')->where('model_type', User::class)->whereIn('model_id', $ids)->exists())->toBeFalse()
         ->and(DB::table('projects')->where('id', $project->id)->exists())->toBeTrue();
 });
 
-it('CHARACTERIZATION (for R0.9-1C): an Eloquent delete of a protected user strips roles and permissions first, then the database refuses', function () {
-    // Not desired behaviour, recorded so that offboarding is built on suspension (H3) and never on User::delete():
-    // the permission library's `deleting` hooks detach roles and direct permissions BEFORE the DELETE statement,
-    // so a delete that the database then refuses has already removed the user's access grants.
+/*
+ * R0.9-1B review finding L1, fixed in R0.9-1C. This test was a CHARACTERIZATION asserting the grants were GONE: the
+ * permission library's `deleting` hooks detach roles and direct permissions BEFORE the DELETE statement, so a delete
+ * the database then refused had already stripped the user's access. Its intent is deliberately inverted: User::delete()
+ * now runs in a transaction, so the refused delete rolls the detach back and the grants SURVIVE. (Offboarding is
+ * suspension, H3, never deletion.) Inside RefreshDatabase that transaction is a savepoint; the committed variant below
+ * proves the top-level case.
+ */
+it('L1 regression (R0.9-1C): a refused Eloquent delete of a protected user keeps its roles and direct permissions', function () {
     $user = User::factory()->create();
     Ticket::factory()->create(['user_id' => $user->id]);
     $user->assignRole(Role::findOrCreate('user', 'web'));
@@ -141,10 +151,45 @@ it('CHARACTERIZATION (for R0.9-1C): an Eloquent delete of a protected user strip
 
     expect(fn () => $user->delete())->toThrow(QueryException::class, 'Cannot delete or update a parent row');
 
-    expect(DB::table('users')->where('id', $user->id)->exists())->toBeTrue()
-        ->and(DB::table('tickets')->where('user_id', $user->id)->exists())->toBeTrue()
-        ->and(DB::table('model_has_roles')->where('model_id', $user->id)->exists())->toBeFalse()
-        ->and(DB::table('model_has_permissions')->where('model_id', $user->id)->exists())->toBeFalse();
+    $reloaded = User::findOrFail($user->id);
+    expect(DB::table('tickets')->where('user_id', $user->id)->exists())->toBeTrue()
+        ->and(DB::table('model_has_roles')->where('model_type', User::class)->where('model_id', $user->id)->count())->toBe(1)
+        ->and(DB::table('model_has_permissions')->where('model_type', User::class)->where('model_id', $user->id)->count())->toBe(1)
+        ->and($reloaded->hasRole('user'))->toBeTrue()
+        ->and($reloaded->hasDirectPermission('projects.manage'))->toBeTrue();
+});
+
+it('L1 regression (R0.9-1C): outside any test transaction, User::destroy() and forceDelete() of a protected user keep its grants', function () {
+    DB::commit(); // end the RefreshDatabase transaction: User::delete() must open the top-level transaction itself
+    expect(DB::transactionLevel())->toBe(0);
+
+    // Committed rows, so every name is unique to this run and removed in the finally block.
+    $suffix = uniqid();
+    $role = Role::create(['name' => "l1-role-{$suffix}", 'guard_name' => 'web']);
+    $permission = Permission::create(['name' => "l1.permission-{$suffix}", 'guard_name' => 'web']);
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->create(['user_id' => $user->id]);
+
+    try {
+        $user->assignRole($role);
+        $user->givePermissionTo($permission);
+
+        foreach (['destroy' => fn () => User::destroy($user->id), 'forceDelete' => fn () => $user->forceDelete()] as $path => $delete) {
+            expect($delete)->toThrow(QueryException::class, 'Cannot delete or update a parent row');
+
+            expect(DB::table('users')->where('id', $user->id)->exists())->toBeTrue("{$path}: the user row")
+                ->and(DB::table('model_has_roles')->where('model_type', User::class)->where('model_id', $user->id)->where('role_id', $role->id)->exists())->toBeTrue("{$path}: the role")
+                ->and(DB::table('model_has_permissions')->where('model_type', User::class)->where('model_id', $user->id)->where('permission_id', $permission->id)->exists())->toBeTrue("{$path}: the direct permission");
+        }
+    } finally {
+        DB::table('tickets')->where('id', $ticket->id)->delete();
+        $user->delete(); // Eloquent, so its pivot rows go with it
+        $role->delete();
+        $permission->delete();
+    }
+
+    expect(DB::table('model_has_roles')->where('model_type', User::class)->where('model_id', $user->id)->exists())->toBeFalse()
+        ->and(DB::table('model_has_permissions')->where('model_type', User::class)->where('model_id', $user->id)->exists())->toBeFalse();
 });
 
 describe('a company that projects reference (H2)', function () {

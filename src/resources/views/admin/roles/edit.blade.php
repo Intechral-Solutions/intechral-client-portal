@@ -28,6 +28,9 @@
     @if (session('status'))
     <x-ui.alert variant="success" class="mb-6">{{ session('status') }}</x-ui.alert>
     @endif
+    @error('account')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
 
     <form method="POST" action="{{ route('roles.update', $role) }}" class="space-y-8">
         @csrf

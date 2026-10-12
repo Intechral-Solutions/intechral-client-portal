@@ -207,3 +207,35 @@ it('gives every new row a distinct identity', () => {
 
     expect(keys.size).toBe(50);
 });
+
+it('keeps an existing suspended member in their row, labelled, but never offers them to another row', async () => {
+    // Release 0.9 (H3): the server lists an existing suspended member flagged, so saving does not drop them.
+    const user = userEvent.setup();
+    const withSuspended: MemberCandidate[] = [
+        ...candidates,
+        { id: 5, name: 'Sid Suspended', email: 'sid@example.test', suspended: true },
+    ];
+    function SuspendedHarness() {
+        const [rows, setRows] = useState<MemberRow[]>([newMemberRow({ user_id: 5 })]);
+
+        return (
+            <MemberRowsEditor
+                idPrefix="test"
+                owner={owner}
+                rows={rows}
+                onChange={setRows}
+                candidates={withSuspended}
+                errors={{}}
+            />
+        );
+    }
+    render(<SuspendedHarness />);
+
+    const [held] = userSelects();
+    expect(held).toHaveValue('5');
+    expect(optionNames(held!)).toContain('Sid Suspended (sid@example.test) (suspended)');
+
+    await user.click(screen.getByRole('button', { name: 'Add member' }));
+    const [, added] = userSelects();
+    expect(optionNames(added!).join('|')).not.toContain('Sid Suspended');
+});

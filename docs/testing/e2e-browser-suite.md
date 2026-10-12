@@ -200,6 +200,17 @@ sorts before every seeded name, so on overlapping workers index 1 was that user.
 (`chooseInvoiceClient` in `blade-theme-controls.spec.ts`), and the draft-invoice test asserts the invoice is billed to
 that client.
 
+## Throwaway users: delete through Eloquent, and verify
+
+`projects-migration.spec.ts` removes the two users it creates with `deleteFixtureUsers()`: it selects them by their
+per-run emails only, deletes each through Eloquent (so the permission library detaches their role and direct-permission
+rows), deletes their own `sessions` rows, and asserts that nothing of them is left. The earlier query-builder
+`User::whereIn(...)->delete()` fired no model events and left `model_has_roles` and `model_has_permissions` rows whose
+user no longer existed (R0.9-1C). The rows it had already orphaned in the development database (49 in each table at
+R0.9-1B) are left alone; this prevents new ones. These users own no durable records (their project memberships
+cascade), so the `RESTRICT` business-record keys never apply; if one ever did, the transactional `User::delete()` makes
+the cleanup fail loudly with nothing stripped.
+
 ## E2E ticket cleanup
 
 Tickets have no delete route, so the suite's tickets are removed by a local/testing-only command

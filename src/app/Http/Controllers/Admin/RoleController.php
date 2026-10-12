@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccessGrants;
 use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
@@ -10,6 +11,8 @@ use Spatie\Permission\Models\Role;
 class RoleController extends Controller
 {
     private const BUILT_IN = ['operator', 'user'];
+
+    public function __construct(private readonly AccessGrants $grants) {}
 
     public function index()
     {
@@ -68,8 +71,9 @@ class RoleController extends Controller
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
-        // Built-in role names cannot be changed; sync permissions still allowed
-        $role->syncPermissions($validated['permissions'] ?? []);
+        // Built-in role names cannot be changed; sync permissions still allowed. Release 0.9 (H3): refused if it
+        // would remove the last active account administrator's users.view or users.manage.
+        $this->grants->syncRolePermissions($role, $validated['permissions'] ?? []);
 
         activity()->causedBy(auth()->user())
             ->performedOn($role)
@@ -85,14 +89,13 @@ class RoleController extends Controller
             return back()->withErrors(['role' => "The \"{$role->name}\" role is built-in and cannot be deleted."]);
         }
 
-        if ($role->users()->count() > 0) {
-            return back()->withErrors(['role' => "Cannot delete \"{$role->name}\" — it is assigned to {$role->users()->count()} user(s). Reassign them first."]);
+        // Release 0.9 (H3): the "no holders" check and the delete are one guarded step (AccessGrants).
+        $assigned = $this->grants->deleteUnassignedRole($role, fn () => activity()->causedBy(auth()->user())
+            ->log("deleted role \"{$role->name}\""));
+
+        if ($assigned > 0) {
+            return back()->withErrors(['role' => "Cannot delete \"{$role->name}\" — it is assigned to {$assigned} user(s). Reassign them first."]);
         }
-
-        activity()->causedBy(auth()->user())
-            ->log("deleted role \"{$role->name}\"");
-
-        $role->delete();
 
         return redirect()->route('roles.index')
             ->with('status', "Role \"{$role->name}\" deleted.");

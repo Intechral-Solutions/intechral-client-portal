@@ -99,6 +99,13 @@ Any number of custom roles can be created. Custom roles:
 - Can be assigned to any user
 - Can be deleted only if no users are currently assigned to them
 
+## Last Active Account Administrator (Release 0.9, H3)
+
+At least one **active** (not suspended) user must always hold both `users.view` and `users.manage`, directly or
+through a role. Changing a user's roles, changing a role's permissions, deleting a role and suspending a user are each
+refused when they would leave none, including under concurrent changes. See
+[Account Lifecycle](./account-lifecycle.md#last-active-account-administrator).
+
 ## Permission Resolution
 
 A user's effective permissions are the **union** of all permissions from all assigned roles:

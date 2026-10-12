@@ -50,8 +50,11 @@ export type ProjectMemberRef = {
     isOwner: boolean;
 };
 
-/** The administrator-only user directory for the membership editor. */
-export type MemberCandidate = { id: number; name: string; email: string };
+/**
+ * The administrator-only user directory for the membership editor. `suspended` (Release 0.9, H3) marks
+ * an existing member whose account is suspended: kept in their row, never offered as a new member.
+ */
+export type MemberCandidate = { id: number; name: string; email: string; suspended?: true };
 
 /** One row on the milestones page (ProjectMilestonePresenter::item). */
 export type MilestoneItem = {
@@ -106,6 +109,12 @@ export type BoardColumn = {
 /** A minimal user reference: id and display name only, never an email (D2/A3 minimisation). */
 export type UserRef = { id: number; name: string };
 
+/**
+ * A project member as offered to a manager for assignment. `suspended` (Release 0.9, H3) marks an account
+ * that keeps its existing assignments but is never offered as a new choice.
+ */
+export type MemberChoice = UserRef & { suspended?: true };
+
 /** A minimal milestone reference, as shown on a task. */
 export type MilestoneRef = { id: number; name: string };
 
@@ -156,7 +165,7 @@ export type TaskCommentData = {
 /** Options for the manager-only edit form; present only when `abilities.manage` is true. */
 export type TaskEditOptions = {
     /** Project members only (A3); the current assignee is added separately if departed. */
-    members: UserRef[];
+    members: MemberChoice[];
     milestones: MilestoneRef[];
     priorities: { value: TaskPriority; label: string }[];
 };

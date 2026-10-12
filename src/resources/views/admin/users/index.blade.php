@@ -46,6 +46,7 @@
                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Name</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Email</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Roles</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Status</th>
                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
@@ -65,13 +66,20 @@
                             @endforeach
                         </div>
                     </td>
+                    <td class="px-6 py-4 text-sm">
+                        @if ($user->isSuspended())
+                        <x-ui.status tone="danger">Suspended</x-ui.status>
+                        @else
+                        <x-ui.status tone="success">Active</x-ui.status>
+                        @endif
+                    </td>
                     <td class="px-6 py-4 text-right text-sm">
                         <x-ui.link :href="route('users.show', $user)" class="font-medium">View</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="4" class="px-6 py-10 text-center text-sm text-text-secondary">
+                    <td colspan="5" class="px-6 py-10 text-center text-sm text-text-secondary">
                         No users found{{ request('search') ? ' matching "' . e(request('search')) . '"' : '' }}.
                     </td>
                 </tr>

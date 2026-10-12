@@ -13,7 +13,10 @@ class TicketController extends Controller
 {
     public function index(Request $request)
     {
+        // The assignee FILTER lists every holder, suspended ones included, because it searches existing assignments;
+        // the bulk "Assign to" choices are active holders only (Release 0.9, H3).
         $operators = User::permission('tickets.assign')->orderBy('name')->get();
+        $assignableOperators = $operators->reject(fn (User $operator) => $operator->isSuspended())->values();
         $includeInternal = $request->user()->can('viewInternal', Ticket::class);
 
         $tickets = Ticket::with(['user', 'assignee'])
@@ -30,7 +33,7 @@ class TicketController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        return view('operator.tickets.index', compact('tickets', 'operators'));
+        return view('operator.tickets.index', compact('tickets', 'operators', 'assignableOperators'));
     }
 
     public function show(Ticket $ticket, TicketService $service)
@@ -46,7 +49,7 @@ class TicketController extends Controller
             'replies.attachments',
         ]);
 
-        $operators = User::permission('tickets.assign')->orderBy('name')->get();
+        $operators = User::permission('tickets.assign')->active()->orderBy('name')->get();
         $categories = UserTicketController::CATEGORIES;
 
         return view('operator.tickets.show', compact('ticket', 'operators', 'categories'));

@@ -35,6 +35,12 @@ const REVIEWED_DELETE_CALLS = [
     // read finds any linked task or time entry (tasks.ticket_id is nullOnDelete, so that check is all that keeps
     // the delete from detaching one). The call is a model delete of that locked ticket, not a query-builder delete.
     'Console/Commands/CleanupE2eTickets.php' => ['$ticket->delete();'],
+    // Release 0.9 R0.9-1C (finding L1): User::delete() wraps the model's own delete in a transaction, so a delete the
+    // RESTRICT keys refuse rolls back the permission library's role/permission detach. It deletes a USER row, never a
+    // task or project row: tasks.created_by and projects.created_by are RESTRICT (the delete is refused), assignee
+    // pointers are SET NULL, and only membership and credential rows cascade. The file is task-aware only because
+    // User declares its `projects()` relation.
+    'Models/User.php' => ['return $this->getConnection()->transaction(fn () => parent::delete());'],
 ];
 
 /**

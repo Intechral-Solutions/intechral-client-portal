@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class InvoiceController extends Controller
@@ -35,7 +36,7 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
-        $clients = User::orderBy('name')->get(['id', 'name', 'email']);
+        $clients = User::active()->orderBy('name')->get(['id', 'name', 'email']);
         $projects = Project::whereIn('status', ['active', 'on_hold'])->orderBy('name')->get(['id', 'name']);
 
         return view('billing.invoices.create', compact('clients', 'projects'));
@@ -46,7 +47,7 @@ class InvoiceController extends Controller
         $this->authorize('create', Invoice::class);
 
         $data = $request->validate([
-            'client_id' => 'required|exists:users,id',
+            'client_id' => ['required', Rule::exists('users', 'id')->whereNull('disabled_at')],
             'project_id' => 'nullable|exists:projects,id',
             'issued_at' => 'required|date',
             'due_at' => 'required|date|after_or_equal:issued_at',
@@ -78,7 +79,9 @@ class InvoiceController extends Controller
     {
         $this->authorize('update', $invoice);
 
-        $clients = User::orderBy('name')->get(['id', 'name', 'email']);
+        // Active accounts, plus the invoice's current client even if suspended (Release 0.9, H3).
+        $clients = User::where(fn ($query) => $query->whereNull('disabled_at')->orWhere('id', $invoice->client_id))
+            ->orderBy('name')->get(['id', 'name', 'email']);
         $projects = Project::whereIn('status', ['active', 'on_hold'])->orderBy('name')->get(['id', 'name']);
         $invoice->load('items');
 
@@ -89,8 +92,11 @@ class InvoiceController extends Controller
     {
         $this->authorize('update', $invoice);
 
+        // A new client must be an active account; the unchanged client may be suspended (Release 0.9, H3).
         $data = $request->validate([
-            'client_id' => 'required|exists:users,id',
+            'client_id' => ['required', Rule::exists('users', 'id')->where(
+                fn ($query) => $query->where(fn ($query) => $query->whereNull('disabled_at')->orWhere('id', $invoice->client_id))
+            )],
             'project_id' => 'nullable|exists:projects,id',
             'issued_at' => 'required|date',
             'due_at' => 'required|date|after_or_equal:issued_at',

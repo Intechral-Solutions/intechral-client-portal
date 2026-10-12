@@ -133,6 +133,10 @@
                             {{ $op->name }}
                         </option>
                         @endforeach
+                        {{-- Release 0.9 (H3): a suspended assignee is not a choice, but the current value still shows. --}}
+                        @if ($ticket->assignee?->isSuspended())
+                        <option value="{{ $ticket->assignee_id }}" selected>{{ $ticket->assignee->name }} (suspended)</option>
+                        @endif
                     </x-ui.select>
                     <x-ui.field-error for="assignee_id" />
                     <x-ui.button type="submit" variant="secondary" class="w-full">Update Assignee</x-ui.button>

@@ -1,4 +1,4 @@
-import type { UserRef } from '@/types/projects';
+import type { MemberChoice, UserRef } from '@/types/projects';
 import type { TaskAssigneeOptions, TaskRow } from '@/types/tasks';
 
 /** One entry of an assignee menu. `current` marks the stored holder who is not a new candidate. */
@@ -26,21 +26,23 @@ export function standaloneChoices(self: UserRef, holder: UserRef | null): Assign
 /**
  * A board task: the members the server listed for its project. A departed current holder is shown as the
  * checked current value even when the server listed no members at all (a project with none left); they
- * are the stored value only, never a new candidate.
+ * are the stored value only, never a new candidate. A member flagged `suspended` (Release 0.9, H3) is
+ * likewise never a new candidate, and is shown only as the current holder, labelled as suspended.
  */
 export function boardChoices(
-    members: readonly UserRef[],
+    members: readonly MemberChoice[],
     holder: UserRef | null,
 ): AssigneeChoice[] {
-    const choices: AssigneeChoice[] = members.map((member) => ({
-        id: member.id,
-        label: member.name,
-    }));
+    const choices: AssigneeChoice[] = members
+        .filter((member) => !member.suspended)
+        .map((member) => ({ id: member.id, label: member.name }));
 
     if (holder && !choices.some((choice) => choice.id === holder.id)) {
+        const suspended = members.some((member) => member.id === holder.id && member.suspended);
+
         choices.push({
             id: holder.id,
-            label: `${holder.name} (no longer a project member)`,
+            label: `${holder.name} (${suspended ? 'suspended' : 'no longer a project member'})`,
             current: true,
         });
     }
