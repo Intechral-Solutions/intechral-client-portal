@@ -11,6 +11,7 @@ use App\Services\ProjectService;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CommittedUsers;
 
 require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
 
@@ -88,7 +89,7 @@ function raceWorld(): array
 function cleanUpRaceWorld(User $creator, Project $project): void
 {
     Project::whereKey($project->id)->delete();   // cascades columns, members and tasks
-    User::whereKey($creator->id)->delete();
+    CommittedUsers::delete($creator->id);
     DB::purge('task_query_race');
 }
 

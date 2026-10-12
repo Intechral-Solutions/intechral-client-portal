@@ -146,16 +146,7 @@ final class TargetGuard
      */
     public static function assert(RehearsalTarget $target): array
     {
-        $target->register();
-
-        $config = (array) config('database.connections.'.$target->connectionName());
-        $violations = self::configViolations(
-            $target,
-            $config,
-            app()->environment(),
-            (string) config('app.env'),
-            (string) config('database.connections.mysql.database'),
-        );
+        [$config, $violations] = self::configuration($target);
 
         $report = [
             'role' => $target->role,
@@ -179,6 +170,37 @@ final class TargetGuard
         }
 
         return $report;
+    }
+
+    /**
+     * Refuse on the configuration alone, without opening a connection. Used before the rehearsal lock is
+     * taken, so no connection is ever made to a target the configuration has already ruled out.
+     *
+     * @throws UnsafeRehearsalTarget
+     */
+    public static function assertConfiguration(RehearsalTarget $target): void
+    {
+        [, $violations] = self::configuration($target);
+
+        if ($violations !== []) {
+            throw new UnsafeRehearsalTarget($violations);
+        }
+    }
+
+    /** @return array{0: array<string, mixed>, 1: list<string>} the registered connection config and its violations */
+    private static function configuration(RehearsalTarget $target): array
+    {
+        $target->register();
+
+        $config = (array) config('database.connections.'.$target->connectionName());
+
+        return [$config, self::configViolations(
+            $target,
+            $config,
+            app()->environment(),
+            (string) config('app.env'),
+            (string) config('database.connections.mysql.database'),
+        )];
     }
 
     /**

@@ -102,7 +102,9 @@ final class RehearsalFiles
         self::assertSafe($path, $kind);
 
         if (is_dir($path)) {
-            File::deleteDirectory($path, preserve: true);
+            if (! self::clear($path)) {
+                throw new RuntimeException('Could not empty '.self::display($path).'; remove what remains by hand (check its permissions).');
+            }
         } else {
             File::ensureDirectoryExists($path, 0700);
         }
@@ -148,9 +150,48 @@ final class RehearsalFiles
     {
         self::assertSafe($path, $kind);
 
-        if (is_dir($path)) {
-            File::deleteDirectory($path);
+        if (! is_dir($path)) {
+            return;
         }
+
+        // A removal that did not finish is an error, never a silent success, and it leaves the marker in place:
+        // the directory stays provably the harness's own, so the cleanup can simply be run again once the cause
+        // (usually a permission) is fixed. The marker goes last.
+        if (! self::clear($path)) {
+            throw new RuntimeException('Could not fully remove '.self::display($path).'; remove what remains by hand (check its permissions), then run the cleanup again.');
+        }
+
+        @unlink($path.DIRECTORY_SEPARATOR.RehearsalTarget::MARKER_FILE);
+        @rmdir($path);
+
+        if (file_exists($path)) {
+            throw new RuntimeException('Could not fully remove '.self::display($path).'; remove what remains by hand (check its permissions), then run the cleanup again.');
+        }
+    }
+
+    /**
+     * Remove everything beneath $path except the marker. True when nothing but the marker is left. A symbolic
+     * link is removed as a link, never followed.
+     */
+    private static function clear(string $path): bool
+    {
+        $clear = true;
+
+        foreach (array_diff(scandir($path) ?: [], ['.', '..', RehearsalTarget::MARKER_FILE]) as $name) {
+            $child = $path.DIRECTORY_SEPARATOR.$name;
+
+            $clear = (is_dir($child) && ! is_link($child) ? File::deleteDirectory($child) : @unlink($child)) && $clear;
+        }
+
+        return $clear && array_diff(scandir($path) ?: [], ['.', '..', RehearsalTarget::MARKER_FILE]) === [];
+    }
+
+    /** A path as the operator knows it: relative to the application's storage directory. */
+    private static function display(string $path): string
+    {
+        $base = dirname(RehearsalTarget::baseDirectory());
+
+        return str_starts_with($path, $base) ? 'storage'.substr($path, strlen($base)) : basename($path);
     }
 
     public static function assertSafe(string $path, string $kind): void

@@ -6,7 +6,9 @@ use App\Support\Rehearsal\BaselineFixtures;
 use App\Support\Rehearsal\IntegritySnapshot;
 use App\Support\Rehearsal\MigrationSet;
 use App\Support\Rehearsal\RehearsalDatabase;
+use App\Support\Rehearsal\RehearsalLock;
 use App\Support\Rehearsal\RehearsalTarget;
+use PDO;
 
 /**
  * What the R0.9-1A rehearsal tests share. The rehearsal harness is destructive by design, so these tests
@@ -18,8 +20,10 @@ use App\Support\Rehearsal\RehearsalTarget;
  *  - candidate migrations live in a throw-away `database_path()` copy of the migrations, so the committed
  *    manifest and migrations are never edited.
  *
- * The two rehearsal databases are shared with `./dev rehearse` (see docs/testing/migration-rehearsal.md):
- * do not run both at once, and do not run the suite with `--parallel`.
+ * The two rehearsal databases are shared with `./dev rehearse` (see docs/testing/migration-rehearsal.md).
+ * The process holds the rehearsal database lock ({@see RehearsalLock}) from its first rehearsal test until it
+ * ends, so a concurrent `./dev rehearse`, a second Pest process or a `--parallel` worker is REFUSED rather than
+ * resetting the databases underneath these tests.
  */
 final class RehearsalSandbox
 {
@@ -40,12 +44,55 @@ final class RehearsalSandbox
         return self::$root;
     }
 
-    /** Point the booted application's storage at the sandbox. Call from beforeEach. */
+    /**
+     * Point the booted application's storage at the sandbox and make sure this process holds the rehearsal
+     * lock. Call from beforeEach.
+     */
     public static function use(): void
     {
         $storage = self::root().DIRECTORY_SEPARATOR.'storage';
         is_dir($storage) || mkdir($storage, 0700);
         app()->useStoragePath($storage);
+
+        if (! RehearsalLock::held()) {
+            RehearsalLock::acquire();
+            register_shutdown_function(static fn () => RehearsalLock::releaseAll());
+        }
+    }
+
+    /**
+     * Run $work while ANOTHER database session (standing in for another process) holds the rehearsal lock,
+     * then give this process its lock back. Returns what $work returns.
+     */
+    public static function withLockHeldElsewhere(callable $work): mixed
+    {
+        RehearsalLock::releaseAll();
+        $other = self::session();
+        $got = (int) $other->query("select get_lock('".RehearsalLock::NAME."', 0)")->fetchColumn();
+
+        try {
+            if ($got !== 1) {
+                throw new \RuntimeException('Another rehearsal (or test process) already holds the rehearsal lock; stop it and retry.');
+            }
+
+            return $work();
+        } finally {
+            $other = null;   // closing the session releases its lock
+            self::use();
+        }
+    }
+
+    /** A separate database session on the primary rehearsal database, built from the harness's fixed configuration. */
+    public static function session(): PDO
+    {
+        $c = RehearsalTarget::primary()->connectionConfig();
+
+        return new PDO(
+            "mysql:host={$c['host']};port={$c['port']};dbname={$c['database']}",
+            (string) $c['username'],
+            (string) $c['password'],
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
     }
 
     /** The sandbox's rehearsal directory (what `storage_path('rehearsal')` is while the sandbox is in use). */
@@ -55,9 +102,11 @@ final class RehearsalSandbox
     }
 
     /**
-     * Make a throw-away database path holding a link to every committed migration plus the given
-     * candidates, and a candidate manifest naming them. The committed migrations are linked, not copied:
-     * several are named classes, and the same class loaded from a second path would be a fatal redeclaration. Returns the path; pass it to `useDatabasePath`.
+     * Make a throw-away database path holding a link to every PINNED BASELINE migration plus the given
+     * candidates, the pinned baseline manifest, and a candidate manifest naming only the given candidates. The
+     * committed migrations are linked, not copied: several are named classes, and the same class loaded from a
+     * second path would be a fatal redeclaration. The committed candidates are deliberately not linked, so a
+     * test's set contains exactly what the test declares. Returns the path; pass it to `useDatabasePath`.
      *
      * @param  array<string, array{up: string, schema?: list<string>, data?: list<string>, sha256?: string}>  $candidates
      *                                                                                                                     name => migration body (PHP statements for up()), declared changes, and (to simulate a file that changed after review) an overriding hash
@@ -68,9 +117,11 @@ final class RehearsalSandbox
         mkdir($path.'/migrations', 0700, true);
         mkdir($path.'/rehearsal', 0700, true);
 
-        foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
-            symlink($file, $path.'/migrations/'.basename($file));
+        $baseline = self::pinnedBaseline();
+        foreach (array_keys($baseline) as $name) {
+            symlink(base_path('database/migrations/'.$name.'.php'), $path.'/migrations/'.$name.'.php');
         }
+        file_put_contents($path.'/rehearsal/baseline.php', "<?php\n\nreturn ".var_export($baseline, true).";\n");
 
         $manifest = [];
         foreach ($candidates as $name => $candidate) {
@@ -92,12 +143,18 @@ final class RehearsalSandbox
         return $path;
     }
 
+    /** @return array<string, string> the committed baseline pin, read from the repository (not from a sandbox) */
+    public static function pinnedBaseline(): array
+    {
+        return require base_path('database/rehearsal/baseline.php');
+    }
+
     /** A MigrationSet over a sandbox database path. */
     public static function migrationSet(array $candidates = []): MigrationSet
     {
         $path = self::databasePath($candidates);
 
-        return new MigrationSet($path.'/migrations', require $path.'/rehearsal/candidates.php');
+        return new MigrationSet($path.'/migrations', require $path.'/rehearsal/candidates.php', require $path.'/rehearsal/baseline.php');
     }
 
     /**

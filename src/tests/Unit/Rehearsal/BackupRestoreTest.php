@@ -295,4 +295,23 @@ describe('cleanup boundaries', function () {
 
         File::deleteDirectory($this->backups);
     });
+
+    it('reports a removal it could not finish as an error, not as a success', function () {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $this->markTestSkipped('A root user can remove a read-only directory, so the failure cannot be provoked.');
+        }
+
+        RehearsalFiles::reset($this->backups, RehearsalFiles::BACKUPS);
+        mkdir($this->backups.'/locked', 0700);
+        file_put_contents($this->backups.'/locked/keep.txt', 'x');
+        chmod($this->backups.'/locked/keep.txt', 0600);
+        chmod($this->backups.'/locked', 0500);
+
+        try {
+            expect(fn () => RehearsalFiles::remove($this->backups, RehearsalFiles::BACKUPS))->toThrow(RuntimeException::class, 'Could not fully remove storage/rehearsal/backups')
+                ->and(fn () => RehearsalFiles::reset($this->backups, RehearsalFiles::BACKUPS))->toThrow(RuntimeException::class, 'Could not empty storage/rehearsal/backups');
+        } finally {
+            chmod($this->backups.'/locked', 0700);
+        }
+    });
 });

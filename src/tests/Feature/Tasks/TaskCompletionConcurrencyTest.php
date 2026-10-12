@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\ProjectService;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedUsers;
 
 require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
 
@@ -103,7 +104,7 @@ it('keeps every column dense and lossless while Complete, Reopen and moves race'
             ->and(Task::whereKey($ids)->pluck('status')->unique()->values()->all())->toBe(['todo']);   // INV-2
     } finally {
         Project::whereKey($project->id)->delete();
-        User::whereKey($creator->id)->delete();
+        CommittedUsers::delete($creator->id);
     }
 });
 
@@ -128,7 +129,7 @@ it('leaves a task that is completed by many racing requests exactly once at the 
         expect(columnOrder($done))->toBe([$already[0]->id, $already[1]->id, $task->id]);
     } finally {
         Project::whereKey($project->id)->delete();
-        User::whereKey($creator->id)->delete();
+        CommittedUsers::delete($creator->id);
     }
 });
 
@@ -175,6 +176,6 @@ it('never reorders a task that is already Done while other tasks are being appen
             ->and(columnOrder($columns[1]))->toBe([]);
     } finally {
         Project::whereKey($project->id)->delete();
-        User::whereKey($creator->id)->delete();
+        CommittedUsers::delete($creator->id);
     }
 });

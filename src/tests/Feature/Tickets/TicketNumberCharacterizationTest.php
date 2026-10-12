@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedUsers;
 
 require_once __DIR__.'/TicketTestHelpers.php';
 
@@ -212,7 +213,7 @@ it('TARGET H8: parallel creates on MariaDB all succeed with unique id-derived nu
             ->and($ok->map(fn ($o) => substr($o, 3))->unique())->toHaveCount($ok->count())
             ->and($tickets->every(fn ($t) => $t->ticket_number === ticketExpectedNumber($t->id)))->toBeTrue();
     } finally {
-        User::whereKey($user->id)->delete();
+        CommittedUsers::delete($user->id);
     }
 
     expect(Ticket::where('user_id', $user->id)->exists())->toBeFalse();

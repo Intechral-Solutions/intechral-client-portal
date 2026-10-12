@@ -26,6 +26,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedUsers;
 
 /**
  * Launch $workers processes that all start at the same instant and run $mode against the ticket
@@ -91,7 +92,7 @@ it('moves a waiting ticket to in_progress exactly once when customer replies rac
             ->and($history->map(fn ($h) => [$h->user_id, $h->old_status, $h->new_status])->all())
             ->toBe([[$customer->id, 'pending_user', 'in_progress']]);
     } finally {
-        User::whereKey($customer->id)->delete();
+        CommittedUsers::delete($customer->id);
     }
 
     expect(Ticket::whereKey($ticket->id)->exists())->toBeFalse();
@@ -118,7 +119,7 @@ it('lets exactly one of several racing operators make the same transition, recor
             ->and($history->map(fn ($h) => [$h->user_id, $h->old_status, $h->new_status])->all())
             ->toBe([[$operator->id, 'open', 'resolved']]);
     } finally {
-        User::whereKey([$requester->id, $operator->id])->delete();
+        CommittedUsers::delete([$requester->id, $operator->id]);
     }
 
     expect(Ticket::whereKey($ticket->id)->exists())->toBeFalse();

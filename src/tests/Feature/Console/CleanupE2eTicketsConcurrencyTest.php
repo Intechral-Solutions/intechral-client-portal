@@ -29,6 +29,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\CommittedUsers;
 
 require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 
@@ -99,7 +100,7 @@ it('A. refuses a ticket whose time entry was committed before the command took i
             ->and(DB::table('time_entries')->where('id', $entryId)->value('ticket_id'))->toBe($ticket->id)
             ->and(Storage::disk('local')->exists($path))->toBeTrue();
     } finally {
-        User::query()->whereKey($owner->id)->delete();
+        CommittedUsers::delete($owner->id);
     }
 
     expect(Ticket::query()->whereKey($ticket->id)->exists())->toBeFalse()
@@ -171,7 +172,7 @@ it('B. cannot be raced after the lock: a time entry or task linked meanwhile wai
             ->and(DB::table('tasks')->where('id', $task->id)->value('ticket_id'))->toBeNull();
     } finally {
         Task::query()->whereKey($task->id)->delete();
-        User::query()->whereKey($owner->id)->delete();
+        CommittedUsers::delete($owner->id);
     }
 
     expect(DB::table('time_entries')->where('user_id', $owner->id)->exists())->toBeFalse();

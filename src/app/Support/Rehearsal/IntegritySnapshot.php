@@ -12,7 +12,8 @@ use Throwable;
  *
  * It holds six things, and is comparable with another snapshot of the same data:
  *
- *  - schema: tables, columns, primary and unique keys, and every foreign key with its delete rule;
+ *  - schema: tables, columns, column and table collations, primary and unique keys, non-unique indexes, and
+ *    every foreign key with its ON DELETE and ON UPDATE rules;
  *  - rows: a count per table and, per table, a SHA-1 of each row over the columns it had at baseline, keyed
  *    by primary key. Only hashes are stored, never values, so a report carries no personal data. A
  *    candidate migration that adds a column does not disturb the hashes (the baseline columns are pinned);
@@ -146,17 +147,34 @@ final class IntegritySnapshot
         $marker = RehearsalTarget::MARKER_TABLE;
 
         $columns = [];
+        $collations = [];
         foreach ($this->db->select(
-            'select table_name as t, column_name as c, column_type as ty, is_nullable as n, column_default as d, extra as e
+            'select table_name as t, column_name as c, column_type as ty, is_nullable as n, column_default as d, extra as e,
+                    character_set_name as cs, collation_name as co
              from information_schema.columns where table_schema = ? and table_name <> ? order by table_name, ordinal_position',
             [$db, $marker]
         ) as $row) {
             $columns[$row->t][$row->c] = $row->ty.'|'.($row->n === 'YES' ? 'null' : 'not null').'|'.($row->d ?? '-').'|'.$row->e;
+
+            // Kept apart from the column signature so a collation change is reported as itself, and declared as itself.
+            if ($row->co !== null) {
+                $collations[$row->t][$row->c] = $row->cs.'/'.$row->co;
+            }
+        }
+
+        $tableCollations = [];
+        foreach ($this->db->select(
+            "select table_name as t, table_collation as tc from information_schema.tables
+             where table_schema = ? and table_type = 'BASE TABLE' and table_name <> ? order by table_name",
+            [$db, $marker]
+        ) as $row) {
+            $tableCollations[$row->t] = (string) $row->tc;
         }
 
         $primary = [];
         $unique = [];
         $keys = [];
+        $plain = [];
         foreach ($this->db->select(
             'select table_name as t, index_name as i, non_unique as nu, column_name as c from information_schema.statistics
              where table_schema = ? and table_name <> ? order by table_name, index_name, seq_in_index',
@@ -166,6 +184,8 @@ final class IntegritySnapshot
                 $primary[$row->t][] = $row->c;
             } elseif ((int) $row->nu === 0) {
                 $keys[$row->t][$row->i][] = $row->c;
+            } else {
+                $plain[$row->t][$row->i][] = $row->c;
             }
         }
         foreach ($keys as $table => $indexes) {
@@ -175,10 +195,21 @@ final class IntegritySnapshot
         }
         sort($unique);
 
+        // Non-unique indexes by table and column list, not by name: a rename is not a change, a lost or added
+        // index is. Foreign-key backing indexes are included, so a migration that drops one is seen.
+        $indexes = [];
+        foreach ($plain as $table => $byName) {
+            foreach ($byName as $cols) {
+                $indexes[] = $table.'('.implode(',', $cols).')';
+            }
+        }
+        $indexes = array_values(array_unique($indexes));
+        sort($indexes);
+
         $groups = [];
         foreach ($this->db->select(
             'select k.table_name as t, k.constraint_name as cn, k.column_name as c, k.referenced_table_name as pt,
-                    k.referenced_column_name as pc, r.delete_rule as dr
+                    k.referenced_column_name as pc, r.delete_rule as dr, r.update_rule as ur
              from information_schema.key_column_usage k
              join information_schema.referential_constraints r
                on r.constraint_schema = k.constraint_schema and r.constraint_name = k.constraint_name and r.table_name = k.table_name
@@ -189,6 +220,7 @@ final class IntegritySnapshot
             $groups[$row->t.'|'.$row->cn]['t'] = $row->t;
             $groups[$row->t.'|'.$row->cn]['pt'] = $row->pt;
             $groups[$row->t.'|'.$row->cn]['rule'] = $row->dr;
+            $groups[$row->t.'|'.$row->cn]['update'] = $row->ur;
             $groups[$row->t.'|'.$row->cn]['c'][] = $row->c;
             $groups[$row->t.'|'.$row->cn]['pc'][] = $row->pc;
         }
@@ -196,7 +228,7 @@ final class IntegritySnapshot
         $foreignKeys = [];
         foreach ($groups as $g) {
             $foreignKeys[$g['t'].'.'.implode(',', $g['c']).'->'.$g['pt'].'.'.implode(',', $g['pc'])] = [
-                'rule' => $g['rule'], 'child' => $g['t'], 'columns' => $g['c'], 'parent' => $g['pt'], 'parent_columns' => $g['pc'],
+                'rule' => $g['rule'], 'update_rule' => $g['update'], 'child' => $g['t'], 'columns' => $g['c'], 'parent' => $g['pt'], 'parent_columns' => $g['pc'],
             ];
         }
         ksort($foreignKeys);
@@ -206,6 +238,9 @@ final class IntegritySnapshot
             'columns' => $columns,
             'primary' => $primary,
             'unique' => $unique,
+            'indexes' => $indexes,
+            'collations' => $collations,
+            'table_collations' => $tableCollations,
             'foreign_keys' => $foreignKeys,
         ];
     }

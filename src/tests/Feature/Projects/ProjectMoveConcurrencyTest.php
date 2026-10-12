@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\ProjectService;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedUsers;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
 
@@ -79,7 +80,7 @@ function committedProject(int $perColumn): array
 
     return [$creator, $project, $a, $b, $tasks, function () use ($project, $creator) {
         Project::whereKey($project->id)->delete();
-        User::whereKey($creator->id)->delete();
+        CommittedUsers::delete($creator->id);
     }];
 }
 

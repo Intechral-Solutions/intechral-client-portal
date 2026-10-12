@@ -1,6 +1,6 @@
 # Release 0.9: Scope and Architecture Design Gate (R0.9-0)
 
-**Status:** **Design gate closed (2026-10-10)** by owner ratification of decisions H1 to H4. The gate itself implemented nothing (R0.9-1A, the first package, is recorded in [§11](#11-work-packages-and-parallel-hosting-discovery)). This document adds no code, migration, test, release flag or deployment infrastructure.
+**Status:** **Design gate closed (2026-10-10)** by owner ratification of decisions H1 to H4. The gate itself implemented nothing (R0.9-1A and R0.9-1B, the packages implemented since, are recorded in [§11](#11-work-packages-and-parallel-hosting-discovery)). This document adds no code, migration, test, release flag or deployment infrastructure.
 **Reconciled (2026-10-11)** with the EPIC-017 WP2 closure ([Amendment 2](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#amendment-2-wp2-customer-helpdesk-in-react-pr-2)); see [§2.1](#21-epic-017-sequencing-dispositions-owner-directed-2026-10-11).
 **Class:** Release scope and data architecture. It is a planning record, not an epic.
 **Inputs:** the Release 0.9 readiness assessment, the R0.9-0 scope and architecture gate, and the independent data architecture review of 2026-10-10 (Opus 5.5).
@@ -234,7 +234,16 @@ Neither rewrite is designed or ratified here. These are the constraints Release 
 
 ## 11. Work packages and parallel hosting discovery
 
-**Status: Recommended sequence, not ratified.** Boundaries are proposed here and are finalized in the planning of each package. **R0.9-1A is implemented** (the migration rehearsal harness, [documented here](../testing/migration-rehearsal.md)) and its independent review (Opus 5.5) concluded **SAFE TO COMMIT**, with follow-ups recorded in the [rehearsal documentation](../testing/migration-rehearsal.md#review-follow-ups). **Hosted CI has not yet verified it.** **R0.9-1B has not started.**
+**Status: Recommended sequence, not ratified.** Boundaries are proposed here and are finalized in the planning of each package. **R0.9-1A is implemented** (the migration rehearsal harness, [documented here](../testing/migration-rehearsal.md)) and its independent review (Opus 5.5) concluded **SAFE TO COMMIT**, with follow-ups recorded in the [rehearsal documentation](../testing/migration-rehearsal.md#review-follow-ups). **Hosted CI has not yet verified it.**
+
+**R0.9-1B is implemented** ([documented here](../testing/migration-rehearsal.md#release-09-preservation-migrations-r09-1b)): M1 adds the nullable `users.disabled_at` (schema only, no enforcement); M2 changes the 13 H1 user business-record foreign keys of [§5.1](#51-h1-business-record-preservation) from `ON DELETE CASCADE` to `RESTRICT`; M3 changes `project_company.crm_company_id` from `CASCADE` to `RESTRICT` (H2). Constraint names, `ON UPDATE` rules and nullability are unchanged. The populated migration rehearsal passed, including the backup and restore round trip, and the rehearsal-harness follow-ups J-1 to J-4 were resolved. Its independent review (Opus 5.5) concluded **SAFE TO COMMIT**. **Hosted CI has not yet verified it**, and the regular development database had not been migrated at the time of that review. Not part of R0.9-1B despite the table below: H5 was not ratified and is not included, and the ticket-number high-water mark ([§7.3](#73-ticket-number-continuity)) is **still undesigned**. **R0.9-1C has not started.**
+
+**R0.9-1B review follow-ups** (recorded, not implemented):
+
+- **L1, for R0.9-1C.** An attempted Eloquent user deletion can strip the user's roles and direct permissions before the database refuses the `DELETE` (the permission library detaches them in a `deleting` hook, outside any transaction). No application path deletes a user today. The account lifecycle must make offboarding non-destructive, prevent this partial mutation, and add regression coverage for it.
+- **L2, for R0.9-1D.** Deleting a CRM company that projects still reference now ends in a database error (HTTP 500); the records and associations are intact. Add a safe business-level refusal with a test. This is needed whatever is decided for H6, which is not ratified.
+- **L3, rehearsal harness.** The general schema snapshot does not detect foreign-key or index name changes, or a duplicate index on the same columns. For M2 and M3 their own post-migration verification and tests cover it.
+- **J-5, before any data-transforming migration.** A declared data transformation must not be able to conceal unexpected row loss.
 
 **Execution mode (owner-directed, [E6](#21-epic-017-sequencing-dispositions-owner-directed-2026-10-11)).** Development runs as one sequential track. The "Depends on" column and the remark below about 1D show what the dependencies *permit*, not how the work is run: unless the owner says otherwise, the packages are done in turn, on the working branch.
 

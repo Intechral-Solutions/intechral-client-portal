@@ -8,6 +8,7 @@ use App\Support\Rehearsal\RehearsalTarget;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Tests\Support\RehearsalSandbox;
 
@@ -146,7 +147,7 @@ it('refuses a candidate that is not approved with exit 2, before changing anythi
     [$exit, $output] = artisan('rehearsal:run', ['--json' => true] + $options);
 
     expect($exit)->toBe(2)
-        ->and($output)->toContain('Candidate selection refused')
+        ->and($output)->toContain('Migration set refused', 'Nothing was changed')
         ->and(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline)
         ->and(backupSets())->toBe([]);
 })->with([
@@ -180,24 +181,33 @@ it('refuses to run, with exit 2 and no change, in a production environment', fun
     expect(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline);
 });
 
-it('refuses to run while another rehearsal holds the lock, and changes nothing', function () {
+it('refuses to run or clean while another database session holds the rehearsal lock, and changes nothing', function () {
     $baseline = IntegritySnapshot::hash(RehearsalSandbox::baseline());
-    File::ensureDirectoryExists(RehearsalTarget::baseDirectory(), 0700);
-    $held = fopen(RehearsalTarget::baseDirectory().'/.lock', 'cb');
-    flock($held, LOCK_EX);
 
-    try {
+    RehearsalSandbox::withLockHeldElsewhere(function () {
         [$exit, , $output] = rehearse(['--no-restore' => true]);
+        [$cleanExit, $cleanOutput] = artisan('rehearsal:clean');
 
         expect($exit)->toBe(2)
-            ->and($output)->toContain('another rehearsal is running')
-            ->and(Artisan::call('rehearsal:clean'))->toBe(2);
-    } finally {
-        flock($held, LOCK_UN);
-        fclose($held);
-    }
+            ->and($output)->toContain('another rehearsal is running', 'Nothing was changed')
+            ->and($cleanExit)->toBe(2)
+            ->and($cleanOutput)->toContain('another rehearsal is running', 'Nothing was changed');
+    });
 
     expect(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline);
+});
+
+it('refuses, with exit 2 and no change, a migration file that is neither pinned nor an approved candidate', function () {
+    $baseline = IntegritySnapshot::hash(RehearsalSandbox::baseline());
+    $path = RehearsalSandbox::databasePath();
+    file_put_contents($path.'/migrations/2026_12_31_000009_surprise_migration.php', '<?php return null;');
+    $this->app->useDatabasePath($path);
+
+    [$exit, , $output] = rehearse(['--no-restore' => true]);
+
+    expect($exit)->toBe(2)
+        ->and($output)->toContain('undeclared migration file "2026_12_31_000009_surprise_migration"', 'Nothing was changed')
+        ->and(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline);
 });
 
 describe('candidate migrations', function () {
@@ -211,7 +221,7 @@ describe('candidate migrations', function () {
             ->and($report['migration']['applied'])->toBe([PROBE])
             ->and($report['migration']['differences'])->toBe([])
             ->and($report['restore']['matches_primary'])->toBeTrue()
-            ->and($report['proves'])->toContain('The approved candidate migration(s) changed exactly the declared structure and no existing record.');
+            ->and($report['proves'])->toContain('The approved candidate migration(s) were applied to the populated baseline (after the fixtures) and changed exactly the declared structure and no existing record.');
     });
 
     it('fails, exit 1, when a declared change did not happen', function () {
@@ -241,6 +251,42 @@ describe('candidate migrations', function () {
         // The change to the row itself was declared; the broken reference it caused was not.
         expect($exit)->toBe(1)
             ->and(array_column($report['migration']['differences'], 'code'))->toContain('check.failed');
+    });
+
+    it('applies the candidate to the POPULATED baseline, after the fixtures, never to an empty schema', function () {
+        $up = "if (DB::table('users')->count() < 5 || DB::table('tickets')->count() < 5) { throw new RuntimeException('applied to an empty schema'); } "
+            ."Schema::table('task_comments', fn (Blueprint \$t) => \$t->string('rehearsal_probe')->nullable());";
+        $this->app->useDatabasePath(RehearsalSandbox::databasePath([PROBE => ['up' => $up, 'schema' => ['column+:task_comments.rehearsal_probe']]]));
+
+        [$exit, $report] = rehearse(['--candidate' => [PROBE], '--no-restore' => true]);
+
+        expect($exit)->toBe(0)
+            ->and($report['migration']['applied_after_fixtures'])->toBeTrue()
+            ->and($report['migration']['populated_before']['fixture_rows'])->toBeGreaterThan(200)
+            ->and($report['migration']['populated_before']['migrations'])->toBe(count(array_keys(RehearsalSandbox::pinnedBaseline())));
+    });
+
+    it('says which approved candidates this run did not exercise', function () {
+        $second = '2026_10_12_000002_rehearsal_probe_two';
+        $this->app->useDatabasePath(RehearsalSandbox::databasePath(addsColumn() + [$second => ['up' => '']]));
+
+        [$exit, $report] = rehearse(['--candidate' => [PROBE], '--no-restore' => true]);
+
+        expect($exit)->toBe(0)
+            ->and($report['migration']['unexercised'])->toBe([$second])
+            ->and(implode("\n", $report['proves']))->toContain('NOT exercised', $second);
+    });
+
+    it('does not claim the unexercised candidates were rehearsed when none is selected', function () {
+        $this->app->useDatabasePath(RehearsalSandbox::databasePath(addsColumn()));
+
+        [$exit, $report] = rehearse(['--no-restore' => true]);
+
+        expect($exit)->toBe(0)
+            ->and($report['migration']['applied'])->toBe([])
+            ->and($report['migration']['unexercised'])->toBe([PROBE])
+            ->and($report['proves'])->toContain('NO candidate migration was exercised. This run proves nothing about any future migration.')
+            ->and(implode("\n", $report['proves']))->toContain('NOT exercised', PROBE);
     });
 });
 
@@ -340,5 +386,68 @@ describe('failure reporting and temporary artifacts', function () {
 
         expect(Artisan::call('rehearsal:clean'))->toBe(2)
             ->and(file_get_contents($stray))->toBe('precious');
+    });
+});
+
+describe('failure classification', function () {
+    it('reports a candidate that throws as a failure after the start, exit 1, never as "nothing changed"', function () {
+        $this->app->useDatabasePath(RehearsalSandbox::databasePath([PROBE => ['up' => "throw new RuntimeException('candidate exploded');"]]));
+
+        [$exit, $output] = artisan('rehearsal:run', ['--candidate' => [PROBE], '--no-restore' => true]);
+        [, $report] = rehearse(['--candidate' => [PROBE], '--no-restore' => true]);
+
+        expect($exit)->toBe(1)
+            ->and($output)->toContain('Rehearsal stopped during "candidate migrations"', 'may be partly changed', 'candidate exploded')
+            ->and($output)->not->toContain('Nothing was changed')
+            ->and($report['ok'])->toBeFalse()
+            ->and($report['failure']['phase'])->toBe('candidate migrations')
+            ->and($report['failure']['state'])->toContain('partly changed')
+            ->and($report['baseline']['fixture_rows'])->toBeGreaterThan(200)   // what was known before the failure is still reported
+            ->and(backupSets())->toBe([]);
+    });
+
+    it('reports a guard refusal that happens after the run began (a candidate removed the marker) as a failure, exit 1', function () {
+        RehearsalSandbox::baseline();
+        $this->app->useDatabasePath(RehearsalSandbox::databasePath([PROBE => ['up' => "Schema::dropIfExists('rehearsal_marker');"]]));
+
+        try {
+            [$exit, $output] = artisan('rehearsal:run', ['--candidate' => [PROBE], '--no-restore' => true]);
+
+            expect($exit)->toBe(1)
+                ->and($output)->toContain('Rehearsal stopped during', 'UnsafeRehearsalTarget', 'may be partly changed')
+                ->and($output)->not->toContain('Nothing was changed');
+        } finally {
+            // The database is now "unidentified" (tables, no marker) and the harness will, rightly, not touch it.
+            Schema::connection(RehearsalTarget::primary()->connectionName())->dropAllTables();
+        }
+    });
+
+    it('stops a cleanup that fails part-way with exit 1, naming the step and what was already cleaned', function () {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $this->markTestSkipped('A root user can remove a read-only directory, so the failure cannot be provoked.');
+        }
+
+        RehearsalSandbox::baseline();
+        $restore = RehearsalTarget::restore();
+        $files = $restore->filesRoot();
+        RehearsalFiles::reset($files, RehearsalFiles::kindFor($restore));
+        mkdir($files.'/locked', 0700);
+        file_put_contents($files.'/locked/keep.txt', 'x');
+        chmod($files.'/locked/keep.txt', 0600);
+        chmod($files.'/locked', 0500);   // nothing inside it can be removed
+
+        try {
+            [$exit, $output] = artisan('rehearsal:clean');
+
+            expect($exit)->toBe(1)
+                ->and($output)->toContain('Cleanup stopped part-way while cleaning '.$restore->database(), 'already cleaned: '.RehearsalTarget::primary()->database(), 'Could not fully remove')
+                ->and($output)->not->toContain('Nothing was changed');
+        } finally {
+            chmod($files.'/locked', 0700);
+        }
+
+        // Once the cause is fixed, running it again finishes the job.
+        expect(Artisan::call('rehearsal:clean'))->toBe(0)
+            ->and(is_dir($files))->toBeFalse();
     });
 });

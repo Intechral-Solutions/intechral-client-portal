@@ -15,9 +15,10 @@ use InvalidArgumentException;
  * candidate migrations, comparison, and a backup/restore round trip, all inside two dedicated rehearsal
  * databases and one rehearsal file area. It never touches the development, testing or E2E database.
  *
- * Exit codes: 0 every invariant held; 1 the rehearsal ran and found a difference or a broken invariant, or
- * could not remove its own temporary backup; 2 it refused to start (unsafe target, a candidate that is not
- * approved, or another rehearsal running). A refusal changes nothing.
+ * Exit codes: 0 every invariant held; 1 the rehearsal ran and found a difference or a broken invariant, failed
+ * part-way (the report names the step; the rehearsal databases and files may be partly changed), or could not
+ * remove its own temporary backup; 2 it refused to start (an unapproved, undeclared or drifted migration, an
+ * unsafe target, or another rehearsal running). Only a refusal promises that nothing was changed.
  *
  * Temporary artifacts: the run's backup set is removed when the run passes, and kept (private) when it
  * fails or --keep-backup is given. `rehearsal:clean` removes anything kept.
@@ -37,6 +38,7 @@ class RehearsalRun extends Command
             $report = $runner->run((array) $this->option('candidate'), ! $this->option('no-restore'), (bool) $this->option('keep-backup'));
         } catch (UnsafeRehearsalTarget|InvalidArgumentException $e) {
             $this->components->error($e->getMessage());
+            $this->line('  Refused before the rehearsal started. Nothing was changed.');
 
             return 2;
         }
@@ -56,6 +58,11 @@ class RehearsalRun extends Command
     private function report(array $report): void
     {
         $this->newLine();
+        if ($report['failure'] !== null) {
+            $this->components->error("Rehearsal stopped during \"{$report['failure']['phase']}\": {$report['failure']['error']}");
+            $this->line("  {$report['failure']['state']}");
+        }
+
         foreach ($report['targets'] as $target) {
             $this->line(sprintf(
                 '  Target %-8s %s on %s:%d as %s (env %s)',
@@ -65,8 +72,15 @@ class RehearsalRun extends Command
 
         $b = $report['baseline'];
         $this->newLine();
-        $this->line("  Baseline: {$b['migrations']} migrations, {$b['fixture_rows']} fixture rows in {$b['fixture_tables']} tables, {$b['files']} private files");
-        $this->line("  Baseline snapshot: {$b['snapshot_sha256']}");
+        $this->line("  Baseline: {$b['migrations']} pinned migrations, {$b['fixture_rows']} fixture rows in {$b['fixture_tables']} tables, {$b['files']} private files");
+        if ($b['snapshot_sha256'] !== '') {
+            $this->line("  Baseline snapshot: {$b['snapshot_sha256']}");
+        }
+
+        if ($report['migration']['applied'] !== []) {
+            $p = $report['migration']['populated_before'] ?? ['fixture_rows' => 0, 'fixture_tables' => 0];
+            $this->line('  Applied to the populated baseline ('.$p['fixture_rows'].' rows in '.$p['fixture_tables'].' tables, seeded first): '.implode(', ', $report['migration']['applied']));
+        }
 
         foreach ($b['failures'] as $failure) {
             $this->components->error("Baseline integrity failure: {$failure}");

@@ -7,7 +7,8 @@ namespace App\Support\Rehearsal;
  *
  * Nothing is "probably fine". With no expectations, any difference at all is reported: a missing, added or
  * altered row, a lost or changed file, a table or column that appeared or vanished, a changed foreign-key
- * rule, a changed fact, an unexpected migration, or a check that is not zero. A candidate migration declares
+ * rule (ON DELETE or ON UPDATE), a changed index or collation, a changed fact, an unexpected migration, or a
+ * check that is not zero. A candidate migration declares
  * what it is MEANT to change (see database/rehearsal/candidates.php), and the comparison then demands an
  * exact match: a declared change that did not happen is a difference, and so is an undeclared one.
  */
@@ -152,6 +153,31 @@ final class SnapshotComparator
             if (($before['primary'][$table] ?? []) !== ($after['primary'][$table] ?? [])) {
                 $tokens[] = "primary~:{$table}";
             }
+
+            // A column's collation, reported on its own (a new column's collation is part of "column+").
+            $oldCollations = $before['collations'][$table] ?? [];
+            $newCollations = $after['collations'][$table] ?? [];
+            foreach ($oldCollations as $column => $collation) {
+                if (isset($new[$column]) && ($newCollations[$column] ?? null) !== $collation) {
+                    $tokens[] = "collation~:{$table}.{$column}";
+                }
+            }
+            foreach (array_diff_key($newCollations, $oldCollations) as $column => $_) {
+                if (isset($old[$column])) {
+                    $tokens[] = "collation~:{$table}.{$column}";
+                }
+            }
+
+            if (($before['table_collations'][$table] ?? null) !== ($after['table_collations'][$table] ?? null)) {
+                $tokens[] = "tablecollation~:{$table}";
+            }
+        }
+
+        foreach (array_diff($after['indexes'] ?? [], $before['indexes'] ?? []) as $key) {
+            $tokens[] = "index+:{$key}";
+        }
+        foreach (array_diff($before['indexes'] ?? [], $after['indexes'] ?? []) as $key) {
+            $tokens[] = "index-:{$key}";
         }
 
         foreach (array_diff($after['unique'], $before['unique']) as $key) {
@@ -161,15 +187,24 @@ final class SnapshotComparator
             $tokens[] = "unique-:{$key}";
         }
 
+        // An added or removed foreign key states both rules (ON DELETE/ON UPDATE), so neither can change unseen.
         foreach (array_diff_key($after['foreign_keys'], $before['foreign_keys']) as $key => $fk) {
-            $tokens[] = "fk+:{$key}:{$fk['rule']}";
+            $tokens[] = "fk+:{$key}:{$fk['rule']}/".($fk['update_rule'] ?? '?');
         }
         foreach (array_diff_key($before['foreign_keys'], $after['foreign_keys']) as $key => $fk) {
-            $tokens[] = "fk-:{$key}:{$fk['rule']}";
+            $tokens[] = "fk-:{$key}:{$fk['rule']}/".($fk['update_rule'] ?? '?');
         }
         foreach ($before['foreign_keys'] as $key => $fk) {
-            if (isset($after['foreign_keys'][$key]) && $after['foreign_keys'][$key]['rule'] !== $fk['rule']) {
-                $tokens[] = "fk~:{$key}:{$fk['rule']}>{$after['foreign_keys'][$key]['rule']}";
+            $now = $after['foreign_keys'][$key] ?? null;
+
+            if ($now === null) {
+                continue;
+            }
+            if ($now['rule'] !== $fk['rule']) {
+                $tokens[] = "fk~:{$key}:{$fk['rule']}>{$now['rule']}";
+            }
+            if (($now['update_rule'] ?? null) !== ($fk['update_rule'] ?? null)) {
+                $tokens[] = "fku~:{$key}:".($fk['update_rule'] ?? '?').'>'.($now['update_rule'] ?? '?');
             }
         }
 
