@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Http\Requests\Auth\ActiveAccountTwoFactorLoginRequest;
 use App\Http\Responses\PasswordResetLinkResponse;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Requests\TwoFactorLoginRequest;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -24,6 +26,10 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(FailedPasswordResetLinkRequestResponse::class, PasswordResetLinkResponse::class);
         $this->app->singleton(SuccessfulPasswordResetLinkRequestResponse::class, PasswordResetLinkResponse::class);
+
+        // Release 0.9 (H3): the two-factor challenge must not complete for an account suspended after its password
+        // step. Fortify resolves this request from the container, so the binding swaps in the checking subclass.
+        $this->app->bind(TwoFactorLoginRequest::class, ActiveAccountTwoFactorLoginRequest::class);
     }
 
     public function boot(): void

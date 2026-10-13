@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -35,7 +36,38 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'two_factor_confirmed_at' => 'datetime',
+        'disabled_at' => 'datetime',
     ];
+
+    /**
+     * Release 0.9 (H3): a suspended account keeps its row, id, records and grants, but cannot sign in and is not
+     * offered for new assignments or sent notifications. See docs/architecture/account-lifecycle.md.
+     */
+    public function isSuspended(): bool
+    {
+        return $this->disabled_at !== null;
+    }
+
+    /**
+     * Active accounts only. A local scope for candidate lists and recipient choices, deliberately never a global
+     * one: historical relations (authors, assignees, owners) must still resolve a suspended user.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeActive(Builder $query): void
+    {
+        $query->whereNull($query->qualifyColumn('disabled_at'));
+    }
+
+    /**
+     * R0.9-1B finding L1. The permission library detaches roles and direct permissions in `deleting` hooks, before
+     * the DELETE that the RESTRICT keys on business records can refuse. One transaction makes a refused delete lose
+     * nothing. Deletion is still not an offboarding path: accounts are suspended.
+     */
+    public function delete(): ?bool
+    {
+        return $this->getConnection()->transaction(fn () => parent::delete());
+    }
 
     public function invitation(): BelongsTo
     {
@@ -69,7 +101,7 @@ class User extends Authenticatable
 
     public function sendPasswordResetNotification($token): void
     {
-        if ($this->password === null) {
+        if ($this->password === null || $this->isSuspended()) {
             return;
         }
 

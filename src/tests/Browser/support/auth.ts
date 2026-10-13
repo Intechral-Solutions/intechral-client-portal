@@ -33,19 +33,30 @@ import { signIn } from './sign-in';
  * their own initial conditions.
  *
  * **Choosing who a test is.** The default is the operator. `test.use({ persona: 'member' })` picks the
- * member profile and `test.use({ persona: 'anonymous' })` starts signed out. The two personas are not
+ * member profile and `test.use({ persona: 'anonymous' })` starts signed out. The personas are not
  * interchangeable: `member` holds the built-in `user` role, and the specs asserting capability
  * filtering, read-only boards and non-owner permissions depend on being that actor.
+ *
+ * **Shell presentation (EPIC-017 WP1).** A user who holds no operator-surface capability gets the
+ * Focused customer shell: a top bar, no rail, drawer, utility bar, breadcrumb or global timer. So
+ * `member` and `customer` see that shell. A spec whose subject is the Operational chrome (the rail,
+ * the drawer, the breadcrumb, the timer pill and tray) uses `operationalMember`: the same built-in
+ * `user` role plus a direct `projects.manage`, which selects the Operational shell while staying a
+ * customer-scoped actor for everything else. `customerOther` is a second, unrelated customer, seeded
+ * now and first used by the Helpdesk isolation journey in the next package.
  *
  * **Extra contexts.** A bare `browser.newContext()` inherits the test's own `storageState`, i.e. it is
  * *already signed in*. Open extra contexts with `contextFor(...)`, which states who the context is.
  */
-export type Persona = 'operator' | 'member';
+export type Persona = 'operator' | 'member' | 'customer' | 'customerOther' | 'operationalMember';
 export type Who = Persona | 'anonymous';
 
 export const personas: Record<Persona, { email: string }> = {
     operator: { email: 'operator@intechral.test' },
     member: { email: 'user@intechral.test' },
+    customer: { email: 'e2e-customer@intechral.test' },
+    customerOther: { email: 'e2e-customer-other@intechral.test' },
+    operationalMember: { email: 'e2e-operational-member@intechral.test' },
 };
 
 type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>;

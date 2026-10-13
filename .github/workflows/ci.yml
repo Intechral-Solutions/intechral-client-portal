@@ -24,7 +24,9 @@ jobs:
   checks:
     name: ./dev check gates
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 30 -> 45 for R0.9-1E: its real-process cache-race tests (~14 s each) run in the no-skip Redis step and again in the
+    # whole suite, on top of the ~13 minutes the first hosted run took. Time is the only thing changed.
+    timeout-minutes: 45
     steps:
       # Depth 2: the git diff --check gate compares HEAD with its parent.
       - uses: actions/checkout@v7
@@ -32,10 +34,23 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      # The compose service itself, not a re-declared one: same image, my.cnf, init-testing.sql
-      # (the testing database) and healthcheck as local. Nothing is built.
-      - name: Start MariaDB (compose db service)
-        run: docker compose up -d --wait db
+      # The compose services themselves, not re-declared ones: same images, my.cnf, init-testing.sql
+      # (the testing database), init-rehearsal.sql (the two disposable rehearsal databases) and
+      # healthcheck as local. Nothing is built. Redis is the same redis:7 service the dev stack runs:
+      # the permission-cache security tests (R0.9-1C M-1, R0.9-1D) need a shared store outside the
+      # database transaction, as production has, and skip themselves when none is reachable.
+      - name: Start MariaDB and Redis (compose db and redis services)
+        run: docker compose up -d --wait db redis
+
+      # A fresh runner builds a fresh volume, so the init scripts must have run. Say so in one line
+      # of evidence rather than let a missing database surface later as an unrelated test failure.
+      - name: Verify the testing and rehearsal databases were provisioned
+        run: |
+          visible="$(docker compose exec -T db mariadb -uportal -pportal -N -e "SHOW DATABASES LIKE 'intechral%'")"
+          echo "$visible"
+          for database in intechral_client_portal_testing intechral_client_portal_rehearsal intechral_client_portal_rehearsal_restore; do
+            echo "$visible" | grep -qx "$database" || { echo "::error::database $database is missing or not granted to the portal account"; exit 1; }
+          done
 
       # tests/bootstrap.php, phpunit.xml and .env.example address the database as host `db`, as
       # the app container does. Resolve that name on the runner rather than change them.
@@ -46,7 +61,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: bcmath, exif, gd, intl, mbstring, pcntl, pdo_mysql, zip
+          extensions: bcmath, exif, gd, intl, mbstring, pcntl, pdo_mysql, redis, zip
           coverage: none
           tools: composer:v2
 
@@ -102,10 +117,24 @@ jobs:
           LARAVEL_BYPASS_ENV_CHECK: '1'
         run: npm run check
 
+      # The permission-cache security tests on a real Redis server. These tests skip themselves when
+      # Redis is unreachable, and a skip is not a pass, so this step fails on any skip: a missing
+      # extension, server or address shows up here instead of as a quietly smaller test count.
+      # REDIS_HOST is explicit because .env.testing (loaded under APP_ENV=testing) does not set it.
+      - name: 'PHP tests: permission-cache security on Redis (a skip fails)'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: src
+        env:
+          REDIS_HOST: 127.0.0.1
+        run: ./vendor/bin/pest tests/Feature/Admin/PermissionCacheCommitOrderTest.php tests/Feature/Admin/PermissionCacheEpochTest.php --fail-on-skipped
+
       # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
+      # Redis is reachable here too, so the Redis variants run in the whole suite as well.
       - name: 'PHP tests: Pest (testing DB)'
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: src
+        env:
+          REDIS_HOST: 127.0.0.1
         run: ./vendor/bin/pest
 
   # `./dev test:e2e` itself, on the dev stack from docker-compose.yml: nginx + php-fpm, MariaDB,
@@ -143,6 +172,13 @@ jobs:
       # chmod in `npm run setup`.
       - name: Make storage writable for php-fpm
         run: chmod -R a+rwX src/storage src/bootstrap/cache
+
+      # Evidence for the cross-UID path (EPIC-017 G3-A): Playwright runs as the runner's UID, php-fpm
+      # writes the 0700 attachment directories as `portal`, and the wrapper's cleanup runs as `portal`.
+      - name: Show the identities the E2E cleanup crosses
+        run: |
+          echo "runner (Playwright, ./dev test:e2e): $(id -u):$(id -g)"
+          docker compose exec -T app sh -c 'echo "portal (php-fpm, ticket cleanup): $(id -u portal):$(id -g portal)"'
 
       - name: Playwright (./dev test:e2e)
         run: ./dev test:e2e

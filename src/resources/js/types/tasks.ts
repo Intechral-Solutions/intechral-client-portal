@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskStatusDto, UserRef } from '@/types/projects';
+import type { MemberChoice, TaskPriority, TaskStatusDto, UserRef } from '@/types/projects';
 
 /**
  * The context a Tasks-workspace row belongs to. The workspace surfaces exactly two kinds
@@ -131,12 +131,13 @@ export type TaskFormOptions = TaskCreateOptions;
  * the only person a standalone task may be handed to; `projects` lists, for each project the viewer may
  * assign a row in on this page, that project's current members. The server sends nothing for a project
  * whose rows the viewer may not assign, and never a departed member, so this is the whole candidate
- * pool: the browser derives no membership of its own. It is a convenience: the assign endpoint
- * authorizes and validates every request again.
+ * pool (less any member flagged `suspended`, who is only ever a row's current holder): the browser
+ * derives no membership of its own. It is a convenience: the assign endpoint authorizes and validates
+ * every request again.
  */
 export type TaskAssigneeOptions = {
     self: UserRef;
-    projects: { projectId: number; members: UserRef[] }[];
+    projects: { projectId: number; members: MemberChoice[] }[];
 };
 
 /**

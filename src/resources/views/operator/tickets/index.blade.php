@@ -120,7 +120,7 @@
         <x-ui.field-error for="action" />
         <x-ui.select name="assignee_id" aria-label="Assign to">
             <option value="">Select assignee&hellip;</option>
-            @foreach ($operators as $op)
+            @foreach ($assignableOperators as $op)
             <option value="{{ $op->id }}">{{ $op->name }}</option>
             @endforeach
         </x-ui.select>

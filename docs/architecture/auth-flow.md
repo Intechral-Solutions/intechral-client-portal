@@ -70,3 +70,11 @@ Operator                          System                          Invitee
    - Credentials verified → 2FA challenge screen shown
    - TOTP or recovery code required
    - On success → session established
+
+## Account Suspension (Release 0.9, H3)
+
+A suspended account (`users.disabled_at` set) cannot sign in by password, two-factor challenge, remembered login,
+existing session, SSO, password reset or invitation acceptance; to an unauthenticated caller it looks exactly like an
+account that does not exist. Suspension and reactivation sign the user out everywhere. The entry-point inventory, the
+enforcement mechanism for each, and the last-active-administrator rule are in
+[Account Lifecycle](./account-lifecycle.md).

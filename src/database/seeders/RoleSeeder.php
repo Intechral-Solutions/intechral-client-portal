@@ -2,26 +2,27 @@
 
 namespace Database\Seeders;
 
-use App\Shared\Permissions\PermissionCatalogue;
+use App\Services\BuiltInRoleSynchronizer;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
+use RuntimeException;
 
+/**
+ * Disposable environments only (Release 0.9, decision H4). It resets the built-in roles to the code's definitions,
+ * revocations included, with no preview, which is right for a local or test database and wrong for any data that matters.
+ * Anywhere else it refuses: use `php artisan roles:sync` to preview a plan and apply it with an explicit approval.
+ */
 class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        if (! app()->environment('local', 'testing')) {
+            throw new RuntimeException('RoleSeeder resets the built-in roles without a preview and is only for local and testing '
+                .'databases. Run `php artisan roles:sync` to preview the change, then apply the plan you reviewed.');
+        }
 
-        // ── Operator role (all permissions) ──────────────────
-        $operator = Role::firstOrCreate(['name' => 'operator', 'guard_name' => 'web']);
-        $operator->syncPermissions(Permission::all());
+        $synchronizer = app(BuiltInRoleSynchronizer::class);
+        $synchronizer->apply($synchronizer->plan()->fingerprint(), allowRevocations: true, audit: false);
 
-        // ── User role (minimal default permissions) ───────────
-        $user = Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
-        $user->syncPermissions(PermissionCatalogue::userDefaults());
-
-        $this->command->info('Built-in roles seeded: operator, user.');
+        $this->command?->info('Built-in roles seeded: operator, user.');
     }
 }

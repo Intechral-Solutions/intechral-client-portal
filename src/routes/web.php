@@ -117,6 +117,12 @@ Route::middleware(['auth', 'can:users.view'])->prefix('admin')->name('users.')->
     Route::put('/users/{user}/roles', [UserController::class, 'updateRoles'])
         ->middleware('can:users.manage')
         ->name('roles.update');
+
+    // Release 0.9 (H3): account suspension, the only supported offboarding.
+    Route::middleware('can:users.manage')->group(function () {
+        Route::post('/users/{user}/suspend', [UserController::class, 'suspend'])->name('suspend');
+        Route::post('/users/{user}/reactivate', [UserController::class, 'reactivate'])->name('reactivate');
+    });
 });
 
 // Projects

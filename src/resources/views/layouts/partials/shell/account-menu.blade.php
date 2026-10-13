@@ -10,6 +10,11 @@
     The trigger is a 40×40 rounded-square button containing a 28px circular avatar (L9). The initials
     are the server's (`$shellUser['avatar']['initials']`, App\Support\Initials) — never derived here.
 
+    EPIC-017 WP1 — `$placement` ('rail' by default, or 'topbar') chooses where the trigger lives
+    (Direction D §13): the Operational rail opens the menu beside it, the Focused top bar opens it below
+    and right-aligned, and the trigger there is the circular 34px avatar itself (§13.1). The menu is the
+    same personal list either way.
+
     Behaviour (resources/js/shell/blade-shell.ts): a real menu — the trigger toggles it, arrow keys /
     Home / End move between items, Escape closes and returns focus to the trigger, Tab or a pointer
     outside closes it. Appearance writes localStorage['theme'] and html[data-theme], the same contract
@@ -18,6 +23,7 @@
 @php
     $shellItem = 'block cursor-pointer rounded-control px-3 py-2 text-sm text-text hover:bg-surface-hover focus:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus';
     $shellProfile = route('profile.show', [], false);
+    $shellTopbar = ($placement ?? 'rail') === 'topbar';
 @endphp
 <div class="relative" data-shell-account-root>
     <button type="button"
@@ -26,10 +32,12 @@
             aria-expanded="false"
             aria-controls="shell-account-menu"
             aria-label="Account menu: {{ $shellUser['name'] }}"
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-surface ring-1 ring-control-edge transition-colors duration-motion-fast hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+            class="{{ $shellTopbar
+                ? 'flex shrink-0 items-center justify-center rounded-full transition-colors duration-motion-fast hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+                : 'flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-surface ring-1 ring-control-edge transition-colors duration-motion-fast hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' }}">
         {{-- The trigger already carries the accessible name, so the avatar is decorative. --}}
         <span aria-hidden="true"
-              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-rule-control bg-surface-sunken text-xs font-semibold text-text select-none">{{ $shellUser['avatar']['initials'] }}</span>
+              class="inline-flex {{ $shellTopbar ? 'h-8.5 w-8.5 text-sm' : 'h-7 w-7 text-xs' }} shrink-0 items-center justify-center rounded-full border border-rule-control bg-surface-sunken font-semibold text-text select-none">{{ $shellUser['avatar']['initials'] }}</span>
     </button>
 
     <div id="shell-account-menu"
@@ -37,7 +45,7 @@
          aria-label="Account"
          data-shell-account-menu
          hidden
-         class="absolute top-full right-0 z-50 mt-1.5 w-64 rounded-overlay bg-surface p-1 text-text shadow-overlay md:top-auto md:right-auto md:bottom-0 md:left-full md:mt-0 md:ml-1.5">
+         class="absolute z-50 w-64 rounded-overlay bg-surface p-1 text-text shadow-overlay {{ $shellTopbar ? 'top-full right-0 mt-1.5' : 'top-full right-0 mt-1.5 md:top-auto md:right-auto md:bottom-0 md:left-full md:mt-0 md:ml-1.5' }}">
         <div class="flex items-center gap-2.5 px-3 py-2.5">
             <span aria-hidden="true"
                   class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-rule-control bg-surface-sunken text-sm font-semibold text-text select-none">{{ $shellUser['avatar']['initials'] }}</span>

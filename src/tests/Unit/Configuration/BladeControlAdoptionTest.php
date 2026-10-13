@@ -45,7 +45,7 @@ it('scans the whole target set, so a new view cannot dodge the check', function 
     $views = bladeTargetViews();
 
     expect(count($views))->toBeGreaterThanOrEqual(39)
-        ->and($views)->toContain('billing/invoices/_line_item.blade.php', 'tickets/show.blade.php', 'admin/roles/edit.blade.php', 'errors/403.blade.php');
+        ->and($views)->toContain('billing/invoices/_line_item.blade.php', 'operator/tickets/show.blade.php', 'admin/roles/edit.blade.php', 'errors/403.blade.php');
 });
 
 it('has no hand-built control left in any target view: every action, link, field and checkbox is an x-ui component', function (string $view) {

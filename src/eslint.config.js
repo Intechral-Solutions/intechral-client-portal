@@ -5,6 +5,8 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
+import { requesterBoundaryPlugin } from './eslint/requester-boundary.js';
+
 export default tseslint.config(
     { ignores: ['resources/js/actions/**', 'resources/js/routes/**', 'resources/js/wayfinder/**'] },
     eslint.configs.recommended,
@@ -30,6 +32,37 @@ export default tseslint.config(
         // are excluded below.
         files: ['resources/js/**/*.{ts,tsx}'],
         rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['@dnd-kit/*', '@dnd-kit'],
+                            message:
+                                'dnd-kit imports are confined to components/projects/board-dnd.tsx and components/projects/board-card-handle.tsx (EPIC-011E §9).',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        // EPIC-017 §15: a requester page module must not import from the operator workspace. The two
+        // audiences share only audience-neutral pieces (`components/helpdesk/*`, never `.../operator/*`), so
+        // an operator-only field or control cannot reach a customer page through an import.
+        //
+        // The boundary is a local rule (eslint/requester-boundary.js) and not a `no-restricted-imports`
+        // pattern, because that matches the literal specifier: `./operator/x` or `../operator/x` would pass.
+        // The rule resolves the specifier against the importing file. `no-restricted-imports` stays here for
+        // dnd-kit only, restated because a later block's options replace an earlier one's.
+        files: [
+            'resources/js/pages/tickets/**/*.{ts,tsx}',
+            'resources/js/components/helpdesk/**/*.{ts,tsx}',
+        ],
+        ignores: ['resources/js/components/helpdesk/operator/**'],
+        plugins: { 'requester-boundary': requesterBoundaryPlugin },
+        rules: {
+            'requester-boundary/no-operator-import': 'error',
             'no-restricted-imports': [
                 'error',
                 {

@@ -10,7 +10,9 @@ use App\Rules\AccessibleCrmCompany;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,7 +147,7 @@ class ProjectController extends Controller
         ];
 
         if ($props['abilities']['editMembers']) {
-            $props['memberCandidates'] = ProjectPresenter::memberCandidates();
+            $props['memberCandidates'] = ProjectPresenter::memberCandidates($project);
         }
 
         return Inertia::render('projects/edit', $props);
@@ -185,7 +187,7 @@ class ProjectController extends Controller
         $this->authorize('manageMembers', $project);
 
         $data = $request->validate([
-            ...$this->memberRules(),
+            ...$this->memberRules($project),
             'members' => 'present|array',
         ]);
 
@@ -213,14 +215,20 @@ class ProjectController extends Controller
     // ── Private ──────────────────────────────────────────────
 
     /**
-     * Existing users only, each at most once, with a valid role. `users` has no active or
-     * disabled state, so "an existing row" is the whole eligibility rule (D7-B).
+     * Existing users only, each at most once, with a valid role (D7-B). A new member must be an
+     * active account (Release 0.9, H3); a suspended account that is already a member of $project may
+     * stay, so saving the list never silently removes them.
      */
-    private function memberRules(): array
+    private function memberRules(?Project $project = null): array
     {
+        $eligible = Rule::exists('users', 'id')->where(fn ($query) => $query->where(
+            fn ($query) => $query->whereNull('disabled_at')
+                ->when($project, fn ($query) => $query->orWhereIn('id', DB::table('project_members')->where('project_id', $project->id)->select('user_id')))
+        ));
+
         return [
             'members' => 'nullable|array',
-            'members.*.user_id' => 'required|integer|distinct|exists:users,id',
+            'members.*.user_id' => ['required', 'integer', 'distinct', $eligible],
             'members.*.role' => 'required|in:member,manager',
         ];
     }

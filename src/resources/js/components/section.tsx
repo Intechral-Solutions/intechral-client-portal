@@ -4,6 +4,12 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 type SectionProps = {
+    /**
+     * Makes the section an in-page anchor target (`/profile#sessions`). A section with an `id`
+     * also gets a scroll margin, so the anchor scrolls it clear of a sticky shell bar (the 60px
+     * Focused top bar or the 48px operator utility bar). Without an `id` the section is unchanged.
+     */
+    id?: string;
     title: string;
     description?: string;
     /** Section-level actions, right-aligned on the title row. */
@@ -27,6 +33,7 @@ type SectionProps = {
  * still list.
  */
 export function Section({
+    id,
     title,
     description,
     actions,
@@ -35,13 +42,16 @@ export function Section({
     children,
 }: SectionProps) {
     const headingId = useId();
+    const anchorMargin = id ? 'scroll-mt-20' : undefined;
 
     if (layout === 'split') {
         return (
             <section
+                id={id}
                 aria-labelledby={headingId}
                 className={cn(
                     'grid gap-6 border-b border-rule py-8 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]',
+                    anchorMargin,
                     className,
                 )}
             >
@@ -60,7 +70,11 @@ export function Section({
     }
 
     return (
-        <section aria-labelledby={headingId} className={cn('space-y-4 py-2', className)}>
+        <section
+            id={id}
+            aria-labelledby={headingId}
+            className={cn('space-y-4 py-2', anchorMargin, className)}
+        >
             <div className="flex items-end justify-between gap-4 border-b border-rule-strong pb-2">
                 <div className="min-w-0">
                     <h2 id={headingId} className="text-base font-semibold text-text">

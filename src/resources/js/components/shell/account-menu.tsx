@@ -30,12 +30,30 @@ import type { AuthUser } from '@/types';
  * "N active") are deliberately absent — shipping "Not set up" to someone who has MFA on would be
  * worse than shipping nothing, and no shared prop carries the truth.
  */
-export function AccountMenu({ user }: { user: AuthUser }) {
+export function AccountMenu({
+    user,
+    placement = 'rail',
+}: {
+    user: AuthUser;
+    /**
+     * Where the trigger lives (Direction D §13): the Operational rail opens the menu beside it, the
+     * Focused top bar opens it below and right-aligned. It is the same menu in both.
+     */
+    placement?: 'rail' | 'topbar';
+}) {
     return (
         <DropdownMenu>
-            <AccountTrigger user={user} />
+            {placement === 'topbar' ? (
+                <TopbarAccountTrigger user={user} />
+            ) : (
+                <AccountTrigger user={user} />
+            )}
 
-            <DropdownMenuContent side="right" align="end" className="w-64">
+            <DropdownMenuContent
+                side={placement === 'topbar' ? 'bottom' : 'right'}
+                align="end"
+                className="w-64"
+            >
                 <div className="flex items-center gap-2.5 px-3 py-2.5">
                     <Avatar name={user.name} size="lg" decorative />
                     <div className="min-w-0">
@@ -107,6 +125,27 @@ function AccountTrigger({ user }: { user: AuthUser }) {
         >
             {/* The trigger already carries the accessible name, so the avatar is decorative. */}
             <Avatar name={user.name} size="md" decorative />
+        </DropdownMenuTrigger>
+    );
+}
+
+/**
+ * The customer top-bar account control: the circular avatar IS the trigger (Direction D §13.1, L9).
+ * Avatar shape never encodes role, so this is the same circle the rail wraps in its square tile.
+ *
+ * The class string is a literal on purpose: `shadcn/require-static-classes` cannot read a `cn()` call
+ * that includes the imported `focusRing` constant on a primitive, and the rail trigger's baselined
+ * findings must not grow. The focus classes are `focusRing`'s, spelled out.
+ */
+function TopbarAccountTrigger({ user }: { user: AuthUser }) {
+    return (
+        <DropdownMenuTrigger
+            data-shell-account
+            aria-label={`Account menu: ${user.name}`}
+            className="flex shrink-0 items-center justify-center rounded-full transition-colors duration-motion-fast hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+            {/* The trigger already carries the accessible name, so the avatar is decorative. */}
+            <Avatar name={user.name} size="account" decorative />
         </DropdownMenuTrigger>
     );
 }

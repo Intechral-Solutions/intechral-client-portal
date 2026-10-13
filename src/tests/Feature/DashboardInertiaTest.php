@@ -34,9 +34,14 @@ it('requires authentication for the dashboard', function () {
     $this->get(route('dashboard'))->assertRedirect('/login');
 });
 
+// FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer Home (pinned by
+// Shell/CustomerHomeTest). This test's subject is the OPERATIONAL dashboard's own-records scoping, so
+// its actor is a `user` who also holds `projects.manage`: still scoped to their own tickets, invoices
+// and member projects, and still on the operator dashboard component. Every assertion is unchanged.
 it('renders scoped user dashboard data without model leakage', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    $user->givePermissionTo('projects.manage');
     $other = User::factory()->create();
 
     Ticket::factory()->open()->for($user, 'user')->create(['title' => 'Visible ticket']);

@@ -19,7 +19,8 @@
         </div>
         @if ($isBuiltIn)
         <p class="mt-1.5 text-sm text-text-secondary">
-            This is a built-in role. Its name cannot be changed, but permissions can be updated.
+            This is a built-in role. The application owns its name and permissions, so it cannot be edited or deleted here.
+            Its permissions change only through a reviewed deployment synchronization. For different access, create a custom role.
         </p>
         @endif
     </div>
@@ -28,12 +29,20 @@
     @if (session('status'))
     <x-ui.alert variant="success" class="mb-6">{{ session('status') }}</x-ui.alert>
     @endif
+    @error('account')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
+    @error('role')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
 
     <form method="POST" action="{{ route('roles.update', $role) }}" class="space-y-8">
         @csrf
         @method('PUT')
 
         {{-- Permissions --}}
+        {{-- A built-in role's permissions are shown, not edited: the disabled fieldset disables every box. --}}
+        <fieldset @disabled($isBuiltIn) class="min-w-0 border-0 p-0">
         <div id="permissions-group" role="group" aria-labelledby="permissions-heading"
              @if ($errors->has('permissions') || $errors->has('permissions.*')) aria-describedby="permissions-group-error" @endif>
             <p id="permissions-heading" class="text-sm font-medium mb-3 text-text">Permissions</p>
@@ -54,12 +63,17 @@
             </div>
             @endforeach
         </div>
+        </fieldset>
         <x-ui.field-error for="permissions-group" :error-key="['permissions', 'permissions.*']" />
 
         {{-- Submit --}}
         <div class="flex items-center gap-3 pt-2">
+            @if (! $isBuiltIn)
             <x-ui.button type="submit">Save Changes</x-ui.button>
             <x-ui.button :href="route('roles.index')" variant="ghost">Cancel</x-ui.button>
+            @else
+            <x-ui.button :href="route('roles.index')" variant="ghost">Back to Roles</x-ui.button>
+            @endif
 
             {{-- The delete form lives OUTSIDE this form (forms cannot nest: the parser would merge both into
                  this one, and its PUT and DELETE `_method` fields would collide). The button stays in this row

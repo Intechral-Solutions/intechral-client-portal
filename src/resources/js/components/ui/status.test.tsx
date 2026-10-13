@@ -71,3 +71,14 @@ it('renders a hostile label as text, never as markup', () => {
     expect(screen.getByText(hostile)).toBeInTheDocument();
     expect(container.querySelector('img, b')).not.toBeInTheDocument();
 });
+
+it('draws the hourglass as its own stroked shape, distinct from the dashed circle it replaces for waiting states', () => {
+    const hourglass = render(<Status glyph="hourglass">Waiting on you</Status>);
+    const dashed = render(<Status glyph="dashed">On hold</Status>);
+
+    expect(shapeOf(hourglass.container)).toContain('path');
+    expect(shapeOf(hourglass.container)).not.toContain('circle');
+    expect(shapeOf(hourglass.container)).not.toEqual(shapeOf(dashed.container));
+    expect(glyphOf(hourglass.container)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Waiting on you')).toBeVisible();
+});

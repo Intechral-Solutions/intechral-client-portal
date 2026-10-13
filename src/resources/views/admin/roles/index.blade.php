@@ -42,7 +42,7 @@
             </thead>
             <tbody class="divide-y divide-rule">
                 @forelse ($roles as $role)
-                @php $builtIn = in_array($role->name, ['operator', 'user']); @endphp
+                @php $builtIn = \App\Shared\Permissions\BuiltInRoles::isBuiltIn($role->name); @endphp
                 <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-6 py-4">
                         <span class="font-medium text-text">{{ $role->name }}</span>
@@ -56,7 +56,7 @@
                     <td class="px-6 py-4 text-right text-sm">
                         <div class="flex items-center justify-end gap-3">
                             @can('roles.manage')
-                            <x-ui.link :href="route('roles.edit', $role)" class="font-medium">Edit</x-ui.link>
+                            <x-ui.link :href="route('roles.edit', $role)" class="font-medium">{{ $builtIn ? 'View' : 'Edit' }}</x-ui.link>
                             @endcan
                             @can('roles.admin')
                             @if (! $builtIn)

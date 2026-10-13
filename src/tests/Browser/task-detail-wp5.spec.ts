@@ -120,6 +120,16 @@ async function expectSingleBreadcrumb(page: Page) {
     expect(tree.match(/navigation "Breadcrumb"/g) ?? []).toHaveLength(1);
 }
 
+/**
+ * FLIPPED IN EPIC-017 WP1: a customer member is in the Focused shell, which owns no breadcrumb
+ * landmark and ignores the page's `trail`. The page does not draw one itself (A13.12), so there is none.
+ */
+async function expectNoBreadcrumb(page: Page) {
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(0);
+    const tree = await page.locator('body').ariaSnapshot();
+    expect(tree.match(/navigation "Breadcrumb"/g) ?? []).toHaveLength(0);
+}
+
 test('a standalone task is created, opened, edited, assigned, completed, reopened and deleted from its own page', async ({
     page,
     cleanup,
@@ -330,12 +340,12 @@ test('a member-assignee completes and reopens a board task from its detail, and 
         for (const forbidden of ['Edit task', 'Delete task']) {
             await expect(memberPage.getByRole('button', { name: forbidden })).toHaveCount(0);
         }
-        // Read-only assignee, no assign control, and still the one breadcrumb.
+        // Read-only assignee, no assign control, and (Focused shell) no breadcrumb landmark.
         await expect(memberPage.getByRole('button', { name: /Change assignee/ })).toHaveCount(0);
         await expect(
             memberPage.getByRole('definition').filter({ hasText: 'Dev User' }),
         ).toBeVisible();
-        await expectSingleBreadcrumb(memberPage);
+        await expectNoBreadcrumb(memberPage);
 
         await memberPage.getByRole('button', { name: 'Complete task' }).click();
         await expect(memberPage.getByRole('button', { name: 'Reopen task' })).toBeFocused();

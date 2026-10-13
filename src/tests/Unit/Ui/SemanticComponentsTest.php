@@ -57,14 +57,15 @@ it('defaults to the neutral tone', function () {
 
 it('draws a distinct shape for every glyph in the shared vocabulary', function () {
     $shapes = [];
-    foreach (['circle', 'half', 'dot', 'check', 'triangle', 'square', 'dashed'] as $glyph) {
+    foreach (['circle', 'half', 'dot', 'check', 'triangle', 'square', 'dashed', 'hourglass'] as $glyph) {
         [, $svg] = uiStatusParts('<x-ui.status glyph="'.$glyph.'">X</x-ui.status>');
         $shapes[$glyph] = preg_replace('/\s+/', ' ', trim($svg->ownerDocument->saveHTML($svg)));
         expect($svg->getAttribute('data-glyph'))->toBe($glyph);
     }
 
-    // Seven glyphs, seven different drawings: two states never differ by colour alone.
-    expect(count(array_unique($shapes)))->toBe(7)
+    // Eight glyphs, eight different drawings: two states never differ by colour alone.
+    expect(count(array_unique($shapes)))->toBe(8)
+        ->and($shapes['hourglass'])->toContain('<path')->not->toContain('<circle')
         ->and($shapes['dashed'])->toContain('stroke-dasharray')
         ->and($shapes['circle'])->not->toContain('stroke-dasharray')
         ->and($shapes['half'])->toContain('<path')
@@ -104,7 +105,7 @@ it('never draws a filled pill, a hex colour or an inline style', function (strin
 
 it('rejects an unknown tone or glyph instead of drawing something misleading', function () {
     expect(fn () => uiRender('<x-ui.status tone="purple">X</x-ui.status>'))->toThrow(InvalidArgumentException::class, 'tone')
-        ->and(fn () => uiRender('<x-ui.status glyph="hourglass">X</x-ui.status>'))->toThrow(InvalidArgumentException::class, 'glyph');
+        ->and(fn () => uiRender('<x-ui.status glyph="sparkle">X</x-ui.status>'))->toThrow(InvalidArgumentException::class, 'glyph');
 });
 
 // ── x-ui.priority ────────────────────────────────────────────────────────────

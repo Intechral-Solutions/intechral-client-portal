@@ -61,7 +61,13 @@ test('Dashboard and Profile coexist with Blade pages and a persistent theme', as
 test.describe('as a member', () => {
     // The capability-filtering assertions below are about this actor's own profile, so the persona is
     // the point of the test, not incidental setup.
-    test.use({ persona: 'member' });
+    //
+    // FLIPPED IN EPIC-017 WP1: a plain `user` now gets the Focused customer shell, which has no rail,
+    // so the Workspaces-hidden assertion below would pass vacuously for it. This test's subject is the
+    // Operational rail folding into its nav sheet at S, so it uses `operationalMember`: the built-in
+    // `user` role plus `projects.manage`, still without System or Directory. The Focused shell's own
+    // sheet, at the same widths, is `customer-shell.spec.ts`.
+    test.use({ persona: 'operationalMember' });
 
     test('narrow shell exposes permission-aware navigation through the nav sheet', async ({
         page,
@@ -106,7 +112,11 @@ test.describe('account mutation', () => {
 
     test('profile information reports validation and saves through Inertia', async ({ page }) => {
         await signIn(page, 'e2e-profile-mutation@intechral.test');
-        await page.getByRole('link', { name: 'My Profile' }).click();
+        // FLIPPED IN EPIC-017 WP1: the Focused Home has no quick actions, so Profile is reached the way a
+        // customer reaches it everywhere: from the account menu.
+        await openAccountMenu(page);
+        await page.getByRole('menuitem', { name: 'Profile', exact: true }).click();
+        await expect(page).toHaveURL(/\/profile$/);
 
         const name = page.getByLabel('Name');
         const email = page.getByLabel('Email address');

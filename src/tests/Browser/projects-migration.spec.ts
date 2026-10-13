@@ -35,6 +35,31 @@ function artisan(php: string) {
     });
 }
 
+/**
+ * Removes the throwaway users this file created, by their per-run emails only, and reports what is left of
+ * them, which must be nothing. Each is deleted through Eloquent so the permission library's `deleting` hooks
+ * detach its role and direct-permission rows: the previous query-builder delete fired no model events and left
+ * those pivot rows orphaned (R0.9-1C). `User::delete()` is transactional and these users own no durable
+ * records (their project memberships cascade), so a refused delete fails here loudly with nothing stripped. The
+ * fixtures' own session rows (`sessions.user_id` has no foreign key) go too.
+ */
+function deleteFixtureUsers(emails: string[]): Record<string, number> {
+    const list = emails.map((email) => `"${email}"`).join(', ');
+    const output = artisan(
+        `$ids = \\App\\Models\\User::whereIn("email", [${list}])->pluck("id")->all(); ` +
+            `\\App\\Models\\User::whereKey($ids)->get()->each->delete(); ` +
+            `\\DB::table("sessions")->whereIn("user_id", $ids)->delete(); ` +
+            `$type = (new \\App\\Models\\User)->getMorphClass(); ` +
+            `echo json_encode([` +
+            `"users" => \\DB::table("users")->whereIn("id", $ids)->count(), ` +
+            `"roles" => \\DB::table("model_has_roles")->where("model_type", $type)->whereIn("model_id", $ids)->count(), ` +
+            `"permissions" => \\DB::table("model_has_permissions")->where("model_type", $type)->whereIn("model_id", $ids)->count(), ` +
+            `"sessions" => \\DB::table("sessions")->whereIn("user_id", $ids)->count()]);`,
+    );
+
+    return JSON.parse(output.trim().split('\n').pop() ?? '');
+}
+
 test('index to create, and the create page as projects.admin adds a member and lands on the Overview', async ({
     page,
     cleanup,
@@ -163,6 +188,7 @@ test('administrator membership editing, a hostile member name stays text, and a 
         `$u = \\App\\Models\\User::forceCreate(["name" => "E2E WP3 Manager", "email" => "${managerEmail}", "password" => bcrypt("unused-e2e-password"), "email_verified_at" => now()]); $u->assignRole("user"); $u->givePermissionTo("projects.manage");`,
     );
 
+    let leftovers: Record<string, number> = {};
     try {
         await page.goto(`/projects/${projectId}/edit`);
 
@@ -223,10 +249,10 @@ test('administrator membership editing, a hostile member name stays text, and a 
             await managerContext.close();
         }
     } finally {
-        artisan(
-            `\\App\\Models\\User::whereIn("email", ["${hostileEmail}", "${managerEmail}"])->delete();`,
-        );
+        leftovers = deleteFixtureUsers([hostileEmail, managerEmail]);
     }
+
+    expect(leftovers).toEqual({ users: 0, roles: 0, permissions: 0, sessions: 0 });
 });
 
 test('the projects index and create page are usable at a phone viewport with no document scroll', async ({

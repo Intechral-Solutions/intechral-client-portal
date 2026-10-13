@@ -148,6 +148,9 @@ it('rejects inaccessible and multiple time contexts', function () {
     expect(TimeEntry::where('user_id', $user->id)->exists())->toBeFalse();
 });
 
+// FLIPPED IN EPIC-017 WP2 (O1, N1): the ticket half used a plain `user` timing their OWN ticket, which
+// is now refused. The ticket timer is asserted for the same user once they hold `tickets.assign`, and the
+// plain owner's refusal is asserted with nothing written. The task half is unchanged.
 it('allows authorized embedded task and ticket timer contexts', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
@@ -176,13 +179,25 @@ it('allows authorized embedded task and ticket timer contexts', function () {
 
     $this->actingAs($user)
         ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ticket_id');
+    expect(TimeEntry::where('ticket_id', $ticket->id)->exists())->toBeFalse();
+
+    $user->givePermissionTo('tickets.assign');
+
+    $this->actingAs(User::findOrFail($user->id))
+        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
         ->assertOk()
         ->assertJsonPath('context.type', 'Ticket');
 });
 
+// FLIPPED IN EPIC-017 WP2 (O1, N1): this test's subject is the context DTO, not eligibility. Ticket
+// time is now operator work, so the actor also holds `tickets.assign`; every DTO assertion is unchanged.
 it('identifies the context record by id on every timer context DTO', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    $user->givePermissionTo('tickets.assign');
+    $user = User::findOrFail($user->id);
     $other = User::factory()->create();
     $project = app(ProjectService::class)->create($other, ['name' => 'Shared project']);
     $project->members()->attach($user->id, ['role' => 'member']);

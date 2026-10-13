@@ -48,10 +48,13 @@ final class TaskAssigneeOptions
                 ->whereIn('project_members.project_id', array_keys($projectIds))
                 ->orderBy('users.name')
                 ->orderBy('users.id')
-                ->get(['project_members.project_id', 'users.id', 'users.name']);
+                ->get(['project_members.project_id', 'users.id', 'users.name', 'users.disabled_at']);
 
+            // A suspended member (Release 0.9, H3) is listed flagged, never as a new choice: the client keeps them
+            // only as a row's current holder, labelled as suspended rather than as departed.
             foreach ($members as $member) {
-                $byProject[$member->project_id][] = ['id' => (int) $member->id, 'name' => $member->name];
+                $byProject[$member->project_id][] = ['id' => (int) $member->id, 'name' => $member->name]
+                    + ($member->disabled_at !== null ? ['suspended' => true] : []);
             }
         }
 

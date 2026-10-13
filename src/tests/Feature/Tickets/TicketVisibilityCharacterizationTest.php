@@ -3,6 +3,7 @@
 use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
+use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
@@ -60,11 +61,12 @@ it('TARGET H4: a same-company peer holding tickets.view_org neither lists nor op
     expect($f['peer']->can('tickets.view_org'))->toBeTrue()
         ->and($f['peer']->orgCompanyIds())->toBe([$f['company']->id]);
 
-    $this->actingAs($f['peer'])->get(route('tickets.index'))
-        ->assertOk()
-        ->assertDontSee('Company linked ticket')
-        ->assertDontSee($f['ticket']->ticket_number)
-        ->assertDontSee(route('tickets.show', $f['ticket']), false);
+    // From the page's props, not its markup: a URL assertion against serialized JSON (escaped
+    // slashes) would pass whatever was listed.
+    $listed = ticketOwnProps($this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk())['tickets']['data'];
+    expect(array_column($listed, 'title'))->not->toContain('Company linked ticket')
+        ->and(array_column($listed, 'number'))->not->toContain($f['ticket']->ticket_number)
+        ->and(array_column($listed, 'href'))->not->toContain(route('tickets.show', $f['ticket']));
 
     $this->actingAs($f['peer'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
     expect(Gate::forUser($f['peer'])->allows('view', $f['ticket']))->toBeFalse();
@@ -73,10 +75,10 @@ it('TARGET H4: a same-company peer holding tickets.view_org neither lists nor op
 it('BASELINE H4: the owner lists and opens their ticket; an unrelated customer does neither', function () {
     $f = ticketCompanyFixture();
 
-    $this->actingAs($f['owner'])->get(route('tickets.index'))->assertSee('Company linked ticket');
+    expect(ticketListedTitles($f['owner']))->toContain('Company linked ticket');
     $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
 
-    $this->actingAs($f['outsider'])->get(route('tickets.index'))->assertDontSee('Company linked ticket');
+    expect(ticketListedTitles($f['outsider']))->not->toContain('Company linked ticket');
     $this->actingAs($f['outsider'])->get(route('tickets.show', $f['ticket']))->assertForbidden();
 });
 
@@ -85,20 +87,21 @@ it('TARGET H4: every row on a customer list is a ticket the customer may open (n
     ticketFor($f['peer'], ['title' => 'Peer own ticket', 'company_id' => $f['company']->id]);
     ticketFor($f['peer'], ['title' => 'Peer unlinked ticket']);
 
-    $listed = $this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk()->viewData('tickets');
+    $listed = ticketOwnProps($this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk())['tickets']['data'];
 
-    expect($listed->pluck('title')->sort()->values()->all())->toBe(['Peer own ticket', 'Peer unlinked ticket'])
-        ->and($listed->every(fn (Ticket $ticket) => Gate::forUser($f['peer'])->allows('view', $ticket)))->toBeTrue();
+    expect(collect($listed)->pluck('title')->sort()->values()->all())->toBe(['Peer own ticket', 'Peer unlinked ticket'])
+        ->and(collect($listed)->every(fn (array $row) => Gate::forUser($f['peer'])->allows('view', Ticket::findOrFail($row['id']))))->toBeTrue();
 });
 
 it('BASELINE H4: /tickets is an operator\'s own-requests list, while the operator still opens any ticket', function () {
     $f = ticketCompanyFixture();
     ticketFor($f['operator'], ['title' => 'Operator own request']);
 
-    $this->actingAs($f['operator'])->get(route('tickets.index'))
-        ->assertSee('Operator own request')
-        ->assertDontSee('Company linked ticket');
-    $this->actingAs($f['operator'])->get(route('tickets.show', $f['ticket']))->assertOk();
+    expect(ticketListedTitles($f['operator']))->toBe(['Operator own request']);
+    // P2 (EPIC-017): the operator still reaches every ticket; only the page changes.
+    $this->actingAs($f['operator'])->get(route('tickets.show', $f['ticket']))
+        ->assertRedirect(route('operator.tickets.show', $f['ticket']));
+    $this->actingAs($f['operator'])->get(route('operator.tickets.show', $f['ticket']))->assertOk();
 });
 
 // ── F-1 — company_id is validated but never persisted ───────────────────────
@@ -114,7 +117,8 @@ it('BASELINE F-1 (D3: no write-path fix in EPIC-010D): ticket creation never per
     // Explicitly chosen (passes AccessibleCrmCompany validation)...
     $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Chosen company', 'company_id' => $company->id])
         ->assertRedirect();
-    // ...and auto-selected for a single-organization member.
+    // ...and (EPIC-017 WP2) no longer auto-selected for a single-organization member: the form and the
+    // auto-fill are gone, nothing persisted a company before either.
     $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Auto company'])
         ->assertRedirect();
 
@@ -195,15 +199,21 @@ it('GUARD H9 (defense-in-depth in place): the agent still uses the operator queu
         ->and($f['ticket']->replies()->where('body', 'Agent internal')->sole()->is_internal)->toBeTrue();
 });
 
-it('TARGET H9: the agent opens the user show page and every attachment linked from the operator show page', function () {
+it('TARGET H9: the agent reaches the ticket (P2: the operator page) and every attachment linked from it', function () {
     $f = ticketRoleFixture();
 
-    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertOk();
+    // CONVERTED IN EPIC-017 WP2 (P2): `/tickets/{id}` is the requester page, so a capability-only agent
+    // who is not the requester is sent to the operator page, which they open.
+    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertRedirect(route('operator.tickets.show', $f['ticket']));
+    $this->actingAs($f['agent'])->get(route('operator.tickets.show', $f['ticket']))->assertOk();
     $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['publicAttachment']))->assertOk();
     $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertOk();
 });
 
-it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to them; a customer still cannot use a foreign ticket', function () {
+// FLIPPED IN EPIC-017 WP2 (O1, N1): the ticket's OWNER used to be allowed to time it (`TicketPolicy::view`
+// was the whole rule). Ticket-context time is now operator work, so the owner is refused like any other
+// customer, with nothing written. The agent half is unchanged.
+it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to them; no customer, the owner included, may time a ticket', function () {
     $f = ticketRoleFixture();
 
     $this->actingAs($f['agent'])
@@ -222,7 +232,10 @@ it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to
 
     $this->actingAs($f['owner'])
         ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
-        ->assertSuccessful();
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ticket_id');
+
+    expect(TimeEntry::where('ticket_id', $f['ticket']->id)->where('user_id', '!=', $f['agent']->id)->exists())->toBeFalse();
 });
 
 it('BASELINE H9: dashboard and navigation already key on tickets.assign, so the agent gets the queue and operator links', function () {
@@ -235,11 +248,16 @@ it('BASELINE H9: dashboard and navigation already key on tickets.assign, so the 
             ->where('navigation', fn ($navigation) => collect($navigation)->flatten()->contains('ticket-queue')));
 });
 
-it('TARGET H9: internal-note visibility no longer depends on the route; the agent sees notes on both show pages, the owner on neither', function () {
+it('TARGET H9: internal-note visibility follows the capability; every operator sees notes on the operator page, the requester page never carries them', function () {
     $f = ticketRoleFixture();
 
-    $this->actingAs($f['agent'])->get(route('operator.tickets.show', $f['ticket']))->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
-    $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
-    $this->actingAs($f['operator'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
-    $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk()->assertDontSee('AGENT-VISIBLE-INTERNAL-NOTE');
+    // CONVERTED IN EPIC-017 WP2 (P2): the operators' `/tickets/{id}` is a redirect to the operator page, where
+    // the notes are; the requester page (the owner's) is built without them.
+    foreach (['agent', 'operator'] as $actor) {
+        $this->actingAs($f[$actor])->get(route('tickets.show', $f['ticket']))->assertRedirect(route('operator.tickets.show', $f['ticket']));
+        $this->actingAs($f[$actor])->get(route('operator.tickets.show', $f['ticket']))->assertOk()->assertSee('AGENT-VISIBLE-INTERNAL-NOTE');
+    }
+
+    $owner = $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
+    expect(json_encode(ticketOwnProps($owner)))->not->toContain('AGENT-VISIBLE-INTERNAL-NOTE');
 });

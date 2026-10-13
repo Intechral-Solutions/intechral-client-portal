@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\CrmService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrganizationMemberController extends Controller
 {
@@ -16,7 +17,7 @@ class OrganizationMemberController extends Controller
     public function store(Request $request, Organization $organization): RedirectResponse
     {
         $data = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => ['required', Rule::exists('users', 'id')->whereNull('disabled_at')], // active accounts only (H3)
             'role' => 'required|in:admin,member',
         ]);
 

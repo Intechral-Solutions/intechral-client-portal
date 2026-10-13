@@ -20,5 +20,8 @@ export default defineConfig({
     // Explicit rather than Playwright's core-count default so that isn't left to chance: 3 leaves
     // two logins of headroom under the limiter for each persona. See docs/testing/e2e-browser-suite.md.
     workers: 3,
+    // Ticket cleanup runs once, here, after every worker has finished, and nowhere else: the command is
+    // untargeted and the workers' tickets share a prefix. See support/global-teardown.ts.
+    globalTeardown: './tests/Browser/support/global-teardown.ts',
     projects: [{ name: 'chromium' }],
 });

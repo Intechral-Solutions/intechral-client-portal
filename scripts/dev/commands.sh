@@ -24,9 +24,13 @@ DEV_COMMANDS=(
     'db:status||Migration status of the development DB (read-only)'
     'db:migrate||Show pending, back up, ask for "yes", then run "php artisan migrate" (never fresh)'
     'db:backup||Dump the development DB to backups/dev/<db>-<timestamp>.sql'
+    '#Migration rehearsal (R0.9-1A; two dedicated rehearsal databases, never "portal" or the testing DB)'
+    'rehearse:provision||Create the two rehearsal databases and grant the app account on them ONLY. Idempotent; the one step that uses the DB root login'
+    'rehearse|[options]|Rehearse in the rehearsal DBs: fixtures, snapshot, approved --candidate=NAME migrations, compare, backup/restore (also --no-restore --keep-backup --json). Removes its own backup when it passes'
+    'rehearse:clean||Empty both rehearsal databases and delete rehearsal files and any retained backups (rehearsal resources only)'
     '#Tests and checks'
     'test:php|[pest args]|Pest against the TESTING DB (intechral_client_portal_testing); refuses otherwise'
-    'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; prints before/after counts'
+    'test:e2e|[playwright args]|Playwright (image-baked Chromium) in portal_app. Runs against the DEVELOPMENT DB; sweeps and cleans up E2E tickets; prints before/after counts'
     'check|[--no-php]|CLI self-tests, git diff --check, Pint, npm run check, then the full Pest suite (--no-php skips Pest)'
 )
 
@@ -165,6 +169,93 @@ cmd_db_migrate() {
     app_exec php artisan migrate:status
 }
 
+# ── Migration rehearsal (R0.9-1A) ──────────────────────────────────────────────
+# These commands are thin on purpose. WHAT may be destroyed is decided inside Laravel, by
+# App\Support\Rehearsal\TargetGuard, against fixed database names and a marker the harness wrote itself. This
+# layer only (a) refuses to run unless the stack resolves to the normal development target, so nothing is
+# redirected, (b) pins the environment, and (c) passes on a short allow-list of options, so no flag (--env,
+# --database, a path) can aim the harness elsewhere. Docs: docs/testing/migration-rehearsal.md.
+readonly REHEARSAL_SQL_FILE='.docker/mysql/init-rehearsal.sql'
+
+# rehearsal_sql_violations <file> - prints one line per statement that is not one of the three the rehearsal
+# provisioning may run. The file is run as the database ROOT, so it is held to: CREATE DATABASE IF NOT EXISTS
+# for exactly the two rehearsal databases, GRANT ALL on exactly those two (never *.*), and FLUSH PRIVILEGES.
+rehearsal_sql_violations() {
+    local statement db='intechral_client_portal_rehearsal' dbesc='intechral\\_client\\_portal\\_rehearsal'
+    local create="^CREATE DATABASE IF NOT EXISTS \`${db}(_restore)?\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci\$"
+    local grant="^GRANT ALL PRIVILEGES ON \`${dbesc}(\\\\_restore)?\`\\.\\* TO \`portal\`@\`%\`\$"
+    [[ -r $1 ]] || { printf 'cannot read %s\n' "$1"; return 0; }
+    while IFS= read -r -d ';' statement || [[ -n $statement ]]; do
+        statement="$(printf '%s' "$statement" | grep -v '^[[:space:]]*--' | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+        [[ -n $statement ]] || continue
+        if [[ $statement =~ $create || $statement =~ $grant || $statement == 'FLUSH PRIVILEGES' ]]; then continue; fi
+        printf 'unexpected statement: %s\n' "$statement"
+    done <"$1"
+}
+
+# rehearsal_args_violations <args...> - prints one line per argument that is not on the allow-list.
+rehearsal_args_violations() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --no-restore | --keep-backup | --json) ;;
+            --candidate=*)
+                [[ ${arg#--candidate=} =~ ^[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[a-z0-9_]+$ ]] || printf 'not a migration name: %s\n' "$arg"
+                ;;
+            *) printf 'option not allowed: %s\n' "$arg" ;;
+        esac
+    done
+}
+
+# rehearsal_preflight - the stack must resolve to the normal development target. Nothing is touched; this
+# proves the app is not pointed somewhere unexpected before the harness's own (stricter) guard runs.
+rehearsal_preflight() {
+    require_docker
+    require_running "$SVC_APP" "$SVC_DB"
+    resolve_or_die dev
+    head_line "Rehearsal (dedicated databases only)"
+    say "  The application resolves to: $R_ENV / $R_DB on $R_HOST:$R_PORT (this is NOT touched)."
+    say "  Rehearsal databases: intechral_client_portal_rehearsal, intechral_client_portal_rehearsal_restore"
+    enforce_contract dev
+    say
+}
+
+# rehearsal_artisan <artisan args...> - as the host user, with the environment pinned like db:migrate does.
+rehearsal_artisan() {
+    app_exec env "APP_ENV=$DEV_ENV" "DB_HOST=$DEV_DB_HOST" php artisan "$@" --no-interaction
+}
+
+cmd_rehearse_provision() {
+    local violations file="$DEV_ROOT/$REHEARSAL_SQL_FILE"
+    require_docker
+    require_running "$SVC_DB"
+    violations="$(rehearsal_sql_violations "$file")"
+    if [[ -n $violations ]]; then
+        printf '%sREFUSING:%s %s is not limited to the two rehearsal databases.\n%s\nNothing was run.\n' "$C_RED" "$C_RST" "$REHEARSAL_SQL_FILE" "$violations" >&2
+        exit 1
+    fi
+    head_line "Provisioning the rehearsal databases (database root login, $REHEARSAL_SQL_FILE)"
+    # The password is read inside the container from its own environment; it never reaches this shell or the output.
+    dc exec -T "$SVC_DB" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot' <"$file" || die "provisioning failed."
+    say "Done. The application account has ALL on the two rehearsal databases only. Run ./dev rehearse."
+}
+
+cmd_rehearse() {
+    local violations
+    violations="$(rehearsal_args_violations "$@")"
+    if [[ -n $violations ]]; then
+        printf '%sREFUSING:%s unsupported rehearse arguments (allowed: --candidate=<migration name>, --no-restore, --keep-backup, --json).\n%s\nNothing was run.\n' "$C_RED" "$C_RST" "$violations" >&2
+        exit 2
+    fi
+    rehearsal_preflight
+    rehearsal_artisan rehearsal:run "$@"
+}
+
+cmd_rehearse_clean() {
+    rehearsal_preflight
+    rehearsal_artisan rehearsal:clean
+}
+
 # ── Tests ──────────────────────────────────────────────────────────────────────
 # run_pest [args...] - verifies the resolved test target, then runs Pest as the host user.
 run_pest() {
@@ -181,11 +272,29 @@ cmd_test_php() {
     run_pest "$@"
 }
 
+# run_ticket_cleanup <label> - the E2E ticket cleanup command (EPIC-017 §25.3) against the verified dev
+# target, as the web-server user (owner of the attachment files). It takes no ticket arguments; the command
+# itself decides what is eligible and refuses the rest.
+run_ticket_cleanup() {
+    head_line "E2E ticket cleanup ($1)"
+    dc exec -T -u "$WEB_USER" -e HOME=/tmp "$SVC_APP" env "APP_ENV=$DEV_ENV" "DB_DATABASE=$DEV_DB" "DB_HOST=$DEV_DB_HOST" php artisan e2e:cleanup-tickets --no-interaction </dev/null
+}
+
+# cmd_test_e2e - one suite per database, with the ticket cleanup around it:
+#   lock + competing-suite probe -> recovery sweep -> baseline counts -> Playwright -> post-run cleanup ->
+#   after counts -> reconciliation (ticket rows AND attachment directories).
+# The wrapper owns the cleanup. It runs as the web-server user, which owns the private attachment files; a
+# Playwright globalTeardown runs as whoever launched Playwright (a hosted runner's UID, not `portal`) and could
+# not see them. So Playwright is told (E2E_TICKET_CLEANUP_OWNER=dev) that its teardown must hand the cleanup
+# over, and the wrapper runs it after Playwright has exited. The cleanup therefore never runs while Playwright
+# is running: the sweep is before it and the post-run cleanup after it, in this one process, and Playwright's own
+# run is a single foreground command. Test, cleanup and reconciliation results are kept apart so none hides
+# another.
 cmd_test_e2e() {
     require_docker
     require_running "$SVC_APP" "$SVC_NGINX" "$SVC_DB"
 
-    local before='' after='' listing=0 arg rc=0
+    local before='' after='' dirs_before='' listing=0 arg pw_rc=0 cleanup_rc=0 reconcile_rc=0 dirs_rc=0 final_rc=0
     for arg in "$@"; do
         if [[ $arg == --list ]]; then listing=1; fi
     done
@@ -198,39 +307,111 @@ cmd_test_e2e() {
         say
         say "${C_YLW}NOTE:${C_RST} the browser suite currently exercises the DEVELOPMENT database \"$R_DB\"."
         say "      Test fixtures clean up after themselves; counts are compared below."
+        say "      Only one suite may use this database at a time: the ticket cleanup is untargeted."
+
+        acquire_e2e_lock
+        trap release_e2e_lock EXIT
+        if e2e_suite_running; then
+            die "a Playwright suite is already running in '$SVC_APP'. Not starting a second one against the same database, and not sweeping tickets under it."
+        fi
+
+        # Recovery from an interrupted earlier run (SIGKILL and a lost container run no teardown). Before the
+        # baseline, so the baseline is the non-E2E state and the comparison below is meaningful.
+        if ! run_ticket_cleanup "recovery sweep, before the suite"; then
+            die "the recovery sweep failed, so the ticket baseline would not be clean. Nothing was run. Fix the cause shown above, then run ./dev test:e2e again."
+        fi
+        say
         before="$(product_counts "$R_DB")" || die "could not read baseline counts."
         print_counts "Before" "$before"
+        # After the sweep, so it holds only the directories of tickets this suite must not touch.
+        dirs_before="$(ticket_dir_count)" || die "could not read the attachment directory baseline as '$WEB_USER'. Nothing was run; the private files are not readable by the cleanup identity."
+        say "Before: ticket attachment directories=$dirs_before"
         say
     fi
 
     say "Running Playwright in '$SVC_APP' as $HOST_UID:$HOST_GID (isolated output: $E2E_OUTPUT_DIR), base URL $E2E_BASE_URL"
-    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || rc=$?
+    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" "E2E_TICKET_CLEANUP_OWNER=dev" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || pw_rc=$?
 
     if [[ $listing -eq 0 ]]; then
         say
-        after="$(product_counts "$R_DB")" || die "Playwright finished (exit $rc) but the after-counts could not be read."
+        # The one post-suite cleanup: Playwright's teardown handed it over (E2E_TICKET_CLEANUP_OWNER), and it runs
+        # here as the web-server user once every worker has exited. Idempotent, so a run whose teardown never
+        # happened (a runner crash) is covered too.
+        run_ticket_cleanup "after the suite" || cleanup_rc=$?
+        say
+        after="$(product_counts "$R_DB")" || die "Playwright finished (exit $pw_rc) but the after-counts could not be read."
         print_counts "After" "$after"
         compare_counts "$before" "$after"
+        reconcile_tickets "$before" "$after" || reconcile_rc=$?
+        reconcile_ticket_dirs "$dirs_before" || dirs_rc=$?
     fi
-    [[ $rc -eq 0 ]] || say "Failure traces (if any) stay inside the container at $E2E_OUTPUT_DIR."
-    return "$rc"
+
+    final_rc=$pw_rc
+    if [[ $final_rc -eq 0 && ( $cleanup_rc -ne 0 || $reconcile_rc -ne 0 || $dirs_rc -ne 0 ) ]]; then final_rc=1; fi
+
+    if [[ $listing -eq 0 ]]; then
+        say
+        say "Playwright exit: $pw_rc | ticket cleanup exit: $cleanup_rc | ticket reconciliation: $([[ $reconcile_rc -eq 0 ]] && echo ok || echo FAILED) | attachment directories: $([[ $dirs_rc -eq 0 ]] && echo ok || echo FAILED)"
+        [[ $pw_rc -eq 0 ]] || say "Failure traces (if any) stay inside the container at $E2E_OUTPUT_DIR."
+        [[ $cleanup_rc -eq 0 ]] || say "${C_RED}The ticket cleanup failed:${C_RST} E2E tickets may remain. The next ./dev test:e2e sweeps them once the cause above is fixed."
+    fi
+    return "$final_rc"
 }
 
-# print_counts <label> "<projects> <tasks> <time_entries>"
+# print_counts <label> "<projects> <tasks> <time_entries> <tickets>"
 print_counts() {
-    local p t e
-    read -r p t e <<<"$2"
-    printf '%-7s projects=%s  tasks=%s  time_entries=%s\n' "$1:" "$p" "$t" "$e"
+    local p t e k
+    read -r p t e k <<<"$2"
+    printf '%-7s projects=%s  tasks=%s  time_entries=%s  tickets=%s\n' "$1:" "$p" "$t" "$e" "$k"
 }
 
-# compare_counts <before> <after> - informational only; never deletes anything.
+# compare_counts <before> <after> - informational only (projects, tasks, time_entries); never deletes anything.
 compare_counts() {
-    if [[ $1 == "$2" ]]; then
+    local bp bt be bk ap at ae ak
+    read -r bp bt be bk <<<"$1"
+    read -r ap at ae ak <<<"$2"
+    if [[ "$bp $bt $be" == "$ap $at $ae" ]]; then
         say "${C_GRN}Product-data counts unchanged.${C_RST} (Session rows may change; they are not counted.)"
     else
         say "${C_YLW}WARNING: product-data counts changed. The suite may have leaked fixtures,"
         say "or data was edited while it ran. Nothing was deleted; inspect the development DB.${C_RST}"
     fi
+}
+
+# reconcile_tickets <before> <after> - the ticket count must return to the baseline taken after the recovery
+# sweep. The baseline already holds every non-E2E ticket and the seeded fixtures, so they cancel out. A
+# mismatch is a failure, not something to repair: nothing is deleted to make it pass (a ticket cleanup
+# refused, a storage error and a ticket someone created by hand during the run all show up here).
+reconcile_tickets() {
+    local bp bt be bk ap at ae ak
+    read -r bp bt be bk <<<"$1"
+    read -r ap at ae ak <<<"$2"
+    if [[ $bk == "$ak" ]]; then
+        say "${C_GRN}Ticket count back at its baseline${C_RST} ($ak)."
+        return 0
+    fi
+    say "${C_RED}Ticket count did not return to its baseline:${C_RST} before=$bk after=$ak. Nothing was deleted to reconcile it."
+    say "      Read the cleanup output above (a refusal or storage error), or a ticket created by hand while the suite ran."
+    return 1
+}
+
+# reconcile_ticket_dirs <baseline> - the attachment directory count must return to the baseline taken after the
+# recovery sweep. A ticket row that is gone says nothing about its files, so this reads the directory itself, as the
+# web-server user. A directory that cannot be read is a failure, never zero. Nothing is deleted to make it pass: no
+# general orphan sweep exists, and a file left behind by a deleted row is exactly what this is here to expose.
+reconcile_ticket_dirs() {
+    local now
+    if ! now="$(ticket_dir_count)"; then
+        say "${C_RED}Attachment directories could not be read after the suite${C_RST} (as '$WEB_USER'); the private files cannot be shown to be gone."
+        return 1
+    fi
+    if [[ $now == "$1" ]]; then
+        say "${C_GRN}Attachment directories back at their baseline${C_RST} ($now)."
+        return 0
+    fi
+    say "${C_RED}Attachment directories did not return to their baseline:${C_RST} before=$1 after=$now. Nothing was deleted to reconcile it."
+    say "      A ticket's files outlived its row (or a ticket got attachments by hand while the suite ran). They are private files: look before removing any."
+    return 1
 }
 
 # ── Check ──────────────────────────────────────────────────────────────────────

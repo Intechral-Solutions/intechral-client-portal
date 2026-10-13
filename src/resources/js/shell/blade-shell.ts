@@ -272,9 +272,10 @@ function initNavSheet(shell: HTMLElement): void {
 }
 
 export function initBladeShell(): void {
-    const shell = document.querySelector<HTMLElement>(
-        '[data-shell="operational"][data-shell-renderer="blade"]',
-    );
+    // Either Blade frame: the Operational shell, or the Focused customer shell (EPIC-017 WP1). The
+    // Focused frame has no panel, so `initPanel` finds nothing to control and returns; its account menu
+    // and menu sheet are the same hooks and run unchanged.
+    const shell = document.querySelector<HTMLElement>('[data-shell][data-shell-renderer="blade"]');
 
     if (!shell) {
         return;

@@ -133,6 +133,10 @@
                             {{ $op->name }}
                         </option>
                         @endforeach
+                        {{-- Release 0.9 (H3): a suspended assignee is not a choice, but the current value still shows. --}}
+                        @if ($ticket->assignee?->isSuspended())
+                        <option value="{{ $ticket->assignee_id }}" selected>{{ $ticket->assignee->name }} (suspended)</option>
+                        @endif
                     </x-ui.select>
                     <x-ui.field-error for="assignee_id" />
                     <x-ui.button type="submit" variant="secondary" class="w-full">Update Assignee</x-ui.button>
@@ -173,6 +177,26 @@
                 </ol>
             </div>
             @endif
+
+            {{--
+                N2 continuity (EPIC-017 WP2, owner-approved): the embedded tracker lives here, on the
+                operator-only route, because `/tickets/{id}` became the requester-safe page and carries no
+                time data. The same component, script and endpoints as before; it adds no authorization.
+                Starting ticket time is still refused server-side without `tickets.assign` and ticket
+                visibility (AccessibleTimeContext). TEMPORARY: WP3 replaces this with the React operator
+                ticket page's TimerControl and time summary, and then deletes this embed,
+                components/time-tracker (and /running), the timerStarted/timerStopped listeners in
+                shell/blade-timer.ts, and the tests that pin them. The COMPLETE removal list, and the
+                requester-side privacy tests that must stay, are in EPIC-017 section 37 (N2 continuity).
+            --}}
+            @can('time.log')
+            <x-time-tracker
+                context-type="ticket"
+                :context-id="$ticket->id"
+                :context-label="$ticket->ticket_number"
+                :context-url="route('operator.tickets.show', $ticket)"
+            />
+            @endcan
 
         </aside>
 

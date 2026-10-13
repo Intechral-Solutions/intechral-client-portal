@@ -86,6 +86,37 @@ it('renders the complete local-password profile and associated field errors', ()
     expect(screen.getByText('Current')).toBeInTheDocument();
 });
 
+// The account menu links to /profile#security, #connected-accounts and #sessions in both shells
+// (EPIC-017 N6). The ids must exist, be on the section the entry names, and survive a passwordless
+// account, whose sections show an explanation instead of a form.
+it.each([
+    ['security', 'Password'],
+    ['connected-accounts', 'Connected accounts'],
+    ['sessions', 'Browser sessions'],
+])('exposes #%s on the section headed %s, in both account states', (id, heading) => {
+    const { unmount } = render(<ProfilePage {...baseProps} />);
+
+    for (const state of ['local-password', 'passwordless']) {
+        const section = document.getElementById(id);
+
+        expect(section, `#${id} (${state})`).not.toBeNull();
+        expect(section?.tagName).toBe('SECTION');
+        expect(section).toBe(screen.getByRole('region', { name: heading }));
+        expect(section?.className).toContain('scroll-mt-20');
+
+        if (state === 'local-password') {
+            unmount();
+            render(
+                <ProfilePage
+                    {...baseProps}
+                    profile={{ ...baseProps.profile, hasPassword: false }}
+                    sessions={[]}
+                />,
+            );
+        }
+    }
+});
+
 it('does not offer unsupported password or session forms to passwordless users', () => {
     render(
         <ProfilePage

@@ -295,6 +295,8 @@ it('CHARACTERIZATION notifications: the reply mail carries the ticket number and
         ->and($mail->actionUrl)->toBe(url("/tickets/{$ticket->id}"));
 });
 
+// CONVERTED IN EPIC-017 WP2 (P2): the mail link stays `/tickets/{id}` (per-recipient links are WP5); for an
+// agent who is not the requester it now lands on the operator page, which they open.
 it('TARGET H9: an agent assignee can follow the reply mail link to the ticket', function () {
     $owner = ticketUser();
     $agent = ticketAgent();
@@ -304,5 +306,6 @@ it('TARGET H9: an agent assignee can follow the reply mail link to the ticket', 
     $link = (new TicketRepliedNotification($ticket, $reply))->toMail($agent)->actionUrl;
 
     expect($link)->toBe(route('tickets.show', $ticket));
-    $this->actingAs($agent)->get($link)->assertOk();
+    $this->actingAs($agent)->get($link)->assertRedirect(route('operator.tickets.show', $ticket));
+    $this->actingAs($agent)->followingRedirects()->get($link)->assertOk();
 });

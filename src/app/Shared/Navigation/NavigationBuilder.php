@@ -4,6 +4,7 @@ namespace App\Shared\Navigation;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Shared\Shell\ShellPresentation;
 use Illuminate\Http\Request;
 use LogicException;
 
@@ -48,13 +49,22 @@ use LogicException;
  *   most-specific-wins resolution, so the three A1.10 collisions cannot recur.
  * - `count` is reserved and always null (§12.3 rule 8). Operational and status metadata stay out of
  *   the navigation item contract.
+ *
+ * The Focused projection (EPIC-017 §14) is selected by the `$presentation` argument and is a SUBSET of
+ * what the same actor is offered Operationally. It is derived from the capability-filtered specs: a
+ * workspace appears only if it declares a `focused` entry (`label`, `order`, and the context `item` it
+ * points at, or none for a single-surface workspace) AND that destination survived filtering. Its
+ * `href` and `visit` are copied from that surviving destination, never stated, so the projection can
+ * neither add a workspace nor point anywhere the actor is not already allowed. It carries no `context`
+ * (the Focused shell has no drawer) and no operational hints. Finance and Projects later edit only
+ * their own `focused` argument.
  */
 final class NavigationBuilder
 {
     /**
      * @return array{currentWorkspace: string|null, workspaces: array<int, array<string, mixed>>}
      */
-    public function build(Request $request): array
+    public function build(Request $request, ShellPresentation $presentation = ShellPresentation::Operational): array
     {
         $user = $request->user();
 
@@ -77,6 +87,10 @@ final class NavigationBuilder
         ]));
 
         $activeKey = $this->resolveActiveWorkspace($request, $specs);
+
+        if ($presentation === ShellPresentation::Focused) {
+            return $this->focused($specs, $activeKey);
+        }
 
         return [
             'currentWorkspace' => $activeKey,
@@ -105,6 +119,7 @@ final class NavigationBuilder
             icon: 'house',
             patterns: ['dashboard'],
             surface: ['href' => route('dashboard'), 'visit' => 'inertia'],
+            focused: $this->focusedEntry('Home', 10),
         );
     }
 
@@ -148,6 +163,7 @@ final class NavigationBuilder
             patterns: ['projects.*'],
             panel: PanelDefault::Open,
             sections: $sections,
+            focused: $this->focusedEntry('Projects', 30, 'projects.all'),
             // Direction D §5.3: the list, Overview and Milestones keep the workspace default (Open);
             // the wide canvas surfaces default to Collapsed and remember their own choice. Task
             // detail, Settings and create are not named by §5.3 and keep the workspace default.
@@ -210,7 +226,7 @@ final class NavigationBuilder
         $views = [];
 
         if ($user->can('tickets.view')) {
-            $views[] = $this->item('helpdesk.requests', 'My requests', route('tickets.index'), 'document', [
+            $views[] = $this->item('helpdesk.requests', 'My requests', route('tickets.index'), 'inertia', [
                 'tickets.index',
                 'tickets.show',
                 'tickets.create',
@@ -238,6 +254,7 @@ final class NavigationBuilder
             patterns: ['tickets.*', 'operator.tickets.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, $views)],
+            focused: $this->focusedEntry('Support', 20, 'helpdesk.requests'),
         );
     }
 
@@ -343,6 +360,9 @@ final class NavigationBuilder
             patterns: ['billing.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, [$view])],
+            // Only the client branch (`billing.view` without `billing.manage`) has this item, so the
+            // customer's "Invoices" entry can never resolve to the operator invoice surface.
+            focused: $this->focusedEntry('Invoices', 40, 'finance.my-invoices'),
         );
     }
 
@@ -414,6 +434,7 @@ final class NavigationBuilder
             icon: 'library',
             patterns: ['cms.*'],
             surface: ['href' => route('cms.index'), 'visit' => 'document'],
+            focused: $this->focusedEntry('Resources', 50),
         );
     }
 
@@ -426,6 +447,7 @@ final class NavigationBuilder
      *                                                            destination here instead.
      * @param  array<int, array<string, mixed>>  $sections
      * @param  array<int, array{key: string, panel: PanelDefault, routes: array<int, string>}>  $surfaces  Surfaces with their own panel default (§5.3).
+     * @param  array{label: string, order: int, item: string|null}|null  $focused  The Focused entry (EPIC-017 §14); null leaves the workspace out of the Focused projection.
      * @return array<string, mixed>
      */
     private function workspace(
@@ -437,6 +459,7 @@ final class NavigationBuilder
         ?PanelDefault $panel = null,
         array $sections = [],
         array $surfaces = [],
+        ?array $focused = null,
     ): array {
         $sections = array_values(array_filter($sections, fn (array $section) => $section['items'] !== []));
 
@@ -467,7 +490,99 @@ final class NavigationBuilder
             'sections' => $sections,
             // A workspace with no panel has nothing for a surface to default.
             'surfaces' => $sections === [] ? [] : $surfaces,
+            'focused' => $focused,
         ];
+    }
+
+    /**
+     * The Focused declaration of a workspace (EPIC-017 §14): its plain-language `label`, its position
+     * (`order`), and the context item key it points at (null for a single-surface workspace, which
+     * points at its own surface). No destination is stated here; see {@see self::focused()}.
+     *
+     * @return array{label: string, order: int, item: string|null}
+     */
+    private function focusedEntry(string $label, int $order, ?string $item = null): array
+    {
+        return ['label' => $label, 'order' => $order, 'item' => $item];
+    }
+
+    /**
+     * The Focused projection of the already capability-filtered specs.
+     *
+     * A declared entry whose target item or surface did not survive filtering is dropped — never
+     * replaced with a placeholder — so removing a capability removes its entry. Active state comes
+     * from the same server-side resolution the Operational model uses; `currentWorkspace` is null on a
+     * route that belongs to no Focused entry (Tasks, Time, Profile).
+     *
+     * @param  array<int, array<string, mixed>>  $specs
+     * @return array{currentWorkspace: string|null, workspaces: array<int, array<string, mixed>>}
+     */
+    private function focused(array $specs, ?string $activeKey): array
+    {
+        $entries = [];
+
+        foreach ($specs as $spec) {
+            $focused = $spec['focused'] ?? null;
+
+            if ($focused === null) {
+                continue;
+            }
+
+            $target = $this->focusedTarget($spec, $focused['item']);
+
+            if ($target === null) {
+                continue;
+            }
+
+            $entries[] = [
+                'order' => $focused['order'],
+                'workspace' => [
+                    'key' => $spec['key'],
+                    'label' => $focused['label'],
+                    'icon' => $spec['icon'],
+                    'href' => $target['href'],
+                    'visit' => $target['visit'],
+                    'isActive' => $spec['key'] === $activeKey,
+                    // The Focused shell has no drawer, so no contextual section reaches it.
+                    'context' => [],
+                    'presentation' => ['focused' => ['order' => $focused['order']]],
+                ],
+            ];
+        }
+
+        usort($entries, fn (array $a, array $b) => $a['order'] <=> $b['order']);
+
+        $workspaces = array_map(fn (array $entry) => $entry['workspace'], $entries);
+        $present = array_column($workspaces, 'key');
+
+        return [
+            'currentWorkspace' => in_array($activeKey, $present, true) ? $activeKey : null,
+            'workspaces' => $workspaces,
+        ];
+    }
+
+    /**
+     * The surviving destination a Focused entry points at: the named context item when one is
+     * declared, otherwise the workspace's own destination. Null when the item was filtered out.
+     *
+     * @param  array<string, mixed>  $spec
+     * @return array{href: string, visit: string}|null
+     */
+    private function focusedTarget(array $spec, ?string $item): ?array
+    {
+        if ($item === null) {
+            return ['href' => $spec['href'], 'visit' => $spec['visit']];
+        }
+
+        foreach ($spec['sections'] as $section) {
+            foreach ($section['items'] as $candidate) {
+                if ($candidate['key'] === $item) {
+                    return ['href' => $candidate['href'], 'visit' => $candidate['visit']];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

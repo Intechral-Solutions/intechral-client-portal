@@ -23,7 +23,9 @@ class OrganizationController extends Controller
     {
         $organization->load(['owner', 'company', 'members']);
 
-        $availableUsers = User::whereDoesntHave('organizations', fn ($q) => $q->where('organizations.id', $organization->id)
+        // Candidates to add: active accounts only (Release 0.9, H3). Existing members, suspended or not, are listed
+        // from the relation above.
+        $availableUsers = User::active()->whereDoesntHave('organizations', fn ($q) => $q->where('organizations.id', $organization->id)
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         return view('organizations.show', compact('organization', 'availableUsers'));

@@ -8,6 +8,7 @@ use App\Models\ProjectMilestone;
 use App\Models\User;
 use App\Policies\ProjectTimeAccess;
 use App\Queries\ProjectHealth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Page DTOs for the project index, create and edit pages (EPIC-011E §5). Every method returns
@@ -134,14 +135,22 @@ final class ProjectPresenter
      * The user directory for the membership editor. D7-B: callers pass it to the page only when
      * ProjectPolicy::manageMembers allows, and omit the prop entirely otherwise.
      *
-     * @return array<int, array{id: int, name: string, email: string}>
+     * Active accounts only (Release 0.9, H3), plus, when editing, the project's existing members whose
+     * accounts are suspended, flagged `suspended`: the editor keeps them in their own rows so saving the
+     * list does not silently drop them, but never offers them as a new member.
+     *
+     * @return array<int, array{id: int, name: string, email: string, suspended?: true}>
      */
-    public static function memberCandidates(): array
+    public static function memberCandidates(?Project $project = null): array
     {
-        return User::orderBy('name')
+        return User::query()
+            ->where(fn ($query) => $query->whereNull('disabled_at')
+                ->when($project, fn ($query) => $query->orWhereIn('id', DB::table('project_members')->where('project_id', $project->id)->select('user_id'))))
+            ->orderBy('name')
             ->orderBy('id')
-            ->get(['id', 'name', 'email'])
-            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email])
+            ->get(['id', 'name', 'email', 'disabled_at'])
+            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email]
+                + ($user->isSuspended() ? ['suspended' => true] : []))
             ->all();
     }
 

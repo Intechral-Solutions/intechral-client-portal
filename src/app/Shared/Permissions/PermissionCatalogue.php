@@ -11,7 +11,8 @@ namespace App\Shared\Permissions;
  * To add permissions for a new module:
  *   1. Add a constant block below.
  *   2. Add the constants to the ALL array.
- *   3. Assign relevant permissions to built-in roles in RoleSeeder.
+ *   3. If the built-in `user` role should have it, add it to userDefaults(). `operator` carries the whole catalogue.
+ *   4. Preview and apply the change with `php artisan roles:sync` (App\Shared\Permissions\BuiltInRoles owns the definitions).
  */
 final class PermissionCatalogue
 {

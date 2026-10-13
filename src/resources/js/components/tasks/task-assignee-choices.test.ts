@@ -96,3 +96,32 @@ it('drops the departed holder from the choices once the task is no longer theirs
 
     expect(assigneeChoices(board, options)).toEqual([]);
 });
+
+// Release 0.9 (H3): a member the server flags `suspended` keeps an existing assignment but is never a new choice.
+const withSuspended: TaskAssigneeOptions = {
+    self: { id: 1, name: 'Dana Webb' },
+    projects: [
+        {
+            projectId: 7,
+            members: [
+                { id: 1, name: 'Dana Webb' },
+                { id: 3, name: 'Sid Suspended', suspended: true },
+            ],
+        },
+    ],
+};
+
+it('never offers a suspended member as a new assignee', () => {
+    const board = row({ kind: 'board', projectId: 7 });
+
+    expect(assigneeChoices(board, withSuspended)).toEqual([{ id: 1, label: 'Dana Webb' }]);
+});
+
+it('labels a suspended holder as suspended, not as departed, and only as the current value', () => {
+    const board = row({ kind: 'board', projectId: 7, assignee: { id: 3, name: 'Sid Suspended' } });
+
+    expect(assigneeChoices(board, withSuspended)).toEqual([
+        { id: 1, label: 'Dana Webb' },
+        { id: 3, label: 'Sid Suspended (suspended)', current: true },
+    ]);
+});

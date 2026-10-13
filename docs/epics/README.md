@@ -56,4 +56,4 @@ EPIC-017 (planned 2026-10-07) is the implementation contract for the roadmap's R
 - Its first package is the dedicated customer shell (Release 1 ruling D1).
 - Its design gate has completed owner review: the architecture, decisions O1–O3 and plan choices P1–P6 are approved.
 - The `@shadcn/lint` adoption (PR #29) merged on 2026-10-08 (`61e46ab`) and is part of the current `main` baseline; it is not a WP1 dependency.
-- EPIC-017 is **Planned**: WP0 is committed and WP1 has not started.
+- EPIC-017 is **Planned**: WP0 is on `main`. As of 2026-10-11 WP1 (customer shell) and WP2 (customer Helpdesk in React) are implemented and committed on the unpushed feature branch (Amendments 1 and 2); WP3–WP5 are not started; nothing has merged and hosted CI has not run for any EPIC-017 code.

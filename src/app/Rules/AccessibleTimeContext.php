@@ -33,9 +33,29 @@ class AccessibleTimeContext implements ValidationRule
         return match ($type) {
             'project' => self::canViewProject($user, Project::find($value)),
             'task' => self::canUseTask($user, Task::with(['project', 'ticket'])->find($value)),
-            'ticket' => self::canViewTicket($user, Ticket::find($value)),
+            'ticket' => self::canTimeTicket($user, Ticket::find($value)),
             default => false,
         };
+    }
+
+    /**
+     * Ticket-context time is operator work (EPIC-017 O1, N1): the actor must hold `tickets.assign`
+     * AND be able to view the ticket. Owning the ticket is not enough, so a requester can neither
+     * start a ticket timer nor record ticket time, whichever shell or page they use; the shell
+     * presentation plays no part. This governs NEW ticket attribution, including an update that
+     * keeps an entry on its ticket (TimeEntryController::update). Stopping an already-running timer
+     * and deleting an owned entry never come through here; the controller's
+     * ensureTicketTimeEligible() documents what that leaves allowed.
+     *
+     * A ticket-derived TASK is not this context: it keeps the EPIC-015 rule in canUseTask(),
+     * whose ticket-view fallback is unchanged. Such tasks are dormant (EPIC-010D D5, no code path
+     * creates one); the package that activates them must apply O1 to that fallback.
+     */
+    private static function canTimeTicket(User $user, ?Ticket $ticket): bool
+    {
+        return $ticket !== null
+            && Gate::forUser($user)->allows('tickets.assign')
+            && Gate::forUser($user)->allows('view', $ticket);
     }
 
     /**

@@ -37,6 +37,19 @@
                 <h2 class="mb-4 text-base font-semibold text-text">Account</h2>
                 <dl class="space-y-3 text-sm">
                     <div class="flex justify-between gap-4">
+                        <dt class="text-text-secondary">Status</dt>
+                        <dd class="flex flex-wrap items-center justify-end gap-x-2">
+                            @if ($user->isSuspended())
+                            <x-ui.status tone="danger">Suspended</x-ui.status>
+                            <span class="text-text-secondary">
+                                since <time datetime="{{ $user->disabled_at->toIso8601String() }}">{{ $user->disabled_at->format('d M Y, H:i') }}</time>
+                            </span>
+                            @else
+                            <x-ui.status tone="success">Active</x-ui.status>
+                            @endif
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
                         <dt class="text-text-secondary">Member since</dt>
                         <dd class="text-text">{{ $user->created_at->format('d M Y') }}</dd>
                     </div>
@@ -82,6 +95,9 @@
                     <li class="flex items-start justify-between gap-4 text-sm">
                         <div>
                             <span class="text-text">{{ $log->description }}</span>
+                            @if ($log->causer && ! $log->causer->is($user))
+                            <span class="text-text-secondary">by {{ $log->causer->name }}</span>
+                            @endif
                             @if ($log->properties->isNotEmpty())
                             <p class="text-xs mt-0.5 font-mono text-text-secondary">
                                 {{ $log->properties->except('ip')->toJson() }}
@@ -100,9 +116,47 @@
 
         </div>
 
-        {{-- Right column: roles --}}
+        {{-- Right column: account access and roles --}}
         @can('users.manage')
-        <aside>
+        <aside class="space-y-8">
+            {{-- Release 0.9 (H3): suspension is the only offboarding. The server enforces every rule shown here. --}}
+            <section aria-labelledby="account-access-heading" class="rounded-lg border p-6 border-rule bg-surface">
+                <h2 id="account-access-heading" class="mb-2 text-base font-semibold text-text">Account access</h2>
+                @if ($user->isSuspended())
+                <p class="mb-4 text-sm text-text-secondary">
+                    This account is suspended and cannot sign in. Reactivating it restores sign-in with the roles shown
+                    below; it grants nothing new, and {{ $user->name }} must sign in again.
+                </p>
+                <form method="POST" action="{{ route('users.reactivate', $user) }}"
+                      onsubmit="return confirm('Reactivate {{ addslashes($user->name) }}? They will be able to sign in again.')">
+                    @csrf
+                    <div class="mb-4 space-y-2">
+                        <x-ui.label for="reactivate-reason">Reason (optional)</x-ui.label>
+                        <x-ui.textarea name="reason" id="reactivate-reason" rows="2" maxlength="500" class="w-full">{{ old('reason') }}</x-ui.textarea>
+                        <x-ui.field-error for="reactivate-reason" error-key="reason" />
+                    </div>
+                    <x-ui.button type="submit" variant="secondary" class="w-full">Reactivate account</x-ui.button>
+                </form>
+                @elseif (auth()->user()->is($user))
+                <p class="text-sm text-text-secondary">You cannot suspend your own account.</p>
+                @else
+                <p class="mb-4 text-sm text-text-secondary">
+                    Suspending signs {{ $user->name }} out everywhere and blocks sign-in. Their records, assignments,
+                    roles and history are kept, and the account can be reactivated.
+                </p>
+                <form method="POST" action="{{ route('users.suspend', $user) }}"
+                      onsubmit="return confirm('Suspend {{ addslashes($user->name) }}? They will be signed out everywhere and unable to sign in.')">
+                    @csrf
+                    <div class="mb-4 space-y-2">
+                        <x-ui.label for="suspend-reason">Reason</x-ui.label>
+                        <x-ui.textarea name="reason" id="suspend-reason" rows="2" maxlength="500" required class="w-full">{{ old('reason') }}</x-ui.textarea>
+                        <x-ui.field-error for="suspend-reason" error-key="reason" />
+                    </div>
+                    <x-ui.button type="submit" variant="secondary" tone="danger" class="w-full">Suspend account</x-ui.button>
+                </form>
+                @endif
+            </section>
+
             <section class="rounded-lg border p-6 border-rule bg-surface">
                 <h2 id="user-roles-heading" class="mb-4 text-base font-semibold text-text">Roles</h2>
                 <form method="POST" action="{{ route('users.roles.update', $user) }}">

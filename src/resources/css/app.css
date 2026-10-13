@@ -931,6 +931,98 @@ body {
     z-index: 45;
 }
 
+/* ── Direction D customer (Focused) shell (EPIC-017 WP1) ──────
+   Geometry from direction-d-design-system.md §5.1/§5.2/§7: a 60px top bar and
+   one centred column of at most 1080px. No rail, drawer, utility bar or timer
+   exists in this presentation, so none of the operational rules above apply
+   (they are all scoped to [data-shell='operational']).
+
+   Both renderers emit the same hooks, so this one block lays out React and
+   Blade identically. Unlayered for the same reason as the operational block
+   (A8.12 #2): the parts also carry Tailwind utilities, and a layered
+   `display: none` would lose to `.flex`.
+
+   The width classes are the customer ones, not the operator's 768px rail
+   boundary: the top nav shows from 900px, and the menu sheet carries the same
+   links below it (§5.2). ── */
+[data-shell='focused'] {
+    --shell-topbar: 60px;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--ds-canvas);
+    color: var(--ds-text);
+}
+
+[data-shell='focused'] [data-shell-topbar] {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: var(--shell-topbar);
+    padding: 0 16px;
+    background-color: var(--ds-canvas);
+    border-bottom: 1px solid var(--ds-rule);
+}
+
+@media (min-width: 1024px) {
+    [data-shell='focused'] [data-shell-topbar] {
+        padding: 0 24px;
+    }
+}
+
+[data-shell='focused'] [data-shell-topnav] {
+    display: flex;
+    align-self: stretch;
+    gap: 4px;
+    min-width: 0;
+}
+
+[data-shell='focused'] [data-shell-topbar-end] {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+/* The column owns the 1080px measure and nothing else: the page frame inside it keeps its own
+   gutters, so a customer page and an operator page pad their content identically. */
+[data-shell='focused'] [data-shell-column] {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    max-width: 1080px;
+    min-width: 0;
+    margin-inline: auto;
+}
+
+/* Below 900px the nav list leaves the accessibility tree (not merely the screen), so the menu
+   sheet is the single set of links there. */
+@media (max-width: 899.98px) {
+    [data-shell='focused'] [data-shell-topnav] {
+        display: none;
+    }
+}
+
+@media (min-width: 900px) {
+    [data-shell='focused'] [data-shell-sheet-trigger] {
+        display: none;
+    }
+}
+
+/* The menu sheet's width. Keyed on the attribute alone, NOT nested under [data-shell='focused']:
+   Radix portals the React dialog to <body>, outside the shell root, so a nested selector would never
+   match it. The Blade <dialog> sits inside the root and matches the same rule. One-off geometry, so a
+   rule here rather than a design token. */
+[data-shell-sheet='focused'] {
+    width: min(20rem, 88vw);
+}
+
 /* ── Brand mark theming (EPIC-013 WP4, §10.3 / A1.5) ──────────
    The canonical SVGs hard-code the brand cyan in their gradient stops, which
    is correct on dark. CSS beats SVG presentation attributes, so light flattens

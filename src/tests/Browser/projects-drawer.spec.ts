@@ -271,8 +271,9 @@ test('other workspaces keep their own defaults and remembered state', async ({ p
     await expect(page.getByRole('navigation', { name: 'Tasks views' })).toHaveCount(0);
     await expect(page.locator('html')).not.toHaveAttribute('data-drawer-surface', /.+/);
 
-    // Helpdesk (a Blade page) opens by default, as before.
-    await page.goto('/tickets');
+    // Helpdesk (the operator queue, a Blade page) opens by default, as before. (`/tickets` is a React page
+    // as of EPIC-017 WP2; the queue is the Helpdesk surface that is still Blade.)
+    await page.goto('/operator/tickets');
     await expect(page.getByRole('navigation', { name: 'Helpdesk views' })).toBeVisible();
 });
 

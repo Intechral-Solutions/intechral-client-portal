@@ -4,7 +4,11 @@ use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketReply;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Testing\Fakes\NotificationFake;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\Models\Role;
 
 /*
@@ -87,6 +91,106 @@ function ticketAttachment(Ticket $ticket, ?TicketReply $reply, User $uploader, s
     ]);
 }
 
+/**
+ * Real bytes of a given kind (EPIC-017 §20.1). The attachment rule reads the type from the file's
+ * content, so a zero-filled `UploadedFile::fake()->create('a.pdf')` is, correctly, not a PDF.
+ * Detection depends on the libmagic of the PHP build running the suite, so TicketAttachmentPolicyTest
+ * asserts the detected type of every kind rather than assuming it.
+ */
+function ticketFileBytes(string $kind): string
+{
+    $zip = function (array $entries): string {
+        $path = tempnam(sys_get_temp_dir(), 'tkt-zip');
+        $archive = new ZipArchive;
+        $archive->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        foreach ($entries as $name => $content) {
+            $archive->addFromString($name, $content);
+        }
+        $archive->close();
+        $bytes = (string) file_get_contents($path);
+        unlink($path);
+
+        return $bytes;
+    };
+    $image = function (callable $encode): string {
+        $canvas = imagecreatetruecolor(2, 2);
+        ob_start();
+        $encode($canvas);
+
+        return (string) ob_get_clean();
+    };
+    $ooxml = fn (string $part) => $zip([
+        '[Content_Types].xml' => '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+        '_rels/.rels' => '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+        $part => '<?xml version="1.0"?><root/>',
+    ]);
+
+    return match ($kind) {
+        'pdf' => "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n",
+        'png' => $image(fn ($canvas) => imagepng($canvas)),
+        'jpeg' => $image(fn ($canvas) => imagejpeg($canvas)),
+        'gif' => $image(fn ($canvas) => imagegif($canvas)),
+        // A minimal lossless WebP container (the image GD build here cannot encode WebP).
+        'webp' => 'RIFF'.pack('V', 26).'WEBPVP8L'.pack('V', 14)."\x2f\x00\x00\x00\x00\x07\x10\x11\x11\x88\x88\xfe\x07\x00",
+        'text' => "Plain text notes\nline two\n",
+        'csv' => "name,amount,date\nAlice,10,2026-01-01\nBob,20,2026-01-02\n",
+        'csv-semicolon' => "name;amount\nAlice;10\n",
+        'docx' => $ooxml('word/document.xml'),
+        'xlsx' => $ooxml('xl/workbook.xml'),
+        'pptx' => $ooxml('ppt/presentation.xml'),
+        'zip' => $zip(['readme.txt' => 'hello']),
+        'html' => "<!DOCTYPE html><html><body><script>alert(1)</script></body></html>\n",
+        'svg' => '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        'shell' => "#!/bin/sh\necho owned\n",
+        'php' => "<?php echo 'owned';\n",
+        'exe' => 'MZ'.str_repeat("\0", 58).pack('V', 64)."PE\0\0".str_repeat("\0", 200),
+        'elf' => "\x7fELF\x02\x01\x01".str_repeat("\0", 200),
+        'zeros' => str_repeat("\0", 1024),
+        'empty' => '',
+    };
+}
+
+/** An uploaded file named $filename whose bytes are $kind (see ticketFileBytes()). */
+function ticketUpload(string $filename, string $kind = 'pdf'): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent($filename, ticketFileBytes($kind));
+}
+
+/** The transaction depth of the connection the Ticket models write through. */
+function ticketTransactionLevel(): int
+{
+    return (new Ticket)->getConnection()->transactionLevel();
+}
+
+/**
+ * Notification::fake() that also records, for every notification handed to the dispatcher, the
+ * transaction level of the ticket connection at that instant (EPIC-017 O3 groundwork, "after commit
+ * only"). The test framework's own transaction is part of the baseline, so compare each recorded
+ * level with ticketTransactionLevel() read just before the call under test: equal means the service
+ * had already committed (or never opened) its own transaction, greater means it sent mail inside one.
+ *
+ * @return NotificationFake&object{levels: list<int>}
+ */
+function ticketRecordNotificationLevels(): NotificationFake
+{
+    $fake = new class extends NotificationFake
+    {
+        /** @var list<int> */
+        public array $levels = [];
+
+        public function sendNow($notifiables, $notification, ?array $channels = null)
+        {
+            $this->levels[] = ticketTransactionLevel();
+
+            parent::sendNow($notifiables, $notification, $channels);
+        }
+    };
+
+    Notification::swap($fake);
+
+    return $fake;
+}
+
 /** Remove everything the faked local disk holds, so no fixture bytes outlive the test. */
 function ticketCleanFakeStorage(): void
 {
@@ -117,4 +221,67 @@ function ticketParseCsv(string $csv): array
     fclose($stream);
 
     return $rows;
+}
+
+/**
+ * The titles `/tickets` lists for an actor, from the page's props (what the browser receives), so a
+ * visibility test asserts on the data the customer is sent and not on markup.
+ *
+ * @param  array<string, mixed>  $query
+ * @return list<string>
+ */
+function ticketListedTitles(User $actor, array $query = []): array
+{
+    $response = test()->actingAs($actor)->get(route('tickets.index', $query))->assertOk();
+
+    return array_column(ticketOwnProps($response)['tickets']['data'], 'title');
+}
+
+/** The shared props every Inertia response carries; a page's OWN props are everything else. */
+const TICKET_SHARED_PROP_KEYS = ['errors', 'app', 'auth', 'shell', 'navigation', 'flash'];
+
+/**
+ * The Inertia page object of a response as a plain array (a JSON round trip, so it is exactly what
+ * the browser receives): `component`, `props`, `url`, ...
+ *
+ * @return array<string, mixed>
+ */
+function ticketPage(TestResponse $response): array
+{
+    return json_decode(json_encode($response->viewData('page')), true);
+}
+
+/**
+ * A page's own props, without the shared set. Pest loads every test file into one process, so this
+ * and its siblings carry the "ticket" prefix.
+ *
+ * @return array<string, mixed>
+ */
+function ticketOwnProps(TestResponse $response): array
+{
+    return array_diff_key(ticketPage($response)['props'], array_flip(TICKET_SHARED_PROP_KEYS));
+}
+
+/**
+ * Every key at any depth of a structure, dotted by path (a list's index is `*`), so an exact-key
+ * assertion sees nested props and not only the top level.
+ *
+ * @return list<string>
+ */
+function ticketKeyPaths(mixed $value, string $prefix = ''): array
+{
+    if (! is_array($value)) {
+        return [];
+    }
+
+    $paths = [];
+
+    foreach ($value as $key => $child) {
+        $segment = is_int($key) ? '*' : $key;
+        $path = $prefix === '' ? $segment : "{$prefix}.{$segment}";
+        $paths[] = $path;
+        array_push($paths, ...ticketKeyPaths($child, $path));
+    }
+
+    return array_values(array_unique($paths));
 }

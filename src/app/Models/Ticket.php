@@ -103,16 +103,23 @@ class Ticket extends Model
      */
     public function scopeSearch($query, string $term, bool $includeInternal = false)
     {
-        return $query->where(function ($q) use ($term, $includeInternal) {
-            $q->where('title', 'like', "%{$term}%")
-                ->orWhere('description', 'like', "%{$term}%")
-                ->orWhere('ticket_number', 'like', "%{$term}%")
-                ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', "%{$term}%")
+        // The term is literal text (EPIC-010D F-4): `%`, `_` and `\` are escaped, so they match
+        // themselves rather than acting as LIKE wildcards. The backslash is escaped first.
+        $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term).'%';
+
+        return $query->where(function ($q) use ($like, $includeInternal) {
+            $q->where('title', 'like', $like)
+                ->orWhere('description', 'like', $like)
+                ->orWhere('ticket_number', 'like', $like)
+                ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', $like)
                     ->when(! $includeInternal, fn ($r) => $r->where('is_internal', false)));
         });
     }
 
     // ── Status valid transitions ─────────────────────────────
+
+    /** Every status value, in lifecycle order (the DB enum). */
+    public const STATUSES = ['open', 'in_progress', 'pending_user', 'resolved', 'closed'];
 
     public const TRANSITIONS = [
         'open' => ['in_progress', 'pending_user', 'resolved', 'closed'],

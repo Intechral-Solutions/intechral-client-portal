@@ -57,8 +57,10 @@ class ProjectTaskController extends Controller
         $options = null;
         if ($manage) {
             $options = [
-                'members' => $project->members()->orderBy('name')->get(['users.id', 'users.name'])
-                    ->map(fn (User $member) => ProjectTaskPresenter::userRef($member))
+                // A suspended member (Release 0.9, H3) is flagged: the client offers them only as the current holder.
+                'members' => $project->members()->orderBy('name')->get(['users.id', 'users.name', 'users.disabled_at'])
+                    ->map(fn (User $member) => ProjectTaskPresenter::userRef($member)
+                        + ($member->isSuspended() ? ['suspended' => true] : []))
                     ->values(),
                 'milestones' => $project->milestones()->get(['id', 'name'])
                     ->map(fn (ProjectMilestone $milestone) => ['id' => $milestone->id, 'name' => $milestone->name])

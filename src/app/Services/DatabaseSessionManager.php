@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 final class DatabaseSessionManager
 {
@@ -44,6 +46,36 @@ final class DatabaseSessionManager
             return DB::table(config('session.table', 'sessions'))
                 ->where('user_id', $user->id)
                 ->where('id', '!=', $currentSessionId)
+                ->delete();
+        });
+    }
+
+    /**
+     * Sign the user out everywhere: rotate the remember-me token (so no remembered login can come back), delete any
+     * outstanding password-reset token (so a link issued earlier cannot be used after a reactivation; R0.9-1C review
+     * finding L-1) and delete every stored session. Used by account suspension and reactivation (Release 0.9, H3).
+     *
+     * Unlike the methods above it fails closed (finding L-2): with any session driver but `database` the sessions
+     * cannot be deleted, so it throws before changing anything, and the caller's transaction rolls back. The database
+     * driver is a Release 0.9 deployment prerequisite (docs/architecture/account-lifecycle.md).
+     *
+     * @throws RuntimeException
+     */
+    public function revokeAll(User $user): int
+    {
+        if (config('session.driver') !== 'database') {
+            throw new RuntimeException('Signing a user out everywhere requires SESSION_DRIVER=database (a Release 0.9 '
+                .'deployment prerequisite); the account was not changed.');
+        }
+
+        return DB::transaction(function () use ($user) {
+            $user->setRememberToken(Str::random(60));
+            $user->save();
+
+            Password::broker(config('fortify.passwords'))->deleteToken($user);
+
+            return DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
                 ->delete();
         });
     }

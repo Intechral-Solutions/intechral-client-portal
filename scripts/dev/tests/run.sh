@@ -30,7 +30,7 @@ case "$*" in
     *mariadb-dump*) printf '%b' "${STUB_DUMP-"-- MariaDB dump\nCREATE TABLE t (id int);\n-- Dump completed on 2026-01-01\n"}"; exit "${STUB_DUMP_RC:-0}" ;;
     *"mariadb -N"*)
         n=$(cat "$STUB_LOG.counts" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.counts"
-        if [[ $n -eq 0 ]]; then printf '%b\n' "${STUB_COUNTS_BEFORE:-1\t2\t3}"; else printf '%b\n' "${STUB_COUNTS_AFTER:-1\t2\t3}"; fi
+        if [[ $n -eq 0 ]]; then printf '%b\n' "${STUB_COUNTS_BEFORE:-1\t2\t3\t4}"; else printf '%b\n' "${STUB_COUNTS_AFTER:-1\t2\t3\t4}"; fi
         exit 0 ;;
     *"playwright-core/package.json"*) echo "${STUB_PW_VERSION-1.63.0}"; exit "${STUB_PW_VERSION_RC:-0}" ;;
     *"printenv PLAYWRIGHT_BROWSERS_PATH"*) echo "${STUB_PW_PATH-/opt/ms-playwright}"; exit 0 ;;
@@ -39,6 +39,20 @@ case "$*" in
         echo "${STUB_BROWSER_OUT:-153.0.8010.12}"; exit 0 ;;
     *"ps --all --format"*) printf '%b\n' "${STUB_PS:-app running \nnginx running \ndb running healthy\nredis running \nmailpit running healthy\nqueue running }"; exit 0 ;;
     *" down"*) exit "${STUB_DOWN_RC:-0}" ;;
+    *"e2e:cleanup-tickets"*)
+        n=$(cat "$STUB_LOG.cleanups" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.cleanups"
+        if [[ $n -eq 0 ]]; then exit "${STUB_SWEEP_RC:-0}"; else exit "${STUB_CLEANUP_RC:-0}"; fi ;;
+    *"e2e_suite_probe"*) exit "${STUB_SUITE_RUNNING_RC:-1}" ;;
+    *"e2e_ticket_dirs"*)
+        n=$(cat "$STUB_LOG.dirs" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.dirs"
+        if [[ $n -eq 0 ]]; then
+            [[ -z ${STUB_DIRS_BEFORE_RC:-} ]] || exit "$STUB_DIRS_BEFORE_RC"
+            echo "${STUB_DIRS_BEFORE:-3}"
+        else
+            [[ -z ${STUB_DIRS_AFTER_RC:-} ]] || exit "$STUB_DIRS_AFTER_RC"
+            echo "${STUB_DIRS_AFTER:-3}"
+        fi
+        exit 0 ;;
     *"npm run test:e2e"*) exit "${STUB_PW_RC:-0}" ;;
     *"./vendor/bin/pest"*) exit "${STUB_PEST_RC:-0}" ;;
 esac
@@ -63,17 +77,18 @@ dev_run() {
     fi
     shift # --
     : >"$WORK/docker.log"
-    rm -f "$WORK/docker.log.counts"
+    rm -f "$WORK/docker.log.counts" "$WORK/docker.log.cleanups" "$WORK/docker.log.dirs"
+    rm -rf "$WORK/e2e.lock"
     rm -rf "$WORK/backups"
     OUT="$(printf '%s' "$stdin_text" |
-        env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" DEV_BACKUP_DIR="$WORK/backups" NO_COLOR=1 \
+        env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" DEV_BACKUP_DIR="$WORK/backups" DEV_E2E_LOCK="$WORK/e2e.lock" NO_COLOR=1 \
             "$ROOT/dev" "$@" 2>&1)"
     RC=$?
     LOG="$(cat "$WORK/docker.log")"
 }
 
 reset_stubs() {
-    unset STUB_PW_VERSION STUB_PW_VERSION_RC STUB_PW_PATH STUB_BROWSER_RC STUB_BROWSER_ERR STUB_BROWSER_OUT STUB_PS STUB_DOWN_RC STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC
+    unset STUB_PW_VERSION STUB_PW_VERSION_RC STUB_PW_PATH STUB_BROWSER_RC STUB_BROWSER_ERR STUB_BROWSER_OUT STUB_PS STUB_DOWN_RC STUB_RUNNING STUB_SERVICE_DB STUB_DUMP STUB_DUMP_RC STUB_COUNTS_BEFORE STUB_COUNTS_AFTER STUB_PW_RC STUB_PEST_RC STUB_RESOLVE_RC STUB_SWEEP_RC STUB_CLEANUP_RC STUB_SUITE_RUNNING_RC STUB_DIRS_BEFORE STUB_DIRS_AFTER STUB_DIRS_BEFORE_RC STUB_DIRS_AFTER_RC
     export STUB_RESOLVE_DEV="$DEV_OK" STUB_RESOLVE_TEST="$TEST_OK"
 }
 
@@ -344,8 +359,8 @@ begin "test:e2e states it uses the dev DB, prints counts, forwards args, runs is
 dev_run -- test:e2e --grep "time entries" tests/Browser/time-migration.spec.ts
 assert_rc 0
 assert_out "DEVELOPMENT database"
-assert_out "Before: projects=1  tasks=2  time_entries=3"
-assert_out "After:  projects=1  tasks=2  time_entries=3"
+assert_out "Before: projects=1  tasks=2  time_entries=3  tickets=4"
+assert_out "After:  projects=1  tasks=2  time_entries=3  tickets=4"
 assert_out "counts unchanged"
 assert_log "PLAYWRIGHT_BASE_URL=http://nginx"
 assert_log "--output=/tmp/dev-e2e-results --grep time entries tests/Browser/time-migration.spec.ts"
@@ -376,7 +391,7 @@ assert_out "playwright-core is not installed"
 assert_log_lacks "npm run test:e2e"
 
 begin "test:e2e reports changed counts without deleting anything"
-export STUB_COUNTS_AFTER='1\t2\t4'
+export STUB_COUNTS_AFTER='1\t2\t4\t4'
 dev_run -- test:e2e
 assert_rc 0
 assert_out "WARNING: product-data counts changed"
@@ -403,6 +418,249 @@ assert_log_lacks "mariadb"
 assert_log_lacks "php -- dev"
 assert_log_lacks "chromium.launch"
 assert_log "npm run test:e2e -- --output=/tmp/dev-e2e-results --list"
+
+# ── E2E ticket cleanup lifecycle (EPIC-017 §25.3) ──────────────────────────────
+# line_of <pattern> [n]: the n-th (default first) line number of the docker log that contains the pattern.
+line_of() { grep -n -F -- "$1" <<<"$LOG" | sed -n "${2:-1}p" | cut -d: -f1; }
+
+begin "test:e2e sweeps before the baseline, cleans up after Playwright, and counts around both"
+dev_run -- test:e2e tests/Browser/auth-migration.spec.ts
+assert_rc 0
+CLEANUPS="$(grep -c 'e2e:cleanup-tickets' <<<"$LOG")"
+[[ $CLEANUPS -eq 2 ]] && ok || bad "expected the cleanup command twice (sweep, post-run), got $CLEANUPS"
+SWEEP="$(line_of e2e:cleanup-tickets 1)" BASE="$(line_of 'mariadb -N' 1)" PW="$(line_of 'npm run test:e2e')"
+POST="$(line_of e2e:cleanup-tickets 2)" AFTER="$(line_of 'mariadb -N' 2)"
+[[ -n $SWEEP && -n $BASE && -n $PW && -n $POST && -n $AFTER ]] && ok || bad "a lifecycle step is missing from the log: $LOG"
+[[ $SWEEP -lt $BASE && $BASE -lt $PW && $PW -lt $POST && $POST -lt $AFTER ]] && ok \
+    || bad "wrong order (sweep=$SWEEP baseline=$BASE playwright=$PW post=$POST after=$AFTER): $LOG"
+assert_out "E2E ticket cleanup (recovery sweep, before the suite)"
+assert_out "E2E ticket cleanup (after the suite)"
+assert_out "Ticket count back at its baseline"
+assert_out "Playwright exit: 0 | ticket cleanup exit: 0 | ticket reconciliation: ok | attachment directories: ok"
+DIRS_BASE="$(line_of e2e_ticket_dirs 1)" DIRS_AFTER="$(line_of e2e_ticket_dirs 2)"
+[[ -n $DIRS_BASE && -n $DIRS_AFTER ]] && ok || bad "the attachment directory counts are missing from the log: $LOG"
+[[ $SWEEP -lt $DIRS_BASE && $DIRS_BASE -lt $PW && $POST -lt $DIRS_AFTER ]] && ok \
+    || bad "the directory baseline must follow the sweep and precede Playwright; the after-count must follow the post-run cleanup (sweep=$SWEEP dirs=$DIRS_BASE playwright=$PW post=$POST after=$DIRS_AFTER)"
+assert_out "Attachment directories back at their baseline"
+
+begin "test:e2e runs the cleanup as the web-server user on the verified dev target, with no ticket arguments"
+dev_run -- test:e2e
+CLEAN_LINE="$(grep 'e2e:cleanup-tickets' <<<"$LOG" | head -1)"
+[[ $CLEAN_LINE == *" -u portal "* ]] && ok || bad "the cleanup did not run as the web-server user (it owns the attachment files): $CLEAN_LINE"
+[[ $CLEAN_LINE != *" -u 0 "* ]] && ok || bad "the cleanup ran as root: $CLEAN_LINE"
+[[ $CLEAN_LINE == *"APP_ENV=local"* && $CLEAN_LINE == *"DB_DATABASE=portal"* ]] && ok || bad "the cleanup target is not pinned to the dev contract: $CLEAN_LINE"
+[[ $CLEAN_LINE == *"php artisan e2e:cleanup-tickets --no-interaction" ]] && ok || bad "unexpected arguments on the cleanup command: $CLEAN_LINE"
+assert_log_lacks "tickets:"
+
+begin "test:e2e does not start while another suite is running in the container, and sweeps nothing"
+export STUB_SUITE_RUNNING_RC=0
+dev_run -- test:e2e
+assert_rc 1
+assert_out "already running"
+assert_log_lacks "e2e:cleanup-tickets"
+assert_log_lacks "npm run test:e2e"
+assert_log_lacks "mariadb"
+
+begin "test:e2e refuses a second ./dev holding the lock, and does not touch the database"
+sleep 30 &
+HOLDER=$!
+# dev_run clears the lock directory, so seed it here and run ./dev directly.
+OUT="$(mkdir -p "$WORK/e2e.lock" && echo "$HOLDER" >"$WORK/e2e.lock/pid" &&
+    env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" DEV_BACKUP_DIR="$WORK/backups" DEV_E2E_LOCK="$WORK/e2e.lock" NO_COLOR=1 \
+        STUB_RESOLVE_DEV="$DEV_OK" STUB_RESOLVE_TEST="$TEST_OK" "$ROOT/dev" test:e2e 2>&1)"
+RC=$?
+kill "$HOLDER" 2>/dev/null
+wait "$HOLDER" 2>/dev/null
+assert_rc 1
+assert_out "another ./dev test:e2e (pid $HOLDER) is already running"
+assert_out_lacks "Before:"
+
+begin "test:e2e clears a stale lock left by a process that is gone, and releases its own lock"
+OUT="$(mkdir -p "$WORK/e2e.lock" && echo 999999 >"$WORK/e2e.lock/pid" &&
+    env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" DEV_BACKUP_DIR="$WORK/backups" DEV_E2E_LOCK="$WORK/e2e.lock" NO_COLOR=1 \
+        STUB_RESOLVE_DEV="$DEV_OK" STUB_RESOLVE_TEST="$TEST_OK" "$ROOT/dev" test:e2e 2>&1)"
+RC=$?
+assert_rc 0
+[[ ! -e $WORK/e2e.lock ]] && ok || bad "the lock directory was not released"
+
+begin "test:e2e releases its lock when a step dies"
+export STUB_SWEEP_RC=1
+dev_run -- test:e2e
+[[ ! -e $WORK/e2e.lock ]] && ok || bad "the lock directory survived a failed run"
+
+begin "test:e2e stops before the suite when the recovery sweep fails"
+export STUB_SWEEP_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "the recovery sweep failed"
+assert_log_lacks "npm run test:e2e"
+assert_log_lacks "mariadb"
+
+begin "test:e2e keeps a Playwright failure when the cleanup succeeds"
+export STUB_PW_RC=3
+dev_run -- test:e2e
+assert_rc 3
+assert_out "Playwright exit: 3 | ticket cleanup exit: 0 | ticket reconciliation: ok"
+assert_out "Failure traces"
+CLEANUPS="$(grep -c 'e2e:cleanup-tickets' <<<"$LOG")"
+[[ $CLEANUPS -eq 2 ]] && ok || bad "the post-run cleanup must still run after a failed suite, got $CLEANUPS cleanup call(s)"
+
+begin "test:e2e reports a cleanup failure even when Playwright passed"
+export STUB_CLEANUP_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "Playwright exit: 0 | ticket cleanup exit: 1"
+assert_out "The ticket cleanup failed"
+assert_out "E2E tickets may remain"
+
+begin "test:e2e reports both a Playwright failure and a cleanup failure, and returns the Playwright status"
+export STUB_PW_RC=2 STUB_CLEANUP_RC=1
+dev_run -- test:e2e
+assert_rc 2
+assert_out "Playwright exit: 2 | ticket cleanup exit: 1"
+assert_out "The ticket cleanup failed"
+
+begin "test:e2e fails when the ticket count does not return to the baseline, and deletes nothing to fix it"
+export STUB_COUNTS_AFTER='1\t2\t3\t6'
+dev_run -- test:e2e
+assert_rc 1
+assert_out "Ticket count did not return to its baseline: before=4 after=6"
+assert_out "Nothing was deleted to reconcile it"
+assert_out "ticket reconciliation: FAILED"
+assert_log_lacks "DELETE"
+
+begin "test:e2e reconciles against the post-sweep baseline, so existing non-E2E tickets are neither required to be zero nor touched"
+export STUB_COUNTS_BEFORE='1\t2\t3\t57' STUB_COUNTS_AFTER='1\t2\t3\t57'
+dev_run -- test:e2e
+assert_rc 0
+assert_out "tickets=57"
+assert_out "Ticket count back at its baseline"
+
+begin "test:e2e treats an unchanged ticket count with other counts changed as warning-only, as before"
+export STUB_COUNTS_AFTER='1\t2\t4\t4'
+dev_run -- test:e2e
+assert_rc 0
+assert_out "WARNING: product-data counts changed"
+assert_out "Ticket count back at its baseline"
+
+begin "test:e2e --list runs no cleanup, no sweep and no lock"
+dev_run -- test:e2e --list
+assert_log_lacks "e2e:cleanup-tickets"
+assert_log_lacks "e2e_suite_probe"
+[[ ! -e $WORK/e2e.lock ]] && ok || bad "--list took the lock"
+
+begin "test:e2e refuses a non-dev target before any cleanup"
+export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=other\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- test:e2e
+assert_rc 1
+assert_log_lacks "e2e:cleanup-tickets"
+
+begin "the ticket count is part of the shared count query, after the three existing fields"
+# shellcheck disable=SC2016
+EXPECTED='SELECT (SELECT COUNT(*) FROM projects), (SELECT COUNT(*) FROM tasks), (SELECT COUNT(*) FROM time_entries), (SELECT COUNT(*) FROM tickets)'
+grep -q -F "$EXPECTED" "$ROOT/scripts/dev/lib.sh" && ok || bad "COUNT_SQL does not read projects, tasks, time_entries, tickets in that order"
+
+begin "no per-test or per-worker path runs the untargeted ticket cleanup"
+# The command is allowed in exactly one browser-suite file: the once-per-suite globalTeardown. Anything
+# else (a fixture, a spec, a support helper) would run it while other workers are mid-test.
+USERS="$(grep -rl 'e2e:cleanup-tickets' "$ROOT/src/tests/Browser" "$ROOT/src/playwright.config.ts" 2>/dev/null | sed "s#^$ROOT/##" | sort)"
+[[ $USERS == "src/tests/Browser/support/global-teardown.ts" ]] && ok || bad "unexpected users of the cleanup command in the browser suite: $USERS"
+grep -q "globalTeardown: './tests/Browser/support/global-teardown.ts'" "$ROOT/src/playwright.config.ts" && ok \
+    || bad "playwright.config.ts does not register the suite-level globalTeardown"
+grep -q "workers: 3" "$ROOT/src/playwright.config.ts" && ok || bad "the three-worker session-isolation cap changed"
+if grep -q 'spawn\|execSync\|exec(' "$ROOT/src/tests/Browser/support/e2e-fixtures.ts"; then bad "the per-test E2eCleanup fixture runs a process"; else ok; fi
+
+begin "test:e2e hands the ticket cleanup to itself: Playwright is told, and the cleanup runs after it as the web-server user"
+dev_run -- test:e2e tests/Browser/auth-migration.spec.ts
+assert_rc 0
+PW_LINE="$(grep 'npm run test:e2e' <<<"$LOG" | head -1)"
+[[ $PW_LINE == *"E2E_TICKET_CLEANUP_OWNER=dev"* ]] && ok || bad "Playwright was not told the wrapper owns the cleanup: $PW_LINE"
+# Playwright itself runs as the host user (the browser and its output need that); only the cleanup is portal.
+[[ $PW_LINE == *"-u $(id -u):$(id -g)"* ]] && ok || bad "Playwright must keep running as the host user: $PW_LINE"
+[[ $PW_LINE != *" -u portal "* ]] && ok || bad "Playwright must not run as the web-server user: $PW_LINE"
+POST_LINE="$(grep 'e2e:cleanup-tickets' <<<"$LOG" | sed -n 2p)"
+[[ $POST_LINE == *" -u portal "* ]] && ok || bad "the post-suite cleanup did not run as the web-server user: $POST_LINE"
+[[ $(line_of 'npm run test:e2e') -lt $(line_of e2e:cleanup-tickets 2) ]] && ok || bad "the post-suite cleanup must come after Playwright: $LOG"
+
+begin "test:e2e reads the attachment directory counts as the web-server user, never as the host user"
+dev_run -- test:e2e
+DIR_LINES="$(grep 'e2e_ticket_dirs' <<<"$LOG")"
+[[ $(grep -c . <<<"$DIR_LINES") -eq 2 ]] && ok || bad "expected two attachment directory reads, got: $DIR_LINES"
+[[ $(grep -c ' -u portal ' <<<"$DIR_LINES") -eq 2 ]] && ok || bad "the directory counts must run as the web-server user (the directory is 0700): $DIR_LINES"
+
+begin "test:e2e fails when the attachment directory count does not return to its baseline, even though the ticket count did"
+export STUB_DIRS_BEFORE=3 STUB_DIRS_AFTER=4
+dev_run -- test:e2e
+assert_rc 1
+assert_out "Ticket count back at its baseline"
+assert_out "Attachment directories did not return to their baseline: before=3 after=4"
+assert_out "Nothing was deleted to reconcile it"
+assert_out "attachment directories: FAILED"
+assert_log_lacks "rm -"
+
+begin "test:e2e reconciles directories against the post-sweep baseline, so existing ticket directories are neither required to be zero nor touched"
+export STUB_DIRS_BEFORE=41 STUB_DIRS_AFTER=41
+dev_run -- test:e2e
+assert_rc 0
+assert_out "Attachment directories back at their baseline (41)"
+
+begin "test:e2e treats an unreadable attachment directory after the suite as a failure, never as zero"
+export STUB_DIRS_AFTER_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "Attachment directories could not be read after the suite"
+assert_out "attachment directories: FAILED"
+
+begin "test:e2e does not start Playwright when the attachment directory baseline cannot be read"
+export STUB_DIRS_BEFORE_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "could not read the attachment directory baseline"
+assert_log_lacks "npm run test:e2e"
+
+begin "test:e2e keeps a Playwright failure when the directory reconciliation also fails"
+export STUB_PW_RC=3 STUB_DIRS_AFTER=9
+dev_run -- test:e2e
+assert_rc 3
+assert_out "Playwright exit: 3 | ticket cleanup exit: 0 | ticket reconciliation: ok | attachment directories: FAILED"
+
+begin "test:e2e --list reads no attachment directories"
+dev_run -- test:e2e --list
+assert_log_lacks "e2e_ticket_dirs"
+
+# The teardown hook itself, run for real under Node with a stub `php` first on PATH: it must do nothing under the
+# wrapper, do the cleanup (and fail loudly) when Playwright was started by hand. Needs Node able to run TypeScript.
+begin "globalTeardown: defers to ./dev under the wrapper, and is responsible and fatal when run directly"
+if command -v node >/dev/null 2>&1 && node --experimental-strip-types -e '0' >/dev/null 2>&1 && node --experimental-strip-types -e 'import("node:process")' >/dev/null 2>&1; then
+    TD="$WORK/teardown"
+    mkdir -p "$TD"
+    cat >"$TD/php" <<'PHP'
+#!/usr/bin/env bash
+printf 'php %s\n' "$*" >>"$TD_LOG"
+echo "stub cleanup output"
+exit "${TD_PHP_RC:-0}"
+PHP
+    chmod +x "$TD/php"
+    run_teardown() { # run_teardown <env assignments...>; prints exit code, leaves output in TD_OUT
+        : >"$TD/log"
+        TD_OUT="$(env PATH="$TD:$PATH" TD_LOG="$TD/log" "$@" node --experimental-strip-types --no-warnings -e \
+            "import('$ROOT/src/tests/Browser/support/global-teardown.ts').then(m => m.default()).catch(e => { console.error('THROWN: ' + e.message); process.exit(7); })" 2>&1)"
+        TD_RC=$?
+    }
+    run_teardown E2E_TICKET_CLEANUP_OWNER=dev
+    [[ $TD_RC -eq 0 ]] && ok || bad "the wrapper-owned teardown must succeed without cleaning (rc=$TD_RC): $TD_OUT"
+    [[ ! -s $TD/log ]] && ok || bad "the wrapper-owned teardown ran php (it must leave the cleanup to ./dev): $(cat "$TD/log")"
+    [[ $TD_OUT == *"Handed to ./dev test:e2e"* ]] && ok || bad "the hand-off was not announced: $TD_OUT"
+    run_teardown E2E_UNRELATED=1
+    [[ $TD_RC -eq 0 ]] && ok || bad "a direct run whose cleanup succeeds must succeed (rc=$TD_RC): $TD_OUT"
+    [[ $(cat "$TD/log") == "php artisan e2e:cleanup-tickets --no-interaction" ]] && ok || bad "a direct run must run exactly the untargeted command: $(cat "$TD/log")"
+    run_teardown E2E_UNRELATED=1 TD_PHP_RC=1
+    [[ $TD_RC -eq 7 && $TD_OUT == *"THROWN: E2E ticket cleanup failed (exit 1)"* ]] && ok || bad "a direct run whose cleanup is refused (e.g. a permission mismatch) must be fatal (rc=$TD_RC): $TD_OUT"
+    run_teardown E2E_TICKET_CLEANUP_OWNER=somebody-else TD_PHP_RC=1
+    [[ $TD_RC -eq 7 ]] && ok || bad "only the exact hand-off value defers; anything else is a direct run (rc=$TD_RC): $TD_OUT"
+else
+    echo "skip  node cannot run TypeScript here; the globalTeardown behaviour test was not run"
+fi
 
 # ── lifecycle ──────────────────────────────────────────────────────────────────
 begin "shell uses the host UID:GID, never root"
@@ -474,6 +732,159 @@ grep -q 'install --with-deps chromium' "$DF" && ok || bad "Dockerfile does not i
 grep -q 'playwright-core@${PW_VERSION}' "$DF" && ok || bad "Dockerfile does not install the lockfile-derived playwright-core version"
 if grep -E 'playwright(-core)?@[0-9]' "$DF" >/dev/null; then bad "Dockerfile hard-codes a Playwright version"; else ok; fi
 grep -q 'src/package-lock.json' "$DF" && ok || bad "Dockerfile does not derive the version from src/package-lock.json"
+
+# ── migration rehearsal (R0.9-1A) ──────────────────────────────────────────────
+begin "rehearse commands are registered and listed in help"
+dev_run -- help
+assert_out "rehearse:provision"
+assert_out "rehearse:clean"
+assert_out "rehearse "
+
+begin "rehearse runs rehearsal:run as the host user, environment pinned, after resolving the dev target"
+dev_run -- rehearse
+assert_rc 0
+assert_log "php -- dev"
+assert_log "-u $UIDGID"
+assert_log "APP_ENV=local DB_HOST=db php artisan rehearsal:run --no-interaction"
+assert_out "this is NOT touched"
+assert_log_lacks "migrate"
+assert_log_lacks "-u 0"
+assert_log_lacks "root"
+
+begin "rehearse passes only allow-listed options through"
+dev_run -- rehearse --no-restore --keep-backup --json --candidate=2026_10_12_000001_example_migration
+assert_rc 0
+assert_log "rehearsal:run --no-restore --keep-backup --json --candidate=2026_10_12_000001_example_migration --no-interaction"
+
+begin "rehearse refuses anything that could aim it elsewhere, before touching Docker"
+for bad in --env=production --database=portal --connection=mysql --candidate=all '--candidate=../../x' '--candidate=2026_10_12_000001_x;rm' --candidate= --force --path=/etc plain; do
+    dev_run -- rehearse "$bad"
+    assert_rc 2
+    assert_out "REFUSING"
+    assert_log_lacks "rehearsal:run"
+done
+dev_run -- rehearse --no-restore --env=production
+assert_rc 2
+assert_log_lacks "php -- dev"
+
+begin "rehearse refuses a production-like or non-dev target and runs nothing"
+export STUB_RESOLVE_DEV='env=production\nconnection=mysql\ndatabase=portal\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_out "REFUSING"
+assert_log_lacks "rehearsal:run"
+export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=intechral_client_portal_testing\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_log_lacks "rehearsal:run"
+export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=portal\nhost=db.example.com\nport=3306\nconfig_cached=0'
+dev_run -- rehearse
+assert_rc 1
+assert_log_lacks "rehearsal:run"
+
+begin "rehearse needs the stack running"
+export STUB_RUNNING='nginx'
+dev_run -- rehearse
+assert_rc 1
+assert_out "is not running"
+assert_log_lacks "rehearsal:run"
+
+begin "rehearse propagates the harness exit code (1 failed, 2 refused)"
+dev_run -- rehearse
+assert_rc 0
+# The stub exits 0 for artisan; the wrapper must not mask a non-zero status. Prove it with a failing stub.
+mkdir -p "$WORK/failbin"
+cat >"$WORK/failbin/docker" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$STUB_LOG"
+case "$*" in
+    "info"*) exit 0 ;;
+    "compose version"*) echo "v5.2.0"; exit 0 ;;
+    *"ps --services --status running"*) printf 'app\ndb\nnginx\n'; exit 0 ;;
+    *"php -- dev"*) cat >/dev/null; printf '%b\n' "$STUB_RESOLVE_DEV"; exit 0 ;;
+    *"printenv MYSQL_DATABASE"*) echo portal; exit 0 ;;
+    *"rehearsal:run"*) exit "${STUB_REHEARSAL_RC:-0}" ;;
+esac
+exit 0
+STUB
+chmod +x "$WORK/failbin/docker"
+for code in 1 2; do
+    OUT="$(env PATH="$WORK/failbin:$PATH" STUB_LOG="$WORK/docker.log" STUB_RESOLVE_DEV="$DEV_OK" STUB_REHEARSAL_RC=$code NO_COLOR=1 "$ROOT/dev" rehearse 2>&1)"
+    RC=$?
+    assert_rc $code
+done
+
+begin "rehearse:clean resolves the dev target, then cleans rehearsal resources only"
+dev_run -- rehearse:clean
+assert_rc 0
+assert_log "php -- dev"
+assert_log "APP_ENV=local DB_HOST=db php artisan rehearsal:clean --no-interaction"
+assert_log "-u $UIDGID"
+export STUB_RESOLVE_DEV='env=production\nconnection=mysql\ndatabase=portal\nhost=db\nport=3306\nconfig_cached=0'
+dev_run -- rehearse:clean
+assert_rc 1
+assert_log_lacks "rehearsal:clean"
+
+begin "rehearse:provision pipes the checked SQL file to the DB root login inside the db container"
+dev_run -- rehearse:provision
+assert_rc 0
+assert_log "exec -T db sh -c"
+assert_log 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb -uroot'
+assert_out_lacks "root_password"
+assert_out_lacks "MYSQL_ROOT_PASSWORD="
+assert_log_lacks "-u 0"
+
+begin "rehearse:provision needs only the db service"
+export STUB_RUNNING='db'
+dev_run -- rehearse:provision
+assert_rc 0
+export STUB_RUNNING='app'
+dev_run -- rehearse:provision
+assert_rc 1
+assert_log_lacks "mariadb -uroot"
+
+begin "the provisioning SQL is limited to the two rehearsal databases"
+sql_check() { ( DEV_ROOT="$ROOT"; source "$ROOT/scripts/dev/lib.sh"; source "$ROOT/scripts/dev/commands.sh"; rehearsal_sql_violations "$1" ); }
+V="$(sql_check "$ROOT/.docker/mysql/init-rehearsal.sql")"
+[[ -z $V ]] && ok || bad "the real provisioning SQL was rejected: $V"
+grep -qF 'intechral\_client\_portal\_rehearsal' "$ROOT/.docker/mysql/init-rehearsal.sql" && ok || bad "grants must escape the underscores"
+check_sql() { # <label> <sql>
+    printf '%s' "$2" >"$WORK/prov.sql"
+    [[ -n "$(sql_check "$WORK/prov.sql")" ]] && ok || bad "$1 was accepted"
+}
+RG='GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `portal`@`%`;'
+check_sql "a global grant" 'GRANT ALL PRIVILEGES ON *.* TO `portal`@`%`;'
+check_sql "an unescaped (wildcard) grant" 'GRANT ALL PRIVILEGES ON `intechral_client_portal_rehearsal`.* TO `portal`@`%`;'
+check_sql "a grant on the dev database" 'GRANT ALL PRIVILEGES ON `portal`.* TO `portal`@`%`;'
+check_sql "a grant on the testing database" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_testing`.* TO `portal`@`%`;'
+check_sql "a grant with grant option" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `portal`@`%` WITH GRANT OPTION;'
+check_sql "a grant to another account" 'GRANT ALL PRIVILEGES ON `intechral\_client\_portal\_rehearsal`.* TO `root`@`%`;'
+check_sql "a drop" 'DROP DATABASE `intechral_client_portal_rehearsal`;'
+check_sql "a DROP hidden after a valid grant" "$RG DROP DATABASE portal;"
+check_sql "a trailing statement with no semicolon" "$RG DROP DATABASE portal"
+check_sql "a shell escape" "$RG \\! id;"
+[[ -n "$(sql_check "$WORK/does-not-exist.sql")" ]] && ok || bad "a missing file was accepted"
+
+begin "rehearse:provision refuses a SQL file that is not limited to the rehearsal databases"
+# Run a copy of the repo scripts whose SQL file has been tampered with.
+mkdir -p "$WORK/tampered/.docker/mysql" "$WORK/tampered/scripts"
+cp -R "$ROOT/scripts/dev" "$WORK/tampered/scripts/dev"
+cp "$ROOT/dev" "$WORK/tampered/dev"
+printf 'GRANT ALL PRIVILEGES ON *.* TO `portal`@`%%`;\n' >"$WORK/tampered/.docker/mysql/init-rehearsal.sql"
+: >"$WORK/docker.log"
+OUT="$(env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" NO_COLOR=1 "$WORK/tampered/dev" rehearse:provision 2>&1)"
+RC=$?
+LOG="$(cat "$WORK/docker.log")"
+assert_rc 1
+assert_out "REFUSING"
+assert_log_lacks "mariadb -uroot"
+
+begin "rehearsal scripts never name the dev or testing database as a target"
+# The rehearsal block of commands.sh may mention only the two rehearsal databases.
+BLOCK="$(sed -n '/^# ── Migration rehearsal/,/^# ── Tests/p' "$ROOT/scripts/dev/commands.sh")"
+if grep -nE '\bportal\b.*(DROP|TRUNCATE|DELETE)|DB_DATABASE|\$DEV_DB\b|\$TEST_DB\b|migrate:|db:wipe' <<<"$BLOCK" | grep -v 'portal\`@' >"$WORK/grep.out"; then
+    bad "the rehearsal block references a non-rehearsal database or destructive primitive: $(cat "$WORK/grep.out")"
+else ok; fi
 
 begin "restart is registered, documented and runs down then up without volumes or builds"
 dev_run -- help

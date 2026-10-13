@@ -97,14 +97,12 @@ it('names the operator queue selection checkboxes, filters and bulk controls', f
         ->and($xpath->query('//*[@id="bulk-bar"]')->length)->toBe(1);
 });
 
-it('names the status filters on the member ticket list and the invoice list', function () {
-    $member = User::factory()->create()->assignRole('user');
-    $tickets = $this->actingAs($member)->get(route('tickets.index'))->assertOk()->getContent();
+// CONVERTED IN EPIC-017 WP2: the member ticket list is a React page, so its filter names ('Search requests',
+// 'Status') are pinned in pages/tickets/index.test.tsx. The invoice list is still Blade.
+it('names the status filter and search on the invoice list', function () {
     $invoices = uiPage($this, 'operator', route('billing.invoices.index'));
 
-    expect(uiNames($tickets, '//select[@name="status"]'))->toBe(['Status'])
-        ->and(uiNames($tickets, '//input[@name="search"]'))->toBe(['Search tickets…'])
-        ->and(uiNames($invoices, '//select[@name="status"]'))->toBe(['Status'])
+    expect(uiNames($invoices, '//select[@name="status"]'))->toBe(['Status'])
         ->and(uiNames($invoices, '//input[@name="search"]'))->toBe(['Search invoices or clients…']);
 });
 
@@ -124,33 +122,20 @@ it('names the ticket-detail selects by their existing headings and the file inpu
         ->and($file->getAttribute('name'))->toBe('attachments[]')
         ->and($file->getAttribute('aria-describedby'))->toBe('attachments-hint')
         ->and(trim(uiOne($xpath, '//*[@id="attachments-hint"]')->textContent))->toBe('Up to 10 files, 20 MB each.');
-
-    $member = User::factory()->create()->assignRole('user');
-    $own = Ticket::factory()->open()->for($member, 'user')->create();
-    $memberHtml = $this->actingAs($member)->get(route('tickets.show', $own))->assertOk()->getContent();
-
-    expect(uiNames($memberHtml, '//textarea[@name="body"]'))->toBe(['Your reply…'])
-        ->and(uiNames($memberHtml, '//input[@type="file"]'))->toBe(['Attachments']);
-});
-
-it('names the new-ticket form fields, including the attachments input', function () {
-    $html = uiPage($this, 'user', route('tickets.create'));
-
-    expect(uiNames($html, '//input[@name="title"]'))->toBe(['Subject *'])
-        ->and(uiNames($html, '//select[@name="category"]'))->toBe(['Category *'])
-        ->and(uiNames($html, '//select[@name="priority"]'))->toBe(['Priority *'])
-        ->and(uiNames($html, '//textarea[@name="description"]'))->toBe(['Description *'])
-        ->and(uiNames($html, '//input[@type="file"]'))->toBe(['Attachments']);
+    // CONVERTED IN EPIC-017 WP2: the member's ticket page and the new-request form are React pages; their
+    // field names ('Your reply', 'Attachments', 'Subject', 'Category', 'Priority', 'Description') and the
+    // attachment hint tie are pinned in pages/tickets/{show,create}.test.tsx.
 });
 
 // EPIC-016 WP2 FLIP (A2.9): WP1 pinned the tracker markup as untouched (`time-tracker-start-btn`). WP2 owns the
 // tracker (A1.15 #2), so the utility-class hook became a `data-*` hook and the button an `x-ui.button`. What
 // does NOT change, and is still asserted: the visible name `▶ Start Timer` that time-migration.spec.ts finds
 // by role and name (/Start Timer/).
-it('keeps the embedded ticket time tracker Start Timer name through the WP2 migration', function () {
-    $owner = User::factory()->create()->assignRole('user');
-    $ticket = Ticket::factory()->open()->for($owner, 'user')->create();
-    $html = $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()->getContent();
+// EPIC-017 WP2 (N2 continuity): the tracker now lives on the operator ticket page only.
+it('keeps the embedded ticket time tracker Start Timer name on the operator ticket page', function () {
+    $operator = User::factory()->create()->assignRole('operator');
+    $ticket = Ticket::factory()->open()->for(User::factory()->create()->assignRole('user'), 'user')->create();
+    $html = $this->actingAs($operator)->get(route('operator.tickets.show', $ticket))->assertOk()->getContent();
     $xpath = uiDom($html);
 
     $start = uiOne($xpath, '//button[@data-time-tracker-start]');

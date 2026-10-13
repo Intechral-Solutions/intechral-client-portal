@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -107,6 +108,8 @@ class TimeEntryController extends Controller
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
+
+        $this->ensureTicketTimeEligible($request, $entry);
 
         $this->service->update($entry, [
             ...Arr::except($data, self::CONTEXT_KEYS),
@@ -419,6 +422,27 @@ class TimeEntryController extends Controller
         }
 
         return $submitted === $entry->only(self::CONTEXT_KEYS) ? [] : $submitted;
+    }
+
+    /**
+     * Ticket time is operator work (EPIC-017 O1, N1). contextRules() checks a SUBMITTED ticket_id,
+     * but an update that omits the context keeps the stored ticket (submittedContext()), and editing
+     * such an entry still records ticket time. So the ticket the entry will carry after this update
+     * — submitted or kept — must pass the same rule as new ticket time. Moving an entry OUT of
+     * ticket context is not ticket time and stays allowed. Unlike a task (decision (c) above),
+     * there is no keep-unchanged exemption. Stopping a running timer, editing its description and
+     * deleting an owned entry never come through here, so they do not re-check ticket eligibility.
+     * Stopping a timer that was already running still stores the duration it had accumulated on its
+     * ticket; it starts nothing and moves nothing (pinned in TicketTimeEligibilityTest).
+     */
+    private function ensureTicketTimeEligible(Request $request, TimeEntry $entry): void
+    {
+        $submitted = $this->submittedContext($request, $entry);
+        $ticketId = array_key_exists('ticket_id', $submitted) ? $submitted['ticket_id'] : $entry->ticket_id;
+
+        if ($ticketId !== null && ! AccessibleTimeContext::allows($request->user(), 'ticket', $ticketId)) {
+            throw ValidationException::withMessages(['ticket_id' => 'The selected ticket id is invalid.']);
+        }
     }
 
     /**

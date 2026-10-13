@@ -4,7 +4,6 @@ use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\User;
-use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/ProjectTestHelpers.php';
 
@@ -20,20 +19,25 @@ beforeEach(function () {
     $this->owner = makeUser('operator');
 });
 
-function dashboardProjectCount(User $user): int
+/**
+ * The active-project figure the actor's dashboard reports.
+ *
+ * FLIPPED IN EPIC-017 WP1: a plain member now resolves to the Focused customer Home, which reports the
+ * very same `Project::visibleTo()` count as `projects.active` instead of an Operational `metrics`
+ * figure. Both are read here, so every case below keeps asserting that the number agrees with the
+ * projects index whichever dashboard the actor is given.
+ */
+function dashboardProjectCount(User $user): ?int
 {
-    $count = null;
+    $response = test()->actingAs($user)->get(route('dashboard'));
+    $response->assertOk();
+    $props = json_decode(json_encode($response->viewData('page')), true)['props'];
 
-    test()->actingAs($user)->get(route('dashboard'))
-        ->assertInertia(function (Assert $page) use (&$count) {
-            $page->where('metrics', function ($metrics) use (&$count) {
-                $count = collect($metrics)->firstWhere('key', 'projects')['value'] ?? null;
+    if (isset($props['metrics'])) {
+        return collect($props['metrics'])->firstWhere('key', 'projects')['value'] ?? null;
+    }
 
-                return true;
-            });
-        });
-
-    return $count;
+    return $props['projects']['active'] ?? null;
 }
 
 it('counts only the active projects a project manager can open', function () {

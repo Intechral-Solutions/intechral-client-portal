@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Shared\Navigation\NavigationBuilder;
+use App\Shared\Shell\ShellPresentation;
+use App\Shared\Shell\ShellPresentationResolver;
 use App\Support\Initials;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,10 +46,11 @@ class HandleInertiaRequests extends Middleware
                     ? $user->getAllPermissions()->pluck('name')->sort()->values()->all()
                     : [],
             ],
-            // The presentation family the shell should render, resolved server-side (EPIC-013 §23).
-            // Always 'operational' in this epic: it names a presentation, never a role.
-            'shell' => [
-                'presentation' => 'operational',
+            // The presentation family the shell should render, resolved server-side (EPIC-013 §23,
+            // EPIC-017 P1) by the one resolver. It names a presentation, never a role, and is lazy so a
+            // partial reload that does not ask for it resolves nothing.
+            'shell' => fn () => [
+                'presentation' => $this->presentation($request)->value,
             ],
             'navigation' => fn () => $this->navigation($request),
             'flash' => [
@@ -77,9 +80,18 @@ class HandleInertiaRequests extends Middleware
     {
         if ($this->navigationRequest !== $request || $this->navigation === null) {
             $this->navigationRequest = $request;
-            $this->navigation = app(NavigationBuilder::class)->build($request);
+            $this->navigation = app(NavigationBuilder::class)->build($request, $this->presentation($request));
         }
 
         return $this->navigation;
+    }
+
+    /**
+     * The resolver memoizes on the request, so `shell` and `navigation` always agree and the answer
+     * is computed once per request.
+     */
+    private function presentation(Request $request): ShellPresentation
+    {
+        return app(ShellPresentationResolver::class)->forRequest($request);
     }
 }

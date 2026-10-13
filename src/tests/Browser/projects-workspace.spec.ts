@@ -72,6 +72,16 @@ async function expectOneBreadcrumbAndHeading(page: Page, at = '') {
     await expect(page.getByRole('heading', { level: 1 }), at).toHaveCount(1);
 }
 
+/**
+ * FLIPPED IN EPIC-017 WP1: a customer member is in the Focused shell, which owns no breadcrumb
+ * landmark (Direction D §7: a record page renders its own in-content link back instead). The page
+ * still has exactly one `h1`.
+ */
+async function expectNoBreadcrumbAndOneHeading(page: Page, at = '') {
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }), at).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 1 }), at).toHaveCount(1);
+}
+
 test('the index lists rows with lifecycle and health apart, opens the Overview, and filters by status in the URL', async ({
     page,
     cleanup,
@@ -182,7 +192,7 @@ test('a customer member sees every project page without Settings, management con
                 memberPage.getByRole('main').getByRole('link', { name: 'Settings' }),
                 path,
             ).toHaveCount(0);
-            await expectOneBreadcrumbAndHeading(memberPage, path);
+            await expectNoBreadcrumbAndOneHeading(memberPage, path);
         }
 
         // Milestones read-only: the row and its explicit state, no completion or edit control.

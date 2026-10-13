@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccessGrants;
+use App\Shared\Permissions\BuiltInRoles;
 use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    private const BUILT_IN = ['operator', 'user'];
+    public function __construct(private readonly AccessGrants $grants) {}
 
     public function index()
     {
@@ -28,7 +30,12 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:64', 'unique:roles,name'],
+            'name' => ['required', 'string', 'max:64', 'unique:roles,name', function ($attribute, $value, $fail) {
+                // The built-in role names are reserved (H4), so a custom role cannot pose as one before they exist.
+                if (is_string($value) && BuiltInRoles::isBuiltIn($value)) {
+                    $fail('That name is reserved for a built-in role.');
+                }
+            }],
             'description' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
@@ -55,21 +62,25 @@ class RoleController extends Controller
     {
         $grouped = $this->groupedPermissions();
         $assigned = $role->permissions->pluck('name')->toArray();
-        $isBuiltIn = in_array($role->name, self::BUILT_IN);
+        $isBuiltIn = BuiltInRoles::isBuiltIn($role->name);
 
         return view('admin.roles.edit', compact('role', 'grouped', 'assigned', 'isBuiltIn'));
     }
 
     public function update(Request $request, Role $role)
     {
+        // Release 0.9 (H4): built-in roles are owned by the application, so this is refused before anything else.
+        $this->grants->assertCustom($role);
+
         $validated = $request->validate([
             'description' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
-        // Built-in role names cannot be changed; sync permissions still allowed
-        $role->syncPermissions($validated['permissions'] ?? []);
+        // Release 0.9 (H3): refused if it would remove the last active account administrator's users.view or
+        // users.manage.
+        $this->grants->syncRolePermissions($role, $validated['permissions'] ?? []);
 
         activity()->causedBy(auth()->user())
             ->performedOn($role)
@@ -81,18 +92,16 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
-        if (in_array($role->name, self::BUILT_IN)) {
-            return back()->withErrors(['role' => "The \"{$role->name}\" role is built-in and cannot be deleted."]);
+        // Release 0.9 (H4): a built-in role is refused here, ahead of the guarded delete.
+        $this->grants->assertCustom($role);
+
+        // Release 0.9 (H3): the "no holders" check and the delete are one guarded step (AccessGrants).
+        $assigned = $this->grants->deleteUnassignedRole($role, fn () => activity()->causedBy(auth()->user())
+            ->log("deleted role \"{$role->name}\""));
+
+        if ($assigned > 0) {
+            return back()->withErrors(['role' => "Cannot delete \"{$role->name}\" — it is assigned to {$assigned} user(s). Reassign them first."]);
         }
-
-        if ($role->users()->count() > 0) {
-            return back()->withErrors(['role' => "Cannot delete \"{$role->name}\" — it is assigned to {$role->users()->count()} user(s). Reassign them first."]);
-        }
-
-        activity()->causedBy(auth()->user())
-            ->log("deleted role \"{$role->name}\"");
-
-        $role->delete();
 
         return redirect()->route('roles.index')
             ->with('status', "Role \"{$role->name}\" deleted.");

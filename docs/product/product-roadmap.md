@@ -1,6 +1,6 @@
 # Product Roadmap
 
-**Status:** Governing strategic sequence (adopted 2026-09-24; **re-oriented around Release 1 on 2026-10-06**, see [Release 1](#release-1-re-orientation-2026-10-06))
+**Status:** Governing strategic sequence (adopted 2026-09-24; **re-oriented around Release 1 on 2026-10-06**, see [Release 1](#release-1-re-orientation-2026-10-06); **Release 0.9 addendum 2026-10-10**, see [Release 0.9: Scope and Architecture Gate](./release-0.9-scope-and-architecture.md))
 **Companion documents:** [Platform Product & UX Direction](./platform-product-ux-direction.md) · [Information Architecture](./information-architecture.md)
 
 This roadmap is organized around **product outcomes**, not Blade→React migration order. It supersedes the letter order of [EPIC-011](../epics/EPIC-011-react-frontend-migration.md)'s remaining phases as the source of priority. It uses sequencing buckets and phases, not dates.
@@ -72,11 +72,15 @@ Each item becomes one or more implementation epics before work begins, consisten
    - **Before the first customer production release,** development and testing business data is disposable unless explicitly marked otherwise. It may be cleared, reseeded, rebuilt or normalized whenever that materially simplifies development, migrations, fixtures or validation; do not spend engineering effort preserving arbitrary development history (Tickets included).
    - **After the first production release,** production data is authoritative history. Migrations must preserve it unless explicitly reviewed otherwise; production Ticket numbers must be preserved; destructive resets are not an acceptable migration strategy; and release preflights and backups become operational requirements (see [Deployment / release engineering](#future--deployment--release-engineering)).
 
+   > **Superseded for the Release 0.9 production database (2026-10-10).** Release 0.9, an invitation-only early-access release, is the first customer production release and runs on real, durable data. The first half of this principle (disposable pre-release data) does not apply to that database: production data is authoritative from its first genuine production record, with no `migrate:fresh`, destructive reseeding or assumed future reset. The same applies to every statement in this roadmap that depends on it: owner ruling D3, "reseed rather than transform", "while data is still disposable", and the ordering rationale for Directory and the Billing Account. Local and test environments stay disposable. The earlier text is left as the historical record. See [Release 0.9: Scope and Architecture Gate](./release-0.9-scope-and-architecture.md#12-supersession-record).
+
 ---
 
 ## Release 1 (re-orientation 2026-10-06)
 
 **Release 1** is the first customer production release of the portal. From 2026-10-06 it is this roadmap's governing milestone. Every known item is classified against it ([Release 1 boundary](#release-1-boundary)), and work is sequenced in phases toward it ([Release 1 sequence](#release-1-sequence)). The NOW / NEXT / LATER / FUTURE sections further down are kept as the **historical record and detailed item descriptions**. Where their bucket or ordering conflicts with this section, this section governs.
+
+> **Release 0.9 precedes Release 1 (2026-10-10).** An invitation-only customer support and read-only project-visibility pilot on durable production data is planned before Release 1: customer accounts and Helpdesk, secure project visibility and essential operator support, with invoicing and payments handled externally. It does not change the [Release 1 boundary](#release-1-boundary) below. Its ratified decisions, scope and data contract are in [Release 0.9: Scope and Architecture Gate](./release-0.9-scope-and-architecture.md). EPIC-017 WP3 and WP4 are deferred from the Release 0.9 critical path, not cancelled.
 
 **Baseline.** Re-oriented on `main` @ `88e15d7` (PR #24 merged, `main` CI green, equal to `origin/main`, working tree clean), from the committed roadmap, epics EPIC-010D to EPIC-016, EPIC-012, Direction D, the architecture docs, `docs/testing/ci.md` and the `./dev` CLI. Documentation only: no product code changed.
 
@@ -88,6 +92,8 @@ Each item becomes one or more implementation epics before work begins, consisten
 > - The `@shadcn/lint` adoption ([PR #29](https://github.com/Intechral-Solutions/intechral-client-portal/pull/29)) is **merged** (merge `61e46ab`, 2026-10-08) and is part of the current `main` baseline. It is not a WP1 dependency.
 > - No implementation branch exists yet.
 > - The checkpoint table below is otherwise unchanged and remains the record of the EPIC-016 close.
+
+> **Forward note (2026-10-11, EPIC-017 WP2 implemented locally).** The "No implementation branch exists yet" line above is historical. `feature/epic-017-helpdesk-mvp-customer-shell` now carries WP1 (customer shell) and WP2 (customer Helpdesk in React), committed locally and **not pushed**: no PR exists and hosted CI has not run for either. [EPIC-017 Amendment 2](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#amendment-2-wp2-customer-helpdesk-in-react-pr-2) is the WP2 evidence ledger, with the accepted limitations and the hosted-CI obligations that remain open. WP3–WP5 are not started and the epic is **Planned**, not Done.
 
 > **EPIC-016 IS DONE (2026-10-07).** Release 1 Phase 1's epic is complete and merged. The immediate next step is the `@shadcn/lint` evaluation, then the Helpdesk MVP. Development may pause between epics by owner choice; no product or technical blocker is implied. The owner rulings D1–D4 are locked ([Owner rulings D1–D4](#owner-rulings-d1d4)). Nothing needs owner input before work resumes.
 
@@ -389,6 +395,8 @@ The epic absorbs EPIC-016's deferred Helpdesk items:
 - **Later enrichment:** the broader classification set, non-User requesters, the full hub and relationship analytics.
 - **Migration risk.** The consolidation is the most consequential schema change on the roadmap. Release 1 is a clean install plus a small scripted seed (D3), and development data is disposable (principle 8). The consolidation should therefore exploit the pre-production state: reseed rather than transform. Its migrations must still be reversible and rehearsed, because they become part of the Release 1 schema baseline. The scripted seed (initial organizations, people and users) must be idempotent. Once releases begin, migrations between portal versions follow the [release-safety invariant](#high-risk-migration-invariant).
 
+  > **Addendum (2026-10-10).** The reseed approach no longer applies. Release 0.9 production data is authoritative, so the Directory consolidation is a forward, expand-contract migration of that data, not a reseed. Durable references use immutable ids, not `users.email`. See [Release 0.9 §9](./release-0.9-scope-and-architecture.md#9-corrected-directory-and-finance-migration-seams).
+
 <a id="finance-release-1"></a>
 **Finance.**
 - **Current:** invoices with line items, manual payments, Stripe payment with a signature-verified webhook (`/webhooks/stripe`), a client invoice list (`/my`), and billed time-entry locking (EPIC-010C). Invoices bill Users.
@@ -592,6 +600,8 @@ The future risk model may define lighter treatment for low-risk migrations. **No
 
 **Before Release 1**, development data is disposable (principle 8), and Release 1 is a clean install plus a scripted seed (D3). Directory and the Billing Account move may therefore reseed instead of transform. The invariant applies to the **Release 1 install itself** and to **every migration between portal versions after it**.
 
+> **Addendum (2026-10-10).** For the Release 0.9 production database the invariant applies from its first genuine production record, and reseeding is not available. Ordinary rollback is prior application code against a compatible current schema (N-1 compatibility); restoring the database is exceptional recovery. See [Release 0.9 §6](./release-0.9-scope-and-architecture.md#6-migration-and-rollback-contract).
+
 ### Release 1 hardening
 
 This scopes the historical [FINAL HARDENING](#final-hardening) to Release 1. It verifies a finished surface. It is not where features are completed.
@@ -645,6 +655,8 @@ This scopes the historical [FINAL HARDENING](#final-hardening) to Release 1. It 
 | **D2** | **The Advanced Projects core for Release 1 is estimates, planned budgets and estimate-vs-actual reporting.** | Change control, SOW linkage, customer approval workflows and a generalized approvals platform are later by default. They are promoted only if later repository or product evidence proves one is genuinely required for Release 1. Approvals are not a Release 1 platform dependency. |
 | **D3** | **Release 1 assumes a clean install plus a small scripted seed.** | Exploit the pre-production state, particularly for the Directory consolidation (reseed rather than transform). Release 1 is not designed around importing a legacy production dataset unless this ruling is explicitly revisited. Proper migrations between portal versions are still required once releases begin. |
 | **D4** | **cPanel/shared-hosting compatibility remains the baseline constraint, but the Release 1 production host is not preselected.** | RE-0 determines whether compatible cPanel hosting, a VPS or another supported deployment shape best serves the real requirements. It may recommend a VPS if queue, scheduler, deployment, rollback, observability or operational needs make that materially safer or simpler. "cPanel-compatible" does not mean "must deploy to cPanel". |
+
+> **Addendum (2026-10-10).** D3 is superseded to the extent that it allows resetting or reseeding production data. The Release 0.9 production database is authoritative from its first record, so Release 1 is an upgrade of that data rather than a clean install. D1, D2 and D4 are unchanged. See [Release 0.9 §12](./release-0.9-scope-and-architecture.md#12-supersession-record).
 
 No other owner decision currently blocks the Release 1 plan.
 
@@ -795,6 +807,21 @@ These are the first product slices on the new shell. They exercise the design sy
 **Class:** Product functionality. Friendlier running-timer controls; clear task/project/ticket context; easier switching; editing and recovery; active-state clarity; contextual controls in Tasks and Projects. Server timer contracts (EPIC-011D) remain authoritative.
 
 **Depends on:** shell (global presence); best delivered with or right after the Tasks overhaul.
+
+### Administrative active timer oversight
+
+**Class:** Future enhancement (backlog, **C**; recorded 2026-10-08). **Not an EPIC-017 release blocker and not designed.** It follows from the approved N1 existing-entry exception ([EPIC-017 §37](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#37-owner-decisions)), which accepts that an abandoned timer can accumulate excessive duration because only its owner can stop it today.
+
+Future scope, to be planned in its own epic:
+- authorized platform administrators can inspect active timers that belong to other users;
+- administrators can stop those timers without impersonation;
+- a central management overview, plus contextual access from individual user management;
+- explicit authorization and audit attribution (who stopped whose timer);
+- concurrency-safe stopping;
+- identification and review of long-running timers;
+- preservation of the billing-integrity controls (billed and invoice locks).
+
+**Depends on:** the EPIC-011D server timer contracts; best planned with [Timer UX improvement](#timer-ux-improvement).
 
 ### Projects UX expansion
 

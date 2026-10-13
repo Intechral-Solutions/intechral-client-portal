@@ -4,7 +4,6 @@ import type { PropsWithChildren } from 'react';
 
 import { FlashRegion } from '@/components/feedback/flash-region';
 import { TimerPill } from '@/components/time/timer-pill';
-import { TimerProvider } from '@/components/time/timer-provider';
 import { usePageAnnouncement } from '@/hooks/use-page-announcement';
 import { usePanelState } from '@/hooks/use-panel-state';
 import type { SharedPageProps } from '@/types';
@@ -197,7 +196,7 @@ export function OperatorShell({
     }, [hasPanel, toggle]);
 
     return (
-        <TimerProvider enabled={auth.permissions.includes('time.log')}>
+        <>
             <div
                 data-shell="operational"
                 data-panel={hasPanel ? 'true' : 'false'}
@@ -248,6 +247,6 @@ export function OperatorShell({
                     />
                 </div>
             </div>
-        </TimerProvider>
+        </>
     );
 }
