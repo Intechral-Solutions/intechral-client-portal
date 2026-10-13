@@ -24,7 +24,9 @@ jobs:
   checks:
     name: ./dev check gates
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 30 -> 45 for R0.9-1E: its real-process cache-race tests (~14 s each) run in the no-skip Redis step and again in the
+    # whole suite, on top of the ~13 minutes the first hosted run took. Time is the only thing changed.
+    timeout-minutes: 45
     steps:
       # Depth 2: the git diff --check gate compares HEAD with its parent.
       - uses: actions/checkout@v7
@@ -124,7 +126,7 @@ jobs:
         working-directory: src
         env:
           REDIS_HOST: 127.0.0.1
-        run: ./vendor/bin/pest tests/Feature/Admin/PermissionCacheCommitOrderTest.php --fail-on-skipped
+        run: ./vendor/bin/pest tests/Feature/Admin/PermissionCacheCommitOrderTest.php tests/Feature/Admin/PermissionCacheEpochTest.php --fail-on-skipped
 
       # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
       # Redis is reachable here too, so the Redis variants run in the whole suite as well.

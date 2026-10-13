@@ -56,7 +56,9 @@ the app and building the image would only add minutes. The environment follows t
 - **Redis (R0.9-1D integration).** The `checks` job starts the Compose `redis` service beside `db` and installs the PHP
   `redis` extension, because the permission-cache security tests (R0.9-1C M-1, R0.9-1D) need a shared store outside the
   database transaction and skip themselves when none is reachable. A dedicated step runs
-  `tests/Feature/Admin/PermissionCacheCommitOrderTest.php` with `REDIS_HOST=127.0.0.1` and `--fail-on-skipped`, so a missing
+  `tests/Feature/Admin/PermissionCacheCommitOrderTest.php` and `PermissionCacheEpochTest.php` (R0.9-1E: the cache-repopulation race
+  with independent processes, its negative control, and the persistent-worker, killed-writer and failure cases) with
+  `REDIS_HOST=127.0.0.1` and `--fail-on-skipped`, so a missing
   server, extension or address **fails** the job instead of quietly shrinking the count (a skip is not a pass). The whole
   suite then runs with Redis reachable too. Everything else uses the array cache, so no other gate touches Redis.
 - **Provisioning check.** A step lists the databases the `portal` account can see and fails, naming the missing one, unless

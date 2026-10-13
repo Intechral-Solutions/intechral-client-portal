@@ -54,14 +54,18 @@ function useSharedPermissionCache(array $store): void
         }
     }
 
-    config(['cache.stores.permission-race' => $store, 'permission.cache.store' => 'permission-race']);
+    // A short lifetime (also set in permission_cache_reader.php): since R0.9-1E every reload is stored under a generation
+    // key, and the entries of the generations a run passes through are left behind. They are unreachable, and they expire.
+    config(['cache.stores.permission-race' => $store, 'permission.cache.store' => 'permission-race', 'permission.cache.expiration_time' => 300]);
     app(PermissionRegistrar::class)->initializeCache();
     app(PermissionRegistrar::class)->clearPermissionsCollection();
 }
 
 function forgetSharedPermissionCache(array $store): void
 {
+    // The unsuffixed key (what the library used before R0.9-1E) and the key of the generation this process last loaded.
     Cache::store('permission-race')->forget(config('permission.cache.key'));
+    Cache::store('permission-race')->forget(app(PermissionRegistrar::class)->cacheKey);
 
     if ($store['driver'] === 'file') {
         File::deleteDirectory($store['path']);

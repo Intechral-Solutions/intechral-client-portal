@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Services\BuiltInRoleSynchronizer;
+use App\Support\Permissions\PermissionCacheEpoch;
 use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
@@ -35,6 +36,9 @@ function committedSynchronizedInstallation(): Closure
         DB::table('roles')->delete();
         DB::table('permissions')->delete();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        // Last: the reset above advances the permission cache's epoch (R0.9-1E), which writes this row.
+        $epoch = app(PermissionCacheEpoch::class);
+        DB::table($epoch->tableName())->where('key', $epoch->key())->delete();
 
         expect(DB::table('permissions')->count() + DB::table('roles')->count() + DB::table('model_has_roles')->count())->toBe(0);
     };

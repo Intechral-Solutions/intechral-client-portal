@@ -96,6 +96,8 @@ settings.manage
 `App\Shared\Permissions\BuiltInRoles` (from the permission catalogue), the Roles screens show them read-only, and their
 stored grants change only through the reviewed `php artisan roles:sync`. See [Role Governance](./role-governance.md).
 
+**The shared permission cache is fenced (Release 0.9, R0.9-1E).** The role-to-permission mapping the library caches in Redis is stored under a key that carries a random epoch held in the database and replaced inside every transaction that changes the mapping, so a revocation that has committed cannot be undone by a slower reader's late cache write. Two operating rules follow: run `php artisan permission:cache-reset` after changing roles or permissions outside the application (SQL, a restore, a deployment), and make no role-permission changes while old and new application versions run together. See [Role Governance](./role-governance.md#permission-cache-generation-fencing-r09-1e).
+
 ## Custom Roles
 
 Any number of custom roles can be created. Custom roles:

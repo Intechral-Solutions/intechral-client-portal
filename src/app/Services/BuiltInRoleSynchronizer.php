@@ -10,6 +10,7 @@ use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Release 0.9 (R0.9-1D, decision H4): the deterministic, previewable, idempotent synchronization of the built-in roles
@@ -199,6 +200,13 @@ final class BuiltInRoleSynchronizer
                     ->delete();
             }
         }
+
+        // The grants and revocations above are raw pivot writes the permission library never sees, so nothing has moved
+        // the shared permission cache's epoch for them (R0.9-1E). Advance it now, inside this transaction and after the
+        // last write: it commits or rolls back with them, and a plan that only revokes is covered like any other. Any
+        // load of the cache made between an earlier advance (a created permission or role) and here is stored under
+        // an epoch this replaces, so it can never serve the finished state.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**

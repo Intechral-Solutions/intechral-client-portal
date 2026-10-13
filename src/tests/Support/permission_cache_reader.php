@@ -25,7 +25,7 @@ $store = json_decode($argv[1] ?? '{}', true, flags: JSON_THROW_ON_ERROR);
 $permission = (string) ($argv[2] ?? '');
 $userId = isset($argv[3]) ? (int) $argv[3] : null;
 
-config(['cache.stores.permission-race' => $store, 'permission.cache.store' => 'permission-race']);
+config(['cache.stores.permission-race' => $store, 'permission.cache.store' => 'permission-race', 'permission.cache.expiration_time' => 300]);
 $registrar = $app->make(PermissionRegistrar::class);
 $registrar->initializeCache();
 $registrar->clearPermissionsCollection();

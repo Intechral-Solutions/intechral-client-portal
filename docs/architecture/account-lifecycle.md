@@ -216,10 +216,10 @@ open owner question.
   makes it refuse outside local and testing environments and moves production synchronization to `roles:sync`, which is
   guarded ([Role Governance](./role-governance.md)).
 - The deployment and rollback requirements [above](#release-09-deployment-and-rollback-requirements), and Info-5.
-- Residual permission-cache race (recorded by the R0.9-1D review; inherited from M-1's fix, which closed the in-transaction clear but not this window):
-  a reader that loads the old permissions from the database before a commit and stores them in the shared cache after
-  the post-commit invalidation keeps a revoked permission until the cache expires (24 hours by default). It is not conclusively
-  fixed and is a security-hardening obligation before production permission revocations are relied upon; a one-time deployment
-  cache reset does not cover concurrent changes. See [Role Governance](./role-governance.md#residual-permission-cache-risk-inherited-from-r09-1c-not-fixed-here).
+- Residual permission-cache race (recorded by the R0.9-1D review; M-1's fix closed the in-transaction clear but not this window):
+  a reader that loads the old permissions before a commit and stores them after the post-commit invalidation kept a revoked
+  permission until the cache expired (24 hours). **R0.9-1E addresses it** with a database-backed epoch that fences the cache key
+  and changes inside the writer's transaction; it is implemented and passed independent security review (Opus 5.5) for the supported current topology (no read replica);
+  hosted CI and Playwright for it are outstanding, and its limits and the mixed-version deployment hazard are in [Role Governance](./role-governance.md#permission-cache-generation-fencing-r09-1e).
 - Hosted CI ran R0.9-1C in its first run ([run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30). The hosted job now starts Redis and a dedicated step fails on any
-  skip: the Redis variants of the M-1 test ran there (9 passed, 0 skipped). That does not close the residual cache race above.
+  skip: the Redis variants of the M-1 test ran there (9 passed, 0 skipped). The residual cache race above is addressed by R0.9-1E, which postdates that run.

@@ -9,6 +9,7 @@ use App\Services\BuiltInRoleSynchronizer;
 use App\Services\RoleSyncPlan;
 use App\Shared\Permissions\BuiltInRoles;
 use App\Shared\Permissions\PermissionCatalogue;
+use App\Support\Permissions\PermissionCacheEpoch;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -90,6 +91,12 @@ describe('the plan', function () {
     it('is a pure read: it writes no row, takes no lock and leaves the shared permission cache untouched', function () {
         Role::findByName('user', 'web')->givePermissionTo('billing.admin');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        // R0.9-1E: the live cache entry sits under the ACTIVE generation's key, so that is the key to look at (the old,
+        // unsuffixed key is never used and would be absent whatever the plan did). The epoch row is part of the state.
+        $epoch = app(PermissionCacheEpoch::class);
+        $generation = $epoch->current();
+        $liveKey = config('permission.cache.key').':'.$generation;
+        $cache = Cache::store(config('permission.cache.store') === 'default' ? null : config('permission.cache.store'));
         $state = syncRelevantState();
         $statements = [];
         DB::listen(function ($query) use (&$statements) {
@@ -101,7 +108,9 @@ describe('the plan', function () {
         expect($plan->hasRevocations())->toBeTrue()
             ->and(collect($statements)->filter(fn ($sql) => ! str_starts_with(strtolower(ltrim($sql)), 'select') || str_contains(strtolower($sql), 'for update'))->all())->toBe([])
             ->and(syncRelevantState())->toBe($state)
-            ->and(Cache::store(config('permission.cache.store') === 'default' ? null : config('permission.cache.store'))->has(config('permission.cache.key')))->toBeFalse();
+            ->and($epoch->current())->toBe($generation, 'planning does not advance the generation')
+            ->and($cache->has($liveKey))->toBeFalse('planning does not load the shared cache under the active generation')
+            ->and($cache->has(config('permission.cache.key')))->toBeFalse();
     });
 
     it('reports permissions no built-in role defines without changing them', function () {

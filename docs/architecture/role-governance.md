@@ -181,20 +181,96 @@ The synchronization and the bootstrap use the R0.9-1C machinery unchanged:
 On a new database with no `users.manage` row yet there is nothing to lock: two simultaneous first `roles:sync --apply`
 runs would collide on the permissions' unique index and one fails visibly, rolled back.
 
-### Residual permission-cache risk (inherited from R0.9-1C; not fixed here)
+### Permission-cache generation fencing (R0.9-1E)
 
-Recorded from the R0.9-1D independent review (its informational item 5, not to be confused with R0.9-1C's Info-5 on suspended-status visibility). The post-commit clear closes the window in which the library clears the cache
-inside the transaction. It does **not** close this one: a concurrent request reads the old permissions from the database before
-the commit, and stores them in the shared (Redis) cache **after** the post-commit invalidation has run. That entry then keeps a
-revoked permission alive until the cache expires (`permission.cache.expiration_time`, 24 hours). It is not introduced by R0.9-1D;
-`roles:sync` and every other role change share it, and it is **not conclusively fixed** by anything in this package.
+**Status:** implemented in R0.9-1E; the independent security review (Opus 5.5) passed with no Critical, High or Medium findings.
+Transactional epoch fencing closes the confirmed stale-cache repopulation race recorded by the R0.9-1D review (its informational
+item 5, not to be confused with R0.9-1C's Info-5 on suspended-status visibility) **for the supported current topology**: one
+primary database connection, no read replica, a shared Redis cache. Hosted CI and hosted Playwright for R0.9-1E are **outstanding**
+(the earlier hosted run predates it), and Release 0.9 is not customer-ready.
 
-- It is a **security-hardening obligation before production permission revocations are relied upon** (for example, revoking a
-  grant from a role as a response to an incident).
-- A one-time `permission:cache-reset` during deployment shortens the exposure after that deployment only. It does not address
-  concurrent changes made afterwards, so it is not a solution.
-- No cache redesign is part of this package. The design question (for example a cache version stamped under the lock, or
-  re-checking the stored grants for sensitive decisions) is open and belongs to a later hardening item.
+**The race.** The permission library caches in the shared store (Redis) which roles carry each permission, for 24 hours. A
+request that reloads that mapping from the database just before a revocation commits, and stores it after the writer has cleared
+the cache, keeps the revoked grant alive for the cache lifetime. R0.9-1C's post-commit clear cannot prevent it: it runs before
+the late store. It was reproduced with two independent PHP processes, MariaDB and Redis.
+
+**The invariant.** Once a role-permission revocation has committed, authorization checks that *begin afterward* do not grant
+through stale shared cache data. A decision already under way, and any later check made from the copy the same request already
+loaded, completes under the state it loaded (request-bounded; a queue worker starts every job with no copy, see below).
+
+**The mechanism.** The cache key is `permission.cache.key` plus `:` plus the **epoch**, a random 128-bit token.
+
+- A reader reads the epoch *before* it reads the cache or the database, so whatever it stores goes under the epoch it read.
+- Every change to the shared mapping replaces the epoch with a fresh token **inside the writer's own transaction**. The token
+  commits or rolls back with the change, and no other connection sees it before the commit.
+- A reader that began before a commit can therefore only fill a key that no reader beginning afterward consults. Tokens are
+  never reused, so an obsolete entry cannot become active again whatever it still holds, and it expires under the normal TTL.
+- There is no post-commit step to lose. A writer killed right after COMMIT has already moved the epoch.
+
+**Storage and connection contract** (`App\Support\Permissions\PermissionCacheEpoch`).
+
+- One row in the existing Laravel `cache` table (migration `0001_01_01_000001`; **no new migration**), key
+  `<cache.prefix>spatie.permission.epoch`, value the token, expiration ten years out. The table name comes from
+  `cache.stores.database.table`.
+- It uses the application's **default database connection**, the connection the permission models write through, so the write
+  joins the caller's transaction. Reads use `useWritePdo()`: always the primary, never a replica.
+- It deliberately does **not** use the `database` cache *store*: that store reads through the read replica when one is
+  configured and can be pointed at another connection (`DB_CACHE_CONNECTION`); either would break the guarantee. No read/write
+  split and no read replica is configured today, and **a replica deployment is unsupported**. The epoch read is primary-only (a
+  test proves it with an unreachable replica), but that is only half of the guarantee: the library's own loader
+  (`PermissionRegistrar::getPermissionsWithRoles()`) reads through the read connection whenever no transaction is open, and this
+  package does not change it. With an asynchronous replica, a reader could load pre-revocation rows from a lagging replica and
+  store them under the *active* epoch, where they would be served for the cache lifetime. Introducing a replica is therefore a
+  deployment and architecture constraint, not an implemented capability: permission loading must first be routed explicitly to the
+  primary (or equivalent consistency proved) before the configuration is enabled.
+- First use creates the row with `INSERT IGNORE`; concurrent first uses converge on one token. If the row is lost (`cache:clear`
+  on the database store, a restore), the next reader mints a new token, which also makes every older entry unreachable.
+- The epoch lives in whichever database is the default connection, so the testing and rehearsal databases each have their own.
+
+**Integration** (`App\Support\Permissions\EpochPermissionRegistrar`, bound with `extend` in `AppServiceProvider`). It overrides only
+`getPermissions()`, the *only* route to the library's loader (checked in 6.25: `Permission::getPermissions()`, therefore
+`findByName`/`findById`/`create`, `hasPermissionTo`, `User::permission()`, the Gate's before-callback and `Role::hasPermissionTo` all
+end there), and `forgetCachedPermissions()`, which advances the epoch and then clears the library's in-process copy and the old
+unsuffixed key. It returns `true` once the epoch has advanced, so `permission:cache-reset` reports success.
+
+**What advances the epoch.** The library calls `forgetCachedPermissions()` on every save or delete of a role or permission and on
+every role-permission change made through its models, which covers custom role edits, role creation and deletion, permission
+creation, renaming and removal, and `syncPermissions`/`givePermissionTo`/`revokePermissionTo`. The built-in synchronization writes
+role-permission links with raw SQL the library never sees, so `BuiltInRoleSynchronizer::execute()` advances the epoch itself,
+inside its transaction and after its last write. A user's own roles and direct permissions are not in the shared mapping and do
+not advance it. Changes made outside the application (SQL, a shell, a restore) do not either: run `php artisan permission:cache-reset`
+afterwards.
+
+**The existing hooks are kept.** `AccessGrants`' post-commit and post-rollback clears still run. Each now advances the epoch once
+more (and clears the old key): redundant, harmless, and unable to weaken the guarantee, because the epoch only moves to a token
+never used before. After a rolled-back change the epoch therefore differs from before it, a harmless extra reload.
+
+**Queue workers.** The registrar is a singleton and a worker resets only *scoped* instances between jobs, so it would keep the
+mapping it loaded for its first job indefinitely. `AppServiceProvider` clears the in-memory copy on every `JobProcessing` event for a
+non-`sync` connection; each job's first check reads the current epoch. `sync` jobs run inside the request that dispatched them.
+
+**Failure behaviour.** Nothing swallows an epoch error. If the epoch cannot be read, the check throws (it never falls back to a
+cache that may be stale). If it cannot be advanced inside a transaction, the exception aborts that transaction and the grant change
+does not commit. The cost is one primary-key read per request that authorizes. A shared-cache outage still makes checks fail, as
+before; a revocation no longer depends on it: clearing the old unsuffixed key is best-effort (reported, not thrown), because the
+epoch has already made every suffixed entry unreachable.
+
+**Deployment and rollback.**
+
+- No migration and no schema change. Security compatibility is a separate question from schema compatibility.
+- **Do not change role permissions while old and new application versions run together** (a rolling deployment). Old code
+  ignores the epoch: a revocation made through an old instance does not advance it, and instances running the new code would keep
+  serving entries stored under the current epoch until they expire. The new code clears the old unsuffixed key, which helps old
+  instances read a new instance's change, but old instances keep the old race.
+- After a deployment completes, run `php artisan permission:cache-reset`; it advances the epoch, so it is authoritative.
+- Restart queue workers on deployment (existing requirement): a worker that predates the change has neither the fence nor the reset.
+- After a Redis flush the epoch is unaffected and the next requests rebuild the cache. During a Redis outage checks fail as before.
+- **Rolling back to code that ignores the epoch restores the old race**, whatever the schema says. The suspension-specific
+  rollback restriction of R0.9-1C remains in force.
+
+**Limits.** A decision under way, or a request that already loaded its copy, can still complete under the earlier state. SQL or a
+restore without `permission:cache-reset` is not seen. Mixed-version windows are unsafe, as above. A Spatie upgrade that changes
+how the loader reads the cache key would be caught by the race tests.
 
 ## First-operator bootstrap
 
@@ -248,6 +324,8 @@ and the delete (a stale check), the engine refuses the delete (error 1451) and t
 | Bootstrap | `tests/Feature/Admin/OperatorBootstrapTest.php` |
 | Real-MariaDB races: synchronization vs demotion, two identical syncs, two bootstraps | `tests/Feature/Admin/LastAccountAdministratorConcurrencyTest.php` (worker: `tests/Support/account_admin_worker.php`) |
 | Post-commit cache for the synchronization (file store, and Redis where `REDIS_HOST` names a server) | `tests/Feature/Admin/PermissionCacheCommitOrderTest.php` |
+| The cache-repopulation race with independent processes, a negative control, outer transaction, rollback, consecutive revocations, role deletion, a killed writer, flushes, a persistent worker, the built-in synchronization, torn reads, concurrent first use, failures | `tests/Feature/Admin/PermissionCacheEpochTest.php` (workers: `tests/Support/permission_epoch_reader.php`, `permission_epoch_writer.php`) |
+| Loading paths, mutation coverage, atomic rollback, the job-boundary reset, cache outage | `tests/Feature/Admin/PermissionCacheEpochMutationTest.php` |
 | CRM company deletion | `tests/Feature/Crm/CompanyDeletionSafetyTest.php` |
 
 R0.9-1C tests that edited the built-in `operator` role through the Roles screen as a way to demote an administrator now
@@ -260,10 +338,10 @@ use a custom role carrying the same permissions (`LastAccountAdministratorTest`)
 - Stored permissions that no built-in role defines are reported and kept, never deleted.
 - A custom role that holds a permission later removed from the catalogue keeps the stored row; nothing reconciles it.
 - The bootstrapped account's email is not marked verified (the application does not require verification anywhere).
-- The inherited permission-cache repopulation race ([above](#residual-permission-cache-risk-inherited-from-r09-1c-not-fixed-here)) is open and must be hardened before production permission revocations are relied upon.
+- The permission-cache repopulation race found by the R0.9-1D review is addressed by R0.9-1E ([above](#permission-cache-generation-fencing-r09-1e)), which is implemented and passed independent security review for the supported current topology (no read replica); hosted CI and Playwright for it are outstanding, and its limits and the mixed-version deployment hazard are listed there.
 - Hosted CI ran this package once ([run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30): the full Pest suite passed with 0 skipped, and the Redis variants of the cache
-  tests ran on a real Redis server (a dedicated step fails on any skip). It is evidence, not release approval, and does not
-  address the residual cache race above.
+  tests ran on a real Redis server (a dedicated step fails on any skip). It is evidence, not release approval, and predates
+  R0.9-1E.
 - Not in this package: email normalization on write, removing `client_id` from mass assignment, invitation-token handling
   (H10), and project and company delete policy (H6). They remain in the [§11](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery)
   row for R0.9-1D and need a decision on whether they follow in this package.
