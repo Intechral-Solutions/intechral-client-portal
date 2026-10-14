@@ -13,9 +13,15 @@ import { register } from '@/routes/invitation';
 type InvitationRegisterProps = {
     invitation: { email: string; expiresAt: string };
     token: string;
+    /** False while single sign-on is deferred (Release 0.9 pilot): the password form is the only way in. */
+    providersAvailable?: boolean;
 };
 
-export default function InvitationRegisterPage({ invitation, token }: InvitationRegisterProps) {
+export default function InvitationRegisterPage({
+    invitation,
+    token,
+    providersAvailable = true,
+}: InvitationRegisterProps) {
     const form = useForm({ name: '', password: '', password_confirmation: '' });
     const nameRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
@@ -102,7 +108,7 @@ export default function InvitationRegisterPage({ invitation, token }: Invitation
                     <Button type="submit" className="w-full" disabled={form.processing}>
                         {form.processing ? 'Creating account...' : 'Create account'}
                     </Button>
-                    <ProviderLinks invitation={token} />
+                    {providersAvailable ? <ProviderLinks invitation={token} /> : null}
                 </form>
             </AuthLayout>
         </>

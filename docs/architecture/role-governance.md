@@ -150,6 +150,24 @@ include it. Where this runs in the production pipeline is part of the hosting di
 - The stored roles are the data. Backups include them. A restore followed by a preview shows exactly how far the restored
   roles are from the code.
 
+## Operator eligibility: `portal.operator` (R0.9-CS1)
+
+`portal.operator` is a catalogue permission that marks an account as **eligible to be an operator** for the customer-surface
+boundary ([Customer Pilot Surface Gate](./customer-pilot-surface.md)). It is a trust designation, not a permission to perform any
+action: every endpoint still checks its own capability, and holding it alone reaches 403 pages, not data.
+
+- The built-in `operator` role carries it because it carries the whole catalogue; the built-in `user` role does not and cannot be
+  edited to (`AccessGrants::assertCustom`). `BuiltInRoles::definitions()` is unchanged in shape, so **`roles:sync` shows it as two
+  additions** on an existing installation: create the permission, grant it to `operator`.
+- A custom role carries it only if an authorized operator (`roles.manage`) adds it on the Roles screens. Nothing grants it to a
+  custom role automatically, and no other permission implies it. A custom operator role that is not given it turns its members
+  into customers once the boundary is in `closed` or `pilot` mode.
+- Preview with `php artisan roles:sync`; find the custom roles and accounts that need an explicit decision with
+  `php artisan customer-surface:preflight` (read-only). The procedure and its order are in
+  [Customer Pilot Surface Gate §10](./customer-pilot-surface.md#10-deployment-operator-eligibility-and-rolessync).
+- It is classified `PRESENTATION_NEUTRAL` by the shell drift guard: it gates no route and selects no shell.
+- The R0.9-1C last-administrator protection and the R0.9-1D approval behaviour apply unchanged.
+
 ## Seeders
 
 | Seeder | Local and testing | Elsewhere (production, staging) |

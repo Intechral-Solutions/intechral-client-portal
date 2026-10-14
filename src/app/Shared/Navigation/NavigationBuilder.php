@@ -4,6 +4,7 @@ namespace App\Shared\Navigation;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Shared\Pilot\CustomerPilotGate;
 use App\Shared\Shell\ShellPresentation;
 use Illuminate\Http\Request;
 use LogicException;
@@ -86,6 +87,16 @@ final class NavigationBuilder
             $this->resources($user),
         ]));
 
+        // Release 0.9 (R0.9-CS1): a customer is offered only the workspaces the effective mode allows. Presentation, not the
+        // control (EnforceCustomerPilotSurface refuses the routes), but it is the one place both renderers read,
+        // so neither can offer a link into a module the server will refuse.
+        if (CustomerPilotGate::restricts($user)) {
+            $specs = array_values(array_filter(
+                $specs,
+                fn (array $spec) => in_array($spec['key'], CustomerPilotGate::workspaces(), true),
+            ));
+        }
+
         $activeKey = $this->resolveActiveWorkspace($request, $specs);
 
         if ($presentation === ShellPresentation::Focused) {
@@ -150,7 +161,7 @@ final class NavigationBuilder
 
         // Row-level access stays with Project::visibleTo / ProjectPolicy; this gate only decides
         // whether the actor is offered the create surface at all, exactly as the route does.
-        if ($user->can('projects.manage')) {
+        if ($user->can('projects.manage') && ! CustomerPilotGate::restricts($user)) {
             $sections[] = $this->section('actions', null, ContextKind::Actions, [
                 $this->item('projects.create', 'New project', route('projects.create'), 'inertia'),
             ]);
@@ -233,7 +244,8 @@ final class NavigationBuilder
             ]);
         }
 
-        if ($user->can('tickets.assign')) {
+        // A restricted customer holding `tickets.assign` is offered no operator queue (R0.9-CS1): its routes are refused.
+        if ($user->can('tickets.assign') && ! CustomerPilotGate::restricts($user)) {
             $views[] = $this->item('helpdesk.queue', 'Queue', route('operator.tickets.index'), 'document', [
                 'operator.tickets.index',
                 'operator.tickets.show',

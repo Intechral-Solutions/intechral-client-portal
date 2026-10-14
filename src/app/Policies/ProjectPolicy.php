@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Shared\Pilot\CustomerPilotGate;
 
 /**
  * Maintenance note (EPIC-014 WP3): `view` and `manage` are restated as a batch, in memory, by
@@ -22,7 +23,7 @@ class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
-        if ($user->can('projects.admin')) {
+        if ($this->administers($user)) {
             return true;
         }
 
@@ -31,7 +32,7 @@ class ProjectPolicy
 
     public function manage(User $user, Project $project): bool
     {
-        if ($user->can('projects.admin')) {
+        if ($this->administers($user)) {
             return true;
         }
         if ($user->can('projects.manage')) {
@@ -42,6 +43,16 @@ class ProjectPolicy
         }
 
         return false;
+    }
+
+    /**
+     * `projects.admin` sees and manages every project, except for a restricted customer (R0.9-CS1: an account without
+     * `portal.operator` in closed or pilot mode), for whom membership is the only way in: an operational capability must
+     * not widen the customer's project scope. Mirrored by {@see Project::scopeVisibleTo()}.
+     */
+    private function administers(User $user): bool
+    {
+        return $user->can('projects.admin') && ! CustomerPilotGate::restricts($user);
     }
 
     /**

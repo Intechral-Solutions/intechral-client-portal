@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Exceptions\InvitationUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Services\InvitationService;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
@@ -29,6 +30,8 @@ class InvitationController extends Controller
                 'expiresAt' => $invitation->expires_at->toIso8601String(),
             ],
             'token' => $token,
+            // SSO is deferred for the first pilot (R0.9-CS1): the page offers the password form only.
+            'providersAvailable' => ! CustomerPilotGate::ssoDeferred(),
         ]);
     }
 

@@ -20,6 +20,9 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_URL" value="http://localhost:4242"/>
+        <!-- R0.9-CS1: the suite's baseline is the behaviour before the customer boundary existed. Closed-mode and pilot-mode
+             tests set the mode explicitly (tests/Feature/Pilot). Honoured only because APP_ENV is testing. -->
+        <env name="PORTAL_CUSTOMER_SURFACE_MODE" value="legacy"/>
         <env name="INERTIA_SSR_ENABLED" value="false"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

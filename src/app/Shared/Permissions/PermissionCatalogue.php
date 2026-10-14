@@ -110,6 +110,15 @@ final class PermissionCatalogue
 
     const ORG_MANAGE_ROLES = 'org.manage_roles';
 
+    // ── Portal ─────────────────────────────────────────────
+    /**
+     * Operator ELIGIBILITY for the customer-surface boundary (R0.9-CS1): the one capability that exempts an account
+     * from the customer restrictions. It is a trust designation, not a permission to do anything: every endpoint still
+     * checks its own capability. The built-in `operator` role carries it through `roles:sync`; the built-in `user`
+     * role never does, and no other permission implies it.
+     */
+    const PORTAL_OPERATOR = 'portal.operator';
+
     // ── CMS ────────────────────────────────────────────────
     const CMS_VIEW = 'cms.view';
 
@@ -149,6 +158,8 @@ final class PermissionCatalogue
             self::ORG_ADMIN, self::ORG_INVITE, self::ORG_MANAGE_ROLES,
             // CMS
             self::CMS_VIEW, self::CMS_EDIT, self::CMS_PUBLISH, self::CMS_ADMIN,
+            // Portal
+            self::PORTAL_OPERATOR,
         ];
     }
 

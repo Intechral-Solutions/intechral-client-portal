@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Shared\Navigation\NavigationBuilder;
+use App\Shared\Pilot\CustomerPilotGate;
 use App\Shared\Shell\ShellPresentation;
 use App\Shared\Shell\ShellPresentationResolver;
 use App\Support\Initials;
@@ -42,8 +43,9 @@ class HandleInertiaRequests extends Middleware
                         'url' => null,
                     ],
                 ] : null,
+                // A pilot customer is told only the capabilities the pilot surface uses (R0.9-CS1).
                 'permissions' => fn () => $user
-                    ? $user->getAllPermissions()->pluck('name')->sort()->values()->all()
+                    ? CustomerPilotGate::exposedPermissions($user, $user->getAllPermissions()->pluck('name')->sort()->values()->all())
                     : [],
             ],
             // The presentation family the shell should render, resolved server-side (EPIC-013 §23,

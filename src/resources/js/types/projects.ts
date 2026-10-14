@@ -240,3 +240,16 @@ export type ProjectOverviewProps = {
      */
     tabs?: { time: boolean };
 };
+
+/**
+ * Release 0.9 pilot customer presentation (`CustomerProjectPresenter`, R0.9-CS1). An exact-key allowlist:
+ * the server sends nothing else, so there is no health, progress, description, budget, member or time
+ * datum for a page to show or hide.
+ */
+export type CustomerProjectRow = { id: number; name: string; status: ProjectStatus };
+
+export type CustomerMilestone = {
+    name: string;
+    /** `YYYY-MM-DD`, a calendar day, never timezone-converted. */
+    dueDate: string;
+};

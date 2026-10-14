@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -76,7 +77,8 @@ class Project extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->can('projects.admin')) {
+        // R0.9-CS1: not for a restricted customer, who sees member projects only (see ProjectPolicy::administers()).
+        if ($user->can('projects.admin') && ! CustomerPilotGate::restricts($user)) {
             return $query;
         }
 

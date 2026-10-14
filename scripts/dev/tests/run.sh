@@ -372,6 +372,30 @@ assert_log "chromium.launch"
 assert_log_lacks "playwright install"
 assert_log_lacks "npx"
 
+begin "the hosted browser-pilot step cannot lose ./dev's exit code to tee (R0.9-CS1 R-3)"
+STEP="$(awk '/^  browser-pilot:/{j=1} j&&/Playwright \(\.\/dev test:e2e\) the pilot spec/{s=1} s{print} s&&/pilot-spec.log$/{exit}' "$ROOT/.github/workflows/ci.yml")"
+[[ $STEP == *"shell: bash"* && $STEP == *"set -eo pipefail"* && $STEP == *"| tee pilot-spec.log"* ]] && ok || bad "the browser-pilot step does not run its tee pipeline under pipefail: $STEP"
+# Nothing may swallow the pipeline's status afterwards: the tee line ends the command, and neither the step nor the job continues on error.
+TEE_LINE="$(grep -F 'test:e2e tests/Browser/customer-pilot.spec.ts' <<<"$STEP" | tail -1)"
+[[ $TEE_LINE == *"| tee pilot-spec.log" ]] && ok || bad "the pilot spec's tee pipeline has something after it that could mask its status: $TEE_LINE"
+JOB="$(awk '/^  browser-pilot:/{j=1;next} j&&/^  [a-z-]+:$/{exit} j{print}' "$ROOT/.github/workflows/ci.yml")"
+[[ $JOB != *"continue-on-error"* && $JOB != *"|| true"* && $JOB != *"|| :"* ]] && ok || bad "the browser-pilot job can continue past a failure (continue-on-error or '|| true')"
+# The control itself, run the way the step runs it: with pipefail a failing left-hand side fails the pipeline, without it tee hides it.
+if bash -c 'set -eo pipefail; (false | tee /dev/null)' >/dev/null 2>&1; then bad "a failing command piped into tee returned success under pipefail"; else ok; fi
+if bash -c 'set -e; (false | tee /dev/null)' >/dev/null 2>&1; then ok; else bad "the control is vacuous: without pipefail the pipeline should have succeeded"; fi
+
+begin "test:e2e forwards E2E_REQUIRE_PILOT_GATE (and only that) into the container when it is set"
+dev_run -- test:e2e tests/Browser/customer-pilot.spec.ts
+assert_rc 0
+assert_log_lacks "E2E_REQUIRE_PILOT_GATE"
+: >"$WORK/docker.log"
+OUT="$(env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/docker.log" DEV_BACKUP_DIR="$WORK/backups" DEV_E2E_LOCK="$WORK/e2e.lock" NO_COLOR=1 E2E_REQUIRE_PILOT_GATE=1 SOME_OTHER_HOST_VARIABLE=leak "$ROOT/dev" test:e2e tests/Browser/customer-pilot.spec.ts 2>&1)"
+RC=$?
+LOG="$(cat "$WORK/docker.log")"
+assert_rc 0
+assert_log "E2E_REQUIRE_PILOT_GATE=1"
+assert_log_lacks "SOME_OTHER_HOST_VARIABLE"
+
 begin "test:e2e fails with a rebuild hint when the image has no working browser (and installs nothing)"
 export STUB_BROWSER_RC=1
 dev_run -- test:e2e tests/Browser/auth-migration.spec.ts

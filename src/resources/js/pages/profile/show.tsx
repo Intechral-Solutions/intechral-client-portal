@@ -733,13 +733,16 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
                     )}
                 </SectionPanel>
 
-                <SectionPanel
-                    id="connected-accounts"
-                    title="Connected accounts"
-                    description="Manage the external providers available for sign-in."
-                >
-                    <ConnectedAccounts accounts={connectedAccounts} />
-                </SectionPanel>
+                {/* The server sends no providers while single sign-on is deferred (Release 0.9 pilot). */}
+                {connectedAccounts.length > 0 ? (
+                    <SectionPanel
+                        id="connected-accounts"
+                        title="Connected accounts"
+                        description="Manage the external providers available for sign-in."
+                    >
+                        <ConnectedAccounts accounts={connectedAccounts} />
+                    </SectionPanel>
+                ) : null}
 
                 <SectionPanel
                     id="sessions"

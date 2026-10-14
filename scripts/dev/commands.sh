@@ -330,7 +330,12 @@ cmd_test_e2e() {
     fi
 
     say "Running Playwright in '$SVC_APP' as $HOST_UID:$HOST_GID (isolated output: $E2E_OUTPUT_DIR), base URL $E2E_BASE_URL"
-    app_exec env "PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" "E2E_TICKET_CLEANUP_OWNER=dev" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || pw_rc=$?
+    # The one host variable forwarded into the container (everything else a test needs is configured on the stack
+    # before it starts): it makes tests/Browser/customer-pilot.spec.ts a required test, which fails, never skips,
+    # when the application is not in pilot mode (R0.9-CS1).
+    local -a pw_env=("PLAYWRIGHT_BASE_URL=$E2E_BASE_URL" "E2E_TICKET_CLEANUP_OWNER=dev")
+    [[ -n ${E2E_REQUIRE_PILOT_GATE:-} ]] && pw_env+=("E2E_REQUIRE_PILOT_GATE=$E2E_REQUIRE_PILOT_GATE")
+    app_exec env "${pw_env[@]}" npm run test:e2e -- "--output=$E2E_OUTPUT_DIR" "$@" || pw_rc=$?
 
     if [[ $listing -eq 0 ]]; then
         say
