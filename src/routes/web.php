@@ -38,7 +38,7 @@ Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
         : redirect()->route('login');
-});
+})->name('root');
 
 // Fortify owns: GET/POST /login, POST /logout, GET/POST /forgot-password,
 //               GET/POST /reset-password, GET/POST /two-factor-challenge,

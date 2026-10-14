@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
+use App\Shared\Pilot\CustomerPilotGate;
 
 /**
  * Ticket authorization (EPIC-010D §9). Operator-side Ticket work is identified by the
@@ -61,8 +62,16 @@ class TicketPolicy
         return ! $reply->is_internal || $this->viewInternal($user, $ticket);
     }
 
+    /**
+     * Whether the actor works tickets as an operator: holds `tickets.assign` AND is not a restricted customer.
+     *
+     * R0.9-CS1: an account without `portal.operator` is a customer to the boundary in closed and pilot mode, and
+     * `tickets.assign` must not widen what a customer may see or do on the Helpdesk routes they are allowed. Without
+     * this clause such an account would read every ticket, download internal-note attachments, post internal notes and be
+     * redirected into the operator application. Operators (eligible accounts) and legacy mode are unchanged.
+     */
     private function worksTickets(User $user): bool
     {
-        return $user->can('tickets.assign');
+        return $user->can('tickets.assign') && ! CustomerPilotGate::restricts($user);
     }
 }

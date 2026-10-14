@@ -189,6 +189,36 @@ The refusal-focus probe (removing the `useEffect` that focuses the refusal fails
 above and was not repeated, because it needs an asset rebuild. The original G3-B list of six was not retained, so this
 table is a re-execution, not a transcription ([EPIC-017 A2.9](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a29-mutation-and-non-vacuity-evidence-g3-c-re-execution)).
 
+## Customer pilot surface (`customer-pilot.spec.ts`, R0.9-CS1)
+
+One journey through the customer pilot surface in real Chromium: a customer's navigation (Home, Support, Projects only), the reduced
+project list and overview (no budget, description, milestone description or completion, board, tasks or settings in the page or in
+the page data), direct URLs into excluded modules answering 404, the Helpdesk unchanged, and the operator unchanged. The Pest suite
+(`tests/Feature/Pilot`) is the exhaustive proof; this is the browser proof.
+
+The application must be **in pilot mode**, and the spec asks the server rather than trusting a setting it cannot see
+(`support/pilot-probe.ts`):
+
+- `E2E_REQUIRE_PILOT_GATE=1` makes it a **required** test: it fails, never skips, unless a customer receives the pilot surface (a
+  legacy or closed server, a 500, a redirect or any other status is an error). This is how the hosted `browser-pilot` job runs it
+  ([CI](ci.md#customer-surface-modes-in-ci-r09-cs1)). `./dev test:e2e` forwards this one variable into the container.
+- Without it, the spec skips only on a plainly legacy server (the default development stack), so the normal full run is unaffected.
+
+To run it locally, set the mode where the application reads it, before the app container starts (a real environment variable beats
+`src/.env`), then run the spec alone and put the stack back:
+
+```
+PORTAL_CUSTOMER_SURFACE_MODE=pilot docker compose up -d app      # recreates the app container in pilot mode
+E2E_REQUIRE_PILOT_GATE=1 ./dev test:e2e tests/Browser/customer-pilot.spec.ts
+docker compose up -d app                                         # back to the dev default (legacy)
+```
+
+The operator persona must hold `portal.operator`: a database seeded by `migrate --seed` (as in CI) has it; an older development
+database needs `php artisan roles:sync` first, which you should only apply to a database you can lose. Every other browser spec assumes
+the development default (legacy) and several are expected to fail against a pilot server (customer Invoices and Resources navigation,
+the customer project Overview), so run this file alone in that mode. It creates one project (tracked for cleanup like the other
+project specs) and no tickets.
+
 ## Shared records: never select by position
 
 Workers share one database, so a list or `<select>` another spec's fixture can enter must be addressed by a

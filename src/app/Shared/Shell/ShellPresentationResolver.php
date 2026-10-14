@@ -80,6 +80,7 @@ final class ShellPresentationResolver
         PermissionCatalogue::ORG_MANAGE_ROLES => 'Defined and never checked anywhere.',
         PermissionCatalogue::CMS_PUBLISH => 'Checked inside operator/cms routes, which already require cms.edit.',
         PermissionCatalogue::CMS_ADMIN => 'Checked inside operator/cms routes, which already require cms.edit.',
+        PermissionCatalogue::PORTAL_OPERATOR => 'Customer-surface eligibility (R0.9-CS1): gates no route and selects no shell; the built-in operator role holds every operational capability as well.',
     ];
 
     public function forUser(?User $user): ShellPresentation

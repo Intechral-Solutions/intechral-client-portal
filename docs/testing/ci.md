@@ -23,7 +23,7 @@ blocking by convention until required checks can be configured.
 
 ## What runs
 
-Two jobs, in parallel, on separate runners pinned to `ubuntu-24.04` (not `ubuntu-latest`, so the
+Three jobs (`checks`, `browser` and the required-mode `browser-pilot`), in parallel, on separate runners pinned to `ubuntu-24.04` (not `ubuntu-latest`, so the
 OS and its tooling — Docker/Compose, ShellCheck — do not change underneath the baseline).
 
 ### `checks` — the `./dev check` gates
@@ -123,6 +123,44 @@ stack's own nginx and php-fpm.
 
 The two jobs are separate so that the full Vitest and full Playwright suites never share a machine
 (A13.18: run concurrently, both report false failures).
+
+## Customer surface modes in CI (R0.9-CS1)
+
+The customer-surface boundary has three modes ([Customer Pilot Surface Gate](../architecture/customer-pilot-surface.md)), and CI
+keeps their proofs apart:
+
+| Mode | Proven by | Configured by |
+|---|---|---|
+| legacy (the pre-boundary behaviour) | the `checks` job's whole Pest suite, and the `browser` job's full Playwright suite | `phpunit.xml` sets `PORTAL_CUSTOMER_SURFACE_MODE=legacy`; the dev stack's `docker-compose.yml` defaults it to `legacy` and the `browser` job states it. Honoured only because `APP_ENV` is `testing`/`local` |
+| closed (the shipped default) | `tests/Feature/Pilot/*` in the `checks` job: each test sets the mode itself | `config(['portal.customer_surface_mode' => 'closed'])`, and the missing-key and environment-string cases |
+| pilot | `tests/Feature/Pilot/*`, and the `browser-pilot` job | the job sets the variable on the app container before it starts |
+
+**`browser-pilot`** (hosted, on the pull request) runs `tests/Browser/customer-pilot.spec.ts` against an application that is in pilot
+mode, as a **required** test:
+
+- It is a separate job on a fresh runner, so no pilot container, configuration or database exists in the normal suite's job, and the
+  normal suite is not reduced to a pilot-only suite. It starts the stack with `PORTAL_CUSTOMER_SURFACE_MODE=pilot` in the job
+  environment; `docker-compose.yml` passes it into the app container, where it is a real environment variable (it beats
+  `src/.env`, which says `closed`) visible to php-fpm and artisan alike. `./dev test:e2e` forwards no arbitrary host variable, so
+  the mode is configured before startup, not injected into Playwright.
+- The mode is verified **by behaviour**, twice: `php artisan customer-surface:preflight --expect-mode=pilot` fails the job unless
+  the application resolved pilot mode and `portal.operator` is provisioned (the seeded operator role carries it), and the spec
+  itself probes what a signed-in customer receives. `E2E_REQUIRE_PILOT_GATE=1` (the one host variable `./dev test:e2e` forwards)
+  makes the spec fail, never skip, on a legacy or closed server, a 500, a redirect or any unexpected status
+  (`tests/Browser/support/pilot-probe.ts`, unit-tested in `pilot-probe.vitest.ts`).
+- The Playwright step runs under `set -eo pipefail` in an explicit `bash` shell, because a pipeline's status is its last command's and
+  `./dev test:e2e 2>&1 | tee pilot-spec.log` would otherwise report `tee`'s success for a failed run (closure review R-3). `./dev`
+  folds every failure it can see into its own exit status (the Playwright exit, the post-suite ticket cleanup, the fixture and ticket
+  reconciliation, the attachment baseline), so any of them fails the step. A negative control at the top of the step runs
+  `( false | tee /dev/null )` under the same shell options and fails the job if that returns success, and the CLI self-tests
+  (`scripts/dev/tests/run.sh`) assert the step text and the control's behaviour with and without `pipefail`.
+- Playwright exits 0 for an all-skipped run, so a final step refuses any log that does not report `1 passed` or that reports a
+  skipped test. A green job therefore means the spec ran and passed; a run in which no test executed has no `1 passed` line and fails.
+- Cleanup is `./dev test:e2e`'s own (the spec tracks its one project for cleanup and raises no tickets).
+- The normal `browser` job still shows the spec as `1 skipped` (the stack is legacy there); that skip is the only skip allowed, and
+  only for a plainly legacy server.
+
+Not yet observed on hosted CI: the job was written and rehearsed locally against a disposable database, not run on GitHub.
 
 ## First hosted run of the Release 0.9 foundations (2026-10-12)
 

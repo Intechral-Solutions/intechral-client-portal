@@ -11,6 +11,12 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
+    # R0.9-CS1: the dev stack keeps the pre-boundary customer behaviour (APP_ENV=local, the only environment that
+    # honours "legacy") so the browser suite's customer specs keep their meaning. A real environment variable beats
+    # src/.env. Start the stack with PORTAL_CUSTOMER_SURFACE_MODE=pilot (or closed) in the host environment to run the
+    # pilot specs: docs/testing/e2e-browser-suite.md.
+    environment:
+      PORTAL_CUSTOMER_SURFACE_MODE: ${PORTAL_CUSTOMER_SURFACE_MODE:-legacy}
     volumes:
       - ./src:/var/www/app
       - ./.docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro

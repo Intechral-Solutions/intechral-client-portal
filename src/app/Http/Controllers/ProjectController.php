@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Customer\CustomerProjectController;
 use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
 use App\Queries\ProjectHealth;
 use App\Rules\AccessibleCrmCompany;
 use App\Services\ProjectService;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,12 @@ class ProjectController extends Controller
     public function index(Request $request): Response
     {
         $user = auth()->user();
+
+        // Release 0.9 (R0.9-CS1): a customer gets the reduced list, never this one.
+        if (CustomerPilotGate::restricts($user)) {
+            return app(CustomerProjectController::class)->index($request);
+        }
+
         $status = is_string($request->query('status')) && array_key_exists($request->query('status'), self::STATUSES)
             ? $request->query('status')
             : null;
@@ -121,6 +129,12 @@ class ProjectController extends Controller
      */
     public function show(Project $project): Response
     {
+        // Release 0.9 (R0.9-CS1): a customer gets the reduced overview, never the internal DTO, and is decided before
+        // the policy so a project they may not see answers exactly as one that does not exist (404, never 403).
+        if (CustomerPilotGate::restricts(auth()->user())) {
+            return app(CustomerProjectController::class)->show($project);
+        }
+
         $this->authorize('view', $project);
 
         return Inertia::render('projects/show', [

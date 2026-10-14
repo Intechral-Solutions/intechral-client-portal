@@ -146,6 +146,12 @@ jobs:
     name: Playwright browser suite
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    # R0.9-CS1: this job is the LEGACY-mode regression run. The suite's customer specs describe the behaviour before
+    # the customer-surface boundary existed, and legacy is honoured only because the stack runs APP_ENV=local.
+    # docker-compose.yml already defaults to legacy; stated here so the mode this job proves is not implicit. The
+    # closed-mode and pilot-mode proofs are the Pest suite (tests/Feature/Pilot) and the next job.
+    env:
+      PORTAL_CUSTOMER_SURFACE_MODE: legacy
     steps:
       - uses: actions/checkout@v7
         with:
@@ -182,6 +188,75 @@ jobs:
 
       - name: Playwright (./dev test:e2e)
         run: ./dev test:e2e
+
+      - name: Application log (on failure)
+        if: failure()
+        run: tail -n 200 src/storage/logs/laravel.log 2>/dev/null || echo 'No laravel.log was written.'
+
+  # R0.9-CS1: the customer pilot browser spec against an application that is actually in PILOT mode, as a REQUIRED
+  # test. A separate job on a fresh runner, so no pilot configuration, container or database ever touches the normal
+  # suite above, and the normal suite is not turned into a pilot-only suite.
+  #
+  # The mode is set where the application reads it: PORTAL_CUSTOMER_SURFACE_MODE is a real environment variable of
+  # the app container (docker-compose.yml passes it through), so it reaches php-fpm and artisan alike and beats
+  # src/.env. It is then VERIFIED by behaviour twice: `customer-surface:preflight --expect-mode=pilot` asks the
+  # application what it resolved, and the spec itself (E2E_REQUIRE_PILOT_GATE=1, forwarded by ./dev) probes what a
+  # customer receives and FAILS, never skips, unless that is the pilot surface. The final step refuses a run in which
+  # the spec was skipped or did not run, so a green job means the spec passed.
+  browser-pilot:
+    name: Customer pilot browser spec (pilot mode, required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PORTAL_CUSTOMER_SURFACE_MODE: pilot
+      E2E_REQUIRE_PILOT_GATE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Start the dev stack in pilot mode (app, nginx, db, redis)
+        run: docker compose up -d --wait app nginx
+
+      # APP_ENV=local from .env.example, so DevSeeder provides the personas and e2e-* fixtures, and the seeded
+      # built-in operator role carries portal.operator. .env.example says `closed`; the container environment wins.
+      - name: Install, configure, seed and build
+        run: |
+          docker compose exec -T -u "$(id -u):$(id -g)" -e HOME=/tmp app sh -euc '
+            composer install --no-interaction --no-progress --prefer-dist
+            npm ci --no-audit --no-fund
+            cp .env.example .env
+            php artisan key:generate --no-interaction
+            php artisan migrate --seed --no-interaction
+            npm run build
+          '
+
+      - name: Make storage writable for php-fpm
+        run: chmod -R a+rwX src/storage src/bootstrap/cache
+
+      - name: Verify the application resolved pilot mode and is provisioned (read-only)
+        run: docker compose exec -T -u "$(id -u):$(id -g)" -e HOME=/tmp app php artisan customer-surface:preflight --expect-mode=pilot
+
+      # `pipefail` is explicit (R0.9-CS1 review R-3): a pipeline's status is the LAST command's, so without it `tee` would
+      # report success for a failed `./dev test:e2e` (a failed spec, the post-suite cleanup, the fixture reconciliation, or
+      # the ticket and attachment baselines, all of which ./dev folds into its own exit status). The negative control
+      # proves the shell really fails on a failing left-hand side before the real command runs.
+      - name: Playwright (./dev test:e2e) the pilot spec, required
+        shell: bash
+        run: |
+          set -eo pipefail
+          # A subshell inherits the shell options, so this tests the option this very step runs under.
+          if ( false | tee /dev/null ); then
+            echo '::error::pipefail is not in effect: a failing command piped into tee would pass'
+            exit 1
+          fi
+          ./dev test:e2e tests/Browser/customer-pilot.spec.ts 2>&1 | tee pilot-spec.log
+
+      # `1 passed` and no skipped test. Playwright exits 0 for an all-skipped run, so the exit code alone is not proof.
+      - name: Refuse a skipped or missing pilot spec
+        run: |
+          grep -Eq '^[[:space:]]+1 passed' pilot-spec.log || { echo '::error::the customer pilot spec did not report 1 passed'; exit 1; }
+          if grep -Eq '^[[:space:]]+[0-9]+ skipped' pilot-spec.log; then echo '::error::the customer pilot spec was skipped'; exit 1; fi
 
       - name: Application log (on failure)
         if: failure()

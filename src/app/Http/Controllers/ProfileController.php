@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DatabaseSessionManager;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -32,11 +33,15 @@ class ProfileController extends Controller
                 'enabled' => filled($user->two_factor_secret),
                 'confirmed' => filled($user->two_factor_confirmed_at),
             ],
+            // SSO is deferred for pilot customers (R0.9-CS1): no provider is offered to connect, and one
+            // already connected is listed only so it can be disconnected.
             'connectedAccounts' => collect(self::PROVIDERS)
                 ->map(fn (string $provider) => [
                     'provider' => $provider,
                     'connected' => $connectedProviders->contains($provider),
                 ])
+                ->when(CustomerPilotGate::restricts($user), fn ($accounts) => $accounts->where('connected', true))
+                ->values()
                 ->all(),
             'sessions' => $this->sessions->forUser($user, $request->session()->getId()),
         ]);

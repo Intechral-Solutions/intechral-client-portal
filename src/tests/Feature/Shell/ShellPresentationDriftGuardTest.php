@@ -225,7 +225,7 @@ it('R1: partitions the catalogue into customer defaults, operational and present
 
 it('R1: records the approved sizes and a reason for every neutral capability', function () {
     expect(ShellPresentationResolver::OPERATIONAL)->toHaveCount(11)
-        ->and(ShellPresentationResolver::PRESENTATION_NEUTRAL)->toHaveCount(19)
+        ->and(ShellPresentationResolver::PRESENTATION_NEUTRAL)->toHaveCount(20) // 19 + portal.operator (R0.9-CS1)
         ->and(PermissionCatalogue::userDefaults())->toHaveCount(12);
 
     foreach (ShellPresentationResolver::PRESENTATION_NEUTRAL as $capability => $reason) {

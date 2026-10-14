@@ -7,6 +7,7 @@ use App\Exceptions\InvitationUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use App\Services\InvitationService;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,12 +38,19 @@ class SocialiteController extends Controller
         }
 
         if ($hasInvitation) {
-            $token = $request->string('invitation')->toString();
+            $queried = $request->query('invitation');
+            $token = is_string($queried) ? $queried : '';
 
+            // An empty, repeated (array) or unknown token is the ordinary "no longer available" answer, decided before
+            // anything is built from it (R0.9-CS1: an empty token used to reach route('invitation.show', '') and 500).
             if ($token === '' || ! $this->service->findValid($token)) {
                 return redirect()->route('login')
                     ->withErrors(['email' => 'This invitation is no longer available.'])
                     ->with('error', 'This invitation is no longer available.');
+            }
+
+            if (CustomerPilotGate::ssoDeferred()) {
+                return $this->invitationSsoDeferred($token);
             }
 
             $context = [
@@ -95,6 +103,12 @@ class SocialiteController extends Controller
             return $this->providerFailure($request, $context, $provider);
         }
 
+        // Release 0.9 (R0.9-CS1): SSO is deferred for the first pilot. An invitation always creates a customer
+        // account, so it is refused while the pilot gate is on; an existing customer is refused in login().
+        if ($context['intent'] === 'invitation' && CustomerPilotGate::ssoDeferred()) {
+            return $this->invitationSsoDeferred($context['invitationToken']);
+        }
+
         return match ($context['intent']) {
             'login' => $this->login($provider, $socialUser),
             'link' => $this->link($request, $provider, $socialUser, $context['initiatingUserId']),
@@ -112,7 +126,9 @@ class SocialiteController extends Controller
 
         // Release 0.9 (H3): this signs the user in directly, not through the user provider, so it checks suspension
         // itself. A suspended account gets the unlinked-identity answer: nothing discloses its existence or state.
-        if (! $account || $account->user->isSuspended()) {
+        // Release 0.9 (R0.9-CS1): SSO sign-in is deferred for pilot customers (it also bypasses the two-factor
+        // challenge). They get the same answer as an unlinked identity; operators are unaffected.
+        if (! $account || $account->user->isSuspended() || CustomerPilotGate::restricts($account->user)) {
             return redirect()->route('login')
                 ->withErrors(['email' => 'That provider account is not linked to a portal account.'])
                 ->with('error', 'That provider account is not linked to a portal account.');
@@ -196,6 +212,15 @@ class SocialiteController extends Controller
         Auth::login($user, remember: true);
 
         return redirect()->route('dashboard');
+    }
+
+    private function invitationSsoDeferred(string $token): RedirectResponse
+    {
+        $message = 'Single sign-on is not available yet. Create a password to accept this invitation.';
+
+        return redirect()->route('invitation.show', $token)
+            ->withErrors(['provider' => $message])
+            ->with('error', $message);
     }
 
     private function validContext(mixed $context, string $provider): bool

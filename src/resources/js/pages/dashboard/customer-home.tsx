@@ -116,7 +116,11 @@ function CustomerHomePage({
             <PageFrame width="canvas">
                 <PageHeader
                     title="Home"
-                    description="Your requests, invoices and projects, in one place."
+                    description={
+                        invoices
+                            ? 'Your requests, invoices and projects, in one place.'
+                            : 'Your requests and projects, in one place.'
+                    }
                     actions={
                         newRequest ? (
                             <DestinationLink

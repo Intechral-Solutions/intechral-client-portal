@@ -10,6 +10,8 @@ use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Shared\Pilot\CustomerPilotGate;
+use App\Shared\Pilot\CustomerSurfaceMode;
 use App\Shared\Shell\ShellPresentation;
 use App\Shared\Shell\ShellPresentationResolver;
 use Illuminate\Http\Request;
@@ -21,6 +23,14 @@ class DashboardController extends Controller
     public function __invoke(Request $request, ShellPresentationResolver $presentation): Response
     {
         $user = $request->user();
+
+        // R0.9-CS1: a customer (no `portal.operator`) never gets the operator dashboard, whatever shell their other
+        // capabilities select. Closed mode shows a page with no business data; pilot mode the reduced Home.
+        if (CustomerPilotGate::restricts($user)) {
+            return CustomerPilotGate::mode() === CustomerSurfaceMode::Pilot
+                ? $this->customerHome($user)
+                : Inertia::render('dashboard/customer-unavailable');
+        }
 
         // The one place a controller reads the presentation, and only to choose WHICH page this route
         // renders (EPIC-017 §5, F6): the Focused shell's calm customer Home, or the operator dashboard
@@ -167,7 +177,8 @@ class DashboardController extends Controller
                     'statusLabel' => $statusLabels[$ticket->status] ?? ucfirst(str_replace('_', ' ', $ticket->status)),
                 ]))->values()
                 : null,
-            'invoices' => $user->can('billing.view') ? [
+            // Customer finance is outside the pilot: the section is null (never sent), not hidden by the page.
+            'invoices' => $user->can('billing.view') && ! CustomerPilotGate::restricts($user) ? [
                 'outstanding' => Invoice::where('client_id', $user->id)->whereIn('status', ['sent', 'overdue'])->count(),
                 'href' => route('billing.client.invoices.index'),
                 'visit' => 'document',

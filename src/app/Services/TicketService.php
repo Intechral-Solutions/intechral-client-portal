@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
 use App\Rules\AllowedTicketAttachment;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -72,7 +73,7 @@ class TicketService
      * A reply, with the O2 lifecycle for a customer author (EPIC-017 §13).
      *
      * "Customer" is a capability, never a route or the shell presentation: an author without
-     * `tickets.assign`. Everything happens under a lock on the ticket row, against its committed
+     * `tickets.assign`, or a restricted customer (R0.9-CS1) whatever else they hold. Everything happens under a lock on the ticket row, against its committed
      * status, so a concurrent operator change or auto-close is seen, not overwritten:
      *
      *  - a customer reply on `closed` is refused BEFORE any write: no reply, attachment row, file,
@@ -86,7 +87,9 @@ class TicketService
      */
     public function addReply(Ticket $ticket, User $user, string $body, bool $isInternal, array $files = []): TicketReply
     {
-        $isCustomer = ! $user->can('tickets.assign');
+        // R0.9-CS1: a restricted customer replying with a stray `tickets.assign` is still a customer (closed-ticket
+        // refusal, status lifecycle), exactly as TicketPolicy treats them.
+        $isCustomer = ! $user->can('tickets.assign') || CustomerPilotGate::restricts($user);
 
         [$reply, $current] = $this->storeAttachments(function (array &$stored) use ($ticket, $user, $body, $isInternal, $files, $isCustomer) {
             $current = Ticket::query()->lockForUpdate()->findOrFail($ticket->getKey());
