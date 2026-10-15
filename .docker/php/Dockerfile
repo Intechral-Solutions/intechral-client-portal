@@ -3,7 +3,7 @@
 # always matches the test runner, and fails the build if the lockfile is inconsistent.
 # Only the extracted version reaches the main stage, so unrelated lockfile changes do not
 # invalidate the (large) browser layer.
-FROM php:8.3-fpm AS playwright-version
+FROM php:8.5-fpm AS playwright-version
 COPY src/package-lock.json /tmp/package-lock.json
 RUN php -r '$p = json_decode(file_get_contents("/tmp/package-lock.json"), true)["packages"] ?? []; \
     $core = $p["node_modules/playwright-core"]["version"] ?? ""; \
@@ -14,7 +14,7 @@ RUN php -r '$p = json_decode(file_get_contents("/tmp/package-lock.json"), true)[
     } \
     echo $core;' > /playwright-version
 
-FROM php:8.3-fpm
+FROM php:8.5-fpm
 
 # System dependencies
 RUN apt-get update && apt-get install -y \
@@ -31,7 +31,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
+# PHP extensions. OPcache is not listed: since PHP 8.5 it is compiled into PHP itself, and
+# `docker-php-ext-install opcache` fails (there is no module to build). The check after the Redis
+# line fails the build if it is ever missing. On the PHP 8.3 fallback it is a separate extension
+# that must be installed here again: docs/architecture/docker-setup.md "PHP version".
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
         pdo_mysql \
@@ -42,14 +45,16 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         gd \
         zip \
         xml \
-        intl \
-        opcache
+        intl
 
 # Redis extension (via PECL)
 RUN pecl install redis && docker-php-ext-enable redis
 
+# Fail the build, not a later request, if OPcache is not loaded.
+RUN php -r 'exit(extension_loaded("Zend OPcache") ? 0 : 1);'
+
 # Composer
-COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.10.3 /usr/bin/composer /usr/bin/composer
 
 # Node.js 22 LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \

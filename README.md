@@ -97,7 +97,7 @@ The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` an
 
 | | |
 |--|--|
-| **Language** | PHP 8.3 |
+| **Language** | PHP 8.5 (8.3 tested fallback) |
 | **Framework** | Laravel 13 |
 | **Database** | MariaDB 10.11 |
 | **Cache / Queue** | Redis 7 |

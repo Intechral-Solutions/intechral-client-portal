@@ -53,7 +53,7 @@ The platform is becoming a **professional services operating system with a clien
 
 **Current**, verified against the live repository on 2026-09-24:
 
-- Laravel 13 / PHP 8.3 / MariaDB, server-authoritative authorization (Spatie permissions plus policies), membership-based tenant scoping ([ADR-005](../architecture/adr/ADR-005-organization-multitenancy.md)).
+- Laravel 13 / PHP 8.5 (8.3 tested fallback) / MariaDB, server-authoritative authorization (Spatie permissions plus policies), membership-based tenant scoping ([ADR-005](../architecture/adr/ADR-005-organization-multitenancy.md)).
 - Inertia 3 + React 19 + TypeScript foundation ([ADR-007](../architecture/adr/ADR-007-inertia-react-frontend.md)). Auth, invitations, dashboard, profile, time, timer, projects, board, milestones, project task detail, and the unified `/tasks` list are React ([EPIC-011A–E](../epics/README.md)).
 - Tickets, operator ticket queue/reports, billing/invoices/Stripe payment, CRM companies/contacts, organizations, CMS, users, and roles are still Blade.
 - A single navigation model (`NavigationBuilder`) serves both renderers: a flat primary list (Tickets, Projects, Tasks, Time, Billing, CRM, Pages) plus a "Manage" group (Ticket Queue, Time Reports, Organizations, CMS Pages, Users, Roles), filtered by permission.

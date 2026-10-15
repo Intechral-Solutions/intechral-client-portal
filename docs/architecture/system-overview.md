@@ -13,7 +13,7 @@
 └───────────────────────────┬──────────────────────────────┘
                             │ FastCGI
 ┌───────────────────────────▼──────────────────────────────┐
-│              PHP-FPM 8.3 — Laravel 13                    │
+│              PHP-FPM 8.5 — Laravel 13                    │
 │                                                          │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
 │  │   HTTP       │  │   Queue      │  │   Scheduler    │  │
@@ -69,7 +69,8 @@ This is not a micro-services architecture — it is a well-organized monolith wi
 ## cPanel Deployment
 
 On cPanel:
-- PHP-FPM 8.3 is selected via the "Select PHP Version" tool
+- PHP 8.5 is the preferred runtime, selected via the "Select PHP Version" tool; PHP 8.3 is the tested fallback (`composer.json` keeps `^8.3`; see [docker-setup.md](docker-setup.md#php-version)). OPcache is built into PHP 8.5, so the extension list does not include it
+- Release 0.9 target host (Namecheap Stellar Plus): PHP 8.5.11 with the required extensions, verified over SSH by the owner. Hosting settings are not changed by the repository
 - `public/` is set as the document root
 - MariaDB 10 database created via cPanel
 - Cron job added: `* * * * * php /path/to/portal/artisan schedule:run >> /dev/null 2>&1`
