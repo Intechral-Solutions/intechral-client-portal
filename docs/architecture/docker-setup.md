@@ -4,12 +4,12 @@
 
 | Service | Image | Port (host) | Purpose |
 |---------|-------|-------------|---------|
-| `app` | `php:8.3-fpm` (custom) | — | Laravel PHP-FPM |
+| `app` | `php:8.5-fpm` (custom) | — | Laravel PHP-FPM |
 | `nginx` | `nginx:1.25-alpine` | `4242` | Web server |
 | `db` | `mariadb:10.11` | `3306` | Primary database |
 | `redis` | `redis:7-alpine` | `6379` | Cache / sessions / queues |
 | `mailpit` | `axllent/mailpit` | `8025` (UI), `1025` (SMTP) | Local email testing |
-| `queue` | `php:8.3-fpm` (custom) | — | Laravel queue worker |
+| `queue` | `php:8.5-fpm` (custom) | — | Laravel queue worker |
 
 ## Project Structure
 
@@ -71,11 +71,19 @@ docker compose exec app npm run build
 
 ### PHP-FPM (`app`)
 - Custom Dockerfile at `.docker/php/Dockerfile`
-- PHP 8.3 with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `opcache`, `exif`
-- Composer 2.7 installed globally
+- PHP 8.5 (preferred baseline; PHP 8.3 is the tested fallback, see [PHP version](#php-version)) with extensions: `pdo_mysql`, `redis`, `mbstring`, `xml`, `gd`, `zip`, `bcmath`, `intl`, `exif`, `pcntl`, and OPcache. OPcache is compiled into PHP 8.5, so the Dockerfile no longer installs it; the build fails if it is not loaded
+- Composer 2.10.3 installed globally (pinned to an exact, reviewed release)
 - Node.js 22 LTS + npm installed
 - Playwright Chromium + its OS libraries, baked in at build time (see [End-to-end browser tests](#end-to-end-browser-tests))
 - Working directory: `/var/www/app`
+
+### PHP version
+
+**PHP 8.5 is the preferred baseline** for the development image, CI and the intended production runtime. **PHP 8.3 is the supported, tested fallback.** `src/composer.json` keeps `"php": "^8.3"` (no `config.platform.php`), so the unchanged `composer.lock` installs on either.
+
+Evidence (R0.9-2a, scratch assessment on PHP 8.5.11 against the unchanged lockfile, then this alignment): Composer platform requirements 27/27; the same 3,541 Pest tests with 0 skipped and 0 new PHP deprecations on 8.3.33 and 8.5.11; identical MariaDB 10.11 migrate-and-seed schema; Redis queue, SMTP, PDF, GD and integration-package smoke tests passed. The only deprecations either version reports are the same three `hash_hmac(): Passing null` messages from Stripe's `WebhookSignature` and Laravel's `SessionGuard`.
+
+To run the image on the PHP 8.3 fallback, change both `FROM php:8.5-fpm` lines in `.docker/php/Dockerfile` back to `php:8.3-fpm` **and** add `opcache` to the `docker-php-ext-install` list (on 8.3 it is a separate extension), then rebuild: `docker compose build app queue && docker compose up -d app queue`, and restart `nginx`. For CI, set `php-version: '8.3'` in the `setup-php` step of `.github/workflows/ci.yml`. Nothing in the application changes.
 
 ### End-to-end browser tests
 

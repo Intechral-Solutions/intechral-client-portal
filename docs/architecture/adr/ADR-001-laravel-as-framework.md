@@ -28,3 +28,7 @@ Use **Laravel 11** with **PHP 8.3**.
 
 - Team must be comfortable with Laravel conventions (Eloquent, Blade, Artisan)
 - cPanel deployment requires ensuring PHP 8.3 is selectable in the host's "PHP Version" tool
+
+## Amendment (R0.9-2a, 2026-10-14): PHP runtime
+
+The framework decision stands. The PHP baseline is now **PHP 8.5**, with **PHP 8.3 the supported, tested fallback**; `composer.json` keeps `^8.3`. The decision text above is left as written for the record. See [docker-setup.md](../docker-setup.md#php-version) for the evidence and the fallback procedure.

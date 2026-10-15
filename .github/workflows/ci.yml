@@ -57,10 +57,11 @@ jobs:
       - name: Resolve host "db" to the published MariaDB port
         run: echo '127.0.0.1 db' | sudo tee -a /etc/hosts
 
-      # Versions and extensions follow .docker/php/Dockerfile (PHP 8.3, Node 22).
+      # Versions and extensions follow .docker/php/Dockerfile (PHP 8.5, Node 22). OPcache is built into PHP 8.5, so it
+      # is not in the extensions list. PHP 8.3 stays the tested fallback: docs/architecture/docker-setup.md.
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: bcmath, exif, gd, intl, mbstring, pcntl, pdo_mysql, redis, zip
           coverage: none
           tools: composer:v2
