@@ -137,30 +137,43 @@ Development and CI run **MariaDB 11.4.13**, the version on the Namecheap host. A
 
 A machine with no data worth keeping needs nothing: `./dev up` creates the new volume and the init scripts create the testing and rehearsal databases.
 
-**Before you start.** Do steps 1 to 4 while the stack is still on the 10.11 configuration (before you pull or check out the commit that changes `docker-compose.yml`), and confirm the exact volume name with `docker volume ls | grep dbdata` (it is prefixed with the Compose project name).
+**Before you start.** Do steps 1 to 5 while the stack is still on the 10.11 configuration (before you pull or check out the commit that changes `docker-compose.yml`), and confirm the exact volume name with `docker volume ls | grep dbdata` (it is prefixed with the Compose project name).
 
-1. **Back up.** `./dev db:backup` writes `backups/dev/portal-<timestamp>.sql` (gitignored, outside every Docker volume). Check the file ends with `-- Dump completed`.
-2. **Stop every writer** so the snapshot is final: `docker compose stop app queue nginx`. Check nothing else is connected: `docker compose exec db mariadb -uroot -proot -e "select user,host,command from information_schema.processlist"` should show only your own query. Stop any running Playwright or Pest run first.
-3. **Fingerprint the source.** Row counts alone are not enough. Record both of these and keep the output:
+1. **Preliminary backup (a safety net, not the one you restore).** With the stack still running, `./dev db:backup` writes `backups/dev/portal-<timestamp>.sql` (gitignored, outside every Docker volume). Check the file ends with `-- Dump completed`. This backup can be stale by the time you cut over, because the running app and queue worker may still write, so **do not restore it** unless the final dump in step 4 is lost. `./dev db:backup` also needs the app container running, so it cannot make the final dump once the writers are stopped.
+2. **Stop every writer** so the source is final: `docker compose stop app queue nginx`. Stop any running Playwright or Pest run first. Check nothing else is connected: `docker compose exec db mariadb -uroot -proot -e "select user,host,command from information_schema.processlist"` should show only your own query.
+3. **Fingerprint the quiesced source.** Row counts alone are not enough. Define the function once, then record the source:
 
    ```bash
    # A `for` loop over a captured list, not `| while read`: `docker compose exec` would swallow the piped list.
-   tables=$(docker compose exec -T db mariadb -uroot -proot -N -e "select table_name from information_schema.tables where table_schema='portal' and table_type='BASE TABLE' order by 1")
-   for t in $tables; do
-     n=$(docker compose exec -T db mariadb -uroot -proot -N -e "select count(*) from portal.\`$t\`")
-     h=$(docker compose exec -T db mariadb-dump -uroot -proot --no-create-info --skip-extended-insert --order-by-primary --skip-comments --skip-triggers portal "$t" | grep '^INSERT' | md5sum | cut -c1-32)
-     echo "$t rows=$n md5=$h"
-   done > before.txt
+   fingerprint() {
+     local tables t n h
+     tables=$(docker compose exec -T db mariadb -uroot -proot -N -e "select table_name from information_schema.tables where table_schema='portal' and table_type='BASE TABLE' order by 1")
+     for t in $tables; do
+       n=$(docker compose exec -T db mariadb -uroot -proot -N -e "select count(*) from portal.\`$t\`")
+       h=$(docker compose exec -T db mariadb-dump -uroot -proot --no-create-info --skip-extended-insert --order-by-primary --skip-comments --skip-triggers portal "$t" | grep '^INSERT' | md5sum | cut -c1-32)
+       echo "$t rows=$n md5=$h"
+     done
+   }
+   fingerprint > before.txt
    wc -l before.txt   # one line per table: 41 at the time of the transition
    ```
 
-4. **Optional physical safety copy.** `docker compose stop db`, then `docker run --rm -v intechral-portal_dbdata:/v:ro -v "$PWD/backups/dev":/out alpine tar czf /out/dbdata-1011.tar.gz -C /v .` (read-only mount). Start the database again before step 5 only if you are staying on 10.11.
-5. **Switch.** Check out the commit with the new `docker-compose.yml`, then recreate only the database: `docker compose up -d --no-deps db`. Compose creates the empty volume `intechral-portal_dbdata114`, the init scripts run, and `docker compose exec db mariadb -uroot -proot -e "select version()"` must report `11.4.13`.
-6. **Restore.** `docker compose exec -T db mariadb -uroot -proot portal < backups/dev/portal-<timestamp>.sql` (a dump written with `--databases` already contains `CREATE DATABASE`; omit the trailing `portal` for that form).
-7. **Verify.** Repeat the loop from step 3 against the new database into `after.txt` and `diff before.txt after.txt` (expect no output). Then `./dev db:status` (all migrations ran, none pending), `./dev doctor`, and sign in.
-8. **Start the writers.** `docker compose start app queue nginx`.
+4. **Final authoritative dump, taken from the database container after the writers are stopped.** This is the dump you restore. Use the MariaDB container directly (it mirrors what `./dev db:backup` runs, without needing the app container):
 
-**Rollback.** Until a write happens on 11.4, rollback is lossless: check out the previous `docker-compose.yml` and run `docker compose up -d --no-deps db`; the 10.11 database starts on the untouched `intechral-portal_dbdata`. Once the 11.4 database has taken writes (sign-ins write session rows, any browser run writes data), rolling back **loses those writes unless you carry them over**: take `./dev db:backup` from 11.4 first, switch back, and decide explicitly whether to restore that dump over the 10.11 copy. Do that restore into a copy of the old volume, not the only copy. A 11.4 dump restoring into 10.11 has been checked for this schema (see the R0.9-2a handback), but treat any downgrade as a deliberate, backed-up operation.
+   ```bash
+   f="backups/dev/portal-final-$(date +%Y-%m-%d_%H%M%S).sql"
+   (umask 077 && docker compose exec -T db sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mariadb-dump --single-transaction --routines --triggers --events -u"$MYSQL_USER" portal' > "$f")
+   ```
+
+   **Validate it against the quiesced source** before you rely on it: the file is not empty and `tail -n 5 "$f"` shows `-- Dump completed`; `grep -c '^CREATE TABLE' "$f"` equals the number of lines in `before.txt` (41); and the source did not change while it was dumped, which you prove by running `fingerprint > after-dump.txt` and `diff before.txt after-dump.txt` (expect no output). Keep `$f` outside the Docker volumes together with its `sha256sum`.
+
+5. **Optional physical safety copy of the old volume.** Only after the final dump: `docker compose stop db`, then `docker run --rm -v intechral-portal_dbdata:/v:ro -v "$PWD/backups/dev":/out alpine tar czf /out/dbdata-1011.tar.gz -C /v .` (read-only mount). Start the database again before step 6 only if you are staying on 10.11.
+6. **Switch.** Check out the commit with the new `docker-compose.yml`, then recreate only the database: `docker compose up -d --no-deps db`. Compose creates the empty volume `intechral-portal_dbdata114`, the init scripts run, and `docker compose exec db mariadb -uroot -proot -e "select version()"` must report `11.4.13`.
+7. **Restore the final dump from step 4** (not the preliminary backup from step 1): `docker compose exec -T db mariadb -uroot -proot portal < "$f"`. If you opened a new terminal since step 4, `$f` and the `fingerprint` function are gone: use the `portal-final-*.sql` path you kept and define the function again from step 3. (A dump written with `--databases` already contains `CREATE DATABASE`; for that form omit the trailing `portal`.)
+8. **Verify the restored copy against the quiesced source.** Run `fingerprint > after.txt` against the new database and `diff before.txt after.txt` (expect no output). Then `./dev db:status` (all migrations ran, none pending), `./dev doctor`, and sign in. If you want a rehearsal first, restore the same final dump into a throwaway `mariadb:11.4.13` container and fingerprint that before step 6.
+9. **Start the writers.** `docker compose start app queue nginx`.
+
+**Rollback.** Until a write happens on 11.4, rollback is lossless: check out the previous `docker-compose.yml` and run `docker compose up -d --no-deps db`; the 10.11 database starts on the untouched `intechral-portal_dbdata`. Once the 11.4 database has taken writes (sign-ins write session rows, any browser run writes data), rolling back **loses those writes unless you carry them over**: take a backup from 11.4 first (`./dev db:backup`, or the direct dump from step 4 if the app is stopped), switch back, and decide explicitly whether to restore that dump over the 10.11 copy. Do that restore into a copy of the old volume, not the only copy. A 11.4 dump restoring into 10.11 has been checked for this schema (see the R0.9-2a handback), but treat any downgrade as a deliberate, backed-up operation.
 
 **Cleanup, only when you are sure.** After a few days of normal use and a good backup of the 11.4 database, remove the old volume yourself: `docker volume rm intechral-portal_dbdata`. No `./dev` command and no Compose command does this for you. Keep or delete the `backups/dev/` files by your own retention rule; they contain real development data.
 

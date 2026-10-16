@@ -73,6 +73,6 @@ On cPanel:
 - Release 0.9 target host (Namecheap Stellar Plus): PHP 8.5.11 with the required extensions, verified over SSH by the owner. Hosting settings are not changed by the repository
 - `public/` is set as the document root
 - MariaDB 11.4 database created via cPanel (Namecheap runs 11.4.13; development and CI run the same version)
-- Cron job added: `* * * * * php /path/to/portal/artisan schedule:run >> /dev/null 2>&1`
-- Queue worker managed via cPanel's "Cron Jobs" or a supervisor-equivalent
+- Cron job runs `php /path/to/portal/artisan schedule:run >> /dev/null 2>&1` at the host's shortest allowed interval. Laravel's usual example is every minute (`* * * * *`), but Namecheap Stellar Plus allows no more often than every 5 minutes (`*/5 * * * *`) and at most 5 concurrent cron jobs, so the cron interval and what it runs are placeholders until the host design is decided
+- Queue processing on shared hosting is **not yet decided**: a persistent worker (cPanel "Cron Jobs" or a supervisor-equivalent) cannot be assumed, and cron-driven or database-backed processing is under evaluation. The final scheduler and queue design is a pending decision (RE-0 / ADR-008), not something this document fixes
 - `.env` configured with production credentials
