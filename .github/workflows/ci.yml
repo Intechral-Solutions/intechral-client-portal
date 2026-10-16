@@ -44,8 +44,10 @@ jobs:
 
       # A fresh runner builds a fresh volume, so the init scripts must have run. Say so in one line
       # of evidence rather than let a missing database surface later as an unrelated test failure.
+      # The server version is printed too: it is the compose image tag (MariaDB 11.4.13, the production version).
       - name: Verify the testing and rehearsal databases were provisioned
         run: |
+          docker compose exec -T db mariadb -uportal -pportal -N -e "SELECT CONCAT('MariaDB server version: ', VERSION())"
           visible="$(docker compose exec -T db mariadb -uportal -pportal -N -e "SHOW DATABASES LIKE 'intechral%'")"
           echo "$visible"
           for database in intechral_client_portal_testing intechral_client_portal_rehearsal intechral_client_portal_rehearsal_restore; do

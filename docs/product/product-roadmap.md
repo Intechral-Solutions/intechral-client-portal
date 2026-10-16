@@ -556,7 +556,7 @@ Those properties are tracked **separately**, as release metadata for every relea
 ### Deployment model and open gates
 
 **Already recorded (proven in development, documented as the production intent):**
-- Laravel 13 on PHP 8.5 (8.3 tested fallback), MariaDB 10, with cPanel/shared-hosting **compatibility** as the baseline constraint (ADR-001, `system-overview.md`; EPIC-012 mentions a Namecheap host). Compatibility does not mean "must deploy to cPanel": the actual host is not preselected (D4);
+- Laravel 13 on PHP 8.5 (8.3 tested fallback), MariaDB 11.4, with cPanel/shared-hosting **compatibility** as the baseline constraint (ADR-001, `system-overview.md`; EPIC-012 mentions a Namecheap host). Compatibility does not mean "must deploy to cPanel": the actual host is not preselected (D4);
 - assets prebuilt by Vite, no Node and no SSR on the server (ADR-006, ADR-007);
 - `SESSION_DRIVER=database` required (`docker-setup.md`);
 - the scheduler runs by cron (`tickets:auto-close` daily at 02:00);

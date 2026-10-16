@@ -1,6 +1,6 @@
 # Intechral Client Portal
 
-A full-featured client portal platform built with Laravel 13, MariaDB 10, and Tailwind CSS v4. Deployable on cPanel-compatible hosting.
+A full-featured client portal platform built with Laravel 13, MariaDB 11.4, and Tailwind CSS v4. Deployable on cPanel-compatible hosting.
 
 ## Features
 
@@ -99,7 +99,7 @@ The root `package.json` keeps a few aliases. `up`, `down`, `restart`, `shell` an
 |--|--|
 | **Language** | PHP 8.5 (8.3 tested fallback) |
 | **Framework** | Laravel 13 |
-| **Database** | MariaDB 10.11 |
+| **Database** | MariaDB 11.4.13 (production parity) |
 | **Cache / Queue** | Redis 7 |
 | **CSS** | Tailwind CSS v4 |
 | **Build Tool** | Vite + npm |

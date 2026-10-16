@@ -45,7 +45,7 @@ the app and building the image would only add minutes. The environment follows t
 - **PHP 8.5 and Node 22**, as in `.docker/php/Dockerfile`, with that image's extensions
   (`shivammathur/setup-php`, `actions/setup-node`). PHP 8.5 is the preferred baseline and 8.3 the tested fallback
   ([docker-setup.md](../architecture/docker-setup.md#php-version)); OPcache is built into 8.5, so it is not in the list.
-- **MariaDB** is the compose `db` service itself (`docker compose up -d --wait db`): the same image,
+- **MariaDB 11.4.13** (the production version) is the compose `db` service itself (`docker compose up -d --wait db`): the same image,
   `my.cnf`, `init-testing.sql` (which creates the testing database) and healthcheck as local. Pest
   never runs against SQLite: `tests/bootstrap.php` pins the MariaDB testing database and
   `TestDatabaseSafety` refuses anything else.
