@@ -44,9 +44,14 @@ services:
     networks:
       - portal
 
-  # ── MariaDB 10 ───────────────────────────────────────────
+  # ── MariaDB 11.4 ─────────────────────────────────────────
+  # Pinned to the production patch version (Namecheap: 11.4.13). The data lives in `dbdata114`, a volume created
+  # for this version. The MariaDB 10.11 volume `intechral-portal_dbdata` is intentionally no longer declared here: it is
+  # kept untouched as the rollback source and `docker compose down -v` cannot remove what Compose does not know.
+  # Moving an existing machine across is a dump and restore, never an in-place upgrade:
+  # docs/architecture/docker-setup.md "MariaDB 11.4 transition".
   db:
-    image: mariadb:10.11
+    image: mariadb:11.4.13
     container_name: portal_db
     restart: unless-stopped
     ports:
@@ -57,7 +62,7 @@ services:
       MYSQL_USER: portal
       MYSQL_PASSWORD: portal
     volumes:
-      - dbdata:/var/lib/mysql
+      - dbdata114:/var/lib/mysql
       - ./.docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ./.docker/mysql/init-testing.sql:/docker-entrypoint-initdb.d/init-testing.sql:ro
       - ./.docker/mysql/init-rehearsal.sql:/docker-entrypoint-initdb.d/init-rehearsal.sql:ro
@@ -119,7 +124,7 @@ networks:
     driver: bridge
 
 volumes:
-  dbdata:
+  dbdata114:
     driver: local
   redisdata:
     driver: local

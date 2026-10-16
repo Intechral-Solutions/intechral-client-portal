@@ -72,7 +72,7 @@ On cPanel:
 - PHP 8.5 is the preferred runtime, selected via the "Select PHP Version" tool; PHP 8.3 is the tested fallback (`composer.json` keeps `^8.3`; see [docker-setup.md](docker-setup.md#php-version)). OPcache is built into PHP 8.5, so the extension list does not include it
 - Release 0.9 target host (Namecheap Stellar Plus): PHP 8.5.11 with the required extensions, verified over SSH by the owner. Hosting settings are not changed by the repository
 - `public/` is set as the document root
-- MariaDB 10 database created via cPanel
+- MariaDB 11.4 database created via cPanel (Namecheap runs 11.4.13; development and CI run the same version)
 - Cron job added: `* * * * * php /path/to/portal/artisan schedule:run >> /dev/null 2>&1`
 - Queue worker managed via cPanel's "Cron Jobs" or a supervisor-equivalent
 - `.env` configured with production credentials
