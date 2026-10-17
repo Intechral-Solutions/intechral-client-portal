@@ -40,7 +40,10 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // R0.9 WP1: must exceed the longest a job can run, or an expired reservation hands a still-running job to a
+            // second worker. Mail jobs run at most ~9x MAIL_TIMEOUT (180 s at the default 20 s); 300 s leaves a margin.
+            // See docs/architecture/notification-delivery.md before lowering it.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 300),
             'after_commit' => false,
         ],
 
