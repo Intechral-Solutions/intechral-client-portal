@@ -45,10 +45,13 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            // R0.9 WP1: an explicit, environment-controlled socket timeout (seconds). It is a per-read idle limit, not
-            // a total: a silent peer costs up to two of it (the EHLO read times out, Symfony retries with HELO). A
-            // blank, zero or negative value falls back to the default rather than meaning "no wait".
-            'timeout' => max(1.0, (float) (env('MAIL_TIMEOUT') ?: 20)),
+            // R0.9 WP1: an explicit, environment-controlled socket timeout in seconds. It is a per-read IDLE limit, not a total
+            // bound on a send (see docs/architecture/notification-delivery.md). Anything that is not a positive number (blank,
+            // non-numeric, zero, negative) falls back to the 20 s default, never to "no wait"; a positive value below 1 is
+            // raised to 1 s. It also applies to the synchronous password-reset mail.
+            'timeout' => is_numeric(env('MAIL_TIMEOUT')) && (float) env('MAIL_TIMEOUT') > 0
+                ? max(1.0, (float) env('MAIL_TIMEOUT'))
+                : 20.0,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

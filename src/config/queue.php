@@ -40,9 +40,11 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            // R0.9 WP1: must exceed the longest a job can run, or an expired reservation hands a still-running job to a
-            // second worker. Mail jobs run at most ~9x MAIL_TIMEOUT (180 s at the default 20 s); 300 s leaves a margin.
-            // See docs/architecture/notification-delivery.md before lowering it.
+            // R0.9 WP1: configure retry_after > the worker's execution bound (--timeout) + an allowance for delayed
+            // interruption and blocking I/O, or an expired reservation hands a still-running job to a second worker. An
+            // objective, not a guarantee: MAIL_TIMEOUT is a per-read idle limit, so a send has no total bound, and worker
+            // --timeout needs working signals. 300 s is the owner-approved default, subject to production host
+            // validation. See docs/architecture/notification-delivery.md (section 4).
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 300),
             'after_commit' => false,
         ],

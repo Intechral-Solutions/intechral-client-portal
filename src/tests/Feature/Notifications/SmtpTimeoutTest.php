@@ -57,10 +57,14 @@ it('defaults to 20 seconds and takes the timeout from MAIL_TIMEOUT', function ()
         ->and(wp1ConfiguredMailTimeout('7.5'))->toBe(7.5);
 });
 
-it('never lets a blank, zero or negative MAIL_TIMEOUT mean "no wait"', function () {
-    expect(wp1ConfiguredMailTimeout(''))->toBe(20.0)
-        ->and(wp1ConfiguredMailTimeout('0'))->toBe(20.0)
-        ->and(wp1ConfiguredMailTimeout('-5'))->toBe(1.0);
+it('falls back to the 20 second default for anything that is not a positive number, never to "no wait"', function (string $value) {
+    expect(wp1ConfiguredMailTimeout($value))->toBe(20.0);
+})->with(['blank' => '', 'zero' => '0', 'negative' => '-5', 'text' => 'abc', 'trailing text' => '12abc', 'only a unit' => 's', 'a sign' => '+']);
+
+it('raises a positive sub-second value to 1 second and keeps any other positive value', function () {
+    expect(wp1ConfiguredMailTimeout('0.4'))->toBe(1.0)
+        ->and(wp1ConfiguredMailTimeout('1'))->toBe(1.0)
+        ->and(wp1ConfiguredMailTimeout('90'))->toBe(90.0);
 });
 
 it('applies the configured timeout to the real SMTP socket', function () {

@@ -7,7 +7,10 @@ worker runs it, how long a send can take, how often it is retried, and what it s
 (invitations).
 
 Three notifications are queued (`ShouldQueue`): `InvitationNotification`, `TicketCreatedNotification` and
-`TicketRepliedNotification`. Password reset is **not** queued and is unchanged: it is sent synchronously inside the request.
+`TicketRepliedNotification`. Password reset is **not** queued and remains synchronous: it is sent inside the request, with no
+retries and no send-time check of its own. It does, however, use the same SMTP transport and so **inherits the new
+`MAIL_TIMEOUT`** (a request that sends a reset mail to a silent server now waits about 40 s at the default instead of about
+120 s, and then fails with the same transport error).
 
 ## 1. Send-time eligibility
 
@@ -18,7 +21,7 @@ is therefore decided there, from persisted state read fresh, never from the seri
 | Notification | Dropped at send time when | Rule |
 |---|---|---|
 | `InvitationNotification` | the invitation was re-issued, accepted, expired by time, or deleted | the row is re-read and must satisfy `Invitation::isPending()`, the rule the accept link itself uses. `InvitationService::invite()` marks every earlier pending invitation for the address `expired`, so a re-issued link is dead and is not mailed. A deleted row is discarded (`#[DeleteWhenMissingModels]`). |
-| `TicketRepliedNotification` | the ticket or reply is gone; the reply is an internal note; the recipient may no longer **view** the ticket | `Gate::forUser($recipient)->allows('view', $freshTicket)`: the `TicketPolicy` every ticket screen uses (owner, or `tickets.assign` and not a restricted customer). No access rule of its own. |
+| `TicketRepliedNotification` | the ticket or reply is gone; the reply is not on this ticket; the reply is an internal note; the recipient may no longer **view** the ticket | `Gate::forUser($recipient)->allows('view', $freshTicket)`: the `TicketPolicy` every ticket screen uses (owner, or `tickets.assign` and not a restricted customer, so an assignee who keeps `tickets.assign` but loses `portal.operator` is cut off). The reply's `ticket_id` must equal the ticket being authorised. No access rule of its own. |
 | all three | the recipient was suspended after queueing | unchanged: `SkipSuspendedRecipients` on `NotificationSending` (R0.9-1C). |
 | both ticket notifications | the ticket (or reply) was deleted | unchanged: `#[DeleteWhenMissingModels]` discards the job; no `failed_jobs` row. |
 
@@ -35,26 +38,33 @@ reply that the recipient is still entitled to. Both paths are tested with a real
 ## 2. SMTP timeout
 
 `MAIL_TIMEOUT` (seconds, default **20**) sets `mail.mailers.smtp.timeout`. Before WP1 it was `null`, which falls back to
-PHP's `default_socket_timeout` (60 s). A blank, zero or negative value falls back to the default (a negative becomes 1 s);
-it never means "wait forever".
+PHP's `default_socket_timeout` (60 s). A value that is not a positive number (blank, non-numeric, zero, negative) falls back to
+the 20 s default; a positive value below 1 is raised to 1 s. It never means "wait forever".
 
-What the timeout actually bounds (Symfony Mailer 7.4, measured against an isolated SMTP server, all in
-`backups/dev/r09-wp1-notification-safety/evidence/` on the development machine):
+**What `MAIL_TIMEOUT` is: a per-read idle limit, not a bound on the whole send.** It is applied with `stream_set_timeout`
+and enforced by the kernel socket. Each blocking read or write may wait that long, and every successful read starts the clock
+again. It needs no `pcntl`, which makes it the one bound that holds on a host where worker signals are unavailable. It does
+not cap the total time of a send. Measurements against an isolated SMTP server (Symfony Mailer 7.4; evidence kept in
+`backups/dev/r09-wp1-notification-safety/evidence/` on the development machine), all at `MAIL_TIMEOUT=20`:
 
-* It is a **per-read idle limit** (`stream_set_timeout`), enforced by the kernel socket. It does not need `pcntl`, and it
-  holds on hosts where a worker's `--timeout` cannot be enforced.
-* A peer that greets and then goes silent costs **two** timeouts: the `EHLO` read times out, Symfony retries with `HELO`,
-  and that read times out as well. This is the cause of the earlier gate's 120 s send under `--timeout=60`: 2 × the 60 s
-  default. With `MAIL_TIMEOUT=20` the same peer is cut off after 40.1 s (three runs: 40.1, 40.1, 40.1 s).
-* A peer that never greets costs one. A peer that answers each command just inside the limit is **not** cut off by it:
-  five replies at 19 s took 95.2 s and the message was delivered. The theoretical ceiling for one message is about
-  nine reads (greeting, a timed-out `EHLO`, `HELO`, `MAIL`, `RCPT`, `DATA`, end of data, `QUIT`), i.e. about **9 × MAIL_TIMEOUT**
-  (180 s at 20 s). Name resolution and the TLS handshake are outside this analysis (resolver timeouts are the operating system's).
+| Peer behaviour | Send duration | What it shows |
+|---|---|---|
+| greets, then goes silent | 40.1 s (three runs: 40.1, 40.1, 40.1) | two idle waits: the `EHLO` read times out, Symfony retries with `HELO`, and that read times out too. This is why the earlier gate saw ~120 s at the 60 s default |
+| never greets | one idle wait (timing test at a 1 s limit: 1.08 s) | the greeting read times out; there is no `HELO` retry on this path |
+| answers every command, each reply just inside the limit (19 s) | 95.2 s, delivered | the idle limit never fires; the send is long but legitimate |
 
-`--timeout` on the worker is a second, optional bound and a weaker one: it is a `pcntl` alarm, and PHP handles the signal
-only when the blocked socket read returns. With the default `--timeout=60`, a slow peer's send ran for about 96 s before
-the worker was killed (exit code 1) with the job still **reserved**, to be re-run only after `retry_after`.
-Use `--timeout=240` (below `retry_after`) so the worker's limit never fires before the SMTP bound does.
+These are measurements of two tested behaviours, **not a formula and not a ceiling**. The number of reads in a send is not
+fixed: `STARTTLS` and `AUTH` add round trips, a connection reused across messages adds a `NOOP`, a failed command adds a `RSET`,
+and Symfony retransmits or falls back on some failures (`EHLO` to `HELO`). A server that is responsive, or that drips bytes
+slowly enough never to idle for a full interval, can keep a connection open for far longer than any multiple of
+`MAIL_TIMEOUT`. DNS resolution, the TLS handshake and unusual transport behaviour are outside the idle limit altogether (the
+operating system's resolver timeouts apply). Do not read `MAIL_TIMEOUT` as "a mail job never runs longer than N seconds".
+
+**Worker `--timeout` is a second, weaker bound.** It is a `pcntl` alarm, so it works only where signals work, and PHP handles
+the signal only when the blocked call returns. In one run the default `--timeout=60` let a slow peer's send run for about
+96 s before the worker was killed (exit code 1), leaving the job **reserved** until `retry_after`. A worker `--timeout` is
+therefore a useful safeguard where signals are supported, not a hard limit, and is not part of this package's behaviour:
+whether and how to set it belongs to the host-runtime decision.
 
 ## 3. Retries
 
@@ -69,20 +79,27 @@ after it becomes available, so the real spacing is rounded up to the cron interv
 The database queue reserves a job when a worker takes it and makes it available again after `retry_after` seconds. If a job
 is still running when that expires, a second worker takes it and the **same mail is sent concurrently**.
 
-| Measured (T = 20 s) | Longest send |
+**The configuration objective** is:
+
+> `retry_after` > the worker's execution bound, plus an allowance for delayed interruption and blocking I/O.
+
+This is an objective to configure towards and validate on the production host, **not an unconditional guarantee**, because
+neither term is a hard number. The send itself has no total bound (section 2). The worker's own bound is a `--timeout`, which
+works only with functioning signal support and is acted on late: a blocked read has to return first. The allowance has to
+cover that delay and any DNS, TLS or slow-peer time on top.
+
+What was measured at `MAIL_TIMEOUT=20`:
+
+| Run | Result |
 |---|---|
-| silent peer after greeting | 40.1 s |
-| slow peer, every reply 19 s | 95.2 s |
-| theoretical ceiling (9 × T) | 180 s |
+| silent peer after greeting, `retry_after=300`, a second worker polling every 2 s through three attempts | 40.1 s per attempt, connections never overlapped, third failure reached `failed_jobs` |
+| slow peer (every reply 19 s), worker `--timeout=240` | 95.2 s, delivered, job deleted |
+| slow peer, default worker `--timeout=60` | worker killed after ~96 s, job left reserved |
+| **control:** silent peer with `retry_after=30` | a second worker started the same job at +34.5 s, **while the first was still sending** (overlapping connections) |
 
-* `retry_after=30` (below the 40 s send): a second worker started the same job 34.5 s in, **while the first was still
-  inside its send** (overlapping connections). This is the control that shows the setting matters.
-* `retry_after=300` with a second worker polling every 2 s throughout three 40 s attempts: the connections never
-  overlapped, and the third failure reached `failed_jobs`.
-
-`DB_QUEUE_RETRY_AFTER` now defaults to **300**: 3.1 × the slowest measured send and 1.7 × the theoretical ceiling. It is a
-candidate pending owner approval, not a permanent decision. Keep `retry_after > worker --timeout > 9 × MAIL_TIMEOUT`.
-Raising `MAIL_TIMEOUT` raises the ceiling in proportion; re-check the inequality when changing either.
+`DB_QUEUE_RETRY_AFTER` defaults to **300** (owner-approved default, 3.1 times the slowest measured send). Treat it, `MAIL_TIMEOUT=20`
+and the worker settings as defaults **subject to production host validation**: re-check them on the real host (SMTP provider
+latency, signal support, resolver behaviour) before relying on them, and re-check whenever `MAIL_TIMEOUT` changes.
 
 ## 5. What this does not guarantee
 
@@ -95,6 +112,7 @@ the timeout shortens the window, the three attempts cap the repetition, and the 
 (a repeated invitation carries the same live link; a repeated reply notice names the same ticket). Do not build on the
 assumption that a mail is sent once.
 
-Other residual risks: a peer that keeps answering just inside the timeout can hold a send for up to the ceiling above;
+Other residual risks: a responsive or byte-dripping peer can hold a send longer than any idle limit, and past `retry_after`
+if that is set too low (section 4);
 `shouldSend()` narrows but cannot close the window between its check and the SMTP acceptance; a hung peer consumes one of
-the three attempts, so three consecutive hangs fail the job after about 6 minutes.
+the three attempts, so three consecutive silent-peer hangs at the default timeout fail the job after about 6 minutes (40 + 60 + 40 + 180 + 40 s).

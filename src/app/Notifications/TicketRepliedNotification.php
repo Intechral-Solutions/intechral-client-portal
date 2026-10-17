@@ -44,7 +44,7 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
     }
 
     /**
-     * Genuine ineligibility (ticket or reply gone, an internal note, a recipient who may no longer view the ticket)
+     * Genuine ineligibility (ticket or reply gone, a reply that is not on this ticket, an internal note, a recipient who may no longer view the ticket)
      * returns false and the mail is dropped. A database error is NOT caught: it propagates, the attempt fails and the
      * queue retries, so a transient outage never silently swallows a reply a recipient is still entitled to.
      */
@@ -53,7 +53,9 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
         $ticket = Ticket::query()->find($this->ticket->getKey());
         $reply = TicketReply::query()->find($this->reply->getKey());
 
-        if ($ticket === null || $reply === null || $reply->is_internal) {
+        // The reply must belong to the very ticket being authorised: the view check below says nothing about a reply that
+        // sits on a different ticket.
+        if ($ticket === null || $reply === null || (int) $reply->ticket_id !== (int) $ticket->getKey() || $reply->is_internal) {
             return false;
         }
 

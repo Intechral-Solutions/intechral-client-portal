@@ -26,6 +26,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Notifications\SendQueuedNotifications;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -54,17 +56,72 @@ function wp1QueueState(): array
     return ['jobs' => DB::table('jobs')->count(), 'failed' => DB::table('failed_jobs')->count()];
 }
 
-/** Make the next database statements that mention `$table` fail like a dropped connection, until the returned switch is cleared. */
-function wp1FailQueriesOn(string $table): object
+/**
+ * A database outage that strikes ONLY inside `Notification::shouldSend()`.
+ *
+ * The first version of these tests failed every SELECT on a table, which also broke the worker's unserialize step: the
+ * models were never restored, `shouldSend()` never ran, and the tests passed for a reason that has nothing to do with it.
+ * This one decides by call stack. A SELECT on `$table` made while the queue is restoring a serialized model is counted in
+ * `restored` and allowed to finish; the same SELECT made from `shouldSend()` throws a QueryException (kept in `thrown`
+ * and counted in `struck`) until `$probe->on` is cleared.
+ *
+ * @return object{on: bool, restored: int, struck: int, thrown: ?QueryException}
+ */
+function wp1FailInsideShouldSend(string $table): object
 {
-    $switch = (object) ['on' => true];
-    DB::beforeExecuting(function (string $sql, array $bindings) use ($switch, $table) {
-        if ($switch->on && str_contains($sql, "`{$table}`") && str_starts_with(ltrim($sql), 'select')) {
-            throw new QueryException('mysql', $sql, $bindings, new PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away'));
+    $probe = (object) ['on' => true, 'restored' => 0, 'struck' => 0, 'thrown' => null];
+    DB::beforeExecuting(function (string $sql, array $bindings) use ($probe, $table) {
+        if (! $probe->on || ! str_contains($sql, "`{$table}`") || ! str_starts_with(ltrim($sql), 'select')) {
+            return;
+        }
+
+        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        $inShouldSend = collect($frames)->contains(fn (array $frame) => ($frame['function'] ?? null) === 'shouldSend'
+            && str_ends_with($frame['class'] ?? '', 'Notification'));
+        $restoring = collect($frames)->contains(fn (array $frame) => in_array($frame['function'] ?? null, ['restoreModel', 'getRestoredPropertyValue'], true));
+
+        if ($restoring && ! $inShouldSend) {
+            $probe->restored++;
+
+            return;
+        }
+
+        if ($inShouldSend) {
+            $probe->struck++;
+            $probe->thrown = new QueryException('mysql', $sql, $bindings, new PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away'));
+
+            throw $probe->thrown;
         }
     });
 
-    return $switch;
+    return $probe;
+}
+
+/**
+ * Run the job once while the outage is on and prove, step by step, that it was handled as a failed ATTEMPT: the models
+ * were restored, the outage struck inside shouldSend(), the queue saw that very exception and released the job for a
+ * retry, and nothing was sent, dropped or failed.
+ */
+function wp1RunIntoOutage(object $probe): void
+{
+    $occurred = [];
+    $released = [];
+    Event::listen(JobExceptionOccurred::class, function (JobExceptionOccurred $event) use (&$occurred) {
+        $occurred[] = $event->exception;
+    });
+    Event::listen(JobReleasedAfterException::class, function (JobReleasedAfterException $event) use (&$released) {
+        $released[] = $event->backoff;
+    });
+
+    wp1WorkerRunsOnce();
+
+    expect($probe->restored)->toBeGreaterThan(0, 'the serialized models were restored before shouldSend() ran')
+        ->and($probe->struck)->toBe(1, 'the outage struck exactly once, inside shouldSend()')
+        ->and($occurred)->toHaveCount(1)
+        ->and($occurred[0])->toBe($probe->thrown, 'the queue saw the very exception raised inside shouldSend()')
+        ->and($released)->toBe([60], 'the job was released with the first backoff, not consumed')
+        ->and(wp1QueueState())->toBe(['jobs' => 1, 'failed' => 0])
+        ->and(DB::table('jobs')->value('attempts'))->toBe(1);
 }
 
 function wp1Operator(): User
@@ -128,16 +185,11 @@ describe('invitations', function () {
 
     it('does not mistake a transient database failure for ineligibility: the job is retried and then delivered', function () {
         app(InvitationService::class)->invite('new.person@example.com', wp1Operator());
-        $outage = wp1FailQueriesOn('invitations');
+        $outage = wp1FailInsideShouldSend('invitations');
 
-        wp1WorkerRunsOnce();
-
-        // Attempt 1 hit the outage: nothing was sent or dropped, the job is released 60 s out, not failed.
-        $job = DB::table('jobs')->first();
-        expect(wp1QueueState())->toBe(['jobs' => 1, 'failed' => 0])
-            ->and($this->sent)->toBeEmpty()
-            ->and($job->attempts)->toBe(1)
-            ->and($job->available_at - now()->timestamp)->toBeBetween(58, 60);
+        wp1RunIntoOutage($outage);
+        expect($this->sent)->toBeEmpty()
+            ->and(DB::table('jobs')->value('available_at') - now()->timestamp)->toBeBetween(58, 60);
 
         $outage->on = false;
         $this->travel(61)->seconds();
@@ -170,6 +222,38 @@ describe('ticket replies', function () {
         $this->agent->notify(new TicketRepliedNotification($this->ticket, $reply));
 
         Role::findByName('support_agent')->revokePermissionTo('tickets.assign');
+        wp1WorkerRunsOnce();
+
+        expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
+    });
+
+    it('does not send to an assignee who still holds tickets.assign but became a restricted customer before delivery', function () {
+        // Pilot mode: an account without `portal.operator` is a customer whatever else it holds (TicketPolicy::worksTickets()).
+        config(['portal.customer_surface_mode' => 'pilot']);
+        $role = Role::findByName('support_agent');
+        $role->givePermissionTo('portal.operator');
+        $reply = ticketReply($this->ticket, wp1Operator(), false);
+        $this->agent->notify(new TicketRepliedNotification($this->ticket, $reply));
+
+        // The control half: while eligible, the assignee is mailed.
+        wp1WorkerRunsOnce();
+        expect($this->sent)->toHaveCount(1);
+
+        // Same notification again, but the eligibility is withdrawn while `tickets.assign` is kept.
+        $this->agent->notify(new TicketRepliedNotification($this->ticket, $reply));
+        $role->revokePermissionTo('portal.operator');
+        expect(User::findOrFail($this->agent->id)->can('tickets.assign'))->toBeTrue();
+        wp1WorkerRunsOnce();
+
+        expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toHaveCount(1);
+    });
+
+    it('does not send a reply that belongs to a different ticket than the one being authorised', function () {
+        $otherTicket = ticketFor(ticketUser());
+        $foreignReply = ticketReply($otherTicket, wp1Operator(), false, 'Belongs to another ticket');
+        // The owner can view $this->ticket, so only the ticket/reply pairing can stop this.
+        $this->owner->notify(new TicketRepliedNotification($this->ticket, $foreignReply));
+
         wp1WorkerRunsOnce();
 
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
@@ -220,21 +304,20 @@ describe('ticket replies', function () {
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
     });
 
-    it('does not mistake a transient database failure for lost access: the job is retried and then delivered', function () {
+    it('does not mistake a transient database failure on :table for lost access: the job is retried and then delivered', function (string $table) {
         $reply = ticketReply($this->ticket, wp1Operator(), false);
         $this->owner->notify(new TicketRepliedNotification($this->ticket, $reply));
-        $outage = wp1FailQueriesOn('ticket_replies');
+        $outage = wp1FailInsideShouldSend($table);
 
-        wp1WorkerRunsOnce();
-
-        expect(wp1QueueState())->toBe(['jobs' => 1, 'failed' => 0])->and($this->sent)->toBeEmpty();
+        wp1RunIntoOutage($outage);
+        expect($this->sent)->toBeEmpty();
 
         $outage->on = false;
         $this->travel(61)->seconds();
         wp1WorkerRunsOnce();
 
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toHaveCount(1);
-    });
+    })->with(['tickets', 'ticket_replies']);
 
     it('keeps the existing suspension safeguard: a recipient suspended after queueing gets nothing', function () {
         $reply = ticketReply($this->ticket, wp1Operator(), false);
@@ -304,6 +387,8 @@ describe('retry contract', function () {
             ->and(DB::table('failed_jobs')->value('exception'))->toContain('smtp 451 try again later');
     });
 
+    // Password reset is not queued, so it has no retries and no send-time check of its own; it does use the same SMTP
+    // transport and therefore the same MAIL_TIMEOUT (see SmtpTimeoutTest).
     it('leaves password reset delivery synchronous', function () {
         $user = ticketUser();
 
