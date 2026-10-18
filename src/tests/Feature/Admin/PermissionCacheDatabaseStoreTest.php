@@ -39,8 +39,11 @@ uses()->group('database-cache-security');
  *     parks with its transaction open and ends it only when told. A test process that owned that transaction while waiting
  *     for a child that needs one of its locks would deadlock without InnoDB being able to see it (50 s lock-wait timeout).
  *  2. Every process appends its events to ONE ordered trace (permission_cache_trace.php) before it signals anything that lets
- *     another process proceed. Each scenario asserts the exact sequence it intends, so it cannot pass merely because a reader
- *     never reached the vulnerable point, or because two things that should be ordered happened to be.
+ *     another process proceed. The interleavings themselves are enforced by the flag-file barriers: a parked reader or writer
+ *     cannot go on until the test releases it, so the order the scenario needs is the only order that can happen. Each
+ *     scenario then asserts the events that matter as an ORDERED SUBSEQUENCE of the trace (dcsExpectOrder; other events may fall
+ *     between them), so it cannot pass merely because a reader never reached the vulnerable point, or because two things that
+ *     should be ordered happened to be. It is not an assertion that the trace contains nothing else.
  *  3. A reader that must write its cache entry while a writer's transaction is open does so only against a writer that holds no
  *     row of that entry (the raw writer path loads no mapping) and with a lock wait bounded to a few seconds, so a violated
  *     assumption fails loudly and quickly instead of hanging. A reader whose write COULD wait for the writer (it stores the

@@ -151,6 +151,9 @@ function pceExpectVulnerableOrdering(array $run): void
     expect($run['reachedAt'])->toBeLessThan($run['writerStartedAt'], 'the reader had already read the old state before the writer began')
         ->and($run['writerFinishedAt'])->toBeLessThan($evidence['resumedAt'], 'the reader resumed only after the writer had finished')
         ->and($evidence['resumedAt'])->toBeLessThanOrEqual($evidence['writtenAt'])
+        // The shared reader also records KeyWriteFailed (needed for the database store, where an identical upsert reports it
+        // although the row is stored). On the file and Redis stores a failed write is a failure, not a storage.
+        ->and($evidence['writeOutcome'])->toBe('written', 'the reader\'s write succeeded, so the stale mapping really is in the shared store')
         ->and($evidence['pausedKey'])->toBe($evidence['writtenKey'], 'the reader stored exactly the entry it had been stopped on');
 }
 

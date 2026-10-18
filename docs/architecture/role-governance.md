@@ -303,7 +303,9 @@ state it read*) on that store, and CI runs it as a mandatory step ([ci.md](../te
 (`permission.cache.store = default`; a unique `CACHE_PREFIX` per test, shared by the epoch row and the entries as in production). The
 revocation runs in a child that owns its transaction (`tests/Support/permission_cache_tx_writer.php`), so the test process holds no
 transaction and no lock and can never wait for a lock that it holds. Every process appends to one ordered trace
-(`permission_cache_trace.php`) before it signals anything that lets another proceed, and each scenario asserts the exact event sequence.
+(`permission_cache_trace.php`) before it signals anything that lets another proceed. The flag-file barriers enforce the interleavings (a
+parked process cannot go on until released), and each scenario asserts the events that matter as an **ordered subsequence** of the trace
+(other events may fall between them), not as the complete sequence.
 Waits are flag files with a 60 s bound, never sleeps or `information_schema` polling; a timeout, crash, lock-wait error or skip fails.
 
 | Code | Proven (authorization correctness) |
@@ -367,6 +369,27 @@ prove the actual Namecheap configuration. Still to be verified there: the server
 `innodb_lock_wait_timeout`, no read replica and no `DB_CACHE_CONNECTION`/`DB_CACHE_TABLE` override, that the web and queue processes use
 the same database, `cache:clear` and restore procedures (they delete the epoch row, which is safe: a new token is minted), queue worker
 restarts on deploy, and the mixed-version deployment rule above. Release 0.9 remains **not customer-ready**.
+
+**Production preflight requirements (carry into the WP3 handoff; not implemented in WP2).** The tests above prove the fence only for
+the supported cache topology, and the application does not check that it is running in it. The production preflight must **reject** (fail
+the deployment, not warn) any of:
+
+- a cache store other than `database` (`CACHE_STORE` / `cache.default`);
+- a permission cache store other than `default` (`permission.cache.store`), which would move the library's cache away from the store the
+  epoch fences and the tests exercise;
+- a separate cache connection (`DB_CACHE_CONNECTION` set): the epoch is always on the default connection, so the entries and the epoch
+  would no longer share a transaction, and that layout can wait on its own transaction (see the hazard above);
+- database read/write splitting or a read replica on the default connection (`read`/`write` host lists in `config/database.php`): the
+  library's own loader reads through the read connection and would store pre-revocation rows under the active epoch;
+- an unexpected `DB_CACHE_TABLE` (the epoch row lives in `cache.stores.database.table`; anything but the migrated `cache` table is
+  unreviewed).
+
+**Same effective `CACHE_PREFIX` everywhere.** The epoch row and every permission-cache entry are keyed under `cache.prefix`, which is
+`CACHE_PREFIX` or, when that is unset, a slug derived from `APP_NAME` plus `-cache-`. The web, queue-worker and cron/scheduler
+processes must therefore resolve the **same effective prefix**, including when it is `APP_NAME`-derived (a different `APP_NAME` or
+`.env` for the worker or the cron environment would give it its own epoch row and its own entries: a revocation made by one would never
+advance the epoch the other reads). The preflight must compute the effective prefix in each process context and fail if they differ; the
+tests use one unique prefix per scenario and cannot detect this.
 
 ## First-operator bootstrap
 

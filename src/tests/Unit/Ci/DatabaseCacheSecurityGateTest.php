@@ -100,3 +100,90 @@ it('exits non-zero from the command line exactly when there are problems', funct
         ->and(implode("\n", $badOutput))->toContain('MISSING: DB-F2')
         ->and($missingCode)->toBe(2);
 });
+
+/*
+ * The exclusion boundary. The whole-suite CI step runs `--exclude-group=database-cache-security` so the database-store scenarios
+ * run once, in their own mandatory step. That is only safe while (1) the group names exactly the one test file, and (2) the
+ * dedicated step, with --fail-on-skipped and the verifier, is still in the workflow. Plain string checks, no YAML parser.
+ */
+
+/** @return list<string> repo-relative paths of the test files that declare the group */
+function gateGroupDeclarers(string $testsRoot): array
+{
+    $found = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($testsRoot, FilesystemIterator::SKIP_DOTS)) as $file) {
+        if ($file->getExtension() === 'php' && preg_match('/group\(\s*[\'"]database-cache-security[\'"]/', (string) file_get_contents($file->getPathname())) === 1) {
+            $found[] = 'tests/'.ltrim(substr($file->getPathname(), strlen($testsRoot)), '/');
+        }
+    }
+    sort($found);
+
+    return $found;
+}
+
+/** @return list<string> */
+function gateWorkflowProblems(string $workflow): array
+{
+    // A YAML comment (a whole line, or after whitespace) disables what it covers.
+    $lines = array_filter(
+        array_map(fn (string $line) => trim((string) preg_replace('/(^|\s)#.*$/', '', $line)), explode("\n", $workflow)),
+        fn (string $line) => $line !== '',
+    );
+    $has = fn (string $pattern) => array_filter($lines, fn (string $line) => preg_match($pattern, $line) === 1) !== [];
+    $problems = [];
+
+    if (! $has('/vendor\/bin\/pest\s+tests\/Feature\/Admin\/PermissionCacheDatabaseStoreTest\.php\b.*--fail-on-skipped\b/')) {
+        $problems[] = 'the dedicated database-store Pest invocation (with --fail-on-skipped) is missing';
+    }
+    if (! $has('/php\s+tests\/Support\/verify_database_cache_security\.php\b/')) {
+        $problems[] = 'the JUnit scenario verifier is not run';
+    }
+
+    return $problems;
+}
+
+it('declares the database-cache-security group in exactly one test file', function () {
+    expect(gateGroupDeclarers(base_path('tests')))->toBe(['tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php']);
+});
+
+it('keeps the dedicated database-store step and verifier in the workflow whose whole-suite step excludes the group', function () {
+    // The development container mounts only src/, where the workflow is not visible. Hosted CI has the whole checkout, and
+    // sets CI, so there the file must exist: the guard cannot go vacuous where it matters.
+    $path = base_path('../.github/workflows/ci.yml');
+    if (! is_file($path)) {
+        expect(getenv('CI'))->toBeIn([false, '', '0'], 'hosted CI must be able to read .github/workflows/ci.yml');
+
+        return;
+    }
+    $workflow = (string) file_get_contents($path);
+
+    expect(gateWorkflowProblems($workflow))->toBe([])
+        ->and($workflow)->toContain('--exclude-group=database-cache-security');
+});
+
+it('notices a second declarer of the group, and a workflow that lost the dedicated step or the verifier', function () {
+    $root = sys_get_temp_dir().'/gate-groups-'.bin2hex(random_bytes(3));
+    mkdir($root.'/Feature', 0777, true);
+    $group = 'database-'.'cache-security'; // built, so this file never declares the group itself
+    file_put_contents($root.'/Feature/A.php', "<?php\nuses()->group('$group');\n");
+    file_put_contents($root.'/Feature/B.php', "<?php\npest()->group(\"$group\")->in(__DIR__);\n");
+    file_put_contents($root.'/Feature/C.php', "<?php\n// no group here\n");
+
+    try {
+        $declarers = gateGroupDeclarers($root);
+    } finally {
+        array_map('unlink', glob($root.'/Feature/*.php'));
+        rmdir($root.'/Feature');
+        rmdir($root);
+    }
+
+    $good = "      - run: ./vendor/bin/pest tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php --fail-on-skipped --log-junit x\n"
+        ."      - run: php tests/Support/verify_database_cache_security.php x\n"
+        ."      - run: ./vendor/bin/pest --exclude-group=database-cache-security\n";
+
+    expect($declarers)->toBe(['tests/Feature/A.php', 'tests/Feature/B.php'])
+        ->and(gateWorkflowProblems($good))->toBe([])
+        ->and(gateWorkflowProblems(str_replace('--fail-on-skipped ', '', $good)))->toHaveCount(1)
+        ->and(gateWorkflowProblems(str_replace('php tests/Support/verify_database_cache_security.php', '# php tests/Support/verify_database_cache_security.php', $good)))->toBe(['the JUnit scenario verifier is not run'])
+        ->and(gateWorkflowProblems("      - run: ./vendor/bin/pest --exclude-group=database-cache-security\n"))->toHaveCount(2);
+});
