@@ -40,7 +40,12 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // R0.9 WP1: configure retry_after > the worker's execution bound (--timeout) + an allowance for delayed
+            // interruption and blocking I/O, or an expired reservation hands a still-running job to a second worker. An
+            // objective, not a guarantee: MAIL_TIMEOUT is a per-read idle limit, so a send has no total bound, and worker
+            // --timeout needs working signals. 300 s is the owner-approved default, subject to production host
+            // validation. See docs/architecture/notification-delivery.md (section 4).
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 300),
             'after_commit' => false,
         ],
 

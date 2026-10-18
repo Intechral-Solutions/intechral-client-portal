@@ -147,7 +147,7 @@ it('still sends a reply mail for a ticket and reply that exist', function () {
         ->and($sent)->toBe(1);
 });
 
-it('does not suppress an unrelated failure: a transport error for an existing ticket still fails the job', function () {
+it('does not suppress an unrelated failure: a transport error for an existing ticket is not discarded, the job stays queued for retry', function () {
     $user = User::factory()->create();
     $ticket = Ticket::factory()->for($user, 'user')->create();
     $user->notify(new TicketCreatedNotification($ticket));
@@ -155,8 +155,10 @@ it('does not suppress an unrelated failure: a transport error for an existing ti
         throw new RuntimeException('mail transport down');
     });
 
-    expect(ticketWorkerRunsOnce())->toBe(['jobs' => 0, 'failed' => 1])
-        ->and(DB::table('failed_jobs')->value('exception'))->toContain('mail transport down');
+    // R0.9 WP1: the notification carries its own three attempts, so the first failure releases the job (attempt 1 of 3)
+    // instead of failing it. Reaching failed_jobs on the third attempt is NotificationSendTimeEligibilityTest.
+    expect(ticketWorkerRunsOnce())->toBe(['jobs' => 1, 'failed' => 0])
+        ->and(DB::table('jobs')->value('attempts'))->toBe(1);
 });
 
 it('does not touch work it does not own: an unrelated queued job is left on the queue', function () {
