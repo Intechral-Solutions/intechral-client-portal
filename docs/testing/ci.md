@@ -62,6 +62,19 @@ the app and building the image would only add minutes. The environment follows t
   `REDIS_HOST=127.0.0.1` and `--fail-on-skipped`, so a missing
   server, extension or address **fails** the job instead of quietly shrinking the count (a skip is not a pass). The whole
   suite then runs with Redis reachable too. Everything else uses the array cache, so no other gate touches Redis.
+- **Database cache store (R0.9 WP2).** The approved Release 0.9 hosting profile caches in MariaDB (`CACHE_STORE=database`), where a cache
+  write can share the writer's transaction. A second, mandatory step runs `tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php`
+  (the same security invariant, the real `database` cache driver, independent PHP processes, an ordered event trace per scenario;
+  see [Role Governance](../architecture/role-governance.md#permission-cache-security-on-the-database-store-r09-wp2)) with
+  `--fail-on-skipped` and a JUnit report. Three things make it impossible to shrink quietly: the tests never skip for want of a server
+  (an unavailable MariaDB errors the first test), `REQUIRE_MARIADB_VERSION=11.4.13` makes the first test fail unless the server is exactly
+  the production version (the Compose `db` image is pinned to it), and `src/tests/Support/verify_database_cache_security.php` reads the report and
+  fails unless every scenario in its manifest, dataset variants included, ran and passed as many times as listed. The gate's own failure
+  modes (a missing scenario, a missing variant, a skip, a failure, an error, an empty report, tests from another file, a control standing in
+  for the scenario it controls) are proven by `tests/Unit/Ci/DatabaseCacheSecurityGateTest.php`. The test file is in the Pest group
+  `database-cache-security`; the whole-suite step runs `--exclude-group=database-cache-security`, so these scenarios (about 80 s) run once,
+  not twice. A local `./dev check` or `./dev test:php` still runs them. Reproduce the CI step locally:
+  `REQUIRE_MARIADB_VERSION=11.4.13 ./dev test:php tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php --fail-on-skipped --log-junit …`.
 - **Provisioning check.** A step lists the databases the `portal` account can see and fails, naming the missing one, unless
   `intechral_client_portal_testing`, `..._rehearsal` and `..._rehearsal_restore` exist. A fresh runner builds a fresh
   volume, so `init-testing.sql` and `init-rehearsal.sql` must have run; a gap is reported as a provisioning failure, not as

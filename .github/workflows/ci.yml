@@ -25,7 +25,8 @@ jobs:
     name: ./dev check gates
     runs-on: ubuntu-24.04
     # 30 -> 45 for R0.9-1E: its real-process cache-race tests (~14 s each) run in the no-skip Redis step and again in the
-    # whole suite, on top of the ~13 minutes the first hosted run took. Time is the only thing changed.
+    # whole suite, on top of the ~13 minutes the first hosted run took. Time is the only thing changed. R0.9 WP2 adds the
+    # database-store step (~2 minutes, run once) and takes nothing else out of the budget.
     timeout-minutes: 45
     steps:
       # Depth 2: the git diff --check gate compares HEAD with its parent.
@@ -131,14 +132,36 @@ jobs:
           REDIS_HOST: 127.0.0.1
         run: ./vendor/bin/pest tests/Feature/Admin/PermissionCacheCommitOrderTest.php tests/Feature/Admin/PermissionCacheEpochTest.php --fail-on-skipped
 
+      # R0.9 WP2: the same security invariant on the DATABASE cache store (CACHE_STORE=database, the approved
+      # shared-hosting profile), with the real MariaDB cache driver and independent PHP processes. MANDATORY, and each way
+      # of quietly shrinking it fails the step visibly:
+      #   - an unavailable or wrong server: the tests never skip for want of a server, they fail, and
+      #     REQUIRE_MARIADB_VERSION makes the first of them fail unless the server is exactly the production version;
+      #   - a skipped test: --fail-on-skipped;
+      #   - a deleted scenario or dataset variant: the verifier reads the JUnit report and fails unless every scenario in
+      #     its manifest ran and passed as many times as listed (src/tests/Support/verify_database_cache_security.php; its own
+      #     failure modes are proven by tests/Unit/Ci/DatabaseCacheSecurityGateTest.php in the whole suite below).
+      # The whole-suite step below excludes this group, so these ~30 real-process scenarios run once, not twice.
+      - name: 'PHP tests: permission-cache security on the database store (MariaDB 11.4.13; a skip or a missing scenario fails)'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: src
+        env:
+          REQUIRE_MARIADB_VERSION: '11.4.13'
+        run: |
+          report="$RUNNER_TEMP/database-cache-security-junit.xml"
+          rm -f "$report"
+          ./vendor/bin/pest tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php --fail-on-skipped --log-junit "$report"
+          php tests/Support/verify_database_cache_security.php "$report"
+
       # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
-      # Redis is reachable here too, so the Redis variants run in the whole suite as well.
+      # Redis is reachable here too, so the Redis variants run in the whole suite as well. The database-store
+      # security group ran in its own mandatory step above and is not repeated.
       - name: 'PHP tests: Pest (testing DB)'
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: src
         env:
           REDIS_HOST: 127.0.0.1
-        run: ./vendor/bin/pest
+        run: ./vendor/bin/pest --exclude-group=database-cache-security
 
   # `./dev test:e2e` itself, on the dev stack from docker-compose.yml: nginx + php-fpm, MariaDB,
   # Redis and the image's baked Chromium. The suite depends on how the stack serves assets (see
