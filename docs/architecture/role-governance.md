@@ -204,8 +204,9 @@ runs would collide on the permissions' unique index and one fails visibly, rolle
 **Status:** implemented in R0.9-1E; the independent security review (Opus 5.5) passed with no Critical, High or Medium findings.
 Transactional epoch fencing closes the confirmed stale-cache repopulation race recorded by the R0.9-1D review (its informational
 item 5, not to be confused with R0.9-1C's Info-5 on suspended-status visibility) **for the supported current topology**: one
-primary database connection, no read replica, a shared Redis cache. Hosted CI and hosted Playwright for R0.9-1E are **outstanding**
-(the earlier hosted run predates it), and Release 0.9 is not customer-ready.
+primary database connection, no read replica, a shared Redis cache. R0.9 WP2 added permanent regression coverage of the same
+invariant on the **database** cache store, the approved shared-hosting profile ([below](#permission-cache-security-on-the-database-store-r09-wp2)).
+Release 0.9 is not customer-ready.
 
 **The race.** The permission library caches in the shared store (Redis) which roles carry each permission, for 24 hours. A
 request that reloads that mapping from the database just before a revocation commits, and stores it after the writer has cleared
@@ -290,6 +291,83 @@ epoch has already made every suffixed entry unreachable.
 restore without `permission:cache-reset` is not seen. Mixed-version windows are unsafe, as above. A Spatie upgrade that changes
 how the loader reads the cache key would be caught by the race tests.
 
+### Permission-cache security on the database store (R0.9 WP2)
+
+The approved Release 0.9 hosting profile keeps the shared cache in MariaDB (`CACHE_STORE=database`, default connection). That store differs
+from Redis and the file store in the one way that matters here: its writes are rows of the `cache` table on the **same connection** the
+permission change uses. `tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php` proves the unchanged invariant (*once a revocation has
+committed, a check that begins afterward does not grant through stale shared cache data; a decision already under way may finish under the
+state it read*) on that store, and CI runs it as a mandatory step ([ci.md](../testing/ci.md)). Nothing about the mechanism changed.
+
+**Method.** Real, independent PHP processes against the real MariaDB `database` driver, wired exactly as `CACHE_STORE=database` wires it
+(`permission.cache.store = default`; a unique `CACHE_PREFIX` per test, shared by the epoch row and the entries as in production). The
+revocation runs in a child that owns its transaction (`tests/Support/permission_cache_tx_writer.php`), so the test process holds no
+transaction and no lock and can never wait for a lock that it holds. Every process appends to one ordered trace
+(`permission_cache_trace.php`) before it signals anything that lets another proceed, and each scenario asserts the exact event sequence.
+Waits are flag files with a 60 s bound, never sleeps or `information_schema` polling; a timeout, crash, lock-wait error or skip fails.
+
+| Code | Proven (authorization correctness) |
+|---|---|
+| A | A stale reader (read epoch and rows before the commit, stored after it) cannot restore a revoked permission; a reader that begins afterward uses the new epoch and is denied. The stale entry really is in the table, under the obsolete epoch. |
+| A-control | **Negative control.** The same interleaving with the library's own unfenced registrar *does* grant the revoked permission, so A has teeth. |
+| B | Readers after the commit all see the revocation, whichever of them stores the entry and however `KeyWritten`/`KeyWriteFailed` is reported; exactly one row. |
+| C1, C2 | A rolled-back revocation leaves the committed grants authoritative: library path (epoch restored exactly) and application hooks (epoch advanced once more, a harmless reload). A reader during the open transaction is still granted: the revocation has not committed. |
+| D | Consecutive revocations; stale readers finishing in either order never resurrect an earlier state. |
+| F1, F2, F3 | A cache **miss while a revocation is in flight**: stored after the commit (F1), stored before it (F2), stored and then rolled back (F3, where serving the entry is correct). The reader reads the *committed* epoch, never the writer's uncommitted one. |
+| G1, G2, G3 | A persistent worker decides each job under the state committed when the job begins, across an open and a committed revocation; without the job-boundary reset it would keep granting (control); a reader inside its own REPEATABLE READ transaction keeps deciding under its snapshot and fills only the obsolete epoch. |
+| J | A torn read (between the permissions and roles queries) fills only the obsolete epoch. |
+
+Every scenario with a layout variant also runs with `DB_CACHE_CONNECTION` pointing at a second connection to the same database. That is
+**not** an approved layout (see the hazard below); the invariant holds there too.
+
+**Database-store write semantics (E1, E2, C1).** Represented as they are:
+
+- On the default connection a cache write made inside the writer's transaction (the writer's own reload under the epoch it just created)
+  is invisible to other connections, commits with the transaction (E1) and **disappears with a rollback** (C1), unlike the file and Redis
+  stores, where the rolled-back state stays in the store (still unreachable). On a separate cache connection it commits on its own (C1).
+- Every `syncPermissions` loads the mapping and, on a miss, stores it under the **current, still committed** epoch. On the default
+  connection that insert is part of the writer's transaction.
+- An upsert of an identical entry (same value, same expiration second) changes no row: MariaDB reports 0 affected rows and Laravel fires
+  `KeyWriteFailed` although the entry is in the table (E2, with a frozen clock per reader so the outcome is deterministic). Tests therefore
+  treat both events as "the write was issued" and read the table for what is stored.
+
+**Negative controls that do not apply.** The unfenced control of the *pre-commit* store (R0.9-1C M-1) cannot be made deterministic
+on this store: the reader's write can wait for the writer's transaction and then land after (or race with) the writer's post-commit clear,
+an order a test cannot fix without observing server lock state. The post-commit race it shares with A is controlled by A-control; the
+pre-commit window is covered by F2. No failing control was manufactured.
+
+**Mutation sensitivity** (run by hand on the WP2 branch, reverted each time, not automated; scenarios A, C1, F2, G1, D = 11 tests):
+
+| Production mutation | Result |
+|---|---|
+| A reader does not suffix its cache key with the epoch | 11 of 11 fail (real assertions) |
+| A revocation does not advance the epoch | 11 of 11 fail |
+| The `JobProcessing` reset is removed | exactly **DB-G1** fails; the 10 others pass |
+| The epoch is memoized in the process; or tokens are reused; or the epoch is advanced on its own connection | everything fails, but in *setup* (the library's own lookups read a never-invalidated cache, or the installation waits for its own transaction), so these are not targeted detections and are not claimed as such |
+
+**Database locking and latency (characterised; not authorization).**
+
+- The epoch read is a consistent read: it never waits for a writer and never sees its uncommitted epoch (L1).
+- A reader whose miss stores the very row that a *loading* writer's open transaction has inserted waits for that transaction (L3),
+  bounded by `innodb_lock_wait_timeout` (50 s by default), and then writes after the commit: the post-commit case of A. A revocation that
+  loads nothing (the built-in role synchronization's raw-SQL shape) holds no such row (F2).
+- **Separate cache connection hazard (observed, cause not fully explained, not approved).** In loops of built-in role installations with
+  `DB_CACHE_CONNECTION` set, the second connection's cache `INSERT` waited for the synchronization transaction of the *same PHP process*
+  until the lock-wait timeout in 4 of 46 runs. The server showed the waiter requesting an X lock on the `PRIMARY` supremum pseudo-record
+  held by that open transaction (48 rows modified), and in both runs whose statements were logged the failure came right after the epoch
+  row's `expiration` had changed inside it. A single connection cannot wait for itself, so the approved profile is not exposed to this.
+  The tests install under the default layout for this reason, and the layout is documented as unsupported.
+- The earlier investigation's intermittent InnoDB lock-wait timeouts came from the harness (a parent holding the transaction while waiting
+  for a child whose cache write needed that transaction's row). These tests cannot do that. Its one unexplained lock-*observation* timeout
+  concerned `information_schema` polling, which is not carried over.
+
+**Remaining production host assumptions (not proven by CI).** Testing proves behaviour on MariaDB 11.4.13 in Docker; it does **not**
+prove the actual Namecheap configuration. Still to be verified there: the server really is MariaDB 11.4.x with InnoDB tables and
+`REPEATABLE-READ` (a different isolation level changes lock behaviour, not the epoch's MVCC reasoning, and must be tested), the effective
+`innodb_lock_wait_timeout`, no read replica and no `DB_CACHE_CONNECTION`/`DB_CACHE_TABLE` override, that the web and queue processes use
+the same database, `cache:clear` and restore procedures (they delete the epoch row, which is safe: a new token is minted), queue worker
+restarts on deploy, and the mixed-version deployment rule above. Release 0.9 remains **not customer-ready**.
+
 ## First-operator bootstrap
 
 `php artisan operator:bootstrap <email> [--name=]` creates the first account administrator of a **new installation**.
@@ -344,6 +422,7 @@ and the delete (a stale check), the engine refuses the delete (error 1451) and t
 | Post-commit cache for the synchronization (file store, and Redis where `REDIS_HOST` names a server) | `tests/Feature/Admin/PermissionCacheCommitOrderTest.php` |
 | The cache-repopulation race with independent processes, a negative control, outer transaction, rollback, consecutive revocations, role deletion, a killed writer, flushes, a persistent worker, the built-in synchronization, torn reads, concurrent first use, failures | `tests/Feature/Admin/PermissionCacheEpochTest.php` (workers: `tests/Support/permission_epoch_reader.php`, `permission_epoch_writer.php`) |
 | Loading paths, mutation coverage, atomic rollback, the job-boundary reset, cache outage | `tests/Feature/Admin/PermissionCacheEpochMutationTest.php` |
+| The same invariant on the **database** cache store (A–G, J, negative control, rollback, KeyWriteFailed, locking characterisation), mandatory in CI | `tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php` (workers: `tests/Support/permission_epoch_reader.php`, `permission_cache_tx_writer.php`, `permission_cache_trace.php`, shared helpers `permission_cache_harness.php`; gate: `src/tests/Support/verify_database_cache_security.php`, tested by `tests/Unit/Ci/DatabaseCacheSecurityGateTest.php`) |
 | CRM company deletion | `tests/Feature/Crm/CompanyDeletionSafetyTest.php` |
 
 R0.9-1C tests that edited the built-in `operator` role through the Roles screen as a way to demote an administrator now
