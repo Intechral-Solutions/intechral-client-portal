@@ -163,6 +163,16 @@ jobs:
           REDIS_HOST: 127.0.0.1
         run: ./vendor/bin/pest --exclude-group=database-cache-security
 
+      # R0.9 WP3-DB follow-up: a smoke test, not a second suite. One extra MariaDB 11.4.13 started with the defaults the Namecheap
+      # host reported (MyISAM default engine, latin1, non-strict sql_mode, Eastern-time SYSTEM zone), then `migrate --force` under
+      # APP_ENV=production (so the migration guard runs) and `database:verify`, with both negative controls (the guard refuses a
+      # database holding a MyISAM table; the verifier exits non-zero on one). It also proves the server really has those defaults, so
+      # a changed image or flag cannot make it quietly friendly. The image is the one the compose db service already pulled.
+      # Cost and maintenance: docs/testing/ci.md "Database profile in CI". Reproduce locally: bash scripts/ci/host-parity-smoke.sh
+      - name: 'Host-parity smoke: migrate and database:verify on a MariaDB with the Namecheap defaults'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bash scripts/ci/host-parity-smoke.sh
+
   # `./dev test:e2e` itself, on the dev stack from docker-compose.yml: nginx + php-fpm, MariaDB,
   # Redis and the image's baked Chromium. The suite depends on how the stack serves assets (see
   # docs/testing/ci.md), so it is not re-hosted on `php artisan serve`. Its own runner keeps the
