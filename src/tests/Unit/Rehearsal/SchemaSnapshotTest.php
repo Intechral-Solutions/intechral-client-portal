@@ -100,7 +100,7 @@ describe('foreign-key rules', function () {
     it('states both rules for an added foreign key, so neither can change unseen', function () {
         $db = ($this->db)();
         $db->statement('create table probe_child (id bigint unsigned primary key, ticket_id bigint unsigned not null, '
-            .'constraint probe_child_ticket_foreign foreign key (ticket_id) references tickets (id) on delete cascade on update cascade)');
+            .'constraint probe_child_ticket_foreign foreign key (ticket_id) references tickets (id) on delete cascade on update cascade) engine = InnoDB');  // explicit: a MyISAM default (the Namecheap host) ignores foreign keys
 
         try {
             $differences = schemaDifferences($this->baseline);

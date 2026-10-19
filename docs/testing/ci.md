@@ -176,6 +176,25 @@ mode, as a **required** test:
 
 Not yet observed on hosted CI: the job was written and rehearsed locally against a disposable database, not run on GitHub.
 
+## Database profile in CI (R0.9 WP3)
+
+`tests/Feature/Database/DatabaseProfileTest.php` (22 tests) runs in the normal `checks` job, inside the whole-suite Pest step, on the compose
+MariaDB 11.4.13 that CI already starts. That server is friendlier than the Namecheap host (InnoDB, utf8mb4, strict, UTC), so the tests do not rely on
+its defaults: they assert the **Laravel connection's** effective session (`time_zone +00:00`, strict `sql_mode` with `NO_ENGINE_SUBSTITUTION`,
+`utf8mb4_unicode_ci`), the configuration literals (`engine => InnoDB`, `timezone => +00:00`), the engine and collation of every table and text column, the
+foreign keys against `database/profile/foreign-keys.json`, the production migration guard, and a UTC round trip around the 2026 daylight-saving
+transitions (with a companion test that an Eastern-time session would reject or shift the same writes, so the probe is shown to be able to fail).
+
+Mutation check (friendly server, hand-run): removing the `engine` literal fails 4 of the 22, removing `timezone` fails 5, unregistering the guard fails 3.
+
+**Not covered by CI: a server with the host's defaults.** The reproduction with MyISAM, latin1, non-strict and Eastern time is a disposable local
+server (`docs/architecture/database-profile.md` section 7). A permanent hosted job for it was considered and is **not added**, because with
+the profile stated in the application the server defaults no longer reach any application statement; the cost and the optional lightweight step are
+in the package handoff. **Planned follow-up (owner-approved, a separate change, not in the WP3-DB commit and before Namecheap staging):** a lightweight
+host-parity smoke test, not a second full suite: one extra MariaDB 11.4.13 started with the host's reported defaults (MyISAM, latin1, non-strict,
+Eastern time), then `migrate --force` under `APP_ENV=production` and `database:verify`, with their exit codes asserted. Re-run the reproduction by hand when `config/database.php` connection options, the database server version, or the
+migration set's raw SQL change.
+
 ## First hosted run of the Release 0.9 foundations (2026-10-12)
 
 [run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30, head `3c78fb9` (the first CI of EPIC-017 WP1/WP2 and R0.9-0 to R0.9-1D; the PR is a draft and **Release 0.9 is not

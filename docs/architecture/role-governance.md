@@ -364,8 +364,9 @@ pre-commit window is covered by F2. No failing control was manufactured.
   concerned `information_schema` polling, which is not carried over.
 
 **Remaining production host assumptions (not proven by CI).** Testing proves behaviour on MariaDB 11.4.13 in Docker; it does **not**
-prove the actual Namecheap configuration. Still to be verified there: the server really is MariaDB 11.4.x with InnoDB tables and
-`REPEATABLE-READ` (a different isolation level changes lock behaviour, not the epoch's MVCC reasoning, and must be tested), the effective
+prove the actual Namecheap configuration. Still to be verified there: the server really is MariaDB 11.4.x with InnoDB tables (the host's *default* engine is MyISAM, so InnoDB comes from the application's
+own `engine = InnoDB` and is verified by `database:verify`: [Database Profile](./database-profile.md)) and
+`REPEATABLE-READ` (the 2026-10-19 probe reported it) (a different isolation level changes lock behaviour, not the epoch's MVCC reasoning, and must be tested), the effective
 `innodb_lock_wait_timeout`, no read replica and no `DB_CACHE_CONNECTION`/`DB_CACHE_TABLE` override, that the web and queue processes use
 the same database, `cache:clear` and restore procedures (they delete the epoch row, which is safe: a new token is minted), queue worker
 restarts on deploy, and the mixed-version deployment rule above. Release 0.9 remains **not customer-ready**.

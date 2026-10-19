@@ -12,12 +12,15 @@ use App\Policies\InvoicePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
+use App\Support\Database\MigrationProfileGuard;
 use App\Support\Permissions\EpochPermissionRegistrar;
 use App\Support\Permissions\PermissionCacheEpoch;
 use App\Support\TestDatabaseSafety;
 use App\View\Composers\ShellComposer;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Queue\Events\JobProcessing;
@@ -57,6 +60,10 @@ class AppServiceProvider extends ServiceProvider
         // reaches a suspended user, including one queued before the suspension. docs/architecture/account-lifecycle.md.
         Auth::provider('active-eloquent', fn (Application $app, array $config) => new ActiveUserProvider($app['hash'], $config['model']));
         Event::listen(NotificationSending::class, SkipSuspendedRecipients::class);
+
+        // Release 0.9 (R0.9 WP3): in production a migration neither starts nor is reported complete on a database that does
+        // not match the supported profile (InnoDB, UTC session, strict mode, utf8mb4). docs/architecture/database-profile.md.
+        Event::listen([MigrationsStarted::class, MigrationsEnded::class], MigrationProfileGuard::class);
 
         // Release 0.9 (R0.9-1E): the registrar is a singleton and a queue worker only resets scoped instances between
         // jobs, so a worker would otherwise keep the permission mapping it loaded for its first job. Each job starts with
