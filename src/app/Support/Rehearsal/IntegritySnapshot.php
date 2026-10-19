@@ -3,6 +3,7 @@
 namespace App\Support\Rehearsal;
 
 use App\Services\ProjectIntegrityAudit;
+use App\Support\Database\DatabaseProfile;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -206,8 +207,33 @@ final class IntegritySnapshot
         $indexes = array_values(array_unique($indexes));
         sort($indexes);
 
+        $foreignKeys = self::foreignKeys($this->db, $db, $marker);
+
+        return [
+            'tables' => array_keys($columns),
+            'columns' => $columns,
+            'primary' => $primary,
+            'unique' => $unique,
+            'indexes' => $indexes,
+            'collations' => $collations,
+            'table_collations' => $tableCollations,
+            'foreign_keys' => $foreignKeys,
+        ];
+    }
+
+    /**
+     * Every foreign key of one database, keyed `child.cols->parent.cols`, with its ON DELETE and ON UPDATE rules.
+     *
+     * Static and parameterised so the Release 0.9 database-profile verification (R0.9 WP3,
+     * {@see DatabaseProfile}) reads foreign keys through exactly the code the migration
+     * rehearsal compares them with, instead of keeping a second query that could disagree.
+     *
+     * @return array<string, array{rule: string, update_rule: string, child: string, columns: list<string>, parent: string, parent_columns: list<string>}>
+     */
+    public static function foreignKeys(Connection $db, string $database, ?string $excludeTable = null): array
+    {
         $groups = [];
-        foreach ($this->db->select(
+        foreach ($db->select(
             'select k.table_name as t, k.constraint_name as cn, k.column_name as c, k.referenced_table_name as pt,
                     k.referenced_column_name as pc, r.delete_rule as dr, r.update_rule as ur
              from information_schema.key_column_usage k
@@ -215,7 +241,7 @@ final class IntegritySnapshot
                on r.constraint_schema = k.constraint_schema and r.constraint_name = k.constraint_name and r.table_name = k.table_name
              where k.table_schema = ? and k.referenced_table_name is not null and k.table_name <> ?
              order by k.table_name, k.constraint_name, k.ordinal_position',
-            [$db, $marker]
+            [$database, $excludeTable ?? '']
         ) as $row) {
             $groups[$row->t.'|'.$row->cn]['t'] = $row->t;
             $groups[$row->t.'|'.$row->cn]['pt'] = $row->pt;
@@ -233,16 +259,7 @@ final class IntegritySnapshot
         }
         ksort($foreignKeys);
 
-        return [
-            'tables' => array_keys($columns),
-            'columns' => $columns,
-            'primary' => $primary,
-            'unique' => $unique,
-            'indexes' => $indexes,
-            'collations' => $collations,
-            'table_collations' => $tableCollations,
-            'foreign_keys' => $foreignKeys,
-        ];
+        return $foreignKeys;
     }
 
     // ── checks ────────────────────────────────────────────────────────────────────────────────

@@ -58,7 +58,12 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // Release 0.9 (R0.9 WP3, docs/architecture/database-profile.md): the application states its own profile. A shared
+            // host's server defaults are not ours (Namecheap reports MyISAM, latin1 and a time zone of Eastern time), so
+            // every CREATE TABLE says `engine = InnoDB` and every connection runs `SET time_zone = '+00:00'`. Literals, not
+            // environment variables, so a deployment cannot configure them away; `database:verify` and the tests check them.
+            'engine' => 'InnoDB',
+            'timezone' => '+00:00',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -78,7 +83,9 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // Same database profile as `mysql` above (R0.9 WP3): InnoDB tables, UTC session.
+            'engine' => 'InnoDB',
+            'timezone' => '+00:00',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
