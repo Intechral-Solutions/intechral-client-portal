@@ -187,13 +187,28 @@ transitions (with a companion test that an Eastern-time session would reject or 
 
 Mutation check (friendly server, hand-run): removing the `engine` literal fails 4 of the 22, removing `timezone` fails 5, unregistering the guard fails 3.
 
-**Not covered by CI: a server with the host's defaults.** The reproduction with MyISAM, latin1, non-strict and Eastern time is a disposable local
-server (`docs/architecture/database-profile.md` section 7). A permanent hosted job for it was considered and is **not added**, because with
-the profile stated in the application the server defaults no longer reach any application statement; the cost and the optional lightweight step are
-in the package handoff. **Planned follow-up (owner-approved, a separate change, not in the WP3-DB commit and before Namecheap staging):** a lightweight
-host-parity smoke test, not a second full suite: one extra MariaDB 11.4.13 started with the host's reported defaults (MyISAM, latin1, non-strict,
-Eastern time), then `migrate --force` under `APP_ENV=production` and `database:verify`, with their exit codes asserted. Re-run the reproduction by hand when `config/database.php` connection options, the database server version, or the
-migration set's raw SQL change.
+**A server with the host's defaults: a smoke test, not a second suite.** The last step of the `checks` job runs `scripts/ci/host-parity-smoke.sh`
+(R0.9 WP3-DB follow-up). It starts one extra `mariadb:11.4.13` (the image the compose `db` service already pulled) with the defaults the Namecheap
+host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION` and an Eastern-time SYSTEM zone
+(`TZ=America/New_York`). Under `APP_ENV=production`, so the migration guard runs, it then:
+
+1. proves the server really has those defaults (a changed image or flag cannot make the smoke quietly friendly);
+2. negative control: with a MyISAM table already present, `migrate --force` must fail with the guard's message;
+3. on a fresh database, `migrate --force` and `database:verify --json` must pass, with every table InnoDB;
+4. negative control: with a stray MyISAM latin1 table added, `database:verify` must exit non-zero and name it.
+
+It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 30 to 50 seconds in the existing job (container start and the
+migration set; measured 50 s locally), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
+host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
+`mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
+invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and
+every Laravel command is pinned to it (an inherited `DB_URL`, `DB_SOCKET` or connection override is neutralised, and the pin is verified through the application before
+anything is migrated).
+Locally verified to fail (hand-run): with the `engine` literal removed from `config/database.php` the step fails at the production migration guard.
+
+What this does not cover: the full Pest suite on such a server (a one-off local run is recorded in `docs/architecture/database-profile.md` section 7), the
+daylight-saving round trip (the Pest file covers it with an Eastern-time session on the normal server), and the real host (isolated staging).
+Re-run the full-suite reproduction by hand when `config/database.php` connection options, the database server version, or the migration set's raw SQL change.
 
 ## First hosted run of the Release 0.9 foundations (2026-10-12)
 
