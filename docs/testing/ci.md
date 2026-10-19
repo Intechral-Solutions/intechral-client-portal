@@ -200,7 +200,10 @@ host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CR
 It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 30 to 50 seconds in the existing job (container start and the
 migration set; measured 50 s locally), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
 host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
-`mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh` (it removes its container).
+`mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
+invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and
+every Laravel command is pinned to it (an inherited `DB_URL`, `DB_SOCKET` or connection override is neutralised, and the pin is verified through the application before
+anything is migrated).
 Locally verified to fail (hand-run): with the `engine` literal removed from `config/database.php` the step fails at the production migration guard.
 
 What this does not cover: the full Pest suite on such a server (a one-off local run is recorded in `docs/architecture/database-profile.md` section 7), the
