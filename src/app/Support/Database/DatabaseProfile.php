@@ -220,9 +220,54 @@ final class DatabaseProfile
         try {
             return self::verify($db, $foreignKeys);
         } catch (Throwable $e) {
-            $state = $e instanceof \PDOException ? ' (SQLSTATE '.($e->errorInfo[0] ?? '?').')' : ($e->getPrevious() instanceof \PDOException ? ' (SQLSTATE '.($e->getPrevious()->errorInfo[0] ?? '?').')' : '');
-
-            return ['the database could not be verified: '.class_basename($e).$state];
+            return ['the database could not be verified: '.self::describe($e)];
         }
+    }
+
+    /**
+     * The number of migrations that have not run, or null when that cannot be determined. Shared by `database:verify` and
+     * `runtime:preflight`, so there is one definition of "pending".
+     */
+    public static function pendingMigrations(Connection $db): ?int
+    {
+        try {
+            $migrator = app('migrator');
+            $files = array_keys($migrator->getMigrationFiles(array_merge($migrator->paths(), [database_path('migrations')])));
+            $table = (string) config('database.migrations.table', 'migrations');
+            $ran = $db->getSchemaBuilder()->hasTable($table) ? $db->table($table)->pluck('migration')->all() : [];
+
+            return count(array_diff($files, $ran));
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * {@see self::safely()} plus the pending-migration rule: the foreign-key manifest describes the schema after EVERY migration, so with
+     * migrations pending (or the migration state unreadable) the foreign keys cannot be compared, and an unverifiable check is a failure,
+     * never a pass.
+     *
+     * @return list<string>
+     */
+    public static function safelyWithMigrations(Connection $db): array
+    {
+        $pending = self::pendingMigrations($db);
+        $violations = self::safely($db, foreignKeys: $pending === 0);
+
+        if ($pending !== 0) {
+            $violations[] = $pending === null
+                ? 'the migration state could not be read, so the foreign keys were not verified'
+                : "{$pending} migration(s) are pending, so the foreign keys were not verified (run `php artisan migrate` first)";
+        }
+
+        return $violations;
+    }
+
+    /** An exception reduced to what is safe to print: its class and, for a database error, the SQLSTATE. Never its message. */
+    public static function describe(Throwable $e): string
+    {
+        $pdo = $e instanceof \PDOException ? $e : ($e->getPrevious() instanceof \PDOException ? $e->getPrevious() : null);
+
+        return class_basename($e).($pdo ? ' (SQLSTATE '.($pdo->errorInfo[0] ?? '?').')' : '');
     }
 }

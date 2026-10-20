@@ -2,7 +2,8 @@
 # Host-parity smoke test (Release 0.9, WP3-DB follow-up): `migrate` and `database:verify` against a MariaDB 11.4.13 that has the
 # defaults the Namecheap host reported on 2026-10-19 (MyISAM default engine, latin1, non-strict sql_mode, Eastern-time SYSTEM
 # zone), under APP_ENV=production so the migration guard is exercised. It is a smoke test, not a second test suite: about 30 seconds.
-# docs/architecture/database-profile.md, docs/testing/ci.md. Run it locally from the repository root with Docker and PHP 8.3+
+# R0.9 WP3-A slice A1 adds the runtime preflight (`runtime:preflight`) on the same server: positive path and targeted negative controls.
+# docs/architecture/database-profile.md, docs/architecture/runtime-preflight.md, docs/testing/ci.md. Run it locally from the repository root with Docker and PHP 8.3+
 # (vendor installed, src/.env present): `bash scripts/ci/host-parity-smoke.sh`.
 #
 # Safety, so it can run on a developer machine that has a dev stack:
@@ -12,18 +13,22 @@
 #  - every Laravel command is pinned to that container (connection, host, port, database, test-only credentials; any inherited
 #    DB_URL, DB_SOCKET or cache/queue/session connection override is neutralised) and the pin is verified through the application
 #    BEFORE anything is migrated, so `migrate` cannot reach another database;
-#  - all SQL it runs by hand goes through `docker exec` into its own container.
+#  - all SQL it runs by hand goes through `docker exec` into its own container;
+#  - the configuration cache `runtime:preflight` requires is written to a temporary file of this invocation (APP_CONFIG_CACHE, a path under
+#    a directory `mktemp -d` returned here), never to src/bootstrap/cache/config.php: a developer's own config cache is neither read (it
+#    would override the pins above, and the pin check refuses it), overwritten, removed nor left behind. The script asserts that file is untouched.
 set -euo pipefail
 
 IMAGE="mariadb:11.4.13"
 NAME="hostparity-smoke-$$-${RANDOM}"
 CID=""
+CFGDIR=""
 LOG="$(mktemp)"
 
 cd "$(dirname "$0")/../../src"
 
 # Only a container this invocation created (CID is set from `docker run`'s own output) is ever removed.
-cleanup() { [ -n "$CID" ] && docker rm -f -v "$CID" >/dev/null 2>&1 || true; rm -f "$LOG"; }
+cleanup() { [ -n "$CID" ] && docker rm -f -v "$CID" >/dev/null 2>&1 || true; [ -n "$CFGDIR" ] && rm -rf -- "$CFGDIR"; rm -f "$LOG"; }
 trap cleanup EXIT
 fail() { echo "::error::host-parity smoke: $*"; [ -s "$LOG" ] && sed 's/^/    | /' "$LOG" | tail -n 25; exit 1; }
 sql() { docker exec -i "$CID" mariadb -h127.0.0.1 -uroot -proot -N "$@"; }
@@ -52,6 +57,13 @@ export APP_ENV=production APP_DEBUG=false LOG_CHANNEL=stderr CACHE_STORE=databas
 export DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT="$PORT" DB_DATABASE=portal DB_USERNAME=portal DB_PASSWORD=portal
 export DB_URL= DB_SOCKET= DB_CHARSET=utf8mb4 DB_COLLATION=utf8mb4_unicode_ci
 export DB_CACHE_CONNECTION= DB_CACHE_LOCK_CONNECTION= DB_QUEUE_CONNECTION= SESSION_CONNECTION=
+# An isolated configuration cache path. It does not exist yet, so every command below runs on live configuration (a developer's cached
+# configuration is ignored, not read); only the preflight steps create it, and it is removed with its directory on exit.
+CFGDIR="$(mktemp -d)"
+export APP_CONFIG_CACHE="${CFGDIR}/config.php"
+DEV_CACHE="bootstrap/cache/config.php"
+dev_cache_state() { if [ -e "$DEV_CACHE" ]; then stat -c '%i:%s:%Y' "$DEV_CACHE"; else echo absent; fi; }
+DEV_CACHE_BEFORE="$(dev_cache_state)"
 reset() { sql -e 'drop database if exists portal; create database portal'; }
 artisan() { php artisan "$@" >"$LOG" 2>&1; }
 
@@ -61,10 +73,10 @@ php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app-
   $c = config("database.connections.mysql");
   echo implode("|", [config("database.default"), $c["host"], $c["port"], $c["database"], (string) ($c["url"] ?? ""), (string) ($c["unix_socket"] ?? ""),
     config("cache.stores.database.connection") ?? "", config("queue.connections.database.connection") ?? "", config("session.connection") ?? "",
-    Illuminate\Support\Facades\DB::scalar("select @@default_storage_engine"), Illuminate\Support\Facades\DB::scalar("select @@system_time_zone")]), "\n";' >"$LOG" 2>&1 || fail "the application could not connect to the disposable container"
+    Illuminate\Support\Facades\DB::scalar("select @@default_storage_engine"), Illuminate\Support\Facades\DB::scalar("select @@system_time_zone"), $app->configurationIsCached() ? "cached" : "live"]), "\n";' >"$LOG" 2>&1 || fail "the application could not connect to the disposable container"
 pinned="$(tail -n 1 "$LOG")"
 case "$pinned" in
-  "mysql|127.0.0.1|${PORT}|portal||||||MyISAM|EDT" | "mysql|127.0.0.1|${PORT}|portal||||||MyISAM|EST") echo "pinned: the application reaches only ${NAME} (127.0.0.1:${PORT})" ;;
+  "mysql|127.0.0.1|${PORT}|portal||||||MyISAM|EDT|live" | "mysql|127.0.0.1|${PORT}|portal||||||MyISAM|EST|live") echo "pinned: the application reaches only ${NAME} (127.0.0.1:${PORT})" ;;
   *) fail "the application is not pinned to the disposable container (resolved: ${pinned})" ;;
 esac
 
@@ -83,6 +95,63 @@ non_innodb="$(sql -e "select count(*) from information_schema.tables where table
 tables="$(sql -e "select count(*) from information_schema.tables where table_schema='portal'")"
 [ "$non_innodb" = "0" ] && [ "$tables" -gt 0 ] || fail "expected only InnoDB tables, found ${non_innodb} other of ${tables}"
 echo "ok  migrate and database:verify pass on the host-parity server (${tables} InnoDB tables)"
+
+# 2b. Runtime preflight (R0.9 WP3-A, slice A1) on the same server: a production-shaped environment, the configuration cached at the ISOLATED path
+# (APP_CONFIG_CACHE above), the live cache and lock probes, and targeted negative controls. Fake, non-deliverable hosts: nothing is sent.
+export APP_URL=https://portal.smoke.invalid CACHE_PREFIX=smoke_prod_ MAIL_MAILER=smtp MAIL_HOST=smtp.smoke.invalid MAIL_PORT=587 MAIL_TIMEOUT=20
+export MAIL_FROM_ADDRESS=portal@smoke.invalid DB_QUEUE_RETRY_AFTER=300
+# Review F1 and F2: the session cookie must be Secure (stated explicitly: Laravel's default is null, which the profile refuses), and an inherited
+# MAIL_URL is neutralised (empty, not unset, so src/.env cannot supply one): a non-empty transport URL is itself a violation.
+export SESSION_SECURE_COOKIE=true MAIL_URL=
+cache_config() { rm -f "$APP_CONFIG_CACHE"; env "$@" php artisan config:cache >"$LOG" 2>&1 || fail "config:cache failed at the isolated path"; [ -f "$APP_CONFIG_CACHE" ] || fail "config:cache did not write the isolated cache file"; }
+preflight() { env "$@" php artisan runtime:preflight --json >"$LOG" 2>&1; }
+expect_preflight_failure() { # label, message, VAR=value... (the environment the configuration is cached with)
+  local label="$1" message="$2"; shift 2
+  cache_config "$@"
+  if preflight "$@"; then fail "runtime:preflight passed with ${label}"; fi
+  grep -qF -- "$message" "$LOG" || fail "runtime:preflight failed with ${label}, but not with: ${message}"
+  echo "ok  runtime:preflight refuses ${label}"
+}
+
+rm -f "$APP_CONFIG_CACHE"
+if preflight; then fail "runtime:preflight passed without cached configuration"; fi
+grep -qF 'configuration is not cached' "$LOG" || fail "runtime:preflight failed without cached configuration, but not with the cache message"
+echo "ok  runtime:preflight refuses uncached configuration"
+
+cache_config
+preflight || fail "runtime:preflight failed on the production profile"
+grep -q '"passed": true' "$LOG" && grep -q '"probes_ran": true' "$LOG" || fail "runtime:preflight did not report passed with its probes run"
+probe_rows="$(sql -e "select (select count(*) from portal.cache where \`key\` like '%runtime-preflight%') + (select count(*) from portal.cache_locks where \`key\` like '%runtime-preflight%')")"
+[ "$probe_rows" = "0" ] || fail "runtime:preflight left ${probe_rows} probe row(s) behind"
+echo "ok  runtime:preflight passes on the production profile with cached configuration and leaves no probe row"
+
+expect_preflight_failure "a log mail transport" "mail.default is 'log'" MAIL_MAILER=log
+# F1: a MAIL_URL replaces the smtp mailer's transport, host and credentials (log://localhost selects the log driver). Refused, and never printed.
+expect_preflight_failure "a MAIL_URL selecting the log driver" "mail.mailers.smtp.url is set" MAIL_URL=log://localhost
+! grep -qF -e 'log://' -e 'localhost' "$LOG" || fail "runtime:preflight printed the mail URL"
+expect_preflight_failure "a MAIL_URL carrying credentials" "mail.mailers.smtp.url is set" MAIL_URL=smtp://smokeuser:smokesecret@mailpit:1025
+! grep -qF -e 'smokesecret' -e 'smokeuser' -e 'mailpit' "$LOG" || fail "runtime:preflight printed the mail URL credentials"
+# F2: Secure is required whether it is false, unset (null) or combined with SameSite=None; SameSite=None is fine when Secure is true.
+expect_preflight_failure "an insecure session cookie (SESSION_SECURE_COOKIE=false)" "session.secure must be true" SESSION_SECURE_COOKIE=false
+expect_preflight_failure "an unset session cookie Secure flag" "session.secure must be true" -u SESSION_SECURE_COOKIE
+expect_preflight_failure "an insecure session cookie with SameSite=None" "session.secure must be true" SESSION_SECURE_COOKIE=false SESSION_SAME_SITE=none
+expect_preflight_failure "a session cookie readable by scripts" "session.http_only must be true" SESSION_HTTP_ONLY=false
+cache_config SESSION_SAME_SITE=none
+preflight SESSION_SAME_SITE=none || fail "runtime:preflight refused SameSite=None on a Secure cookie"
+echo "ok  runtime:preflight accepts SameSite=None when the session cookie is Secure"
+expect_preflight_failure "a file cache store" "cache.default is 'file'" CACHE_STORE=file
+expect_preflight_failure "a queue retry_after below 300" "retry_after must be an integer of at least 300" DB_QUEUE_RETRY_AFTER=299
+cache_config
+sql portal -e 'rename table cache_locks to cache_locks_off'
+if preflight; then fail "runtime:preflight passed with the cache locks table missing"; fi
+grep -qF 'the cache locks table is missing' "$LOG" || fail "runtime:preflight failed with the lock table missing, but not with its message"
+sql portal -e 'rename table cache_locks_off to cache_locks'
+echo "ok  runtime:preflight refuses a missing required table"
+
+# The configuration cache this smoke needed was the isolated one; a developer's own was never touched.
+rm -f "$APP_CONFIG_CACHE"
+[ "$(dev_cache_state)" = "$DEV_CACHE_BEFORE" ] || fail "${DEV_CACHE} changed during the smoke (it must never be touched)"
+echo "ok  ${DEV_CACHE} untouched (${DEV_CACHE_BEFORE})"
 
 # 3. Negative control: the verifier must report a table outside the profile and exit non-zero.
 sql portal -e 'create table stray_probe (note varchar(20)) engine = MyISAM default charset = latin1'
