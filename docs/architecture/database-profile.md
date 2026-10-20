@@ -110,7 +110,8 @@ external effect without the owner's explicit authorization.
 3. `php artisan migrate --force`. A non-zero exit stops the release; see section 4 for what each refusal means.
 4. **Mandatory post-migration gate:** `php artisan database:verify` must exit 0 with nothing pending. This is the authoritative schema check; a failure
    aborts the release, including after a `MigrationsEnded` refusal or a `migrate` that found nothing to run.
-5. Then `roles:sync` and the rest of the release steps.
+5. `php artisan config:cache`, then `php artisan runtime:preflight` (must exit 0): the production runtime shape, [Runtime Preflight](./runtime-preflight.md).
+6. Then `roles:sync` and the rest of the release steps.
 
 ## 6. Safe database creation, import and restoration (utf8mb4)
 

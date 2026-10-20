@@ -196,9 +196,13 @@ host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CR
 2. negative control: with a MyISAM table already present, `migrate --force` must fail with the guard's message;
 3. on a fresh database, `migrate --force` and `database:verify --json` must pass, with every table InnoDB;
 4. negative control: with a stray MyISAM latin1 table added, `database:verify` must exit non-zero and name it.
+5. (R0.9 WP3-A slice A1) `runtime:preflight` on the same server: refused without cached configuration; passes on a production-shaped environment with the configuration cached at an
+   **isolated temporary path** (`APP_CONFIG_CACHE`, so a developer's `bootstrap/cache/config.php` is never read, overwritten, removed or left behind, and the script asserts it is
+   untouched) and leaves no probe row; refused for a `log` mail transport, a `MAIL_URL` (selecting the log driver, or carrying credentials), a session cookie that is not Secure or not HttpOnly, a `file` cache store, a `retry_after` of 299 and a missing `cache_locks` table. See
+   [Runtime Preflight](../architecture/runtime-preflight.md).
 
-It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 30 to 50 seconds in the existing job (container start and the
-migration set; measured 50 s locally), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
+It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 70 seconds in the existing job (container start, the migration set and the
+runtime-preflight steps; measured 69 s locally, 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
 host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
 `mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
 invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and
