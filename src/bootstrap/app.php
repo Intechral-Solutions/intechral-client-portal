@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Shared\Pilot\CustomerPilotGate;
+use App\Support\Runtime\RuntimeChallenges;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('tickets:auto-close')->dailyAt('02:00');
+
+        // Release 0.9 (R0.9 WP3-A2): the SCHEDULER half of the cross-context runtime check. In-process (no child process), production only
+        // (`when` is evaluated before the callback, so development never queries), and with no active challenge one SELECT. It runs at
+        // every scheduler tick rather than at minutes divisible by five: with the planned `*/5` cron that is every five minutes, and a
+        // manual `schedule:run` at any minute still answers a challenge. docs/architecture/runtime-preflight.md.
+        $schedule->call(fn () => RuntimeChallenges::observeQuietly('scheduler'))
+            ->name('runtime-context-observation')
+            ->everyMinute()
+            ->when(fn () => app()->environment('production'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [

@@ -200,9 +200,13 @@ host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CR
    **isolated temporary path** (`APP_CONFIG_CACHE`, so a developer's `bootstrap/cache/config.php` is never read, overwritten, removed or left behind, and the script asserts it is
    untouched) and leaves no probe row; refused for a `log` mail transport, a `MAIL_URL` (selecting the log driver, or carrying credentials), a session cookie that is not Secure or not HttpOnly, a `file` cache store, a `retry_after` of 299 and a missing `cache_locks` table. See
    [Runtime Preflight](../architecture/runtime-preflight.md).
+   (R0.9 WP3-A slice A2) The same server also runs the **cross-context verification** with real, bounded processes: `runtime:preflight --issue`, a PHP web server (`php -S`, SAPI `cli-server`) answering one
+   `GET /up`, a real database queue worker (`queue:work --stop-when-empty --max-jobs=1`) and `schedule:run` through a symlink to the release, then `--verify` passes. Negative controls: a scheduler on another
+   configuration cache (`CACHE_PREFIX`), a scheduler running from a second physical release directory with identical configuration, a missing scheduler observation and a superseded challenge. Each process is
+   bounded by `timeout`; the only server is stopped immediately and again by the cleanup trap; the extra configuration cache and release directory live under the same `mktemp -d` directory.
 
 It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 70 seconds in the existing job (container start, the migration set and the
-runtime-preflight steps; measured 69 s locally, 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
+runtime-preflight steps; measured 59 s locally with slice A2, 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
 host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
 `mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
 invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and
