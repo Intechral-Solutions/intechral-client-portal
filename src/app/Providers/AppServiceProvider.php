@@ -16,9 +16,11 @@ use App\Support\Database\MigrationProfileGuard;
 use App\Support\Permissions\EpochPermissionRegistrar;
 use App\Support\Permissions\PermissionCacheEpoch;
 use App\Support\Runtime\RuntimeChallenges;
+use App\Support\Runtime\RuntimeStartupGuard;
 use App\Support\TestDatabaseSafety;
 use App\View\Composers\ShellComposer;
 use Illuminate\Cache\CacheManager;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\MigrationsStarted;
@@ -75,6 +77,10 @@ class AppServiceProvider extends ServiceProvider
                 RuntimeChallenges::observeQuietly('web');
             }
         });
+
+        // Release 0.9 (R0.9 WP3-A3): in production, the queue worker and scheduler commands refuse to start unless the configuration-only
+        // runtime profile holds. Exactly four commands, no database access, nothing else is affected. docs/architecture/runtime-preflight.md.
+        Event::listen(CommandStarting::class, RuntimeStartupGuard::class);
 
         // Release 0.9 (R0.9-1E): the registrar is a singleton and a queue worker only resets scoped instances between
         // jobs, so a worker would otherwise keep the permission mapping it loaded for its first job. Each job starts with

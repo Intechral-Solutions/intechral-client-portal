@@ -1,4 +1,4 @@
-# Runtime Preflight: the Production Shape of Release 0.9 (R0.9 WP3-A, slices A1 and A2)
+# Runtime Preflight: the Production Shape of Release 0.9 (R0.9 WP3-A, slices A1, A2 and A3)
 
 **Authority:** the Release 0.9 shared-hosting runtime gate (database cache, sessions and queue; no Redis; no persistent worker; two five-minute cron
 tasks) and the WP3-A design gate rulings of 2026-10-19. **Companions:** [Database Profile](./database-profile.md) (what `database:verify` checks),
@@ -7,7 +7,7 @@ tasks) and the WP3-A design gate rulings of 2026-10-19. **Companions:** [Databas
 
 `php artisan runtime:preflight [--json]` states the production shape the application is built for and refuses anything else. **Slice A1** (this section and the
 next three) checks ONE process, one context. **Slice A2** ([Cross-context verification](#cross-context-verification-slice-a2)) adds `--issue` and `--verify`, which prove that the
-CLI, the web, a real database queue worker and the scheduler agree with each other. It does not guard the worker and scheduler commands at startup (slice A3, not started).
+CLI, the web, a real database queue worker and the scheduler agree with each other. **Slice A3** ([Fail-closed startup](#fail-closed-worker-and-scheduler-startup-slice-a3)) makes the queue worker and scheduler commands refuse to start in production when the configuration-only profile is violated.
 
 Run it **after `migrate`**, with `APP_ENV=production` and the configuration cached. Its local checks (also run first by `--issue` and `--verify`) write two disposable rows (below) and nothing else, and it exits
 non-zero on any violation; `--issue` additionally writes the challenge rows described under [Challenge lifecycle](#challenge-lifecycle-and-what-is-written). A check that cannot run is a violation. Development and CI are expected to fail it: it is the production profile, and
@@ -222,11 +222,122 @@ reported as a mismatch rather than as a missing observation). Raw rows, as the p
 
 `--verify` proves that the contexts that actually answered THIS challenge agree. It does **not** prove that no other process disagrees: a second PHP pool that was not hit, a worker started
 before the deployment that is still running an older release, or a cron entry that has not fired yet are only caught if one of them happened to answer (a conflict marker, a release or a
-configuration mismatch). Re-run the sequence after every deployment and every change to the environment, and treat startup enforcement (slice A3) as the control for stale workers.
+configuration mismatch). Re-run the sequence after every deployment and every change to the environment. Startup enforcement (slice A3) is a different control: it stops a worker or scheduler from starting under an INVALID configuration; it does not detect a stale worker, a stale release or a configuration drift between contexts, which only the sampling above can reveal.
 A context's PHP version, SAPI and disabled functions are shown but not judged. The check does not look at mail, the session cookie or the other A1 rules in other contexts; those are properties of the
 shared configuration, which the compared values stand in for.
 
+## Fail-closed worker and scheduler startup (slice A3)
+
+A1 is a command an operator runs; nothing forces anyone to run it. A3 makes the production worker and scheduler commands check the profile themselves, every time they start, so a
+cron entry that launches them under a configuration that has drifted (an edited `.env`, a missing configuration cache, a stale `CACHE_STORE`) does not quietly keep running.
+
+### What is guarded, exactly
+
+`App\Support\Runtime\RuntimeStartupGuard` listens to Laravel's `CommandStarting` event, which is dispatched **before** a command's own work begins, and applies to **exactly four commands**,
+compared for equality with the command's canonical name (so `queue:wo`, typed as an abbreviation, resolves to `queue:work` and is guarded; `queue:worker` or `queue:work-all` are not):
+
+| Command | Why |
+|---|---|
+| `queue:work` | the database queue worker the cron entry runs |
+| `queue:listen` | the other worker command; refused for the same reason |
+| `schedule:run` | the scheduler tick the cron entry runs |
+| `schedule:work` | the scheduler's long-running form |
+
+Nothing else is touched. In particular `migrate`, `database:verify`, `runtime:preflight`, `config:cache`, `config:clear`, `cache:clear`, `roles:sync`, `schedule:list`, `queue:failed`,
+`queue:retry`, `queue:restart` and every other command run exactly as before, **including when the profile is violated**: they are how an operator diagnoses and repairs it. There is no wildcard
+and no web-request enforcement (no 503 middleware): a web request is not affected by A3.
+
+### When it applies, and what it checks
+
+- **Only when this process is, or is configured as, production** (see [the environment, and `--env`](#the-environment-and---env) below): when EITHER Laravel's detected environment OR the effective cached
+  `app.env` is `production`, compared case-insensitively. Development, testing and any other environment that says production in neither source, including a `staging` value, are never blocked.
+  (Staging rehearsals must run with `APP_ENV=production` anyway, which is also what makes the A1 profile and the database migration guard apply.)
+- **`RuntimeProfile::configuration()` and nothing else**: the same configuration-only rules `runtime:preflight` enforces (production environment, debug off, UTC, key, https `APP_URL`, **cached
+  configuration**, database cache/session/queue topology, `retry_after >= 300`, SMTP-only transport with no `MAIL_URL`, Secure and HttpOnly session cookie, ...). There is no second copy of
+  the rules. **No database query and no cache probe** runs at startup: the guard cannot be slowed or broken by an unreachable database, and a worker's first database access happens after
+  it has been allowed to start.
+- Because production requires the configuration to be **cached**, what is checked is the effective configuration the process actually runs with, which is also why an `--env` override cannot change what is checked. An uncached production configuration is itself
+  a violation, so the guard refuses to start under it: the operator runs `php artisan config:cache`.
+- The A2 challenge is **not** checked at startup. A2 remains the explicit deployment verification gate; A3 does not make a worker depend on a challenge.
+
+### The environment, and `--env`
+
+Two things can name the environment, and they can differ:
+
+- **Laravel's detected environment** (`app()->environment()`): normally the cached `app.env`, but the `--env=<name>` option of an Artisan command **replaces** it for that one run. It is what `when()` filters, seeders and
+  `runningUnitTests()` look at.
+- **The effective `app.env`** from the (normally cached) configuration. `--env` does **not** change it: the cached production configuration stays loaded.
+
+The guard applies when **either** says production (case-insensitively), and `RuntimeProfile` stays the single authority on whether the configuration is valid: it still requires the **exact** value `production`. So:
+
+| Invocation | Result |
+|---|---|
+| invalid cached production profile, no override | refused |
+| the same with `--env=local`, `--env=staging`, `--env=PRODUCTION`, `--env=Production` | **refused** (the cached configuration still says production) |
+| cached `APP_ENV=Production` or `PRODUCTION` (any case or surrounding whitespace) | the guard applies, and the profile refuses it: `app.env is 'Production', expected 'production'` |
+| detected `production` while the cached `app.env` is something else | the guard applies, and the profile refuses the value |
+| a real local or development profile (cached or not) | not blocked, with or without `--env=local` |
+| a VALID cached production profile with `--env=local` | **starts.** The override changes the name the process reports (and therefore which `when(production)` callbacks, such as the A2 scheduler observation, run), not the validated configuration |
+| `--env=testing` | see below |
+
+The guard's applicability check runs inside its fail-closed path: if it cannot tell whether the process is production, it refuses.
+
+**A3 does not protect a deployment that is labelled with a different environment, such as `APP_ENV=prod`.** Such a process says production in neither source, so the guard does not apply. The mandatory A1 `runtime:preflight` deployment gate rejects any `app.env` other than exactly `production`, which is what catches the mislabel.
+
+**Production cron entries and worker commands must not pass `--env=`.** An override is not a bypass of an invalid profile, but it changes which environment-gated code runs, and a command that reports another
+environment than its configuration is a deployment error. The cron lines (WP3-B) rely on the cached configuration alone.
+
+**`--env=testing` is different, and is not covered by the guard.** `Application::runningUnitTests()` is true when the detected environment is `testing`, and Laravel does not re-route Symfony's command events while it is true,
+so `CommandStarting` is never dispatched and **this guard cannot fire at all** (a listener condition cannot cover an event that never happens). What stops such a run is a separate fence:
+`App\Support\TestDatabaseSafety`, called from `AppServiceProvider::boot()` when the environment is `testing`, throws unless the resolved database is exactly `intechral_client_portal_testing`. With the production
+database configuration loaded it throws **while the providers boot, before the command's own work**, so no job is reserved and no scheduled task runs. Verified with real processes against a cached production profile, for
+`queue:work`, `queue:listen`, `schedule:run` and `schedule:work` (output: `Test database safety check failed before database access ... resolved APP_ENV="testing" and DB_DATABASE="<production database>"`, non-zero exit, no
+"Refusing to start", no database connection attempted). The limits of that protection, stated plainly: it is a database-NAME fence, not the runtime profile (it checks nothing about the cache, queue, mail or session
+configuration); it depends on the production database not being named `intechral_client_portal_testing`, which a production or staging database must never be; and it is only as strong as that boot-time call remaining in place.
+
+### What a refusal does
+
+1. The command **does not start**. Laravel dispatches the event before the command runs, and the guard throws `RuntimeProfileRefused`, which propagates out of the console application to the
+   kernel: **exit status 1**, no queued job is reserved or attempted, no scheduled task runs, and no A2 observation is recorded through the refused command. This is verified with real
+   `php artisan` processes (a committed job in the testing database is left unreserved with zero attempts, the same job is consumed when the guard does not apply, and the refusal names the
+   rule, so it is not some unrelated CLI error), not assumed from Laravel's documentation.
+2. The output lists the violated rules, one per line: configuration names, driver and table names, and categorical reasons. They are the same strings `runtime:preflight` prints, which never
+   contain a key, a password, a URL with credentials or a raw exception message.
+3. **One** `critical` log entry is written (`Production runtime profile violated: refusing to start a worker or scheduler command.`) with the command and the violations. The exception marks itself
+   as already reported, so Laravel's exception handler does not add a second, stack-traced entry for the same refusal. If the log channel itself is broken, the refusal still happens.
+4. **Failing closed:** if evaluating the profile throws for any reason, that is a refusal (`the runtime profile could not be evaluated: <ExceptionClass>`, never the exception's message), not
+   a pass.
+5. Nothing is repaired automatically.
+
+A cron entry that is refused prints this output (the host mails or discards it per the cron configuration) and exits non-zero on every tick until the profile is fixed.
+
+### Correcting an invalid profile
+
+Read the listed rules, fix the environment file, then on the host: `php artisan config:cache`, then `php artisan runtime:preflight` (it must exit 0), and, after a deployment or an environment change,
+the [cross-context sequence](#operational-sequence). `runtime:preflight` works while the profile is violated precisely so that it can name what is wrong.
+
+### Relationship to A1 and A2
+
+| | A1 `runtime:preflight` | A2 `--issue` / `--verify` | A3 startup guard |
+|---|---|---|---|
+| Runs | when an operator runs it | when an operator runs the sequence | automatically, at every start of the four commands, in production |
+| Checks | the profile, the database, live probes | that the four contexts agree (release, key, configuration) | the configuration-only profile |
+| Touches the database | yes (probes) | yes (challenge rows) | no |
+| Proves | this process is configured correctly | the sampled contexts are the same application | the command does not run under an invalid configuration |
+
+### Tests and how CI exercises it
+
+`tests/Unit/Runtime/RuntimeStartupGuardTest.php`: the listener for each command (and which environment source decides, review M-1) and each representative violation, production-only behaviour, the exact-match scope, fail-closed evaluation, a broken log
+channel, no database queries, no secret in the exception or the log, and **real `php artisan` processes** for each guarded command (non-zero exit, the rule named, one critical entry, nothing leaked,
+no refusal outside production, other commands usable; and, with real `config:cache` files, every `--env` override against an invalid cached production profile, a differently spelled cached `APP_ENV`, the `--env=testing` fence, and a valid profile and a local profile still starting). `tests/Feature/Runtime/StartupGuardIntegrationTest.php`: the same through the whole console kernel against the testing database (a refused worker
+leaves its job unreserved; a refused scheduler runs no callback; A2 still works through the guard; a refused worker and scheduler record no observation), and a real worker process against a committed
+job, refused under an invalid production environment (also with `--env=local` on the command line) and consuming the job otherwise. Laravel does not re-route Symfony's command events while it runs unit tests, so the in-process tests
+re-route them explicitly (`Kernel::rerouteSymfonyCommandEvents()`, the call the kernel makes for a real process); the real-process tests need no such help.
+
+The host-parity smoke runs the four commands under an invalid production configuration cache (`MAIL_MAILER=log`), also with `--env=local` and `--env=PRODUCTION`, checks each is refused by exactly that rule, that `--env=testing` stops at the test-database fence, that the queued job is still unreserved and no
+observation was recorded, and then that the valid worker and scheduler start and the challenge verifies.
+
 ## Not covered (not started)
 
-- **A3:** startup enforcement for the production queue and scheduler worker commands.
+- Startup enforcement of the A2 challenge, a web-request guard (503 middleware) and the cron wrapper scripts (WP3-B).
 - Whether `retry_after` of 300 is enough on the host: WP3-B timing validation.

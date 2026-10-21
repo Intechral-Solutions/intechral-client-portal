@@ -204,9 +204,12 @@ host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CR
    `GET /up`, a real database queue worker (`queue:work --stop-when-empty --max-jobs=1`) and `schedule:run` through a symlink to the release, then `--verify` passes. Negative controls: a scheduler on another
    configuration cache (`CACHE_PREFIX`), a scheduler running from a second physical release directory with identical configuration, a missing scheduler observation and a superseded challenge. Each process is
    bounded by `timeout`; the only server is stopped immediately and again by the cleanup trap; the extra configuration cache and release directory live under the same `mktemp -d` directory.
+   (R0.9 WP3-A slice A3) Then the **startup guard**: with an invalid production configuration cache (built with `MAIL_MAILER=log`, also under the `mktemp -d` directory) `queue:work`, `queue:listen`,
+   `schedule:run` and `schedule:work` must each be refused (`queue:work` and `schedule:run` also with `--env=local`, and `queue:work` with `--env=PRODUCTION`: `--env` replaces the detected environment, not the cached configuration; `--env=testing` must instead stop at the test-database fence), with the `Refusing to start` message and the `mail.default` rule in the output (so an unrelated CLI error cannot pass), the queued job must still
+   be unreserved with no attempt, and no observation may exist for the challenge; then the valid worker and scheduler start and `--verify` passes. Every process is bounded by `timeout`.
 
 It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 70 seconds in the existing job (container start, the migration set and the
-runtime-preflight steps; measured 59 s locally with slice A2, 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
+runtime-preflight steps; measured 59 s locally with slice A2 (A3 adds four refused starts and two valid ones, a few seconds), 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
 host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
 `mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
 invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and

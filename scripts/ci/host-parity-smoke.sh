@@ -240,6 +240,48 @@ unbounded="$(sql -e "select count(*) from portal.cache where \`key\` like 'porta
 [ "$unbounded" = "0" ] || fail "${unbounded} cross-context row(s) outlive their challenge window plus one hour"
 echo "ok  cross-context rows are bounded; the observation jobs were consumed"
 
+# 2d. Fail-closed worker and scheduler startup (R0.9 WP3-A, slice A3), with real processes. The production profile is enforced at the start of exactly
+# queue:work, queue:listen, schedule:run and schedule:work (config only; nothing queries the database). Here the SAME commands run once under an INVALID production
+# profile (a configuration cache built with MAIL_MAILER=log) and must be refused by that rule and not by anything else, with the queued job left unreserved and
+# the scheduler's callback not run (no observation is recorded); then under the valid profile they start and the challenge verifies. Bounded by `timeout`.
+INVALID_CACHE="${CFGDIR}/config-invalid.php"
+env "APP_CONFIG_CACHE=${INVALID_CACHE}" MAIL_MAILER=log php artisan config:cache >"$LOG" 2>&1 || fail "config:cache failed for the invalid profile"
+rx_refused() { # the command name as the refusal prints it, then the artisan arguments
+  local name="$1"; shift
+  if timeout 60 env "APP_CONFIG_CACHE=${INVALID_CACHE}" php artisan "$@" >"$LOG" 2>&1; then fail "${name} started under an invalid production profile"; fi
+  grep -qF "Refusing to start \`${name}\`" "$LOG" && grep -qF "mail.default is 'log'" "$LOG" || fail "${name} failed, but not with the startup refusal for the mail.default rule"
+}
+
+rx_issue
+rx_web "$WEBPORT"
+rx_refused queue:work queue:work database --stop-when-empty --max-jobs=1 --tries=1
+rx_refused schedule:run schedule:run
+rx_refused queue:listen queue:listen database
+rx_refused schedule:work schedule:work
+# Review M-1: `--env=` replaces the DETECTED environment but not the CACHED configuration, so it must not let an invalid production profile start (nor may a
+# differently cased name). Each is refused by the same rule, with the same untouched job and schedule asserted below.
+rx_refused queue:work queue:work database --stop-when-empty --max-jobs=1 --tries=1 --env=local
+rx_refused queue:work queue:work database --stop-when-empty --max-jobs=1 --tries=1 --env=PRODUCTION
+rx_refused schedule:run schedule:run --env=local
+# `--env=testing` is different: Laravel then believes it runs unit tests and never dispatches CommandStarting, so the guard cannot fire. The test-database fence
+# (App\Support\TestDatabaseSafety, in AppServiceProvider::boot) does, before any command work, because this database is not the testing database. VALID cache here.
+for testing_cmd in "queue:work database --once --tries=1" "schedule:run"; do
+  if timeout 60 php artisan ${testing_cmd} --env=testing >"$LOG" 2>&1; then fail "'${testing_cmd} --env=testing' started against the production-profile database"; fi
+  grep -qF 'Test database safety check failed before database access' "$LOG" || fail "'${testing_cmd} --env=testing' failed, but not at the test-database fence"
+  ! grep -qF 'Refusing to start' "$LOG" || fail "'${testing_cmd} --env=testing' was refused by the guard (the fence is the control under test)"
+done
+untouched="$(sql -e "select count(*) from portal.jobs where reserved_at is null and attempts = 0")"
+[ "$untouched" = "1" ] || fail "the refused worker touched the queued job (${untouched} unreserved job(s), expected 1)"
+observed="$(sql -e "select count(*) from portal.cache where \`key\` in ('portal:runtime-context:obs:${challenge}:queue', 'portal:runtime-context:obs:${challenge}:scheduler')")"
+[ "$observed" = "0" ] || fail "a refused command recorded an observation"
+echo "ok  queue:work, queue:listen, schedule:run and schedule:work (also with --env=local and --env=PRODUCTION) are refused under an invalid production profile by the mail.default rule, and --env=testing stops at the test-database fence; the job and the schedule are untouched"
+
+rx_worker
+rx_scheduler
+rx_verify || fail "the valid worker and scheduler did not answer the challenge after the refusals"
+grep -q '"passed": true' "$LOG" || fail "the verification after the refusals did not pass"
+echo "ok  the same worker and scheduler start under the valid profile and the challenge verifies"
+
 # The configuration cache this smoke needed was the isolated one; a developer's own was never touched.
 rm -f "$APP_CONFIG_CACHE"
 [ "$(dev_cache_state)" = "$DEV_CACHE_BEFORE" ] || fail "${DEV_CACHE} changed during the smoke (it must never be touched)"
