@@ -23,12 +23,13 @@ IMAGE="mariadb:11.4.13"
 NAME="hostparity-smoke-$$-${RANDOM}"
 CID=""
 CFGDIR=""
+WEBPID=""
 LOG="$(mktemp)"
 
 cd "$(dirname "$0")/../../src"
 
 # Only a container this invocation created (CID is set from `docker run`'s own output) is ever removed.
-cleanup() { [ -n "$CID" ] && docker rm -f -v "$CID" >/dev/null 2>&1 || true; [ -n "$CFGDIR" ] && rm -rf -- "$CFGDIR"; rm -f "$LOG"; }
+cleanup() { [ -n "$WEBPID" ] && kill "$WEBPID" >/dev/null 2>&1 || true; [ -n "$CID" ] && docker rm -f -v "$CID" >/dev/null 2>&1 || true; [ -n "$CFGDIR" ] && rm -rf -- "$CFGDIR"; rm -f "$LOG"; }
 trap cleanup EXIT
 fail() { echo "::error::host-parity smoke: $*"; [ -s "$LOG" ] && sed 's/^/    | /' "$LOG" | tail -n 25; exit 1; }
 sql() { docker exec -i "$CID" mariadb -h127.0.0.1 -uroot -proot -N "$@"; }
@@ -147,6 +148,97 @@ if preflight; then fail "runtime:preflight passed with the cache locks table mis
 grep -qF 'the cache locks table is missing' "$LOG" || fail "runtime:preflight failed with the lock table missing, but not with its message"
 sql portal -e 'rename table cache_locks_off to cache_locks'
 echo "ok  runtime:preflight refuses a missing required table"
+
+# 2c. Cross-context runtime verification (R0.9 WP3-A, slice A2): REAL separate processes against the committed disposable database. A challenge is issued
+# by the CLI; a PHP web server (SAPI cli-server) answers GET /up; a real bounded database queue worker and a scheduler run answer too (the scheduler through a
+# symlink to the release, which must be the SAME release); then the CLI verifies. Negative controls: a scheduler running another configuration cache
+# (a different CACHE_PREFIX), another physical release directory with identical configuration, and a superseded challenge. Every process is bounded by `timeout`,
+# nothing is a daemon, and the only server is killed by the cleanup trap. The configuration caches are the isolated ones under $CFGDIR.
+cache_config
+challenge=""
+rx_issue() { # prints the new challenge id
+  php artisan runtime:preflight --issue --json >"$LOG" 2>&1 || fail "runtime:preflight --issue failed"
+  grep -q '"mode": "issue"' "$LOG" || fail "runtime:preflight --issue did not report issue mode"
+  challenge="$(sed -n 's/.*"id": "\([0-9a-f]\{32\}\)".*/\1/p' "$LOG" | head -n 1)"
+  [ -n "$challenge" ] || fail "runtime:preflight --issue did not print a challenge id"
+}
+rx_verify() { env "$@" php artisan runtime:preflight --verify --challenge="$challenge" --json >"$LOG" 2>&1; }
+rx_web() { # the real web context: PHP's own web server (SAPI cli-server, as `artisan serve` runs it), one GET /up, then stopped
+  local port="$1" body
+  ( cd public && exec php -S "127.0.0.1:${port}" ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php >/dev/null 2>&1 ) &
+  WEBPID=$!
+  for _ in $(seq 1 30); do curl -fsS --max-time 3 -o /dev/null "http://127.0.0.1:${port}/" 2>/dev/null && break; sleep 1; done
+  body="$(curl -sS --max-time 10 -w '\n%{http_code}' "http://127.0.0.1:${port}/up" 2>/dev/null)" || true
+  kill "$WEBPID" >/dev/null 2>&1 || true; wait "$WEBPID" 2>/dev/null || true; WEBPID=""
+  # The answer must be the application's own health page (a router mistake can answer 200 with a PHP warning, which proves nothing).
+  [ "$(printf '%s' "$body" | tail -n 1)" = "200" ] && printf '%s' "$body" | grep -q 'Application up' && ! printf '%s' "$body" | grep -qi 'warning' || fail "GET /up did not return the application's health page from the PHP web server"
+}
+rx_worker() { timeout 90 env "$@" php artisan queue:work database --stop-when-empty --max-jobs=1 --tries=1 >"$LOG" 2>&1 || fail "the bounded queue worker failed"; }
+rx_scheduler() { timeout 90 env "$@" php "${SCHED_ARTISAN:-artisan}" schedule:run >"$LOG" 2>&1 || fail "schedule:run failed"; }
+WEBPORT="$(( 20000 + RANDOM % 20000 ))"
+
+# The same release reached through a symlink (the deployment model's `current`), and a second PHYSICAL release that differs only in its location.
+ln -s "$PWD" "${CFGDIR}/current"
+RELEASE_B="${CFGDIR}/release-b"
+mkdir -p "${RELEASE_B}/bootstrap/cache"
+cp artisan composer.json "${RELEASE_B}/"; cp bootstrap/app.php bootstrap/providers.php "${RELEASE_B}/bootstrap/"
+for entry in app config database public resources routes storage vendor; do ln -s "${PWD}/${entry}" "${RELEASE_B}/${entry}"; done
+OTHER_CACHE="${CFGDIR}/config-other.php"
+
+# The pass: CLI + web + queue + scheduler (through the symlink), then verify.
+rx_issue
+rx_web "$WEBPORT"
+rx_worker
+SCHED_ARTISAN="${CFGDIR}/current/artisan" rx_scheduler
+rx_verify || fail "runtime:preflight --verify did not pass with every context answering"
+grep -q '"passed": true' "$LOG" || fail "runtime:preflight --verify did not report passed"
+for ctx in cli web queue scheduler; do
+  grep -A1 "\"${ctx}\": {" "$LOG" | grep -q '"status": "ok"' || fail "context ${ctx} was not ok in the verification"
+done
+grep -q '"sapi": "cli-server"' "$LOG" && grep -q '"sapi": "cli"' "$LOG" || fail "the web observation was not made by the PHP web server (expected sapi cli-server beside cli)"
+jobs_left="$(sql -e "select count(*) from portal.jobs")"
+[ "$jobs_left" = "0" ] || fail "the observation job was not consumed by the worker (${jobs_left} left)"
+echo "ok  runtime:preflight --verify passes with the CLI, a web server (cli-server), a real queue worker and the scheduler via a symlink to the release"
+
+# Negative: a scheduler running another configuration cache (CACHE_PREFIX) must fail, by name, with the other contexts still ok.
+env "APP_CONFIG_CACHE=${OTHER_CACHE}" CACHE_PREFIX=smoke_other_ php artisan config:cache >"$LOG" 2>&1 || fail "config:cache failed for the second configuration"
+rx_issue
+rx_web "$WEBPORT"
+rx_worker
+rx_scheduler "APP_CONFIG_CACHE=${OTHER_CACHE}"
+if rx_verify; then fail "runtime:preflight --verify passed although the scheduler ran another CACHE_PREFIX"; fi
+grep -qF 'scheduler: differs from this process in: cache.prefix' "$LOG" || fail "the verification failed, but not with the scheduler cache.prefix difference"
+! grep -qF 'smoke_other_' "$LOG" || fail "the verification printed a configuration value"
+echo "ok  runtime:preflight --verify refuses a scheduler running another CACHE_PREFIX"
+
+# Negative: the SAME configuration from another physical release directory must fail on the release identity alone.
+rx_issue
+rx_web "$WEBPORT"
+rx_worker
+(cd "$RELEASE_B" && timeout 90 php artisan schedule:run >"$LOG" 2>&1) || fail "schedule:run failed from the second release"
+if rx_verify; then fail "runtime:preflight --verify passed although the scheduler ran from another release directory"; fi
+grep -qF 'scheduler: differs from this process in: release (a different physical release directory)' "$LOG" || fail "the verification failed, but not with the release difference"
+! grep -qF "$CFGDIR" "$LOG" || fail "the verification printed a hosting path"
+echo "ok  runtime:preflight --verify refuses a scheduler running from another physical release with identical configuration"
+
+# Negative: a missing context, then a superseded challenge.
+rx_issue
+rx_web "$WEBPORT"
+rx_worker
+if rx_verify; then fail "runtime:preflight --verify passed with no scheduler observation"; fi
+grep -qF 'scheduler: no observation was recorded' "$LOG" || fail "the verification failed, but not with the missing scheduler"
+old_challenge="$challenge"
+rx_issue
+challenge="$old_challenge"
+if rx_verify; then fail "runtime:preflight --verify passed for a superseded challenge"; fi
+grep -qF 'superseded' "$LOG" || fail "the verification failed, but not as superseded"
+echo "ok  runtime:preflight --verify refuses a missing scheduler observation and a superseded challenge"
+rx_worker   # consume the last queued observation job
+
+# The A1 probe residue check still holds and the cross-context rows are bounded (every row expires an hour after its challenge).
+unbounded="$(sql -e "select count(*) from portal.cache where \`key\` like 'portal:runtime-context:%' and expiration > unix_timestamp() + 1800 + 3600 + 60")"
+[ "$unbounded" = "0" ] || fail "${unbounded} cross-context row(s) outlive their challenge window plus one hour"
+echo "ok  cross-context rows are bounded; the observation jobs were consumed"
 
 # The configuration cache this smoke needed was the isolated one; a developer's own was never touched.
 rm -f "$APP_CONFIG_CACHE"

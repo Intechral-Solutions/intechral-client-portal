@@ -15,12 +15,14 @@ use App\Policies\TicketPolicy;
 use App\Support\Database\MigrationProfileGuard;
 use App\Support\Permissions\EpochPermissionRegistrar;
 use App\Support\Permissions\PermissionCacheEpoch;
+use App\Support\Runtime\RuntimeChallenges;
 use App\Support\TestDatabaseSafety;
 use App\View\Composers\ShellComposer;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\MigrationsStarted;
+use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Queue\Events\JobProcessing;
@@ -64,6 +66,15 @@ class AppServiceProvider extends ServiceProvider
         // Release 0.9 (R0.9 WP3): in production a migration neither starts nor is reported complete on a database that does
         // not match the supported profile (InnoDB, UTC session, strict mode, utf8mb4). docs/architecture/database-profile.md.
         Event::listen([MigrationsStarted::class, MigrationsEnded::class], MigrationProfileGuard::class);
+
+        // Release 0.9 (R0.9 WP3-A2): the WEB half of the cross-context runtime check. A GET /up on the production URL runs this in the real
+        // web context; with no active challenge it does one SELECT, in production only (development and CI never touch the cache table
+        // here), and it can never fail or change the health response. docs/architecture/runtime-preflight.md.
+        Event::listen(DiagnosingHealth::class, function () {
+            if ($this->app->environment('production')) {
+                RuntimeChallenges::observeQuietly('web');
+            }
+        });
 
         // Release 0.9 (R0.9-1E): the registrar is a singleton and a queue worker only resets scoped instances between
         // jobs, so a worker would otherwise keep the permission mapping it loaded for its first job. Each job starts with
