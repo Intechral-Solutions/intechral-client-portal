@@ -66,13 +66,19 @@ keeps reading from it lazily, the next tick skips on the shared lock, then uses 
 
 ### Deployment checklist (not a deployment framework)
 
+The authoritative order, for a first installation and for later releases, with the reasons for it, is [Staging First Install](../operations/staging-first-install.md); the build half is [Release Build](../operations/release-build.md). This list is its summary for the cron wrapper.
+
 1. Build the new release directory completely; it is never modified afterwards (A2 assumes this).
-2. In it: link or copy the shared `.env` and `storage`; `php artisan config:cache`; `migrate --force`; `database:verify`; `runtime:preflight` (must exit 0). Do all of it **before** the swap:
+2. In it: **symlink** (never copy) the shared `.env` and `storage`; `php artisan config:cache` (under `umask 077`: the cache holds the resolved `APP_KEY` and database password, and its mode follows the umask, so verify it is 0600); `migrate --force`; `database:verify`; `runtime:preflight` (must exit 0). Do all of it **before** the swap:
    a tick that meets an uncached production configuration is refused by A3.
 3. Swap atomically: `ln -s releases/<new> current.new && mv -T current.new current`.
 4. After the swap: `php artisan queue:restart` (a running old worker finishes its job and stops), then the A2 cross-context sequence.
 5. **Keep the previous release for at least 15 minutes** (longer than any worker's life, 270 s, with a margin): PHP loads classes lazily from its release directory, and deleting it under a running worker breaks that worker.
 6. Never run `queue:work` or `schedule:run` by hand in production outside the wrapper (below).
+7. **`php artisan down` makes the cron entries inert, not failed.** Under maintenance mode a `queue:work --stop-when-empty` worker sleeps once and exits 0 without taking a job, and `schedule:run` runs no due event
+   (including the 02:00 UTC `tickets:auto-close`, which is then missed that day); the wrapper logs `END status=ok` and nothing is mailed. Verified in the installed Laravel (13.36: `Worker::daemonShouldRun`,
+   `Event::isDue`). Consequences: keep any maintenance window short; do not read `ok` lines during it as work done; and run the A2 cross-context sequence after `php artisan up`, never before (only `GET /up` is excepted
+   from maintenance, so the queue and scheduler contexts cannot answer while the application is down).
 
 ## Timing and reservation safety
 
@@ -230,6 +236,11 @@ still applies (a drain sends the queued mail). It takes the same lock as the cro
 `… portal-cron.sh schedule`. `queue:work` and `schedule:run` typed directly are for development.
 
 ## Staging rehearsal (documented, not executed)
+
+**Authority and status (WP3-B2, 2026-10-22).** The runnable procedure is [Staging First Install](../operations/staging-first-install.md), with [Staging Acceptance](../operations/staging-acceptance.md) for what must pass and
+[Release Build](../operations/release-build.md) for the archive; where this section differs from them, they govern, and the sequence below is the B1-time summary. The owner's host inventory reported the PHP 8.5 CLI
+signal functions, `pcntl` and `posix`, `proc_open`, the SIGALRM and SIGTERM probes, GNU `timeout` and `flock` 2.32.1 and the wrapper's shell syntax checks all passing. **No staging resource exists yet, and human Namecheap confirmation
+of the roughly 270-second queue process lifetime is still pending**; the two-second signal probes do not establish it. The worker timings are unchanged.
 
 Not run by B1. **No Namecheap work, cron change, database creation or mail is authorised by this document.** Requirements: a separate staging database and credentials, separate storage, a staging domain,
 `APP_ENV=production` (so A1/A3 and the migration guard apply), a safe outbound mail sink the owner controls, no customer data and no live integration secrets.
