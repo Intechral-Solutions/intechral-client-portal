@@ -24,6 +24,7 @@ The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 13 
 | [Epics](./epics/README.md) | Development epics and story breakdowns |
 | [Progress](./progress/README.md) | Sprint-by-sprint progress log |
 | [API](./api/README.md) | Internal and external API documentation |
+| [Operations](./operations/staging-first-install.md) | The [release build](./operations/release-build.md), the [staging first-install runbook](./operations/staging-first-install.md) and the [staging acceptance checklist](./operations/staging-acceptance.md) for the Namecheap host |
 | [Testing](./testing/ci.md) | CI baseline, the [E2E browser suite](./testing/e2e-browser-suite.md) and the [migration rehearsal harness](./testing/migration-rehearsal.md) |
 
 ## Tech Stack
@@ -33,7 +34,7 @@ The Intechral Client Portal is a multi-tenant SaaS platform built on Laravel 13 
 | Language | PHP 8.5 (8.3 tested fallback) |
 | Framework | Laravel 13 |
 | Database | MariaDB 11.4 |
-| Cache / Queue | Redis |
+| Cache / Queue | Redis in development; the database for cache, sessions and queue on the Release 0.9 shared host |
 | CSS | Tailwind CSS v4 |
 | Auth | Laravel Fortify + Laravel Socialite (OpenID) |
 | Authorization | Spatie Laravel Permission |

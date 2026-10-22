@@ -56,12 +56,15 @@ host, database and SQL. The tests pin all of this with fake secrets.
 
 ## Deployment order
 
-After [the database-profile order](./database-profile.md#5-deployment-order) (guarded `migrate`, then the mandatory post-migration `database:verify`):
+The configuration cache is built **before** the migration, and `runtime:preflight` runs after it ([the database-profile order](./database-profile.md#5-deployment-order); the full procedure is
+[Staging First Install](../operations/staging-first-install.md)):
 
-1. `php artisan config:cache`
-2. `php artisan runtime:preflight`: must exit 0. A non-zero exit aborts the release.
+1. `php artisan config:cache` (under `umask 077`, mode verified 0600, because it holds the resolved key and database password; before `migrate --force`, so every later command runs against the configuration all contexts will use)
+2. guarded `migrate`, then the mandatory post-migration `database:verify`
+3. `php artisan runtime:preflight`: must exit 0. A non-zero exit aborts the release.
 
-Re-run both after any change to the environment file, then prove the contexts against each other with the [cross-context sequence](#operational-sequence) below.
+Re-run `config:cache` and `runtime:preflight` after any change to the environment file, then prove the contexts against each other with the [cross-context sequence](#operational-sequence) below. That sequence needs the
+application **up**: under `php artisan down` the queue worker pauses without taking a job and scheduled events are not due, so the queue and scheduler contexts can never answer (only `GET /up` is excepted from maintenance mode).
 
 ## How CI exercises it
 

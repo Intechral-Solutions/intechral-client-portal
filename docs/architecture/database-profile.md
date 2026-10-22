@@ -102,16 +102,21 @@ external effect without the owner's explicit authorization.
 
 ## 5. Deployment order
 
+The authoritative, end-to-end procedure (first installation and later releases, with the reasons for the order) is [Staging First Install](../operations/staging-first-install.md). The database
+part of it is:
+
 1. Deploy code; `APP_ENV=production`, `.env` mode 600.
-2. **Pre-migration checks are the guard's, not the verifier's.** `php artisan migrate --force` starts with the `MigrationsStarted` check (configuration, the
+2. `php artisan config:cache`, under `umask 077` (the cache holds the resolved `APP_KEY` and database password; verify the file is mode 0600). **It comes before the migration**, so that the migration, `database:verify`, `runtime:preflight` and everything after them run against the one frozen configuration the web,
+   the queue worker and the scheduler will use. It needs no database. (An earlier version of this section cached the configuration after `database:verify`; the order above replaces it.)
+3. **Pre-migration checks are the guard's, not the verifier's.** `php artisan migrate --force` starts with the `MigrationsStarted` check (configuration, the
    Laravel session, and every table that already exists). There is no separate command to pass first. `php artisan database:verify` run **before** migrating
    on a database with pending migrations exits non-zero by design (it reports the pending migrations and the foreign keys as not verified); do not use it as
    a pre-migration gate, and never treat a non-zero result of any run of it as ignorable.
-3. `php artisan migrate --force`. A non-zero exit stops the release; see section 4 for what each refusal means.
-4. **Mandatory post-migration gate:** `php artisan database:verify` must exit 0 with nothing pending. This is the authoritative schema check; a failure
+4. `php artisan migrate --force`. A non-zero exit stops the release; see section 4 for what each refusal means.
+5. **Mandatory post-migration gate:** `php artisan database:verify` must exit 0 with nothing pending. This is the authoritative schema check; a failure
    aborts the release, including after a `MigrationsEnded` refusal or a `migrate` that found nothing to run.
-5. `php artisan config:cache`, then `php artisan runtime:preflight` (must exit 0): the production runtime shape, [Runtime Preflight](./runtime-preflight.md).
-6. Then `roles:sync` and the rest of the release steps.
+6. `php artisan runtime:preflight` (must exit 0): the production runtime shape, [Runtime Preflight](./runtime-preflight.md). Re-run `config:cache` and this after any change to the environment file.
+7. Then `roles:sync` and the rest of the release steps.
 
 ## 6. Safe database creation, import and restoration (utf8mb4)
 
