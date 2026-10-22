@@ -64,7 +64,7 @@ operating system's resolver timeouts apply). Do not read `MAIL_TIMEOUT` as "a ma
 the signal only when the blocked call returns. In one run the default `--timeout=60` let a slow peer's send run for about
 96 s before the worker was killed (exit code 1), leaving the job **reserved** until `retry_after`. A worker `--timeout` is
 therefore a useful safeguard where signals are supported, not a hard limit, and is not part of this package's behaviour:
-whether and how to set it belongs to the host-runtime decision.
+whether and how to set it belongs to the host-runtime decision (decided in [Cron Execution](./cron-execution.md): `--timeout=120` with `--max-time=120`, an external `timeout` of 255 s plus 15 s, and `retry_after` 300).
 
 ## 3. Retries
 

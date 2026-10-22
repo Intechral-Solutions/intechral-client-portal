@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Shared\Pilot\CustomerPilotGate;
+use App\Support\Runtime\CronFailureMarker;
 use App\Support\Runtime\RuntimeChallenges;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -47,6 +48,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: HandleInertiaRequests::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Release 0.9 (R0.9 WP3-B1): the database half of the cron wrapper's failure marker. `queue:work` REPORTS a failure to pop a job and carries on (exit 0),
+        // so the reporting path is where it is seen. The callback returns nothing: the exception is still logged exactly as before, and the marker is silent
+        // outside the wrapper. (A method, so Laravel reads the `Throwable` type from its signature; this file has no namespace to import it into.)
+        $exceptions->reportable(CronFailureMarker::reported(...));
+
         // Release 0.9 (R0.9-CS1): for a customer, every JSON 404 carries the same body. Laravel puts an HttpException's own
         // message in a JSON response even with debug off, and route-model binding's message names the model and the id
         // ("No query results for model [App\\Models\\Project] 12"), so an unknown id and a project the customer may not see
