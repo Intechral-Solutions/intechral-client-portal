@@ -282,6 +282,36 @@ rx_verify || fail "the valid worker and scheduler did not answer the challenge a
 grep -q '"passed": true' "$LOG" || fail "the verification after the refusals did not pass"
 echo "ok  the same worker and scheduler start under the valid profile and the challenge verifies"
 
+# 2e. Cron wrapper (R0.9 WP3-B1): the SAME command lines the cron entries run, through scripts/cron/portal-cron.sh, against the disposable database. No timing is tested here
+# (tests/Unit/Cron does that with shortened limits); this proves the pinned worker and scheduler arguments are accepted by the installed Laravel under the production profile,
+# that a successful tick is silent to cron, and that a refused start (A3) is a visible, categorised failure with the queued job untouched. Each case has its own PORTAL_ROOT so
+# alert state never carries over. The wrapper's physical release is this checkout (src); nothing outside $CFGDIR is written.
+cron() { local root="$1"; shift; mkdir -p "${root}/shared"; env PORTAL_ROOT="$root" PORTAL_PHP="$(command -v php)" "$@" sh scripts/cron/portal-cron.sh "${CRON_TASK}" >"$LOG" 2>&1; }
+cache_config
+rx_issue
+rx_web "$WEBPORT"
+CRON_TASK=queue cron "${CFGDIR}/portal-valid" || fail "the wrapper's queue invocation failed under the valid production profile"
+[ ! -s "$LOG" ] || fail "a successful wrapper invocation printed to cron"
+CRON_TASK=schedule cron "${CFGDIR}/portal-valid" || fail "the wrapper's scheduler invocation failed under the valid production profile"
+[ ! -s "$LOG" ] || fail "a successful wrapper invocation printed to cron"
+rx_verify || fail "the challenge did not verify after the wrapper's worker and scheduler answered it"
+grep -q '"passed": true' "$LOG" || fail "the verification after the wrapper did not pass"
+[ "$(sql -e "select count(*) from portal.jobs")" = "0" ] || fail "the wrapper's worker did not consume the observation job"
+grep -q ' END status=ok category=ok exit=0 ' "${CFGDIR}/portal-valid/shared/logs/cron-queue.log" && grep -q ' END status=ok category=ok exit=0 ' "${CFGDIR}/portal-valid/shared/logs/cron-schedule.log" || fail "the wrapper did not record END status=ok for both tasks"
+[ "$(stat -c %a "${CFGDIR}/portal-valid/shared/logs/cron-queue.log")" = "600" ] || fail "the wrapper's log is not restricted to 0600"
+echo "ok  the cron wrapper runs the worker and the scheduler under the production profile: silent on success, restricted log, and the challenge verifies"
+
+rx_issue
+for CRON_TASK in queue schedule; do
+  if cron "${CFGDIR}/portal-refused" "APP_CONFIG_CACHE=${INVALID_CACHE}"; then fail "the wrapper's ${CRON_TASK} invocation started under an invalid production profile"; fi
+  grep -qF "FAILED task=${CRON_TASK} category=profile-refused status=1" "$LOG" || fail "the wrapper's ${CRON_TASK} refusal was not reported as profile-refused"
+  ! grep -qF "mail.default" "$LOG" || fail "the wrapper's notification carried a rule's detail"
+  grep -qF "mail.default is 'log'" "${CFGDIR}/portal-refused/shared/logs/cron-${CRON_TASK}.log" || fail "the refusal's rule was not kept in the wrapper's local log"
+done
+[ "$(sql -e "select count(*) from portal.jobs where reserved_at is null and attempts = 0")" = "1" ] || fail "a refused wrapper invocation touched the queued job"
+echo "ok  the cron wrapper reports an A3 startup refusal for the worker and the scheduler as profile-refused, by category only, with the queued job untouched"
+CRON_TASK=queue cron "${CFGDIR}/portal-valid" || fail "the wrapper's worker did not start again under the valid profile"
+
 # The configuration cache this smoke needed was the isolated one; a developer's own was never touched.
 rm -f "$APP_CONFIG_CACHE"
 [ "$(dev_cache_state)" = "$DEV_CACHE_BEFORE" ] || fail "${DEV_CACHE} changed during the smoke (it must never be touched)"
@@ -292,3 +322,19 @@ sql portal -e 'create table stray_probe (note varchar(20)) engine = MyISAM defau
 if artisan database:verify; then fail "database:verify passed with a MyISAM latin1 table present"; fi
 grep -q 'table stray_probe uses engine MyISAM' "$LOG" || fail "database:verify failed, but not with the engine violation"
 echo "ok  database:verify reports a MyISAM latin1 table and exits non-zero"
+
+# 4. A database that becomes unavailable (R0.9 WP3-B1). The disposable container is stopped (the cleanup trap removes it), the configuration cache is the valid production
+# profile, and the connection is refused for real. Under the production profile (database cache store) a worker that starts with the database already down fails at its first
+# cache read (the queue-restart check), loudly and uncaught, so even Laravel's own status is non-zero; the wrapper must report that as category=database through the
+# application's marker (the exception is reported) and not as an anonymous PHP failure, without carrying any connection detail. The case Laravel itself swallows (a pop failure
+# while the worker runs, exit 0) needs a cache that does not depend on the database: tests/Unit/Cron/PortalCronApplicationTest.php runs that one with the real worker.
+cache_config
+docker stop "$CID" >/dev/null || fail "could not stop the disposable database container"
+timeout 90 php artisan queue:work database --stop-when-empty --sleep=1 --tries=1 --no-ansi >"$LOG" 2>&1 && fail "Laravel's own worker started and exited 0 against an unavailable database under the production profile"
+! grep -q '@@PORTAL-CRON-FAILURE@@' "$LOG" || fail "the application emitted its failure marker outside the wrapper"
+CRON_TASK=queue
+if cron "${CFGDIR}/portal-outage"; then fail "the wrapper reported success while the database was unavailable"; fi
+grep -qF 'FAILED task=queue category=database status=1' "$LOG" && grep -qE 'class=Illuminate.Database.QueryException sqlstate=HY000|class=PDOException sqlstate=HY000' "$LOG" || fail "the wrapper did not report the database failure by category, class and SQLSTATE"
+! grep -qF -e '127.0.0.1' -e 'Connection refused' -e 'SQLSTATE' -e 'smoke_prod_' "$LOG" || fail "the wrapper's notification carried a database detail"
+grep -q ' END status=fail category=database php_status=1 exit=1 ' "${CFGDIR}/portal-outage/shared/logs/cron-queue.log" || fail "the wrapper did not record the database failure in its log"
+echo "ok  with the database unavailable, the cron wrapper reports category=database (not an anonymous PHP failure) without any connection detail"

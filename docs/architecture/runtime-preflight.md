@@ -23,7 +23,7 @@ non-zero on any violation; `--issue` additionally writes the challenge rows desc
 | Configuration cache | `php artisan config:cache` has been run in this context (so every context reads the same resolved configuration, and `env()` is no longer consulted) |
 | Database | `database.default` is `mysql` or `mariadb`; no `read`/`write` split on it (the permission-cache epoch and the queue read through the primary only) |
 | Cache | `cache.default` is `database`; `permission.cache.store` is `default`; no `DB_CACHE_CONNECTION` or `DB_CACHE_LOCK_CONNECTION`; table `cache` and lock table `cache_locks`; `cache.prefix` is non-empty |
-| Queue | `queue.default` is `database`; no `DB_QUEUE_CONNECTION`; table `jobs`; `retry_after` is an integer of at least **300** (provisional: to be confirmed by the WP3-B worker timing validation); failed jobs in `failed_jobs` through `database-uuids` on the default connection |
+| Queue | `queue.default` is `database`; no `DB_QUEUE_CONNECTION`; table `jobs`; `retry_after` is an integer of at least **300** (provisional: the cron wrapper's timings keep the worker inside it, [Cron Execution](./cron-execution.md); the host is not yet validated); failed jobs in `failed_jobs` through `database-uuids` on the default connection |
 | Session | `session.driver` is `database`; no `SESSION_CONNECTION`; table `sessions`; **`session.secure` is exactly `true`** (`SESSION_SECURE_COOKIE=true`: Laravel's default is `null`, which also sends the cookie over plain http, and `false` or the string `"true"` do not pass) and **`session.http_only` is exactly `true`**. `SameSite` is deliberately not checked: `None` is permitted when Secure is true, and Secure is what is required |
 | Mail | `mail.default` is `smtp` (the one transport whose bounds WP1 validated) **and `mail.mailers.smtp.transport` is `smtp`**; **`mail.mailers.smtp.url` (`MAIL_URL`) is empty or null**; host is set and is not the development sink; a valid port; a positive timeout; a real `from` address. `log`, `array`, `failover`, `ses` and the rest are refused, not tolerated |
 
@@ -156,6 +156,10 @@ php artisan schedule:run
 php artisan runtime:preflight --verify --challenge=<id printed in step 1>
 ```
 
+**In production the queue and scheduler steps go through the cron wrapper** ([Cron Execution](./cron-execution.md#relationship-to-the-a2-manual-worker-instructions)): `PORTAL_ROOT=… sh …/current/scripts/cron/portal-cron.sh queue`
+(and `… schedule`) instead of the bare `queue:work` and `schedule:run` commands below. It takes the same lock as the cron entries, so a manual run cannot overlap a tick, and it drains every eligible job within its bounds,
+not one. The bare commands are for development, CI and the smoke script.
+
 **Check the queue before running a worker by hand.** `--max-jobs=1` processes the oldest AVAILABLE job, which is not necessarily the observation job: with other jobs queued ahead of it (mail
 notifications, for instance) the worker would execute one of THOSE, and the observation job would stay queued, leaving the queue context missing. Do not answer that by draining the queue without
 looking (`--stop-when-empty` without `--max-jobs` runs every queued business job). On staging, where the queue should hold only the observation job, the command above is safe; if other jobs are
@@ -285,7 +289,7 @@ The guard's applicability check runs inside its fail-closed path: if it cannot t
 **A3 does not protect a deployment that is labelled with a different environment, such as `APP_ENV=prod`.** Such a process says production in neither source, so the guard does not apply. The mandatory A1 `runtime:preflight` deployment gate rejects any `app.env` other than exactly `production`, which is what catches the mislabel.
 
 **Production cron entries and worker commands must not pass `--env=`.** An override is not a bypass of an invalid profile, but it changes which environment-gated code runs, and a command that reports another
-environment than its configuration is a deployment error. The cron lines (WP3-B) rely on the cached configuration alone.
+environment than its configuration is a deployment error. The cron lines ([Cron Execution](./cron-execution.md), WP3-B1) rely on the cached configuration alone.
 
 **`--env=testing` is different, and is not covered by the guard.** `Application::runningUnitTests()` is true when the detected environment is `testing`, and Laravel does not re-route Symfony's command events while it is true,
 so `CommandStarting` is never dispatched and **this guard cannot fire at all** (a listener condition cannot cover an event that never happens). What stops such a run is a separate fence:
@@ -339,5 +343,5 @@ observation was recorded, and then that the valid worker and scheduler start and
 
 ## Not covered (not started)
 
-- Startup enforcement of the A2 challenge, a web-request guard (503 middleware) and the cron wrapper scripts (WP3-B).
-- Whether `retry_after` of 300 is enough on the host: WP3-B timing validation.
+- Startup enforcement of the A2 challenge and a web-request guard (503 middleware).
+- The cron wrapper, its bounded timings and the failure marker are WP3-B1 ([Cron Execution](./cron-execution.md)). Whether `retry_after` of 300 and those timings hold on the host is still unproven until the staging rehearsal and the gated survival test.

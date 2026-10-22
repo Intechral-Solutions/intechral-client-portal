@@ -208,8 +208,13 @@ host reported on 2026-10-19: MyISAM default engine, latin1, `sql_mode=NO_AUTO_CR
    `schedule:run` and `schedule:work` must each be refused (`queue:work` and `schedule:run` also with `--env=local`, and `queue:work` with `--env=PRODUCTION`: `--env` replaces the detected environment, not the cached configuration; `--env=testing` must instead stop at the test-database fence), with the `Refusing to start` message and the `mail.default` rule in the output (so an unrelated CLI error cannot pass), the queued job must still
    be unreserved with no attempt, and no observation may exist for the challenge; then the valid worker and scheduler start and `--verify` passes. Every process is bounded by `timeout`.
 
-It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 70 seconds in the existing job (container start, the migration set and the
-runtime-preflight steps; measured 59 s locally with slice A2 (A3 adds four refused starts and two valid ones, a few seconds), 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
+   (R0.9 WP3-B1) Then the **cron wrapper** ([Cron Execution](../architecture/cron-execution.md)) runs the real command lines on the production profile: one valid worker tick and one valid scheduler tick through `scripts/cron/portal-cron.sh`
+   (silent to cron, a 0600 log with `END status=ok`, the challenge verifies and the observation job is consumed); an A3 refusal through the wrapper for the worker and the scheduler, reported as `profile-refused` by category only, with the
+   rule kept in the local log and the queued job untouched; and, last, the disposable container is **stopped** and the wrapper must report `category=database` with the class and SQLSTATE and no connection detail. No timing is
+   tested here: the shortened-timeout, lock and release-switching cases are in `tests/Unit/Cron` (about 50 seconds of Pest, in the existing gates).
+
+It needs no new service definition in `docker-compose.yml` and no new job. Cost: about 80 seconds in the existing job (container start, the migration set and the
+runtime-preflight steps; measured 59 s locally with slice A2 (A3 adds four refused starts and two valid ones, a few seconds; the WP3-B1 wrapper steps add about 12 s), 45-50 s before slice A1), and the run is not repeated for the whole suite. Maintenance: the flag list in the script must keep equal to the
 host's reported defaults, and the pinned version equal to the host's `11.4.13`; when the host's defaults or version change, change the script and the
 `mariadb:11.4.13` pin with them. Reproduce locally from the repository root, with Docker and PHP: `bash scripts/ci/host-parity-smoke.sh`. It is safe beside a dev stack: the container name is unique to the
 invocation and published on an ephemeral loopback port, only the container (and its anonymous data volume) that `docker run` returned to it is ever removed, and
