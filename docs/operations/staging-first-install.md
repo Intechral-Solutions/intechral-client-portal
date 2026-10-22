@@ -693,21 +693,33 @@ a job, the scheduler runs nothing (including the 02:00 UTC auto-close, which is 
 name the *last* holder and are never deleted), so they cannot show whether a release is still in use. Before removing an older release `OLD`, establish that nothing is running from it, scoped to your user and to that exact path, and that the locks are free:
 
 ```bash
+release_unselected() {   # release_unselected <id>: current is a link to a real release directory and that directory is NOT <id>: canonical paths, never link text or REL_ID alone; anything unexpected fails
+  local old=${1:-} cur dir
+  [[ "$old" =~ ^[0-9]{14}-[0-9a-f]{7}$ && -d "$PORTAL_ROOT/releases" && ! -L "$PORTAL_ROOT/releases" && "$(readlink -f -- "$PORTAL_ROOT/releases")" == "$PORTAL_ROOT/releases" ]] || return 1
+  [[ -L "$PORTAL_ROOT/current" && -d "$PORTAL_ROOT/current" && -d "$PORTAL_ROOT/releases/$old" && ! -L "$PORTAL_ROOT/releases/$old" ]] || return 1        # current missing, broken or not a link; or no such real release directory
+  cur=$(readlink -f -- "$PORTAL_ROOT/current") && dir=$(readlink -f -- "$PORTAL_ROOT/releases/$old") || return 1
+  [[ "${cur%/*}" == "$PORTAL_ROOT/releases" && "$dir" == "$PORTAL_ROOT/releases/$old" && "$cur" != "$dir" ]]                                         # current is a release and a different one
+}
 release_idle() (   # release_idle <id>: succeeds only if that release is safe to remove; says why not
   set -u; root_ok || exit 1
   old=${1:-}
-  [[ "$old" =~ ^[0-9]{14}-[0-9a-f]{7}$ && "$old" != "$REL_ID" && "$(readlink "$PORTAL_ROOT/current")" != "releases/$old" && -d "$PORTAL_ROOT/releases/$old" ]] \
-    || { echo "'$old' is not an existing release other than the selected one: STOP" >&2; exit 1; }
+  [[ "$old" =~ ^[0-9]{14}-[0-9a-f]{7}$ && "$old" != "$REL_ID" ]] && release_unselected "$old" \
+    || { echo "'$old' is not an existing release other than the selected one (or current is not a link to a release): STOP" >&2; exit 1; }
   [[ -z "$(procs_cmd "$PORTAL_ROOT/releases/$old/")" ]] || { echo "a process of yours is running from $old: STOP" >&2; exit 1; }      # no process of yours runs from that release
   for t in queue schedule; do f="$PORTAL_ROOT/shared/run/$t.lock"; [[ ! -e "$f" ]] || lock_free "$f" || { echo "the $t lock is held: STOP" >&2; exit 1; }; done      # both locks are free right now
   echo "release $old is not in use"
 )
+release_remove() (   # release_remove <id>: the only way a release is removed: every check above, then the selected-release guard AGAIN immediately before the one exact rm
+  set -u; release_idle "${1:-}" || exit 1
+  release_unselected "$1" || { echo "current changed or is not a link to another release: refusing to remove: STOP" >&2; exit 1; }
+  rm -rf -- "${PORTAL_ROOT:?}/releases/${1:?}"
+)
 OLD=REPLACE_WITH_THE_OLD_RELEASE_ID
-release_idle "$OLD"          # also confirm by hand: 15 minutes have passed since the swap, and it is not the rollback target
+release_idle "$OLD"          # also confirm by hand: 15 minutes have passed since the swap, and it is not the rollback target; only then: release_remove "$OLD"
 ```
 
-Keep no more than three releases, to bound disk and inode use. Removal is one exact path, and only when the check passes (a placeholder or malformed id fails the check, so the `rm` never runs):
-`release_idle "$OLD" && rm -rf -- "${PORTAL_ROOT:?}/releases/${OLD:?}"`; never a pattern.
+Keep no more than three releases, to bound disk and inode use. Removal is one exact path, and only when the checks pass (a placeholder or malformed id fails them, so the `rm` never runs): `release_remove "$OLD"` (it runs `release_idle`, then checks again, immediately before the `rm`, that
+`current` is a link to a different release). Both compare **canonical paths** (`readlink -f`), never link text or `REL_ID` alone, and refuse when `current` is missing, broken, not a link, or resolves outside `releases/`; never a pattern.
 
 **Ordinary rollback.** Valid only if every migration since the previous release was N-1 compatible **and** the rollback reopens no access the current release closes. Check the second condition:
 `art tinker --no-ansi --execute='echo DB::table("users")->whereNotNull("disabled_at")->count();'`; if it is not 0 and the previous release predates account suspension, do not roll back (fix forward). Then, after `setrel <the release you are returning to>`:
