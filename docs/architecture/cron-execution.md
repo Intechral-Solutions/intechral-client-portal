@@ -239,7 +239,8 @@ still applies (a drain sends the queued mail). It takes the same lock as the cro
 
 **Authority and status (WP3-B2, 2026-10-22).** The runnable procedure is [Staging First Install](../operations/staging-first-install.md), with [Staging Acceptance](../operations/staging-acceptance.md) for what must pass and
 [Release Build](../operations/release-build.md) for the archive; where this section differs from them, they govern, and the sequence below is the B1-time summary. The owner's host inventory reported the PHP 8.5 CLI
-signal functions, `pcntl` and `posix`, `proc_open`, the SIGALRM and SIGTERM probes, GNU `timeout` and `flock` 2.32.1 and the wrapper's shell syntax checks all passing. **No staging resource exists yet, and human Namecheap confirmation
+signal functions, `pcntl` and `posix`, `proc_open`, the SIGALRM and SIGTERM probes, GNU `timeout` and `flock` 2.32.1 and the wrapper's shell syntax checks all passing. **The owner has since created the staging hostname, its alias and an acme.sh-managed
+certificate, and removed the diagnostic cron entry; no staging database, release, mail sink or cron entry exists yet** ([Current state](../operations/staging-first-install.md#current-state-owner-reported-2026-10-22)). **Human Namecheap confirmation
 of the roughly 270-second queue process lifetime is still pending**; the two-second signal probes do not establish it. The worker timings are unchanged.
 
 Not run by B1. **No Namecheap work, cron change, database creation or mail is authorised by this document.** Requirements: a separate staging database and credentials, separate storage, a staging domain,
@@ -247,9 +248,9 @@ Not run by B1. **No Namecheap work, cron change, database creation or mail is au
 
 **Prerequisites (owner, before anything is installed):**
 
-1. Confirm the cPanel cron email recipient exists and is monitored.
-2. Read the account's current crontab. Establish whether the temporary WP3-0B diagnostic cron is still installed, and count the entries: the account allows five concurrent cron jobs, overlapping runs each count,
-   and a queue holder, a queue contender (briefly), the scheduler, the SSL renewal job and the diagnostic would already be five. Remove the diagnostic only on the owner's instruction; never touch the SSL renewal entry.
+1. Confirm the cPanel cron email recipient exists and is monitored (the owner reports it is; confirm it, and record it without the address).
+2. **Capture the account's current crontab afresh** (the owner changed it on 2026-10-22; an older capture is obsolete) and count the entries: the account allows five concurrent cron jobs and overlapping runs each count. The temporary WP3-0B diagnostic entry was **removed by the owner**
+   and is not restored; the SSL-renewal (acme.sh) entry is never touched. The worst case with the two staging entries is worked out in the runbook's [cron slot budget](../operations/staging-first-install.md#phase-10-install-the-two-cron-entries-g7): five, which is the reported limit.
 3. **Host signal prerequisites, with the Namecheap PHP CLI** (`/opt/alt/php85/usr/bin/php`, over SSH, before relying on the worker's `--timeout`; Laravel's worker alarm and its handling of TERM need them, and
    with `pcntl_async_signals` disabled `queue:work` fails at startup):
    ```

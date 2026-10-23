@@ -320,7 +320,9 @@ Adding `portal.operator` changes the built-in role catalogue, so **the pilot can
 and until it has, every operator is a customer to the boundary. There is no automatic privilege migration and no competing
 provisioning tool: `roles:sync` (R0.9-1D) is the only path.
 
-**Deploy in maintenance mode, and resume traffic only once operator eligibility is established.** The order is the control:
+**Deploy in maintenance mode, and resume traffic only once operator eligibility is established.** This describes a deployment **over a release that is already served**. A **first installation has no `current` release and does not use maintenance mode**:
+nothing is served until the application is ready, because the document root is pointed at the release only after `roles:sync`, the first operator and the pilot-mode cache are done, which meets the intent of this order (and the cron wrapper and cross-context check cannot run under
+maintenance mode at all). See [Staging First Install, why this order](../operations/staging-first-install.md#why-this-order) items 3 and 4. For every later release the order below is the control:
 
 1. **Take the application down.** `php artisan down` (or the host's maintenance page) before the new code serves any request, so no
    operator or customer is served between the code and the grant. The first requests after code and before grant would treat every

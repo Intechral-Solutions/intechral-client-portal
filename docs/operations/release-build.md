@@ -7,7 +7,7 @@ The Namecheap account has **no Composer and no Node**, and Release 0.9 installs 
 uploaded, checked against its checksum, unpacked into a new immutable directory and selected with a symlink. This document is the build half. It uses the project's existing
 toolchain (the development image and the `composer` and `npm` scripts already in the repository) and adds no deployment system.
 
-> **Status.** Documentation only. The build was rehearsed end to end on 2026-10-22 against `c0624ac` in a disposable directory on a development machine (numbers at the end). **Nothing has been
+> **Status.** Documentation only. The build was rehearsed end to end on 2026-10-22 against `c0624ac` in a disposable directory on a development machine, and a verified archive of `6df8847` exists on the development machine (both recorded at the end). **Nothing has been
 > uploaded to Namecheap**, and no host step in this file is authorised until the owner opens the gate named in the first-install runbook.
 
 ## The platform contract
@@ -224,12 +224,16 @@ scp "$BUILD/out/portal-$REL_ID.tar.gz" "$BUILD/out/portal-$REL_ID.tar.gz.sha256"
 rel_ok && find "$REL" ! -type d | wc -l                                   # equals the number recorded before upload
 sed -n 1,2p "$REL/RELEASE"                                                # release= and commit= match the build
 stat -c '%a %n' "$REL/scripts/cron/portal-cron.sh" "$REL/public/.htaccess" "$REL"            # 755, 644, 755
-find "$REL" -perm /022 | wc -l                                            # 0: nothing group- or world-writable
+find "$REL" ! -type l -perm /022 | wc -l                                  # 0: no file or directory is group- or world-writable (links are excluded: their own mode is always 0777; phase 4 adds three, checked by path and owner)
 sha256sum "$REL/public/.htaccess" | cut -d' ' -f1; sed -n 's/^htaccess_sha256=//p' "$REL/RELEASE"   # equal: the baseline, before any control-panel edit
 ```
 
-Do not `chmod -R a-w` the release. The release's `public/` is the web document root, and cPanel AutoSSL (and possibly a PHP-version selection) writes there; AutoSSL's validation files are inert and disappear with
-the next release. Directories need to stay readable and traversable (0755) so the web server can serve `public/build`.
+Do not `chmod -R a-w` the release. The release's `public/` is the web document root, and a PHP-version selection in cPanel may write there (the handler block, [carried over before selection](./staging-first-install.md#phase-8-select-the-release-and-serve-it-g5)). Directories need to stay readable and traversable (0755) so the web server can serve `public/build`.
+
+**TLS does not write into the release.** The staging certificate is issued and renewed by acme.sh with `portal-staging-holding` as its webroot, so no ACME file is ever written into a release (an earlier version of this document assumed cPanel AutoSSL did, and that is not the case on this account).
+What a release needs for the renewal to keep working after it is served is one **symlink added after extraction**, `public/.well-known -> ../../../../portal-staging-holding/.well-known`, created by the runbook's `wk_link` in phase 4 while the release is unselected. It is a recorded, controlled
+addition: the archive, its checksum and the release's `RELEASE` file are not modified, and the archive contains no link and no `.well-known` entry (checked). Consequently the count above (`find "$REL" ! -type d`, equal to the recorded one) is taken **before** the links exist; after phase 4 it is that count plus three
+(`.env`, `storage` and `public/.well-known`; [Staging Acceptance B11 and B12](./staging-acceptance.md#b-filesystem-permissions-quota-resources)).
 
 On the host nothing is installed or compiled: the next steps are the extension checks, `config:cache`, the migration and the rest of the runbook.
 
@@ -249,3 +253,19 @@ Commit `c0624ac704fe4e577562986bb2ffb5fb259c0a6d`, image `intechral-portal-app:l
   this commit and `false` for an unknown one). `vendor/composer/platform_check.php` was read: it tests the PHP version and 64-bit only.
 
 None of this proves the host: the host PHP, extensions, web handler and cron environment are checked in the acceptance checklist.
+
+## Verified archive for the staging first install (WP-S1, 2026-10-22, development machine)
+
+Built from `6df8847fb6a806ee9a38fbd7af1cc294bb163094` (the merged WP3-B2 runbook), release id `20261022225141-6df8847`, kept under `backups/dev/release-build/20261022225141-6df8847/out/` (outside the repository's tracked files; never deleted or rebuilt by a documentation package):
+
+| Item | Value |
+|---|---|
+| Archive | `portal-20261022225141-6df8847.tar.gz`, 12,733,552 bytes |
+| SHA-256 | `cfbb103eb466e3cb0c44c939f388180084a543bb3c224a5402a4aff38aa478a4` (re-checked against the `.sha256` file when WP-S0 was prepared) |
+| Entries | 12,237, of which 10,596 are not directories; **no symbolic link** and **no `.well-known` entry** (checked when WP-S0 was prepared) |
+| `public/.htaccess` SHA-256 | `b7e379c77639fd56144947dbae84c84eb466d9c686ea81f2f013ae85421da923` (`htaccess_sha256` in `RELEASE`) |
+| `composer.lock` SHA-256 | `91c03ae8b0dbae7696c1c8ac3c5d5b69054315bcd6f130cf85b9e67b120c884a` (the same lock as the earlier rehearsal) |
+| `RELEASE` fields | `release`, `commit`, `built_utc`, `build_image`, `build_php`, `build_composer`, `build_node`, `build_npm`, `composer_lock_sha256`, `package_lock_sha256`, `htaccess_sha256`, `required_extensions` (17 names, `exif` included) |
+
+The WP-S1 build reports that re-tarring reproduced the same SHA-256 and that the unpacked release booted offline with no `RuntimeProfile` violation; those two results are the build package's, not re-run by the documentation package. This archive is what gate G3 uploads
+(`setrel 20261022225141-6df8847`). It is **not** modified by anything in the runbook: the ACME link, `.env` and `storage` links, and the handler block are additions made to the unpacked, unselected release directory.
