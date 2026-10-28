@@ -14,7 +14,7 @@ toolchain (the development image and the `composer` and `npm` scripts already in
 
 | Item | Value | Where it comes from |
 |---|---|---|
-| Host PHP CLI | `/opt/alt/php85/usr/bin/php`, PHP 8.5.11 | Host inventory (owner, 2026-10-22) |
+| Host PHP CLI | `/opt/alt/php85/usr/bin/php`, PHP 8.5.11 (owner inventory, 2026-10-22); **8.5.12**, built 2026-10-26, when read back on 2026-10-28 (a host-side patch update; the selector and the web SAPI also report 8.5.12) | Host inventory (owner, 2026-10-22); read-only read-back (2026-10-28) |
 | Build PHP | 8.5.11 in the project image (`intechral-portal-app:latest`, from `.docker/php/Dockerfile`, `php:8.5-fpm`) | `docker run … php -v` |
 | Composer | 2.10.3 (pinned in the Dockerfile) | Dockerfile |
 | Node / npm | 22 LTS / 10 (NodeSource 22.x in the image) | Dockerfile |
@@ -66,7 +66,7 @@ The archive is built from an **allowlist** of top-level paths, so nothing outsid
 - **The archive's SHA-256** is recorded next to it in `<archive>.sha256`. A file cannot contain its own hash, which is why the checksum is a separate file.
 - A release is **built from a commit, never from a working tree** (`git archive`), so uncommitted or untracked files, a local `.env`, a dev `vendor/` or a stale `public/build` cannot enter it.
 - Never rebuild and re-upload an id that already exists on the host. A fix is a new commit and a new id. The runtime checks (A2) depend on a release directory never being modified after it is built; the one deliberate,
-  recorded exception is the reviewed PHP handler block appended to the `public/.htaccess` of a release that is **not yet selected** ([Staging First Install, phase 8](./staging-first-install.md#phase-8-select-the-release-and-serve-it-g5)); it is logged on the host, and the archive and its checksum still describe the artifact as built.
+  conditional exception is a reviewed PHP handler block appended to the `public/.htaccess` of a release that is **not yet selected**, only if one is ever found (none was written at G1d) ([Staging First Install, phase 8](./staging-first-install.md#phase-8-select-the-release-and-serve-it-g5)); it is logged on the host, and the archive and its checksum still describe the artifact as built.
 
 ## Build
 
@@ -228,7 +228,7 @@ find "$REL" ! -type l -perm /022 | wc -l                                  # 0: n
 sha256sum "$REL/public/.htaccess" | cut -d' ' -f1; sed -n 's/^htaccess_sha256=//p' "$REL/RELEASE"   # equal: the baseline, before any control-panel edit
 ```
 
-Do not `chmod -R a-w` the release. The release's `public/` is the web document root, and a PHP-version selection in cPanel may write there (the handler block, [carried over before selection](./staging-first-install.md#phase-8-select-the-release-and-serve-it-g5)). Directories need to stay readable and traversable (0755) so the web server can serve `public/build`.
+Do not `chmod -R a-w` the release. The release's `public/` is the web document root, and a PHP handler block, if one were ever written for the hostname, could appear there (the conditional [handler carry-over before selection](./staging-first-install.md#phase-8-select-the-release-and-serve-it-g5)). Directories need to stay readable and traversable (0755) so the web server can serve `public/build`.
 
 **TLS does not write into the release.** The staging certificate is issued and renewed by acme.sh with `portal-staging-holding` as its webroot, so no ACME file is ever written into a release (an earlier version of this document assumed cPanel AutoSSL did, and that is not the case on this account).
 What a release needs for the renewal to keep working after it is served is one **symlink added after extraction**, `public/.well-known -> ../../../../portal-staging-holding/.well-known`, created by the runbook's `wk_link` in phase 4 while the release is unselected. It is a recorded, controlled
@@ -268,4 +268,4 @@ Built from `6df8847fb6a806ee9a38fbd7af1cc294bb163094` (the merged WP3-B2 runbook
 | `RELEASE` fields | `release`, `commit`, `built_utc`, `build_image`, `build_php`, `build_composer`, `build_node`, `build_npm`, `composer_lock_sha256`, `package_lock_sha256`, `htaccess_sha256`, `required_extensions` (17 names, `exif` included) |
 
 The WP-S1 build reports that re-tarring reproduced the same SHA-256 and that the unpacked release booted offline with no `RuntimeProfile` violation; those two results are the build package's, not re-run by the documentation package. This archive is what gate G3 uploads
-(`setrel 20261022225141-6df8847`). It is **not** modified by anything in the runbook: the ACME link, `.env` and `storage` links, and the handler block are additions made to the unpacked, unselected release directory.
+(`setrel 20261022225141-6df8847`). It is **not** modified by anything in the runbook: the ACME link, `.env` and `storage` links, and, only if one is found, a handler block are additions made to the unpacked, unselected release directory.
