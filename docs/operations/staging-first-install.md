@@ -12,8 +12,8 @@ one is authoritative, and they now point here ([why the order differs](#why-this
 > ahead of the gate order ([Current state](#current-state-owner-reported-2026-10-22)); that is a record of the host, not a pass of any gate's observation steps.
 >
 > **Host facts this procedure does not assume.** None of the following is resolved by this document; each is a stop condition or a gate below: human Namecheap confirmation of the roughly 270-second queue process
-> lifetime ([Host support dependency](#host-support-dependency)); the web PHP, its extensions and its handler for the staging hostname (G1d, not yet performed); whether this web server follows the `.well-known`
-> symlink ([G1d](#phase-1-staging-resources-g1-each-sub-gate-separate), not yet performed); what cPanel does with the document root and with a PHP handler; a mail sink; the staging database default collation.
+> lifetime ([Host support dependency](#host-support-dependency)); the web PHP, its extensions and its handler for the staging hostname, and whether this web server follows the `.well-known`
+> symlink, were observed at [G1d](#phase-1-staging-resources-g1-each-sub-gate-separate) on 2026-10-27 (recorded in the table below), and are re-checked at G5; what cPanel does with the document root; a mail sink; the staging database default collation.
 > The worker timings are unchanged.
 
 ## Protected resources and boundaries
@@ -24,7 +24,7 @@ The account already holds resources that this procedure must never touch, inspec
 - the existing **acme.sh** installation and its **account-wide renewal cron entry**. They now also manage the staging certificate ([TLS and ACME](#tls-and-acme-acmesh)). The entry, the acme.sh configuration and
   the certificate are **never modified, re-issued or force-renewed** by this procedure, and its ACME webroot (`portal-staging-holding`) is never moved;
 - the account-wide **cron email** (`MAILTO`) setting, which the owner has configured to a monitored address. It is read, never changed, and never "restored" to an older value by teardown (G7a is the only way to change it);
-- every other site, database, backup and mailbox, the account-wide CloudLinux PHP selector (the "Select PHP Version" extension and option toggles apply to the whole account), and the shared MariaDB server's settings
+- every other site, database, backup and mailbox, the account-level CloudLinux PHP selector (the "Select PHP Version" extension and option toggles are account-level), and the shared MariaDB server's settings
   (no server-wide default is ever changed).
 
 The WP3-0B diagnostic cron entry was **removed by the owner** (2026-10-22). It is not a protected resource any more, and no step here restores it ([G10](#gates-and-approvals)).
@@ -43,12 +43,14 @@ the right-hand column has been observed or passed by this procedure; every obser
 | Temporary document root `$HOME/portal-staging-holding`; the future document root is `$HOME/portal-staging/current/public`. The holding root was seen serving an owner-written `index.html` | owner; read-only look | the cPanel field and the directory listing not yet read back |
 | TLS: a Let's Encrypt certificate for both names, issued and installed by **acme.sh 3.1.6** (HTTP-01, `cpanel_uapi` deploy hook); both names use `portal-staging-holding` as their ACME webroot | owner | `acme.sh --list` read-back and `curl` certificate dates not yet recorded |
 | The PHP 8.5 CLI has all 20 required extensions (the 17 from `RELEASE`, plus `pdo_mysql`, `pcntl`, `posix`) | owner | phase 0 command not yet recorded here |
-| The existing portal still runs PHP 8.5 | owner | the G1d baseline file does not yet exist |
+| The existing portal still runs PHP 8.5 | owner | **still owner-reported.** MultiPHP Manager is unavailable and UAPI `LangPHP` reports no `multiphp` feature, and no per-domain PHP listing was established, so the portal's own version was never read back. What was recorded at G1d is the **account-level selector** state (`php-selector.before.txt`), which the existing portal may share |
+| The PHP selector baseline | G1d (2026-10-27), full candidate 2026-10-28 | **No approved baseline is active.** `php-selector.before.txt` is a legacy capture truncated at 60 lines (12 of 17 options) and is history only. A full candidate (`php-selector.candidate-20261028T124744Z.txt`) covers every earlier section and option value identically and adds five options the original never covered; it is **awaiting the owner's approval** (G1d step 1) |
 | The diagnostic cron entry is removed; the account-wide cron email is a monitored address | owner | **recapture the crontab** (phase 0 step 3); do not rely on any earlier capture |
 | Account disk use is about 2.1 GB, with no reported quota limit | owner | cPanel Disk Usage (B7) not yet recorded |
 | An observed `http` to `https` 301 on the holding root | read-only look | its source is unknown (a vhost setting, or an `.htaccess` in the holding root, which G1d step 1 treats as a stop for owner review) |
 | The web server is **LiteSpeed** | `Server` header, read-only look | see [Hosting environment](#hosting-environment) |
-| The web PHP version and extensions, the `.well-known` symlink behaviour, the document-root read-back, any application check | nobody | **G1d, G5 and acceptance: not performed** |
+| The web PHP version and extensions, the `.well-known` symlink behaviour | G1d, 2026-10-27 | **performed:** the staging hostname's web PHP is 8.5.12 (SAPI `litespeed`, the account-level CloudLinux selector's version) and all 18 required web extensions are present; the symlink was followed on both names (`wk_symprobe` `RESULT=PASS`); `$HOLD/.htaccess` was absent before and after; no PHP configuration was changed; the selector's version/handler line and `defaults.cfg` hash were identical before and after (**no full after-capture was taken**). The post-deletion request answered HTTP 500 once and a later check verified 404; the owner accepted that deviation, and the diagnostic `error_log` was preserved and then removed under the owner's approved guarded checks, **before** the bounded retry, `dlog_ok` and the guarded removal of steps 2a and 2b were written; those steps were not what ran (see step 2a and acceptance A13) |
+| The document-root read-back, any application check | nobody | **G5 and acceptance: not performed** |
 | The 270-second process lifetime (human Namecheap answer) | pending | gates only the survival test (G11) |
 
 ## Hosting environment
@@ -60,8 +62,11 @@ what this procedure relies on and what it does not.
   the `.well-known` link is **probed** before a release exists (G1d) and its effect is **observed** through a served release (G5).
 - **Directory listings.** An account-wide automatic index was observed to be on. Laravel's `public/.htaccess` sets `Options -Indexes` only inside `<IfModule mod_negotiation.c>`, which may not apply on LiteSpeed.
   Directory-listing exposure under `/build/` is therefore an acceptance check, not an assumption ([D9](./staging-acceptance.md#d-web-and-tls)).
-- **Handler block.** cPanel's MultiPHP writes the PHP handler into an `.htaccess`, if it writes a file at all. Which form it takes under LiteSpeed is observed at G1d; `htaccess_check` accepts one bounded
-  `AddHandler`/`AddType` block naming `php85`, and anything else is an owner review.
+- **PHP is provided by an account-level selector.** An **account-level** CloudLinux PHP selector was observed: `selectorctl --user-current` reported version 8.5, native 8.5.12, handler `/opt/alt/php85/usr/bin/php-cgi`, and `~/.cl.selector/defaults.cfg` holds the choice. **cPanel MultiPHP is
+  unavailable on this account** (UAPI `LangPHP` answers `You do not have the feature “multiphp”`). **No per-domain PHP selection mechanism has been established or used for this deployment, and CloudLinux per-domain selection has not been evaluated.** The deployment uses the observed account-level selector configuration and does not modify it, and this procedure creates no per-domain setting. The existing portal's own PHP version is therefore not read back, and the selector state
+  (version, handler, enabled extensions, option values, the `defaults.cfg` hash) is the baseline that must not change ([G1d step 1](#phase-1-staging-resources-g1-each-sub-gate-separate)).
+- **Handler block.** At G1d the selector wrote **no** handler into the temporary document root (`$HOLD/.htaccess` was absent before and after), so the handler is not in a file. The `htaccess_*` helpers remain as a conditional safeguard: they act only if an `.htaccess` handler block is ever found
+  (phase 8, step 3). `htaccess_check` accepts one bounded `AddHandler`/`AddType` block naming `php85`, and anything else is an owner review.
 - **One account user** runs the web server's PHP, cron and SSH, so file ownership checks compare against `id -un`.
 
 ## Names used here
@@ -89,7 +94,7 @@ $HOME/
   portal-staging/                    $PORTAL_ROOT, 0755, created at G2
     incoming/             0700       uploaded archives and the .env, staged before they are moved into place
     releases/             0755
-      <REL_ID>/           0755       immutable once unpacked. The archive's files are never modified, with ONE recorded exception: the reviewed PHP handler block appended to public/.htaccess BEFORE the release is selected (phase 8).
+      <REL_ID>/           0755       immutable once unpacked. The archive's files are never modified, with ONE conditional exception: a reviewed PHP handler block appended to public/.htaccess BEFORE the release is selected, only if a block is ever found (phase 8; none was written at G1d).
                                      Three symlinks are ADDED (never overwriting anything) before it is selected, and recorded: .env, storage and public/.well-known (phase 4)
         scripts/cron/portal-cron.sh  0755
         bootstrap/cache/config.php   written once, before the release is selected; mode 0600 (it holds the resolved APP_KEY and database password)
@@ -100,7 +105,7 @@ $HOME/
     shared/               0700
       .env                0600       the only private configuration; created by the owner, never committed
       .env.good           0600       the verified-good copy kept for the deliberate configuration-break rehearsals only
-      home/               0700       HOME for administrative artisan runs; also htaccess.baseline, php-handler.block and handler-carry-over.log (phase 8), and wellknown-link.log (phase 4)
+      home/               0700       HOME for administrative artisan runs; also htaccess.baseline (phase 8), php-handler.block and handler-carry-over.log (phase 8, only if a handler block is ever adopted), and wellknown-link.log (phase 4)
       storage/            0700       app/{private,public}, framework/{cache/data,sessions,views}, logs   (Laravel's application log)
       run/                0700       cron locks, holder and alert state, written by the wrapper
       logs/               0700       cron-schedule.log, cron-queue.log (+ .1), written by the wrapper
@@ -114,7 +119,7 @@ everything from it. Attachments live on the private `local` disk (`shared/storag
 |---|---|---|
 | Hostname, TLS certificate | `portal-staging.intechral.solutions` (canonical) and its `www.` alias; one acme.sh-managed Let's Encrypt certificate for exactly those two names | `portal.intechral.solutions` and every other name |
 | ACME challenge path | the shared `portal-staging-holding/.well-known`, reached from each release through its `public/.well-known` link | the release's own files: nothing else of `HOLD` is ever linked into a release |
-| Web PHP | a **per-domain** setting for the staging hostname only | the existing portal's version and handler, and the account-wide selector |
+| Web PHP | whatever the observed **account-level CloudLinux selector** already provides (8.5.12, `php-cgi`); this procedure sets no PHP configuration and creates no per-domain setting | nothing: the selector, its extensions and its options are never changed here, and a change could reach the existing portal |
 | Database, user, privileges | new, this database only | the existing `portal*` database and its user |
 | Files | `$PORTAL_ROOT` | `portal.intechral.solutions/` and everything else under `$HOME` |
 | `APP_KEY` | generated for staging, discarded at teardown | any other environment |
@@ -130,11 +135,11 @@ proves it, the stop condition, and how to undo it.
 | Gate | Opens | Host changes |
 |---|---|---|
 | G0 | Owner rulings recorded: database and user names, mail sink, the existing `MAILTO` state (a monitored address is reported; record it), operator address, the support question sent. Includes the read-only host check (phase 0) and a fresh crontab capture | none (read-only SSH) |
-| G1 | Staging resources, **each approved on its own**: G1a subdomain, alias, temporary document root and TLS (**performed by the owner ahead of the gate order**; its read-only observation steps remain); G1b database, user and default collation; G1c mail sink; **G1d the web PHP probe, the `.well-known` symlink probe and, only if needed, the per-domain PHP version** | cPanel; temporary files in the temporary document root |
+| G1 | Staging resources, **each approved on its own**: G1a subdomain, alias, temporary document root and TLS (**performed by the owner ahead of the gate order**; its read-only observation steps remain); G1b database, user and default collation; G1c mail sink; **G1d the web PHP probe, the `.well-known` symlink probe and the PHP selector baseline (read-only; no PHP setting is ever changed)** | temporary files in the temporary document root, removed again |
 | G2 | Create `$PORTAL_ROOT` and its directories | `mkdir` under `$PORTAL_ROOT` |
 | G3 | Upload and unpack one release ([Release Build](./release-build.md#upload-and-verify-on-the-host-a-host-step-gated)) | files under `$PORTAL_ROOT` |
 | G4 | Private configuration and database preparation (phases 4 to 7), including the three release symlinks | `.env`, staging database, symlinks in the unselected release |
-| G5 | Select the release and serve it (phase 8). **Not successful until the ACME challenge is retrieved through the served release** | `current` link, cPanel document root, a PHP handler block, one temporary token file in the ACME directory |
+| G5 | Select the release and serve it (phase 8). **Not successful until the ACME challenge is retrieved through the served release** | `current` link, cPanel document root, a PHP handler block only if one is found (none at G1d), one temporary token file in the ACME directory |
 | G6 | Wrapper runs by hand and the A2 cross-context check | cache and job rows, wrapper logs, mail to the sink |
 | G7 | Install the two staging cron entries | crontab (two added lines) |
 | **G7a** | **Only if the existing `MAILTO` is absent or not a monitored recipient:** change the account-wide Cron Email. Never part of G7 and never read-only | crontab (the `MAILTO` line) |
@@ -608,7 +613,7 @@ Each phase lists what to expect and when to stop. **On any unexpected result, st
    ev() { [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]] && evid_ok && printf '%s/%s' "$EVID" "$1"; }      # ev crontab.before -> its absolute path; prints nothing (so a redirect to it fails) if EVID is not safe
    ( umask 077; mkdir -p -m 700 -- "$EVID" ) && evid_ok && echo "evidence directory ready: $EVID"
    ```
-   It holds `crontab.before`, `crontab.pre-g7`, `crontab.pre-g7a` (only if G7a is opened), `crontab.after`, `crontab.mailto`, `crontab.teardown`, `php-vhosts.before.json`, `php-vhosts.after.json`, and the certificate and ACME read-backs (`cert.last` and `cert.last.history`). These contain account paths and possibly addresses: they are never committed, pasted into a ticket or printed in a report. If `evid_ok` fails,
+   It holds `crontab.before`, `crontab.pre-g7`, `crontab.pre-g7a` (only if G7a is opened), `crontab.after`, `crontab.mailto`, `crontab.teardown`, the PHP selector evidence (`php-selector.before.txt`, the legacy truncated G1d capture, kept unchanged as history; then one new `php-selector.<event>-<UTC>.txt` per capture, for example `candidate`, `g1d-after`, `pre-g5`, `post-g5`, `after-cpanel`, `swap-<REL_ID>`, `rollback-<REL_ID>`, `recovery-<REL_ID>` and `teardown`, each created once and never overwritten; any failed attempt is kept as `….txt.FAILED`; the owner-approved `php-selector.baseline-<UTC>.txt` files, read-only; and `php-selector.approvals.log`, the append-only record of which baseline is active), the G1d outputs (`g1d-web-probe.txt`, `g1d-symprobe.txt`, and `g1d-holding-error_log.preserved` only if a diagnostic log had to be removed), and the certificate and ACME read-backs (`cert.last` and `cert.last.history`). There is **no** `php-vhosts.*` baseline: this account cannot produce one. If you save the failed UAPI answer, keep it only as a record of that (`php-vhosts.before.unavailable.json`), never as a baseline. These contain account paths and possibly addresses: they are never committed, pasted into a ticket or printed in a report. If `evid_ok` fails,
    `ev` prints nothing and the redirect fails before any command runs. Then:
    ```bash
    SSH_TARGET=REPLACE_WITH_YOUR_SSH_CONFIG_ALIAS
@@ -677,13 +682,155 @@ so correctness does not depend on the default. Record which case applied. Do not
 **G1c, mail sink.** An owner-controlled mailbox or sink is chosen and verified by the owner, with host, port, TLS mode and credentials noted for the `.env`. Outbound staging mail goes only there.
 *Undo:* delete the mailbox.
 
-**G1d, the web PHP probe, the `.well-known` symlink probe and, only if needed, the per-domain PHP version.** This establishes, before any release exists, which PHP and which extensions the staging hostname's **web** handler really has, and whether this
-web server follows the symlink that the releases will use for ACME, without touching the existing portal, the ACME directory or any account-wide setting. It needs its own approval because it places temporary diagnostic files in the temporary document root.
-**None of it has been performed**; neither a PHP version nor the symlink behaviour is assumed from the owner's reports.
+**G1d, the web PHP probe, the `.well-known` symlink probe and the PHP selector baseline.** This establishes, before any release exists, which PHP and which extensions the staging hostname's **web** handler really has, and whether this
+web server follows the symlink that the releases will use for ACME, without touching the existing portal, the ACME directory or any account-level setting. It needs its own approval because it places a temporary diagnostic file in the temporary document root.
+**G1d changes no PHP setting.** PHP is provided by the observed account-level CloudLinux selector ([Hosting environment](#hosting-environment)); no per-domain option has been established or used (MultiPHP is unavailable; CloudLinux per-domain selection has not been evaluated), and the web PHP is whatever the observed selector configuration provides. The results of the run of 2026-10-27 are in
+[Current state](#current-state-owner-reported-2026-10-22); a repeat follows the same steps. Neither a PHP version nor the symlink behaviour is ever assumed from a report.
 
-1. **Record the baseline of the existing site's runtime (read-only), before anything.** In cPanel MultiPHP Manager read, and save privately, the PHP version and handler of **every** domain. If UAPI is available you can read the same list from your machine:
-   `( umask 077; ssh "${SSH_TARGET:?}" 'uapi --output=json LangPHP php_get_vhost_versions' > "$(ev php-vhosts.before.json)" )` (if it is unavailable, save a screenshot instead; nothing here assumes it exists). Put only the existing portal's row, and "all other rows recorded", in the evidence record.
-   Record the temporary document root's `.htaccess` state: `ls -la "$HOLD"` and, if the file exists, its `sha256sum`. **It should not exist yet.** If it does, stop for owner review: nothing could then tell cPanel's additions from earlier content.
+1. **Record the account-level PHP selector state (read-only), have the owner approve it as the baseline, and record the state of the temporary document root, before anything.** The selector is account-level, so a change to it could reach the existing portal and the other sites, and its **approved baseline** is what "the PHP configuration is unchanged" is judged against (acceptance [A9](./staging-acceptance.md#a-host-and-php)).
+   A capture holds the version, the handler, the enabled extensions, the **complete** option set (with its count), the `[versions]` block and the hash of `defaults.cfg`; no secret and no truncation. Every capture and comparison goes through the helpers below, which run on your machine (they need `ev` and `SSH_TARGET` from phase 0 step 3). They exist because a capture that fails silently, followed by a `diff` of a file that was
+   not just captured, would print "identical" falsely. Paste them once per session:
+   ```bash
+   SEL_LOG=php-selector.approvals.log
+
+   sel_remote() {        # the read-only capture, run on the host. Any failing command ends it early; the last line proves it ran to the end
+     ssh "${SSH_TARGET:?}" 'bash -s' <<'SELECTOR'
+   echo "captured $(date -u +%FT%TZ) as $(id -un)"
+   echo "== capture format 2 (complete option set, counted)"
+   echo "== user-current (version, native, handler)"; selectorctl --user-current 2>&1 || exit 1
+   echo "== enabled extensions for the user, php 8.5"; selectorctl --list-user-extensions --version=8.5 2>&1 || exit 1
+   echo "== user options, php 8.5 (safe strings)"; OPTS=$(selectorctl --print-options-safe --version=8.5 2>&1) || exit 1; printf '%s\n' "$OPTS"
+   echo "== option count: $(grep -c '^TITLE:' <<< "$OPTS")"
+   echo "== defaults.cfg [versions]"; sed -n '/^\[versions\]/,/^\[/p' ~/.cl.selector/defaults.cfg || exit 1
+   echo "== defaults.cfg sha256"; sha256sum < ~/.cl.selector/defaults.cfg || exit 1
+   echo "== end of capture"
+   SELECTOR
+   }
+
+   sel_valid() {         # a complete, well-formed format-2 capture: mine, private, not a link, every section once, option count matches, ends with the end marker
+     local f=${1:-} n
+     [[ -n "$f" && -f "$f" && ! -L "$f" && "$(stat -c '%U %a' -- "$f")" =~ ^$(id -un)\ (600|400)$ ]] || { echo "sel_valid: not a private regular file of mine: ${f:-<none>}" >&2; return 1; }
+     [[ "$(head -n 1 -- "$f")" =~ ^captured\ [0-9T:Z-]+\ as\ [a-z0-9_]+$ ]] || { echo "sel_valid: no capture header: $f" >&2; return 1; }
+     [[ "$(tail -n 1 -- "$f")" == "== end of capture" ]] || { echo "sel_valid: the capture did not run to the end (truncated?): $f" >&2; return 1; }
+     local exp=("== capture format 2 " "== user-current " "== enabled extensions " "== user options, " "== option count: " "== defaults.cfg [versions]" "== defaults.cfg sha256" "== end of capture") got i
+     mapfile -t got < <(grep '^== ' -- "$f")
+     [[ "${#got[@]}" == 8 ]] || { echo "sel_valid: the sections are not the expected eight, once each: $f" >&2; return 1; }
+     for i in 0 1 2 3 4 5 6 7; do [[ "${got[i]}" == "${exp[i]}"* ]] || { echo "sel_valid: section $((i + 1)) is not '${exp[i]}': $f" >&2; return 1; }; done
+     [[ "$(sed -n '/^== user-current/{n;p}' -- "$f")" =~ ^[0-9]+\.[0-9]+$'\t'[0-9]+\.[0-9]+\.[0-9]+$'\t'/.+$ ]] || { echo "sel_valid: no version/native/handler line: $f" >&2; return 1; }
+     n=$(sed -n 's/^== option count: \([0-9]\{1,4\}\)$/\1/p' -- "$f")
+     [[ -n "$n" && "$n" -ge 1 && "$n" == "$(grep -c '^TITLE:' -- "$f")" ]] || { echo "sel_valid: the option count does not match the options present (truncated?): $f" >&2; return 1; }
+     [[ "$(grep -c '^[0-9a-f]\{64\}  -$' -- "$f")" == 1 ]] || { echo "sel_valid: no defaults.cfg checksum: $f" >&2; return 1; }
+   }
+
+   sel_capture() {       # sel_capture EVENT: a NEW file php-selector.EVENT-<UTC>.txt. On success sets SEL_LAST to it; on any failure SEL_LAST is unset and the status is 1
+     unset SEL_LAST
+     local event=${1:-} stamp dest tmp rc
+     [[ "$event" =~ ^[a-z0-9][a-z0-9-]{0,60}$ ]] || { echo "sel_capture: the event name is lower-case letters, digits and hyphens: STOP" >&2; return 1; }
+     stamp=$(date -u +%Y%m%dT%H%M%SZ)
+     dest=$(ev "php-selector.$event-$stamp.txt") && tmp=$(ev "php-selector.tmp-$$-$RANDOM") && [[ -n "$dest" && -n "$tmp" ]] || { echo "sel_capture: the evidence directory is not safe: STOP" >&2; return 1; }
+     [[ ! -e "$dest" && ! -L "$dest" ]] || { echo "sel_capture: $dest already exists. Evidence is never overwritten: STOP" >&2; return 1; }
+     ( set -C; umask 077; sel_remote > "$tmp" ) || { rc=$?; echo "sel_capture: the host capture failed (status $rc); nothing was compared: STOP" >&2; ln -- "$tmp" "$dest.FAILED" 2>/dev/null; rm -f -- "$tmp"; return 1; }
+     sel_valid "$tmp" || { echo "sel_capture: the capture is incomplete or malformed; nothing was compared: STOP" >&2; ln -- "$tmp" "$dest.FAILED" 2>/dev/null; rm -f -- "$tmp"; return 1; }
+     ln -- "$tmp" "$dest" || { echo "sel_capture: could not create $dest (it exists?): STOP" >&2; rm -f -- "$tmp"; return 1; }
+     rm -f -- "$tmp"
+     SEL_LAST=$dest
+     echo "captured: $dest"
+   }
+
+   sel_active() {        # prints the ACTIVE approved baseline: the file named by the LAST APPROVED line of the approvals log, re-checked against its recorded checksum. Never the newest or best-named file
+     local log line tag when name sha rest f
+     log=$(ev "$SEL_LOG") || return 1
+     [[ -f "$log" && ! -L "$log" ]] || { echo "sel_active: no approved selector baseline is recorded ($SEL_LOG is absent). The owner must approve one (re-baselining): STOP" >&2; return 1; }
+     line=$(grep '^APPROVED ' -- "$log" | tail -n 1)
+     read -r tag when name sha rest <<< "$line"
+     [[ "$tag" == APPROVED && "$name" =~ ^php-selector\.baseline-[0-9]{8}T[0-9]{6}Z\.txt$ && "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "sel_active: the last approval entry is not well formed: STOP" >&2; return 1; }
+     f=$(ev "$name") || return 1
+     [[ -f "$f" && ! -L "$f" && "$(sha256sum < "$f" | cut -d' ' -f1)" == "$sha" ]] || { echo "sel_active: the approved baseline $name is missing or no longer matches its recorded checksum: STOP" >&2; return 1; }
+     sel_valid "$f" || return 1
+     printf '%s\n' "$f"
+   }
+
+   sel_compare() {       # sel_compare FILE: only the file the last sel_capture produced, against the active approved baseline
+     local new=${1:-} base
+     [[ -n "$new" && -n "${SEL_LAST:-}" && "$new" == "$SEL_LAST" ]] || { echo "sel_compare: that is not the file just captured by sel_capture: STOP" >&2; return 1; }
+     sel_valid "$new" || return 1
+     base=$(sel_active) || return 1
+     if diff <(tail -n +2 -- "$base") <(tail -n +2 -- "$new"); then
+       echo "PHP selector state identical (approved baseline $(basename -- "$base"), capture $(basename -- "$new"))"
+     else
+       echo "PHP selector state DIFFERS from the approved baseline $(basename -- "$base") in capture $(basename -- "$new"): STOP. The owner reviews it (re-baselining); nothing is changed from here." >&2; return 1
+     fi
+   }
+
+   sel_check() {         # capture and compare: the comparison cannot run, and the confirmation cannot print, unless this invocation produced a complete new capture
+     sel_capture "${1:-}" && sel_compare "$SEL_LAST"
+   }
+
+   sel_covers() {        # sel_covers ORIGINAL CANDIDATE: each section of the ORIGINAL (older, shorter) capture must be an identical leading part of the same section of the CANDIDATE. Reports what the candidate adds
+     [[ -f "${1:-}" && -f "${2:-}" ]] || { echo "sel_covers: two capture files are required" >&2; return 1; }
+     awk '
+       function load(file, store, cnt, order,   line, sec, n, first) {
+         sec = ""; n = 0; first = 1
+         while ((getline line < file) > 0) {
+           if (first) { first = 0; continue }                                  # the timestamp line
+           if (line ~ /^== /) { sec = line; order[++n] = sec; cnt[sec] = 0; continue }
+           if (sec != "") store[sec, ++cnt[sec]] = line
+         }
+         close(file); return n
+       }
+       BEGIN {
+         bad = 0
+         no = load(ARGV[1], o, oc, ordo); nc = load(ARGV[2], c, cc, ordc)
+         for (i = 1; i <= no; i++) {
+           s = ordo[i]
+           if (!(s in cc)) { printf "MISSING in the candidate: %s\n", s; bad = 1; continue }
+           d = 0
+           for (j = 1; j <= oc[s]; j++) if (o[s, j] != c[s, j]) { d = j; break }
+           if (d) { printf "DIFFERS: %s (first difference at line %d of the section)\n", s, d; bad = 1 }
+           else if (cc[s] == oc[s]) printf "identical: %s (%d lines)\n", s, oc[s]
+           else printf "original is the leading part: %s (%d lines in the original, %d in the candidate, %d added)\n", s, oc[s], cc[s], cc[s] - oc[s]
+           seen[s] = 1
+         }
+         for (i = 1; i <= nc; i++) if (!(ordc[i] in seen)) printf "added by the candidate (not in the original): %s\n", ordc[i]
+         exit bad
+       }' "$1" "$2"
+   }
+
+   sel_approve() {       # OWNER ONLY, interactive. sel_approve CANDIDATE_FILE "note": records the approval and makes the candidate's immutable copy the active baseline
+     local cand=${1:-} note=${2:-} sha typed stamp name dest log cur
+     [[ -t 0 && -t 1 ]] || { echo "sel_approve needs an interactive terminal: the owner types the confirmation: STOP" >&2; return 1; }
+     [[ "$note" =~ ^[A-Za-z0-9\ ._,:/()+-]{8,200}$ ]] || { echo "sel_approve: give a short note (8-200 plain characters, no secrets) saying what was reviewed: STOP" >&2; return 1; }
+     [[ -n "$cand" && "$cand" == "$(ev "$(basename -- "$cand")")" && "$(basename -- "$cand")" =~ ^php-selector\.[a-z0-9-]+-[0-9]{8}T[0-9]{6}Z\.txt$ ]] || { echo "sel_approve: the candidate must be a php-selector.<event>-<UTC>.txt capture in the evidence directory: STOP" >&2; return 1; }
+     sel_valid "$cand" || return 1
+     log=$(ev "$SEL_LOG") || return 1
+     if [[ -e "$log" || -L "$log" ]]; then      # a log that exists must yield a verified active baseline; a broken one is never a first run
+       cur=$(sel_active) || { echo "sel_approve: $SEL_LOG exists but its active baseline cannot be verified: STOP. Nothing is approved until the owner has resolved this." >&2; return 1; }
+       echo "Active baseline: $(basename -- "$cur"). Differences against the candidate:"; diff <(tail -n +2 -- "$cur") <(tail -n +2 -- "$cand")
+     else
+       echo "There is no approvals log: this is the first approval."
+     fi
+     sha=$(sha256sum < "$cand" | cut -d' ' -f1)
+     read -r -p "Review the differences above. Type APPROVE ${sha:0:12} to adopt $(basename -- "$cand") as the approved baseline: " typed
+     [[ "$typed" == "APPROVE ${sha:0:12}" ]] || { echo "not approved; nothing was recorded"; return 1; }
+     stamp=$(date -u +%Y%m%dT%H%M%SZ); name=php-selector.baseline-$stamp.txt; dest=$(ev "$name") || return 1
+     ( set -C; umask 277; cat -- "$cand" > "$dest" ) || { echo "sel_approve: could not create $name (it exists?): STOP" >&2; return 1; }
+     [[ "$(sha256sum < "$dest" | cut -d' ' -f1)" == "$sha" ]] || { echo "sel_approve: the copy does not match the candidate: STOP" >&2; return 1; }
+     ( umask 077; printf 'APPROVED %s %s %s candidate=%s note=%s\n' "$stamp" "$name" "$sha" "$(basename -- "$cand")" "$note" >> "$log" ) || { echo "sel_approve: could not record the approval: STOP" >&2; return 1; }
+     echo "approved. Active baseline: $name"
+   }
+   ```
+   (The heredoc terminator `SELECTOR` must start in column 1 when you paste this.) **The contract:**
+   - **One new file per capture, never overwritten.** `sel_capture EVENT` writes `php-selector.<EVENT>-<UTC>.txt` (the event is lower-case letters, digits and hyphens; the UTC stamp keeps events that can repeat apart). If the path exists it stops with an explicit error and touches nothing; earlier files, including failed attempts (kept as `….txt.FAILED`), are history and are never edited or removed.
+   - **A capture counts only if it is complete.** It is written to a temporary name and published only when the host command succeeded and `sel_valid` accepts it (private regular file of yours, header, the eight sections in order, an option count equal to the options present, the checksum line, the end marker). On any failure it prints why, leaves `SEL_LAST` unset and returns 1.
+   - **Only that file is compared.** `sel_compare` accepts nothing but `SEL_LAST`, the file this invocation's capture just produced. `sel_check EVENT` is the capture followed by that comparison, joined with `&&`: **the comparison and the `PHP selector state identical` line cannot run unless the capture just succeeded.** Always use `sel_check`; never `diff` evidence files by hand.
+   - **The active approved baseline is explicit.** It is the file named by the **last `APPROVED` line** of `php-selector.approvals.log`, re-checked against the SHA-256 recorded there and re-validated at every use. It is never the newest file, never chosen by name or timestamp, and a candidate is never active until the owner approves it. With no approvals log, `sel_check` stops. **A log that exists is authoritative:** if its active baseline is missing, altered, malformed, unreadable or not a complete capture, `sel_check` and `sel_approve` both stop with the reason, and `sel_approve` never offers the first-run prompt. Only a genuinely absent log permits the first approval.
+   - **The comparison is strict.** Any difference stops, **an 8.5.x patch update included**; it is handled by [re-baselining](#re-baselining-the-php-selector-owner-approved), not by loosening the comparison.
+   **First run (a fresh install):** `sel_capture candidate`, review the file, then the **owner** runs `sel_approve "$SEL_LAST" "G1d baseline reviewed"` (interactive: it shows the differences against any current baseline and asks for `APPROVE <first 12 characters of the file's SHA-256>` to be typed; it records an immutable, read-only copy `php-selector.baseline-<UTC>.txt` and the approval line). An agent never runs `sel_approve`.
+   **Do not look for a per-domain listing here.** MultiPHP is unavailable on this account (UAPI `LangPHP` answers `You do not have the feature “multiphp”`), and CloudLinux per-domain selection has not been evaluated. If you try it anyway, keep the answer only as `php-vhosts.before.unavailable.json` (a record that the listing does not exist), and **never describe it, or anything derived from it, as a baseline**. The existing portal's own PHP version therefore stays **owner-reported**; the unchanged selector is the only evidence that nothing under it changed.
+   **Status of the run of 2026-10-27.** Its baseline, `php-selector.before.txt`, is a **format 1 capture whose option listing was cut by `head -60`**: it holds 12 of the 17 options (the 12th is incomplete: no `TYPE`), and no `option count`. It is kept **unchanged** as history, `sel_valid` rejects it, and it is **not** an active baseline. A full candidate, `php-selector.candidate-20261028T124744Z.txt`, was captured read-only on 2026-10-28 (17 options). `sel_covers` found every
+   section and every previously recorded option value of the original **identical** in it (the original options section is the leading 60 lines of the candidate's 89); the candidate adds the options **`open_basedir`, `post_max_size`, `session.save_path`, `short_open_tag` and `upload_max_filesize`, and the missing remainder of `opcache.jit_buffer_size`, which the original baseline never covered**, plus the capture-format, option-count and end-marker lines. `defaults.cfg` has the same hash. **The candidate has not been approved:** until the owner runs `sel_approve` on it (or on a later full capture), no baseline is active and the G1d step 5 and G5 comparisons stop.
+   Then record the temporary document root: in the host session, `ls -la "$HOLD"; HOLD_BEFORE=$(ls -A "$HOLD")` (the entries before the probe, used by step 2 to recognise anything the probe leaves behind), and the `.htaccess` state: `if [ -e "$HOLD/.htaccess" ] || [ -L "$HOLD/.htaccess" ]; then sha256sum -- "$HOLD/.htaccess"; else echo ".htaccess absent"; fi`.
+   **It should not exist.** If it does, stop for owner review: nothing could then tell later additions from earlier content.
 2. **Probe the staging hostname's web PHP** (the version, the SAPI, every required extension, and the settings that matter after a symlink swap). `EXTS_WEB` is pasted from the build:
    ```bash
    PROBE="ext-check-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n').php"        # an unguessable name
@@ -706,24 +853,99 @@ web server follows the symlink that the releases will use for ACME, without touc
      sed -i "s/__EXTS__/$EXTS_WEB/" "$HOLD/$PROBE" || exit 1
      curl -fsS "https://$STAGING_HOST/$PROBE"
    )
-   curl -s -o /dev/null -w 'after deletion: HTTP %{http_code}\n' "https://$STAGING_HOST/$PROBE"       # 404
    ```
    (The heredoc terminator `PHP` must start in column 1 when you paste this; it prints nothing secret: no `phpinfo()`, no paths, no environment.) Record the output: the version and SAPI, `RESULT`, `disable_functions`, `realpath_cache_ttl` and the OPcache values (they decide how long a swap can look stale: [Later releases](#later-releases)).
-   Compare the temporary document root's `.htaccess` with step 1: a handler block appearing there tells you PHP selection is written into `.htaccess` in the document root (it is then validated and carried into the release in phase 8); nothing appearing tells you it is not.
-   **2a. Probe the `.well-known` symlink** (the mechanism the releases rely on for ACME). `wk_symprobe` builds a throw-away tree `HOLD/wk-probe-<random>/{target,dir}` with `dir/.well-known -> ../target`, fetches one random token through
+   Compare the temporary document root's `.htaccess` with step 1: **nothing appearing there** means PHP selection is not written into a file (the observed case); a handler block appearing there is validated in step 6.
+   **2a. Confirm the probe is gone, with a bounded retry.** The temporary PHP file must be **absent by path**, and then a request for it must end in **404**. Because a request just after a deletion has been seen to answer 500 once before answering 404, the status is retried up to five times, two seconds apart. The rules:
+   a **404** (first attempt or after retries) passes; a **transient 500** (every earlier answer 500, the last 404) passes **with a recorded warning only when the deleted-file failure is independently evidenced**, that is, `$HOLD/error_log` did not exist before the probe (`HOLD_BEFORE`) and holds only the deleted probe's failure; any other non-404 before the 404 is a **FAIL** for owner review;
+   still not 404 after the fifth attempt (a persistent 500 included), a **200**, or any body that contains the probe's `RESULT=` output is a **FAIL: stop**. The cause of the one observed 500 was not established, and this procedure assumes none (no web-server caching behaviour is asserted).
+   **What happened at the original G1d (2026-10-27), exactly:** the request made after the deletion answered **HTTP 500 once** (`g1d-web-probe.txt`), the diagnostic `error_log` it left was found, and a later check **verified 404**; the owner **accepted that deviation**. The **bounded retry below was not run** at that G1d (it did not exist yet), and neither was `dlog_ok` or the removal of step 2b as written: the `error_log` was preserved privately (`g1d-holding-error_log.preserved`) and removed under guarded checks the owner approved at the time, **before** steps 2a and 2b and `dlog_ok` were written. Nothing here implies the original run passed the newer rules; they apply to a repeat:
+   ```bash
+   dlog_ok() {   # the only file treated as the probe's own residue: $HOLD/error_log, created by the probe's failed request
+     local el="$HOLD/error_log"
+     [[ "${PROBE:-}" =~ ^ext-check-[0-9a-f]{16}\.php$ && -n "${HOLD:-}" ]] || { echo "PROBE or HOLD is not set: STOP" >&2; return 1; }
+     ! printf '%s\n' "${HOLD_BEFORE?}" | grep -qxF error_log || { echo "error_log existed before the probe, so it is not the probe's: STOP for owner review" >&2; return 1; }
+     [[ -f "$el" && ! -L "$el" && "$(stat -c %U -- "$el")" == "$(id -un)" ]] || { echo "error_log is missing, a link or not owned by $(id -un): STOP" >&2; return 1; }
+     [[ -s "$el" ]] && (( $(stat -c %s -- "$el") <= 4096 )) || { echo "error_log is empty or larger than 4096 bytes: STOP for owner review" >&2; return 1; }
+     grep -qF -- "$HOLD/$PROBE" "$el" || { echo "error_log does not name the deleted probe: STOP for owner review" >&2; return 1; }
+     [[ -z "$(grep -vF -- "$HOLD/$PROBE" "$el" | grep -vE '^\[[^]]+\] PHP Warning:  Unknown: Failed to open stream: No such file or directory in Unknown on line 0$' | grep .)" ]] \
+       || { echo "error_log holds a line that is neither about the deleted probe nor the generic failed-to-open warning: STOP for owner review" >&2; return 1; }
+     echo "error_log: $(stat -c %s -- "$el") bytes, $(grep -c '' "$el") line(s), only the deleted probe's failure; sha256 $(sha256sum < "$el" | cut -d' ' -f1)"
+   }
+   ( set -u
+     [[ "${PROBE:-}" =~ ^ext-check-[0-9a-f]{16}\.php$ ]] || { echo "PROBE is not set: STOP" >&2; exit 1; }
+     [[ ! -e "$HOLD/$PROBE" && ! -L "$HOLD/$PROBE" ]] || { echo "the probe file still exists: FAIL: STOP" >&2; exit 1; }
+     body=$(mktemp) && [[ -f "$body" && ! -L "$body" ]] || exit 1
+     trap 'rm -f -- "$body"' EXIT
+     codes=; code=
+     for i in 1 2 3 4 5; do
+       code=$(curl -s -o "$body" -w '%{http_code}' --max-time 20 "https://$STAGING_HOST/$PROBE")
+       codes="$codes $code"
+       [[ "$code" != 200 ]] && ! grep -q 'RESULT=' "$body" || { echo "status by attempt:$codes"; echo "the deleted probe is still being served: FAIL: STOP" >&2; exit 1; }
+       [[ "$code" == 404 ]] && break
+       (( i < 5 )) && sleep 2
+     done
+     echo "status by attempt:$codes"
+     [[ "$code" == 404 ]] || { echo "not 404 after 5 attempts (last: $code): FAIL: STOP" >&2; exit 1; }
+     [[ "$codes" == " 404" ]] && { echo "RESULT=PASS (404 on the first attempt)"; exit 0; }
+     [[ "$codes" =~ ^(\ 500)+\ 404$ ]] && dlog_ok > /dev/null \
+       && { echo "RESULT=PASS WITH WARNING: a transient 500 before the 404, independently evidenced by the diagnostic error_log (cause not established)"; exit 0; }
+     echo "a non-404 status before the 404 without independent evidence: FAIL: STOP for owner review" >&2; exit 1
+   )
+   ```
+   **2b. A diagnostic `error_log` left in the temporary document root is removed under guard, with the evidence kept privately.** This applies only to `$HOLD/error_log`, by that exact path, and only when `dlog_ok` accepts it: it did not exist before the probe, it is a regular file owned by the account, at most 4096 bytes, and every line is either the generic
+   failed-to-open warning or names the deleted probe (and at least one does). Anything else is an owner review and nothing is removed. **Never remove any other log** (the account's `~/error_log`, a release's logs, anything under `shared/`). Copy first, privately, compare checksums, and only then remove:
+   ```bash
+   # host session: is it the probe's residue? Note the SHA-256 it prints.
+   if [[ -e "$HOLD/error_log" || -L "$HOLD/error_log" ]]; then dlog_ok; else echo "no error_log: nothing to remove"; fi
+   # your machine: the private copy (it refuses to overwrite), then the comparison. Paste the same SHA-256 into WANT_SHA in BOTH shells.
+   WANT_SHA=REPLACE_WITH_THE_SHA256_PRINTED_ABOVE
+   F=$(ev g1d-holding-error_log.preserved) && [[ ! -e "$F" ]] && ( umask 077; ssh "${SSH_TARGET:?}" 'cat -- "$(readlink -f "$HOME")/portal-staging-holding/error_log"' > "$F" )
+   [[ "$WANT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256sum < "$(ev g1d-holding-error_log.preserved)" | cut -d' ' -f1)" == "$WANT_SHA" ]] && echo "private copy matches" || echo "copy does not match: STOP"
+   # host session: the guarded removal of that one file
+   ( set -u
+     [[ "${WANT_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || { echo "WANT_SHA is not a SHA-256: STOP" >&2; exit 1; }
+     dlog_ok > /dev/null || exit 1
+     [[ "$(sha256sum < "$HOLD/error_log" | cut -d' ' -f1)" == "$WANT_SHA" ]] || { echo "error_log changed since the private copy was taken: STOP" >&2; exit 1; }
+     rm -- "$HOLD/error_log" || exit 1
+     [[ ! -e "$HOLD/error_log" && ! -L "$HOLD/error_log" ]] && echo "error_log removed; the private copy is the record"
+   )
+   [[ "$(ls -A "$HOLD")" == "$HOLD_BEFORE" ]] && echo "temporary document root is exactly as before the probe" || echo "HOLD differs from before the probe: STOP"
+   ```
+   **2c. Probe the `.well-known` symlink** (the mechanism the releases rely on for ACME). `wk_symprobe` builds a throw-away tree `HOLD/wk-probe-<random>/{target,dir}` with `dir/.well-known -> ../target`, fetches one random token through
    it over https on both names, compares the body exactly, and removes the tree. It never reads or writes `HOLD/.well-known`, and it runs only against `HOLD` (the helpers refuse anything else). It checks the web server's symlink policy for a link and a target
    with the same owner; it does **not** replace the G5 check, which goes through the real release and its rewrite rules:
    ```bash
    wk_symprobe          # expect two PASS lines and RESULT=PASS; then: ls -la "$HOLD" shows no wk-probe-* left
    ```
    *Stop:* `RESULT=FAIL`. Then this web server does not follow the link, the releases cannot serve ACME challenges this way, and **no release is selected** until the owner rules on another way. Do not work around it from here (no change to acme.sh, no second ACME directory, no server setting).
-3. **Pass:** the web PHP is **8.5.x** and `RESULT=PASS`. If the staging hostname already runs 8.5.x, **change nothing**.
-4. **If the web PHP is not 8.5.x**, and only then: in cPanel MultiPHP Manager select **the staging hostname only** and its PHP 8.5 option, then repeat step 2. **Only a per-domain setting is permitted.** Do not use the CloudLinux "Select PHP Version"
-   extension or option toggles: they apply to the whole account. If per-domain selection is not available, **stop for an owner decision**.
-5. **Re-read the baseline after every per-domain PHP configuration change** (step 1 again, to `php-vhosts.after.json` through `ev`, and compare). If the existing portal's version or handler, or any other domain's, differs from the baseline in any way: **immediate stop.** Do not try to
-   correct it from here; report it, and the owner decides how to restore the recorded value.
-6. **If a handler block appeared in `$HOLD/.htaccess`, validate it now (read-only):** `htaccess_check "$HOLD/.htaccess"`. It must report nothing and succeed. An unfamiliar format is **not** accommodated by relaxing the check: stop for owner review.
-7. **Stop** also if any extension is `MISSING` (above all `exif`): enabling it account-wide is an owner decision, not a step of this procedure. *Undo:* the probes remove themselves; a per-domain PHP change is reverted by selecting the previously recorded version for the staging hostname only.
+3. **Pass:** the web PHP is **8.5.x** and `RESULT=PASS`. The staging hostname already runs the selector's PHP, so **change nothing**.
+4. **If the web PHP is not 8.5.x: stop for an owner decision.** No per-domain PHP setting has been established or used, and none is created here. The mechanism that was observed is the account-level CloudLinux selector, which would change the existing portal and every other site as well, so this procedure never uses it
+   (neither the "Select PHP Version" selection nor its extension or option toggles). The owner decides whether the account-level selection may change; nothing proceeds until then.
+5. **Re-capture the selector state after the probes and compare:** `sel_check g1d-after`. It must print `PHP selector state identical …` for a capture made by that invocation, against the active approved baseline (step 1). **Any other outcome is an immediate stop**: do not try to correct it from here; report it, and the owner decides ([re-baselining](#re-baselining-the-php-selector-owner-approved)).
+   (At the run of 2026-10-27 **no full after-capture existed**: what was recorded after the probes was only the selector's version/handler line and the first 16 characters of the `defaults.cfg` hash, in `g1d-symprobe.txt`, and they matched the baseline's. That is weaker evidence than a full comparison and is described as exactly that; the full comparison starts with the approved baseline.)
+6. **If a handler block appeared in `$HOLD/.htaccess`** (it did not at G1d, and nothing in this procedure writes one), validate it now (read-only): `htaccess_check "$HOLD/.htaccess"`. It must report nothing and succeed. An unfamiliar format is **not** accommodated by relaxing the check: stop for owner review.
+7. **Stop** also if any extension is `MISSING` (above all `exif`): enabling it through the account-level selector is an owner decision, not a step of this procedure. *Undo:* the probes remove themselves (the diagnostic `error_log` only under step 2b); no PHP setting was changed, so there is nothing to revert.
+
+### Re-baselining the PHP selector (owner-approved)
+
+The comparison in G1d step 1 is strict on purpose: the selector is account-level and could also affect the existing portal. So **any** difference stops activation or deployment, including an 8.5.x patch update the host made on its own (the CLI binary reported 8.5.11 in the inventory of 2026-10-22 and 8.5.12, built 2026-10-26, on 2026-10-28: a host-side patch update is entirely plausible here). The difference is never explained away and the comparison is never loosened.
+What follows is how a *new* baseline is adopted; it is the only way a baseline changes, and the same steps adopt the first full baseline.
+
+1. **Stop.** Nothing is selected, swapped, rolled forward or continued. This procedure changes no PHP setting, and neither does the owner's review below.
+2. **Preserve.** Keep the baseline that was active, `php-selector.approvals.log` and the capture that differed (the file named in the `sel_check` output). Nothing is overwritten, renamed or deleted; the old baseline stays in the evidence directory permanently.
+3. **Report** the difference exactly as `sel_check` printed it, together with what the host says changed, if known.
+4. **The owner reviews it**, with the evidence that exists: CLI PHP version and the required extensions (the phase 0 command, A1 to A6), the web PHP and its extensions (a repeat of the G1d probe, which needs its own approval because it places a file, or A2's `web` row if a release is already served; `RESULT=PASS`, PHP 8.5.x), and that
+   the existing portal and the other sites still answer (their HTTP status, read-only, and the owner's own look). No per-domain read-back has been established, so this is the extent of what can be shown; say so in the note rather than implying more.
+5. **Explicit approval, typed by the owner:** `sel_approve "<the differing or candidate capture>" "<what was reviewed>"`. It displays the differences against the active baseline and accepts only `APPROVE <first 12 characters of the SHA-256>`. It needs a terminal and refuses anything else; an agent never runs it.
+6. **The approved baseline is saved under a unique, immutable name:** `php-selector.baseline-<UTC>.txt` (created once, mode 0400, never overwritten), a copy whose SHA-256 is compared with the capture's before anything is recorded.
+7. **The approval is recorded and the active baseline is identified explicitly:** one appended line in `php-selector.approvals.log`: `APPROVED <UTC> <baseline file> <SHA-256> candidate=<capture> note=<the owner's note>`. The active baseline is the file named by the **last** such line, and `sel_active` prints which one that is.
+8. **Every later comparison uses that baseline.** Run the stopped step again (`sel_check <event>`); it now compares against the new baseline.
+9. **A candidate, or a newer or better-named file, never becomes active because of its timestamp or name.** Only a typed approval changes the log. A baseline whose checksum no longer matches its log line, or that is not a complete format 2 capture, is refused and everything stops.
+
+The original `php-selector.before.txt` stays intact as the historical G1d record and is never active. `sel_covers OLD NEW` compares an older, shorter capture with a newer one section by section (each old section must be an identical leading part of the new one) and reports what the newer one adds; use it to document what a new baseline covers that the previous one did not.
+**Does the release have to be rebuilt?** No. A compatible PHP patch update does not by itself require a new application release. After the approval, the stopped activation may be run again with **the same release** if it is unselected, its contents are unchanged and every pre-selection check passes again (phase 8, failure and rollback, point 5). A new release id is needed only when the release itself needs modification, or when it,
+its handler block or its ACME link cannot safely be reused.
 
 ### Phase 2: host layout (G2)
 
@@ -866,8 +1088,9 @@ onboarding, not to this install. Once the install is verified, and **before** an
 
 ### Phase 8: select the release and serve it (G5)
 
-**A release that is selected is never edited.** If the hostname's PHP handler lives in `.htaccess`, the handler block is added to the release *before* it is selected, from the block cPanel wrote while the hostname still pointed at the temporary
-document root (G1d). The order below is the point: baseline, handler, validation, transfer, selection, then verification of what is actually served. Nothing in this phase touches the account-wide PHP selector, and nothing here assumes how cPanel behaves:
+**A release that is selected is never edited.** PHP is provided by the observed account-level selector ([Hosting environment](#hosting-environment)), so **this phase sets no PHP configuration and never touches the account-level PHP selector**: it verifies that the selector is unchanged before and after activation, and that the PHP the
+served release actually runs is 8.5.x (A2). At G1d the handler was not written into a file (`$HOLD/.htaccess` absent), so there is normally nothing to carry into the release; the handler-block steps remain as a **conditional** safeguard for the case that an `.htaccess` handler block is ever found, and then the
+block is added to the release *before* it is selected. The order below is the point: baseline, selector check, handler (if any), validation, transfer, selection, then verification of what is actually served. Nothing here assumes how cPanel behaves:
 every cPanel-dependent step has a stop. The ACME link was added in phase 4, so it is already in the release, and **this phase is not successful until the ACME challenge has been retrieved through the served release** (step 9): a site that serves the application
 but not the challenge path is a failed activation, because the certificate would not renew.
 
@@ -881,15 +1104,20 @@ but not the challenge path is a failed activation, because the certificate would
      [[ "$(sha256sum < "$REL/public/.htaccess" | cut -d' ' -f1)" == "$want" ]] || { echo "the unpacked .htaccess is not the archived one: STOP" >&2; exit 1; }
      echo "baseline verified: $got" )
    ```
-2. **The handler is selected first, per domain, before any difference is looked at.** G1d left the staging hostname on PHP 8.5.x with a per-domain setting, written (if cPanel writes it into a file at all) into the temporary document root, never into a release. Confirm that
-   it is still in place and the existing portal is untouched (G1d step 5, a new `php-vhosts.after.json`). Do **not** select it again now: cPanel would write into whatever the document root currently is.
-3. **Inspect and validate the handler, only now.** If `$HOLD/.htaccess` exists, its whole content is cPanel's addition (it was required to be absent at G1d). Validate it and keep it as the reviewed block (this refuses anything but one bounded, recognised cPanel PHP 8.5 handler block):
+2. **Verify the PHP selector against the active approved baseline, read-only, before anything changes.** Nothing is selected or configured for PHP here: the staging hostname runs the account's selected PHP, as observed at G1d. Run the G1d step 1 helper with its own event name:
+   ```bash
+   sel_check pre-g5          # a NEW php-selector.pre-g5-<UTC>.txt, compared with the active approved baseline
+   ```
+   It prints `PHP selector state identical (approved baseline …, capture …)` only if **this invocation** produced a complete new capture **and** it equals the active approved baseline (version 8.5, the same handler, the same enabled extensions, the same complete option set, the same `defaults.cfg` hash). **Anything else is an immediate stop** and nothing is selected: no approved baseline recorded yet,
+   a capture that failed or is incomplete, a duplicate evidence path, or any difference. Do not change anything from here; the owner decides. A patch-level update of 8.5.x made by the host itself is a difference like any other: it is not waved through, and it needs no new application release either; the owner reviews it and, if it is acceptable, approves a new baseline
+   ([re-baselining](#re-baselining-the-php-selector-owner-approved)), after which the same step is run again. The existing portal's own PHP version stays owner-reported, because no per-domain read-back has been established; the unchanged selector is the evidence.
+3. **Inspect the temporary document root's `.htaccess`, and validate a handler block only if one exists.** Expect it **absent**, as at G1d (`ls -la "$HOLD"`). If it is absent, the handler is not in a file: record "selector-level handler, no `.htaccess` block", skip the block work in this step and in step 4, and let phase 9 (A2's `web` row) be the proof.
+   If `$HOLD/.htaccess` exists, it appeared after G1d (nothing in this procedure writes it): record its presence and `sha256sum` and **stop for owner review before adopting anything**. Only with the owner's agreement, validate it and keep it as the reviewed block (this refuses anything but one bounded, recognised cPanel PHP 8.5 handler block):
    ```bash
    htaccess_adopt                    # "reviewed block recorded" or a reason and STOP for owner review
    ```
-   If `$HOLD/.htaccess` does not exist, the handler is not in a file: record "vhost-level or default" and skip steps 3 and 4's block work; phase 9 (A2's `web` row) is then the proof. An unfamiliar format (anything the check rejects) is **never** worked around by relaxing the check:
-   it is an owner review.
-4. **Transfer it into the unselected release.** The release is not yet selected (no `current` link points at it), which the helper enforces:
+   An unfamiliar format (anything the check rejects) is **never** worked around by relaxing the check: it is an owner review.
+4. **Transfer a reviewed block into the unselected release (only if step 3 recorded one).** The release is not yet selected (no `current` link points at it), which the helper enforces:
    ```bash
    htaccess_apply                    # appends the reviewed block, mode 644, records it; refuses a selected release, a modified target, or a second block
    htaccess_ok                       # public/.htaccess is exactly what was published
@@ -917,9 +1145,10 @@ but not the challenge path is a failed activation, because the certificate would
    been resolved to a physical `releases/<REL_ID>/public` path.** If it was resolved to a physical release path, **stop**: every later swap would leave it pinned to the old release, and the design depends on the literal `current` link. That is an owner decision.
    Confirm cPanel did not replace the link: `[ -L "$PORTAL_ROOT/current" ] && echo "current is still a symlink" || echo "current was replaced by a directory: see below"`. If cPanel made `current` a real directory (it is then empty apart from `public/`),
    `rmdir "$PORTAL_ROOT/current/public" "$PORTAL_ROOT/current"` removes only empty directories; redo step 5 and set the document root again. This cPanel behaviour is not verified; the check is the control.
-7. **Verify that nothing edited the served release.** `htaccess_ok` and `link_ok` again, after the document-root change and after **any** later cPanel action on the hostname (a PHP re-selection or a redirect toggle; AutoSSL is not run for these names). If either fails, cPanel wrote into
-   the served release: **stop. Do not edit the served release.** Use the recovery loop below.
-8. **Re-read the existing portal's runtime** after every per-domain PHP configuration change and once more now (G1d step 1 to a new file): **any difference from the original is an immediate stop.** Then check the site from outside:
+7. **Verify that nothing edited the served release.** `htaccess_ok` and `link_ok` again, after the document-root change and after **any** later cPanel action on the hostname (a redirect toggle or anything else; no PHP setting is changed by this procedure, and AutoSSL is not run for these names). If either fails, cPanel wrote into
+   the served release: **stop. Do not edit the served release.** Use the failure and rollback procedure below.
+8. **Re-capture the PHP selector state after the document-root change and compare:** `sel_check post-g5`. It must print `PHP selector state identical …` for a capture made by that invocation; **any other outcome is an immediate stop** (failure and rollback procedure below).
+   Repeat it, with its own event name, after every later cPanel action on the hostname (`sel_check after-cpanel`), every swap (`swap-<REL_ID>`), every rollback (`rollback-<REL_ID>`), every failure recovery (`recovery-<REL_ID>`) and at teardown (`teardown`); each is a new file, so a repeat never overwrites an earlier capture. Then check the site from outside:
    ```bash
    curl -fsS -o /dev/null -w '%{http_code} %{scheme}\n' "https://$STAGING_HOST/up"        # 200 https
    curl -s -o /dev/null -w '%{http_code}\n' "https://$STAGING_HOST/.env"                    # not 200 (404 or 403)
@@ -942,16 +1171,16 @@ The `web` row of A2 in phase 9 must show **PHP 8.5.x**. That check, and `acme_pr
 
 *Undo:* set the document root back to `portal-staging-holding` in cPanel, then remove the `current` symlink: `( root_ok && [ -L "$PORTAL_ROOT/current" ] && rm -- "$PORTAL_ROOT/current" )` (it refuses a real directory). Then `acme_probe holding` must pass: the holding root answers the challenge path itself, which is the known-working state the certificate was issued in.
 
-**Recovery loop: phase 9 shows the wrong web PHP version (or step 7 fails).** The loop never edits a served release and never touches the account-wide selector:
+**Failure and rollback: the served web PHP is unexpected, the selector state changed, or step 7 fails.** This procedure never changes PHP: no per-domain setting has been established or used, and a change to the account-level selector could reach the existing portal and the other sites. So a wrong PHP is a **stop and a rollback, not a repair**:
 
-1. **Take the release out of service.** First install: set the document root back to `portal-staging-holding` in cPanel, then remove `current` with the undo command above. Later release: roll `current` back to the previous good release (see *Ordinary rollback*); the failing release is then unselected.
-2. **Select PHP again for the staging hostname only**, in MultiPHP Manager. cPanel now writes, if it writes a file, into the temporary document root. Re-read the existing portal's baseline: any difference is an immediate stop.
-3. **Re-run the G1d probe.** It must report PHP **8.5.x** and `RESULT=PASS`.
-4. **Re-validate.** If `$HOLD/.htaccess` changed, run `htaccess_check "$HOLD/.htaccess"`. The reviewed block (`shared/home/php-handler.block`) is replaced only by a deliberate owner decision: move the old one aside by hand, never overwrite it.
-5. **If the release has no block yet,** `htaccess_apply` it (the release is unselected again). **If it already has a block that did not work, do not patch it:** the helper refuses a second block, and an id is never reused, so build and unpack a **new release** (a new id) and carry the block into that.
-6. **Select again** (step 5 onward, including step 9, `acme_probe release`), re-verify `htaccess_ok`, and repeat phase 9.
-
-If after one pass the web still reports the wrong PHP, stop for an owner decision rather than looping.
+1. **STOP.** Keep the output (the A2 table with its `web` row, the `sel_check` output and the capture file it names, any `htaccess_ok` or `link_ok` message). Nothing is overwritten or deleted: the failed capture, the baseline and the approvals log stay as they are. Do not try to correct PHP from here: not the selector, not its extensions or option toggles, not an `.htaccess`.
+2. **Return the staging hostname to the holding root with the existing guarded rollback.** First install: the *Undo* above (the document root back to `portal-staging-holding` in cPanel, then the guarded removal of `current`; then `acme_probe holding` must pass and `cert_check` must still report `UNCHANGED`, or an evidenced `RENEWED`).
+   Later release: roll `current` back to the previous good release (*Ordinary rollback*); the failing release is then unselected.
+3. **Confirm what was preserved:** a fresh `sel_check recovery-<REL_ID>` against the active approved baseline (identical, unless the difference is what stopped you: then it is reported, not reversed from here), the existing portal and every other site untouched, and `$HOLD/.htaccess` as it was.
+4. **A selected release is never edited.** If cPanel wrote into the served release (step 7), that is evidence: do not patch it. A handler block that did not work is likewise not patched in place (`htaccess_apply` refuses a second block). Such a release, and any release that was changed in any way after it was built, is not used again: the new attempt uses a **new release** (a new id) built and unpacked afresh, and an id is never reused for different contents.
+5. **The same release may be activated again, without a rebuild, when the cause was only the PHP side** (an unexpected served PHP or a changed selector, with step 7 passing). That needs the owner's review first and, if the selector changed, an approved new baseline ([re-baselining](#re-baselining-the-php-selector-owner-approved)). The release must then be unselected and unchanged, and every pre-selection check
+   must pass again exactly as for a first activation: `rel_ok`, `rel_unselected`, `link_ok && wk_content_ok`, `htaccess_ok`, `env_ok`, and `RELEASE` and the archive in `incoming/` still matching what G3 verified. **A compatible PHP patch update does not by itself require a new release.** A new release id is required only when the release needs modification, or when it, its handler block or its ACME link cannot safely be reused (a failed check above, or any doubt about what wrote into it).
+6. **Owner review is required before another activation, of the same release or a new one.** The owner decides whether anything account-wide may change (the selector is theirs and may also affect the existing portal) and opens G5 again explicitly. There is no retry loop.
 
 ### Phase 9: the wrapper by hand, then A2 (G6)
 
@@ -977,8 +1206,8 @@ wrap schedule; echo "schedule exit=$?"                         # the wrapper-lau
 ```
 
 Expect the line `Every context answered the challenge and agrees: CLI, web, queue and scheduler share the configuration, the release and the APP_KEY.` and a four-row table of `ok` with the PHP version and SAPI each ran under.
-**Acceptance requires that the `web` row reports PHP 8.5.x.** A2 itself does not judge PHP versions, so read the row: a web row on any other version means the per-domain PHP setting is not in effect for the served release; stop and
-use the [recovery loop](#phase-8-select-the-release-and-serve-it-g5) at the end of phase 8. Any `missing` or `differs` row also means stop and read [Reading a failure](../architecture/runtime-preflight.md#reading-a-failure). Do not substitute a local PHP server for the web leg.
+**Acceptance requires that the `web` row reports PHP 8.5.x.** A2 itself does not judge PHP versions, so read the row: a web row on any other version means the served release is not running the account's selected PHP (the selector, which this procedure never changes); stop and
+use the [failure and rollback procedure](#phase-8-select-the-release-and-serve-it-g5) at the end of phase 8, which returns the hostname to the holding root and requires owner review before another activation. Any `missing` or `differs` row also means stop and read [Reading a failure](../architecture/runtime-preflight.md#reading-a-failure). Do not substitute a local PHP server for the web leg.
 If the challenge expires, `--issue` again.
 
 ### Phase 10: install the two cron entries (G7)
@@ -1068,9 +1297,10 @@ the swap (step 3) selects it.
 4. `art queue:restart` (a running old worker finishes its job and stops) and `art permission:cache-reset` ([Role Governance](../architecture/role-governance.md)), with `art` pointed at the new release.
 5. **Check the served release is unchanged, wait for the web process to switch, then A2.** `htaccess_ok` first (nothing edited the selected release).  PHP resolves the `current` link through its realpath cache and a cached opcode cache, so the web handler can keep serving the previous release for up to `realpath_cache_ttl` (default 120 seconds; the G1d probe recorded the real
    value, and `opcache.revalidate_freq`) after the swap. Wait at least that long, then `--issue`, `curl /up`, `wrap queue`, `wrap schedule` (or the cron ticks), `--verify`. If the `web` row still reports the previous release after **twice** the recorded
-   `realpath_cache_ttl`, **stop**: the effective document root may be pinned to the old release (phase 8, step 6). **The `web` row must also report PHP 8.5.x**; a different version means the handler did not carry over (step 2). Check `slot_offset_s` and the logs for the
-   first ticks of the new release. After the wait, **`acme_probe release`** (with `setrel` on the new release) must pass, and `cert_check "$(ev cert.last)"` must pass against the most recent verified state (`UNCHANGED`, or `RENEWED` with a `RENEWAL_EVIDENCE` that names the acme.sh run; a swap never causes a certificate change, so an unexplained one is a stop):
-   a swap whose challenge retrieval fails is a failed swap, so roll back (below) and report.
+   `realpath_cache_ttl`, **stop**: the effective document root may be pinned to the old release (phase 8, step 6). **The `web` row must also report PHP 8.5.x**; a different version is a **stop**: run `sel_check recovery-<REL_ID>` against the active approved baseline, check `htaccess_ok` and, if a handler block was recorded, that it carried over (step 2); change no PHP setting, and use the rollback below, with owner review before trying again. Check `slot_offset_s` and the logs for the
+   first ticks of the new release. After the wait, **`acme_probe release`** (with `setrel` on the new release) must pass, and `cert_check "$(ev cert.last)"` must pass against the most recent verified state (`UNCHANGED`, or `RENEWED` with a `RENEWAL_EVIDENCE` that names the acme.sh run; a swap never causes a certificate change, so an unexplained one is a stop).
+   Check the PHP selector again with `sel_check swap-<REL_ID>`: it must print `PHP selector state identical …` for a capture made by that invocation, against the active approved baseline (acceptance [A9](./staging-acceptance.md#a-host-and-php)). A difference stops the swap ([re-baselining](#re-baselining-the-php-selector-owner-approved)).
+   A swap whose challenge retrieval fails is a failed swap, so roll back (below) and report.
 
 **Maintenance release.** Use it when the release changes the built-in role catalogue ([Customer Pilot Surface section 10](../architecture/customer-pilot-surface.md#10-deployment-operator-eligibility-and-rolessync)), when
 a migration is not N-1 compatible or is risky ([Migration and rollback contract](../product/release-0.9-scope-and-architecture.md#6-migration-and-rollback-contract) items 5 and 6), or when the release notes say so.
@@ -1117,7 +1347,7 @@ Keep no more than three releases, to bound disk and inode use. Removal is one ex
 
 **Ordinary rollback.** Valid only if every migration since the previous release was N-1 compatible **and** the rollback reopens no access the current release closes. Check the second condition:
 `art tinker --no-ansi --execute='echo DB::table("users")->whereNotNull("disabled_at")->count();'`; if it is not 0 and the previous release predates account suspension, do not roll back (fix forward). Then, after `setrel <the release you are returning to>`:
-swap `current` back with the same two commands, `art queue:restart` and `art permission:cache-reset`, wait as in step 5, and A2 `--verify` with the same two requirements (the `web` row reports the returned-to release **and** PHP 8.5.x). The previous release's own
+swap `current` back with the same two commands, `art queue:restart` and `art permission:cache-reset`, wait as in step 5, and A2 `--verify` with the same two requirements (the `web` row reports the returned-to release **and** PHP 8.5.x), then `sel_check rollback-<REL_ID>`, which must report the selector identical to the active approved baseline. The previous release's own
 configuration cache was built from the `.env` of its day, and its handler block (if any) is whatever it had at the time; if `shared/.env` changed since, run **`cc`** (never `art config:cache` directly) and `runtime:preflight` in it first, and run
 `htaccess_ok` for it before selecting it (it must still be exactly what was published, block included). **A rollback target has a verified ACME link before it is selected:** `link_ok && wk_content_ok` (a release that lacks the link gets `wk_link` while it is unselected, never after),
 and after the swap and the same wait, **`acme_probe release`** (with `setrel` on the returned-to release) must pass; a rollback whose challenge retrieval fails is not a recovery, so return to a release whose retrieval passes and report. Exceptional recovery (restoring a backup) discards data written since and is the owner's decision, not part of this procedure.
@@ -1160,7 +1390,7 @@ the database if the migration was involved (G1b), after `db_ok` and by exact nam
 5. In cPanel: delete the staging database and its user (`db_ok` was true while it existed; select them by exact name), and the mailbox if it was created for this. **`HOLD` stays**: it is the ACME webroot of a live certificate and the document root the hostname now has.
 6. Discard the staging `APP_KEY`, the database password and the local `.env.staging`. Never reuse them.
 7. Confirm the protected resources are unchanged: `portal.intechral.solutions/`, the existing database, the acme.sh entry, the `MAILTO` setting (the `crontab.teardown` diff above), the acme.sh listing (`"$HOME/.acme.sh/acme.sh" --list`, and `cert_check` for the four `Le_` keys and the certificate against the most recent verified state; `Le_Domain`, `Le_Alt` and `Le_Webroot` unchanged),
-   and **the existing portal's PHP version and handler (re-read the MultiPHP list against the original baseline)**.
+   and **the account-level PHP selector state, which could also affect the existing portal** (`sel_check teardown`: it must print `PHP selector state identical …` against the active approved baseline; the existing portal's own PHP version stays owner-reported, because no per-domain read-back has been established).
 
 **Permanent retirement (G9b): a separate owner decision, never part of G9, never automatic.** Retire the staging hostname only after G9 has completed and the owner has ruled, in writing, that staging is not coming back. Nothing here is run by this procedure or by an agent on its own account:
 
