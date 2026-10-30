@@ -45,6 +45,7 @@ function rtpProductionConfig(): array
         'mail.mailers.smtp.username' => 'MAILUSERMARKER',
         'mail.mailers.smtp.password' => 'MAILPWMARKER',
         'mail.from.address' => 'portal@provider.invalid',
+        'helpdesk.notify_address' => 'helpdesk@provider.invalid',
     ];
 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Support\Runtime;
 
+use App\Support\Helpdesk\HelpdeskNotifyAddress;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Str;
 
@@ -54,7 +55,7 @@ final class RuntimeProfile
             $v[] = 'configuration is not cached: run `php artisan config:cache` (production requires it, so every context reads the same resolved configuration)';
         }
 
-        array_push($v, ...self::database(), ...self::cache(), ...self::queue(), ...self::session(), ...self::mail());
+        array_push($v, ...self::database(), ...self::cache(), ...self::queue(), ...self::session(), ...self::mail(), ...self::helpdesk());
 
         return $v;
     }
@@ -78,6 +79,7 @@ final class RuntimeProfile
             'queue.retry_after' => config('queue.connections.database.retry_after'),
             'session.driver' => self::name(config('session.driver')),
             'mail.default' => self::name(config('mail.default')),
+            'helpdesk.notify_address' => HelpdeskNotifyAddress::usable() === null ? 'missing' : 'configured',
             'configuration_cached' => $configurationCached ?? app()->configurationIsCached(),
             'php' => PHP_VERSION,
         ];
@@ -317,6 +319,21 @@ final class RuntimeProfile
         }
 
         return $v;
+    }
+
+    /**
+     * The operator new-ticket alert destination (EPIC-017 O3, RE-H13). Production does not ship the Helpdesk with the alert silently
+     * off, so a missing or malformed `HELPDESK_NOTIFY_ADDRESS` is a violation like any other, and the cron workers refuse to start on it
+     * (A3). The staging installation runs `APP_ENV=production` and is held to the same rule: it needs an owner-controlled address.
+     * Configuration only: that mail actually reaches the address is proved by a real alert, not here.
+     *
+     * @return list<string>
+     */
+    private static function helpdesk(): array
+    {
+        $violation = HelpdeskNotifyAddress::violation();
+
+        return $violation === null ? [] : [$violation];
     }
 
     /** A configuration NAME (an environment, a driver, a table): printable, bounded, and never a value an operator could have put a secret in. */

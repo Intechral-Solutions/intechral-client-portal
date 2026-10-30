@@ -100,7 +100,7 @@ echo "ok  migrate and database:verify pass on the host-parity server (${tables} 
 # 2b. Runtime preflight (R0.9 WP3-A, slice A1) on the same server: a production-shaped environment, the configuration cached at the ISOLATED path
 # (APP_CONFIG_CACHE above), the live cache and lock probes, and targeted negative controls. Fake, non-deliverable hosts: nothing is sent.
 export APP_URL=https://portal.smoke.invalid CACHE_PREFIX=smoke_prod_ MAIL_MAILER=smtp MAIL_HOST=smtp.smoke.invalid MAIL_PORT=587 MAIL_TIMEOUT=20
-export MAIL_FROM_ADDRESS=portal@smoke.invalid DB_QUEUE_RETRY_AFTER=300
+export MAIL_FROM_ADDRESS=portal@smoke.invalid HELPDESK_NOTIFY_ADDRESS=helpdesk@smoke.invalid DB_QUEUE_RETRY_AFTER=300
 # Review F1 and F2: the session cookie must be Secure (stated explicitly: Laravel's default is null, which the profile refuses), and an inherited
 # MAIL_URL is neutralised (empty, not unset, so src/.env cannot supply one): a non-empty transport URL is itself a violation.
 export SESSION_SECURE_COOKIE=true MAIL_URL=
@@ -127,6 +127,9 @@ probe_rows="$(sql -e "select (select count(*) from portal.cache where \`key\` li
 echo "ok  runtime:preflight passes on the production profile with cached configuration and leaves no probe row"
 
 expect_preflight_failure "a log mail transport" "mail.default is 'log'" MAIL_MAILER=log
+# EPIC-017 O3 / RE-H13: the operator new-ticket alert destination is part of the production profile (empty, not unset, so src/.env cannot supply one).
+expect_preflight_failure "no operator alert destination (HELPDESK_NOTIFY_ADDRESS)" "helpdesk.notify_address is not set" HELPDESK_NOTIFY_ADDRESS=
+expect_preflight_failure "a malformed operator alert destination" "helpdesk.notify_address is not a single valid email address" HELPDESK_NOTIFY_ADDRESS=not-an-address
 # F1: a MAIL_URL replaces the smtp mailer's transport, host and credentials (log://localhost selects the log driver). Refused, and never printed.
 expect_preflight_failure "a MAIL_URL selecting the log driver" "mail.mailers.smtp.url is set" MAIL_URL=log://localhost
 ! grep -qF -e 'log://' -e 'localhost' "$LOG" || fail "runtime:preflight printed the mail URL"

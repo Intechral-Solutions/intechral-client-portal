@@ -288,10 +288,12 @@ it('CHARACTERIZATION notifications: the reply mail carries the ticket number and
 
     $mail = (new TicketRepliedNotification($ticket, $reply))->toMail($owner);
 
+    // Lines that carry a person's text are escaped HtmlString values (EPIC-017 F-3, App\Support\Mail\MailText); for text with no punctuation the
+    // string they hold is exactly the line this test has always pinned, so compare the strings.
     expect($mail->subject)->toBe("[{$ticket->ticket_number}] New reply: VPN drops")
-        ->and($mail->greeting)->toBe('Hello Olivia Owner,')
-        ->and($mail->introLines)->toContain('**Oscar Operator** wrote:')
-        ->and($mail->introLines)->toContain(str_repeat('a', 200).'...')
+        ->and((string) $mail->greeting)->toBe('Hello Olivia Owner,')
+        ->and(array_map('strval', $mail->introLines))->toContain('**Oscar Operator** wrote:')
+        ->and(array_map('strval', $mail->introLines))->toContain(str_repeat('a', 200).'...')
         ->and($mail->actionUrl)->toBe(url("/tickets/{$ticket->id}"));
 });
 

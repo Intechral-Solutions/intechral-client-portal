@@ -26,6 +26,7 @@ non-zero on any violation; `--issue` additionally writes the challenge rows desc
 | Queue | `queue.default` is `database`; no `DB_QUEUE_CONNECTION`; table `jobs`; `retry_after` is an integer of at least **300** (provisional: the cron wrapper's timings keep the worker inside it, [Cron Execution](./cron-execution.md); the host is not yet validated); failed jobs in `failed_jobs` through `database-uuids` on the default connection |
 | Session | `session.driver` is `database`; no `SESSION_CONNECTION`; table `sessions`; **`session.secure` is exactly `true`** (`SESSION_SECURE_COOKIE=true`: Laravel's default is `null`, which also sends the cookie over plain http, and `false` or the string `"true"` do not pass) and **`session.http_only` is exactly `true`**. `SameSite` is deliberately not checked: `None` is permitted when Secure is true, and Secure is what is required |
 | Mail | `mail.default` is `smtp` (the one transport whose bounds WP1 validated) **and `mail.mailers.smtp.transport` is `smtp`**; **`mail.mailers.smtp.url` (`MAIL_URL`) is empty or null**; host is set and is not the development sink; a valid port; a positive timeout; a real `from` address. `log`, `array`, `failover`, `ses` and the rest are refused, not tolerated |
+| Helpdesk alert | `helpdesk.notify_address` (`HELPDESK_NOTIFY_ADDRESS`) is set to **one** valid email address that is not an `example.com`/`.org`/`.net` address (EPIC-017 O3, RE-H13: production does not ship the Helpdesk with the new-ticket alert off). Configuration only: that mail reaches it is proved by a real alert. The value is never printed. **The staging installation is `APP_ENV=production` and is held to this rule too** |
 
 **Why a mail URL is refused, not parsed.** Laravel parses `mail.mailers.smtp.url` over the mailer's own configuration, and the URL can replace the transport and the credentials the checks above
 validated: `MAIL_URL=log://localhost` turns the `smtp` mailer into the log driver (mail is silently not delivered), and `smtp://user:pass@host:port` replaces the host, port and credentials. A non-empty URL
@@ -49,7 +50,7 @@ removed in a `finally` and, if that fails, expiring by themselves. No other tabl
 ## Output and secrets
 
 Human-readable and `--json` forms carry the violations and a short diagnostics block: environment, **effective `CACHE_PREFIX`** and **`APP_URL`** (owner ruling F5: the
-URL with any credentials, query and fragment removed), cache and queue names, `retry_after`, whether configuration is cached, and the PHP version. No key, password, DSN or
+URL with any credentials, query and fragment removed), cache and queue names, `retry_after`, `helpdesk.notify_address` (`configured` or `missing`, never the address), whether configuration is cached, and the PHP version. No key, password, DSN or
 mail credential is ever printed. Messages contain only configuration *names* (an environment, a driver, a table); a value that is not a plain name is printed as
 `(unprintable)`. A failing probe or an unreachable database is reported as the exception class (and SQLSTATE) only, never its message, because a query exception's message carries the
 host, database and SQL. The tests pin all of this with fake secrets.

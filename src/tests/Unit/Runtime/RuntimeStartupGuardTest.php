@@ -100,6 +100,8 @@ describe('an invalid production configuration', function () {
         'smtp transport override' => [['mail.mailers.smtp.transport' => 'log'], "mail.mailers.smtp.transport is 'log'"],
         'MAIL_URL' => [['mail.mailers.smtp.url' => 'log://localhost'], 'mail.mailers.smtp.url is set'],
         'debug enabled' => [['app.debug' => true], 'app.debug must be false'],
+        'no operator alert destination (EPIC-017 O3, RE-H13)' => [['helpdesk.notify_address' => null], 'helpdesk.notify_address is not set'],
+        'malformed operator alert destination' => [['helpdesk.notify_address' => 'not-an-address'], 'helpdesk.notify_address is not a single valid email address'],
     ]);
 
     it('reports every violation at once, in one refusal', function () {
@@ -351,7 +353,7 @@ describe('real processes', function () {
             'APP_ENV' => 'production', 'APP_DEBUG' => 'false', 'APP_TIMEZONE' => 'UTC', 'APP_KEY' => 'base64:'.base64_encode(str_repeat('k', 32)),
             'APP_URL' => 'https://portal.rsg.invalid', 'CACHE_STORE' => 'database', 'CACHE_PREFIX' => 'rsg_', 'SESSION_DRIVER' => 'database',
             'SESSION_SECURE_COOKIE' => 'true', 'QUEUE_CONNECTION' => 'database', 'DB_QUEUE_RETRY_AFTER' => '300', 'MAIL_MAILER' => 'smtp',
-            'MAIL_HOST' => 'smtp.rsg.invalid', 'MAIL_PORT' => '587', 'MAIL_TIMEOUT' => '20', 'MAIL_FROM_ADDRESS' => 'portal@rsg.invalid', 'MAIL_URL' => '',
+            'MAIL_HOST' => 'smtp.rsg.invalid', 'MAIL_PORT' => '587', 'MAIL_TIMEOUT' => '20', 'MAIL_FROM_ADDRESS' => 'portal@rsg.invalid', 'HELPDESK_NOTIFY_ADDRESS' => 'helpdesk@rsg.invalid', 'MAIL_URL' => '',
             'DB_CONNECTION' => 'mysql', 'DB_HOST' => '127.0.0.1', 'DB_PORT' => '1', 'DB_DATABASE' => 'rsg_production', 'DB_USERNAME' => 'rsg',
             'DB_PASSWORD' => 'rsgpw', 'DB_URL' => '', 'LOG_CHANNEL' => 'stderr', 'MAIL_PASSWORD' => 'MAILPWMARKER', 'REDIS_PASSWORD' => 'REDISPWMARKER',
         ];

@@ -983,6 +983,10 @@ On your machine, copy `src/.env.staging.example` to a private file **outside the
 grep -nE '__[A-Z0-9_]+__' .env.staging        # must print nothing
 ```
 
+`HELPDESK_NOTIFY_ADDRESS` (EPIC-017 O3, RE-H13) is **required** in this file: staging runs `APP_ENV=production`, so `runtime:preflight` refuses a release whose configuration lacks it, and the queue and
+scheduler commands then refuse to start. Use an owner-controlled address the mail sink captures. **For a release that introduced it (S1), add it to `shared/.env` before that release's `config:cache`** (the running
+release keeps its own cached configuration until the swap, so adding the line early changes nothing live), then expect `runtime:preflight` to name it until you do.
+
 Generate the key on your machine (`echo "base64:$(openssl rand -base64 32)"`); it exists nowhere else. Then:
 
 ```bash
@@ -1001,7 +1005,7 @@ scp "${ENVFILE:?}" "${SSH_TARGET:?}:portal-staging/incoming/env.new"
 wk_link                                                     # the ACME link (below): creates public/.well-known only if nothing is there, on this unselected release
 env_ok && link_ok && echo "env 0600, release linked to the shared files and to the ACME directory"
 grep -cE '__[A-Z0-9_]+__' "$PORTAL_ROOT/shared/.env"                             # 0
-grep -E '^(APP_ENV|APP_DEBUG|APP_URL|CACHE_STORE|CACHE_PREFIX|SESSION_DRIVER|SESSION_SECURE_COOKIE|QUEUE_CONNECTION|DB_QUEUE_RETRY_AFTER|LOG_STACK|PORTAL_CUSTOMER_SURFACE_MODE)=' "$PORTAL_ROOT/shared/.env"
+grep -E '^(APP_ENV|APP_DEBUG|APP_URL|CACHE_STORE|CACHE_PREFIX|SESSION_DRIVER|SESSION_SECURE_COOKIE|QUEUE_CONNECTION|DB_QUEUE_RETRY_AFTER|LOG_STACK|PORTAL_CUSTOMER_SURFACE_MODE|HELPDESK_NOTIFY_ADDRESS)=' "$PORTAL_ROOT/shared/.env"
 ```
 
 Only those non-secret names are printed: never print the whole file, `APP_KEY` or a `*_PASSWORD`. The uploaded file is briefly created with the host's default mode inside the 0700 `incoming` directory (not reachable by other accounts) before the `chmod`.

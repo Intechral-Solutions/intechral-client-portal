@@ -191,6 +191,34 @@ function ticketRecordNotificationLevels(): NotificationFake
     return $fake;
 }
 
+/**
+ * Notification::fake() whose hand-over THROWS, as a database error on the `jobs` insert would, for every notification of $class (and, when
+ * $when is given, only when $when($notifiable) is true). Every other notification is recorded as usual. The exception message names the class.
+ *
+ * @param  class-string  $class
+ * @param  (Closure(mixed): bool)|null  $when
+ */
+function ticketFailHandOff(string $class, ?Closure $when = null): NotificationFake
+{
+    $fake = new class($class, $when) extends NotificationFake
+    {
+        public function __construct(private string $failing, private ?Closure $when) {}
+
+        public function sendNow($notifiables, $notification, ?array $channels = null)
+        {
+            if ($notification instanceof $this->failing && ($this->when === null || ($this->when)($notifiables))) {
+                throw new RuntimeException('simulated queue insert failure for '.class_basename($notification));
+            }
+
+            parent::sendNow($notifiables, $notification, $channels);
+        }
+    };
+
+    Notification::swap($fake);
+
+    return $fake;
+}
+
 /** Remove everything the faked local disk holds, so no fixture bytes outlive the test. */
 function ticketCleanFakeStorage(): void
 {

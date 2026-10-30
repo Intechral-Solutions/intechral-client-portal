@@ -279,7 +279,7 @@ describe('successful invocations and refused starts', function () {
         $production = [
             'APP_ENV' => 'production', 'APP_DEBUG' => 'false', 'APP_TIMEZONE' => 'UTC', 'APP_URL' => 'https://portal.pca.invalid', 'CACHE_STORE' => 'database', 'CACHE_PREFIX' => 'pca_',
             'SESSION_DRIVER' => 'database', 'SESSION_SECURE_COOKIE' => 'true', 'DB_QUEUE_RETRY_AFTER' => '300', 'MAIL_MAILER' => 'log', 'MAIL_HOST' => 'smtp.pca.invalid',
-            'MAIL_PORT' => '587', 'MAIL_TIMEOUT' => '20', 'MAIL_FROM_ADDRESS' => 'portal@pca.invalid', 'MAIL_URL' => '', 'MAIL_PASSWORD' => 'PCAMAILPW', 'APP_CONFIG_CACHE' => $cache,
+            'MAIL_PORT' => '587', 'MAIL_TIMEOUT' => '20', 'MAIL_FROM_ADDRESS' => 'portal@pca.invalid', 'HELPDESK_NOTIFY_ADDRESS' => 'helpdesk@pca.invalid', 'MAIL_URL' => '', 'MAIL_PASSWORD' => 'PCAMAILPW', 'APP_CONFIG_CACHE' => $cache,
         ];
         $build = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), pcaEnvironment($production), null, 60);
         $build->run();
