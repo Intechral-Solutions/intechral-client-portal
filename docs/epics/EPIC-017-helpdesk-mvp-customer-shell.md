@@ -541,6 +541,12 @@ The transitions caused by O2 (a customer reply) and by `tickets:auto-close` emit
 
 **Not added:** an in-app notification centre, preferences, digests, a status-change notification platform, and mail to every operator.
 
+> **Implementation status (S1, 2026-10-29, uncommitted when written).** The three O3 mails are implemented: the new-ticket alert to `HELPDESK_NOTIFY_ADDRESS` (`NewTicketAlertNotification`), and the
+> "Waiting on you" and "Resolved" mails to the requester (`TicketStatusNotification`), all queued and handed over after commit. F-3 escaping is applied to all five notifications
+> (`App\Support\Mail\MailText`). RE-H13 is enforced by `RuntimeProfile` (and so by `runtime:preflight` and the worker/scheduler startup guard). **Still WP5 and not done:** per-recipient links
+> (operator mail still links to `/tickets/{id}`), the cross-cutting route authorization review, search volume measurement, the NVDA pass and the keyboard-only and 390/768/1280 journeys. Design and limits:
+> [Notification Delivery section 6](../architecture/notification-delivery.md#6-the-o3-notifications-s1).
+
 ## 12. Module search
 
 | | Customer (`/tickets`) | Operator (`/operator/tickets`) |

@@ -81,6 +81,38 @@ it('refuses each way of leaving the approved profile, and says only that one thi
     'mail timeout 0' => ['mail timeout 0', ['mail.mailers.smtp.timeout' => 0], 'mail.mailers.smtp.timeout must be a positive number'],
     'example sender' => ['example sender', ['mail.from.address' => 'hello@example.com'], 'mail.from.address is not a real sender address'],
     'invalid sender' => ['invalid sender', ['mail.from.address' => 'not-an-address'], 'mail.from.address is not a real sender address'],
+    'no operator alert destination' => ['no operator alert destination', ['helpdesk.notify_address' => null], 'helpdesk.notify_address is not set (HELPDESK_NOTIFY_ADDRESS)'],
+    'empty operator alert destination' => ['empty operator alert destination', ['helpdesk.notify_address' => ''], 'helpdesk.notify_address is not set'],
+    'blank operator alert destination' => ['blank operator alert destination', ['helpdesk.notify_address' => "  \n"], 'helpdesk.notify_address is not set'],
+    'operator alert destination of the wrong type' => ['operator alert destination of the wrong type', ['helpdesk.notify_address' => ['ops@provider.invalid']], 'helpdesk.notify_address is not set'],
+    'malformed operator alert destination' => ['malformed operator alert destination', ['helpdesk.notify_address' => 'not-an-address'], 'helpdesk.notify_address is not a single valid email address'],
+    'two operator alert destinations' => ['two operator alert destinations', ['helpdesk.notify_address' => 'a@provider.invalid,b@provider.invalid'], 'helpdesk.notify_address is not a single valid email address'],
+    'operator alert destination with a header injection' => ['operator alert destination with a header injection', ['helpdesk.notify_address' => "a@provider.invalid\nBcc: b@provider.invalid"], 'helpdesk.notify_address is not a single valid email address'],
+    'documentation operator alert destination' => ['documentation operator alert destination', ['helpdesk.notify_address' => 'ops@example.org'], 'helpdesk.notify_address is a documentation address'],
+]);
+
+it('accepts a surrounding-whitespace operator alert destination, as dispatch will trim it', function () {
+    config(['helpdesk.notify_address' => "  helpdesk@provider.invalid \n"]);
+
+    expect(RuntimeProfile::configuration(true))->toBe([]);
+});
+
+it('never puts the operator alert destination into a violation', function (string $value) {
+    config(['helpdesk.notify_address' => $value]);
+
+    expect(implode(' | ', RuntimeProfile::configuration(true)))->not->toContain('LEAKMARKER');
+})->with(['LEAKMARKER', 'LEAKMARKER@example.com', 'LEAKMARKER@a.invalid,LEAKMARKER@b.invalid']);
+
+it('reports whether the operator alert destination is usable in the diagnostics, never the address', function (?string $value, string $expected) {
+    config(['helpdesk.notify_address' => $value]);
+
+    $diagnostics = RuntimeProfile::diagnostics(true);
+
+    expect($diagnostics['helpdesk.notify_address'])->toBe($expected)->and(json_encode($diagnostics))->not->toContain('LEAKMARKER');
+})->with([
+    'configured' => ['LEAKMARKER@provider.invalid', 'configured'],
+    'missing' => [null, 'missing'],
+    'unusable' => ['LEAKMARKER', 'missing'],
 ]);
 
 it('reports an unsupported database default without cascading into read/write checks', function () {

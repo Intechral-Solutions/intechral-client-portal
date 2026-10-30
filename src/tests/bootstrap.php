@@ -9,6 +9,9 @@ $testEnvironment = [
     'DB_USERNAME' => 'portal',
     'DB_PASSWORD' => 'portal',
     'DB_URL' => '',
+    // EPIC-017 O3: unset means "no operator alert". A value inherited from the shell or the container would make every ticket test send
+    // a second notification and change what they assert. Tests that need the alert set the config key themselves.
+    'HELPDESK_NOTIFY_ADDRESS' => '',
 ];
 
 foreach ($testEnvironment as $name => $value) {

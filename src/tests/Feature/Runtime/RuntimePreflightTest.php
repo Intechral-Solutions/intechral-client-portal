@@ -175,6 +175,17 @@ describe('runtime:preflight', function () {
         expect($code)->toBe(1)->and($output)->toContain("mail.default is 'log'");
     });
 
+    it('fails without an operator new-ticket alert destination, naming the rule and never the value (EPIC-017 O3, RE-H13)', function (?string $value, string $expected) {
+        rtpUseProductionProfile(['helpdesk.notify_address' => $value]);
+
+        [$code, $output] = rtpRun();
+
+        expect($code)->toBe(1)->and($output)->toContain($expected)->toContain('HELPDESK_NOTIFY_ADDRESS')->not->toContain('LEAKMARKER');
+    })->with([
+        'unset' => [null, 'helpdesk.notify_address is not set'],
+        'malformed' => ['LEAKMARKER', 'helpdesk.notify_address is not a single valid email address'],
+    ]);
+
     it('fails when configuration is not cached, and still reports the diagnostics', function () {
         rtpUseProductionProfile();
         app()->instance('config_loaded_from_cache', false);

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Invitation;
+use App\Support\Mail\MailText;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -47,13 +48,14 @@ class InvitationNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $url = route('invitation.show', ['token' => $this->invitation->token]);
-        $inviterName = $this->invitation->invitedBy?->name ?? config('app.name');
+        // The inviter's name is user-authored text inside a Markdown template (EPIC-017 F-3, App\Support\Mail\MailText).
+        $inviter = MailText::escape($this->invitation->invitedBy?->name ?? config('app.name'));
         $expiresIn = '48 hours';
 
         return (new MailMessage)
             ->subject("You've been invited to ".config('app.name'))
             ->greeting('Hello!')
-            ->line("{$inviterName} has invited you to join ".config('app.name').'.')
+            ->line(MailText::line($inviter, ' has invited you to join '.config('app.name').'.'))
             ->action('Accept Invitation', $url)
             ->line("This invitation expires in {$expiresIn}. If you did not expect this invitation, you may ignore this email.");
     }

@@ -7,14 +7,19 @@ use App\Models\TicketAttachment;
 use App\Models\TicketReply;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
+use App\Notifications\NewTicketAlertNotification;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
+use App\Notifications\TicketStatusNotification;
 use App\Rules\AllowedTicketAttachment;
 use App\Shared\Pilot\CustomerPilotGate;
+use App\Support\Helpdesk\HelpdeskNotifyAddress;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -30,6 +35,9 @@ class TicketService
         'pending_user' => 'in_progress',
         'resolved' => 'open',
     ];
+
+    /** Hours a ticket stays `resolved` before `tickets:auto-close` may close it; the Resolved mail tells the customer the same number. */
+    public const AUTO_CLOSE_HOURS = 72;
 
     public const CLOSED_REPLY_MESSAGE = 'This request is closed. Raise a new request if you need more help.';
 
@@ -63,8 +71,11 @@ class TicketService
             return $ticket;
         });
 
-        // After commit only: a mail must never describe a ticket that rolled back.
-        $user->notify(new TicketCreatedNotification($ticket));
+        // After commit only: a mail must never describe a ticket that rolled back, and a mail that cannot be queued must never make a
+        // ticket that DID commit look as if it failed. Each hand-over is its own after-commit callback, so one failing (reported, not thrown)
+        // cannot stop the other, whether this runs on its own or inside a caller's transaction.
+        $this->handOffAfterCommit(fn () => $user->notify(new TicketCreatedNotification($ticket)));
+        $this->handOffAfterCommit(fn () => $this->alertOperators($ticket));
 
         return $ticket;
     }
@@ -134,7 +145,9 @@ class TicketService
      */
     public function transition(Ticket $ticket, User $actor, string $newStatus): void
     {
-        DB::transaction(function () use ($ticket, $actor, $newStatus) {
+        $historyId = null;
+
+        DB::transaction(function () use ($ticket, $actor, $newStatus, &$historyId) {
             $current = Ticket::query()->lockForUpdate()->findOrFail($ticket->getKey());
 
             if (! $current->canTransitionTo($newStatus)) {
@@ -161,16 +174,23 @@ class TicketService
 
             $current->save();
 
-            TicketStatusHistory::create([
+            $historyId = TicketStatusHistory::create([
                 'ticket_id' => $current->id,
                 'user_id' => $actor->id,
                 'old_status' => $old,
                 'new_status' => $newStatus,
                 'created_at' => now(),
-            ]);
+            ])->getKey();
 
             $ticket->setRawAttributes($current->getAttributes(), true);
         });
+
+        // EPIC-017 O3: "Waiting on you" and "Resolved" tell the requester. Handed over only once the OUTERMOST transaction commits:
+        // transition() also runs inside the bulk action's batch transaction, which rolls back as one, and a rolled-back change must
+        // announce nothing. A customer's own reply (to in_progress or open) and auto-close (which does not come through here) notify no one.
+        if ($historyId !== null && in_array($newStatus, TicketStatusNotification::STATUSES, true)) {
+            $this->handOffAfterCommit(fn () => $this->notifyRequesterOfStatus($ticket, $actor, $newStatus, (int) $historyId));
+        }
     }
 
     public function assign(Ticket $ticket, ?int $assigneeId, User $actor): void
@@ -192,7 +212,7 @@ class TicketService
      * list was read (EPIC-017 O2) therefore wins, and no false "resolved → closed" row appears.
      * Returns the number of tickets actually closed.
      */
-    public function autoCloseResolved(int $idleHours = 72): int
+    public function autoCloseResolved(int $idleHours = self::AUTO_CLOSE_HOURS): int
     {
         $cutoff = now()->subHours($idleHours);
         $candidates = Ticket::where('status', 'resolved')
@@ -253,6 +273,64 @@ class TicketService
     }
 
     // ── Private helpers ──────────────────────────────────────
+
+    /**
+     * Hand a notification to the dispatcher once the outermost database transaction has committed: at once when none is open, and never
+     * when it rolls back (Laravel's `DB::afterCommit`, which the test framework also honours). It is what lets a service method that may be
+     * called inside a caller's transaction (the bulk action) still send mail "only after commit".
+     *
+     * A hand-over that fails (the `jobs` insert, a policy lookup) is REPORTED and swallowed here, and nowhere else. By then the change is
+     * committed, so an exception thrown from this callback would surface from the commit, make the request answer 500 for something that
+     * succeeded, and stop every later after-commit callback (the rest of a bulk update). The queue worker's own exceptions are a different
+     * path and are not touched: `shouldSend()` still propagates and the attempt is retried.
+     */
+    private function handOffAfterCommit(callable $handOff): void
+    {
+        DB::afterCommit(function () use ($handOff): void {
+            try {
+                $handOff();
+            } catch (Throwable $e) {
+                report($e);
+            }
+        });
+    }
+
+    /**
+     * The new-ticket operator alert (EPIC-017 O3). A destination that is unset or unusable is logged and the request goes on. Production
+     * cannot reach that: RuntimeProfile refuses it, and the cron workers refuse to start. The address is never written to the log.
+     */
+    private function alertOperators(Ticket $ticket): void
+    {
+        $address = HelpdeskNotifyAddress::usable();
+
+        if ($address === null) {
+            Log::log(
+                app()->environment('production') ? 'error' : 'warning',
+                'The new-ticket operator alert was skipped: HELPDESK_NOTIFY_ADDRESS is not set to a usable address.',
+                ['ticket_id' => $ticket->getKey()],
+            );
+
+            return;
+        }
+
+        Notification::route('mail', $address)->notify(new NewTicketAlertNotification($ticket));
+    }
+
+    /**
+     * The requester hears about "Waiting on you" and "Resolved" (EPIC-017 O3): not when they caused the change themselves, not when
+     * the account is suspended, and only while they may still view the ticket. TicketStatusNotification re-decides all of it, and
+     * whether a newer change has overtaken this one, when the worker runs it.
+     */
+    private function notifyRequesterOfStatus(Ticket $ticket, User $actor, string $status, int $historyId): void
+    {
+        $requester = $ticket->user()->first();
+
+        if ($requester === null || $requester->is($actor) || $requester->isSuspended() || Gate::forUser($requester)->denies('view', $ticket)) {
+            return;
+        }
+
+        $requester->notify(new TicketStatusNotification($ticket, $status, $historyId));
+    }
 
     private function ticketNumberFor(Ticket $ticket): string
     {

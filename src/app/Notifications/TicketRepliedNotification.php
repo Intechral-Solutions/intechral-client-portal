@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Ticket;
 use App\Models\TicketReply;
+use App\Support\Mail\MailText;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,7 +14,6 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 
 /**
  * A queued mail about a ticket (or reply) that no longer exists has nothing left to say, so the job is
@@ -64,13 +64,16 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $preview = Str::limit($this->reply->body, 200);
+        // F-3: the title, the author's name and the preview are user-authored text inside a Markdown template (App\Support\Mail\MailText).
+        // The preview keeps its pinned shape: the first 200 characters, then `...` (the ellipsis is ours, so it is appended after escaping).
+        $body = MailText::plain($this->reply->body);
+        $preview = MailText::line(MailText::escape(rtrim(mb_substr($body, 0, 200))), mb_strlen($body) > 200 ? '...' : '');
 
         return (new MailMessage)
-            ->subject("[{$this->ticket->ticket_number}] New reply: {$this->ticket->title}")
-            ->greeting("Hello {$notifiable->name},")
+            ->subject("[{$this->ticket->ticket_number}] New reply: ".MailText::plain($this->ticket->title))
+            ->greeting(MailText::line('Hello ', MailText::escape($notifiable->name), ','))
             ->line("A new reply has been added to ticket **{$this->ticket->ticket_number}**.")
-            ->line("**{$this->reply->user->name}** wrote:")
+            ->line(MailText::line('**', MailText::escape($this->reply->user->name), '** wrote:'))
             ->line($preview)
             ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
     }

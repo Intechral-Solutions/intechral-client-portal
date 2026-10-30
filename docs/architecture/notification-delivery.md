@@ -6,8 +6,9 @@ worker runs it, how long a send can take, how often it is retried, and what it s
 **Companions:** [Account Lifecycle](./account-lifecycle.md) (the suspension check) · [Authentication Flow](./auth-flow.md)
 (invitations).
 
-Three notifications are queued (`ShouldQueue`): `InvitationNotification`, `TicketCreatedNotification` and
-`TicketRepliedNotification`. Password reset is **not** queued and remains synchronous: it is sent inside the request, with no
+Five notifications are queued (`ShouldQueue`): `InvitationNotification`, `TicketCreatedNotification`,
+`TicketRepliedNotification` and, since S1 (EPIC-017 O3), `NewTicketAlertNotification` and `TicketStatusNotification`
+([section 6](#6-the-o3-notifications-s1)). Password reset is **not** queued and remains synchronous: it is sent inside the request, with no
 retries and no send-time check of its own. It does, however, use the same SMTP transport and so **inherits the new
 `MAIL_TIMEOUT`** (a request that sends a reset mail to a silent server now waits about 40 s at the default instead of about
 120 s, and then fails with the same transport error).
@@ -116,3 +117,73 @@ Other residual risks: a responsive or byte-dripping peer can hold a send longer 
 if that is set too low (section 4);
 `shouldSend()` narrows but cannot close the window between its check and the SMTP acceptance; a hung peer consumes one of
 the three attempts, so three consecutive silent-peer hangs at the default timeout fail the job after about 6 minutes (40 + 60 + 40 + 180 + 40 s).
+
+## 6. The O3 notifications (S1)
+
+Closes EPIC-017 O3, option (c) ([EPIC-017 section 11](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#11-email-and-notifications)):
+nobody was told when a request arrived (G-E1), and a customer was not told when it needed them or was resolved (G-E2). Same retry policy as every
+queued mail here: three attempts, 60 s then 180 s apart, a vanished ticket discarded rather than failed.
+
+| Event | Recipient | Sent when | Not sent when |
+|---|---|---|---|
+| A customer raises a request | **one** mailbox, `HELPDESK_NOTIFY_ADDRESS` (an address, not an account) | after the ticket and its attachments commit | the address is unset or unusable (logged, the request still succeeds); the creation rolls back |
+| Status becomes `pending_user` ("Waiting on you") | the requester | after the transition commits | the requester made the change; the account is suspended; they may not `view` the ticket |
+| Status becomes `resolved` | the requester | as above | as above |
+
+Never mailed by these: the assignee, any operator, any `tickets.assign` holder (that is the O3 option (d) the owner did not choose), anyone on a
+customer reply (`pending_user` to `in_progress`, `resolved` to `open`) or on `tickets:auto-close` (to `closed`), or on any other status.
+
+**After commit, including inside a caller's transaction.** The requester's confirmation, the operator alert and the status mails are each handed over with
+`DB::afterCommit` (through `TicketService::handOffAfterCommit`), not by position in the code. `TicketService::transition()` also runs inside the bulk action's batch
+transaction, which commits or rolls back as one, so a rolled-back batch announces nothing and a committed one announces every ticket once. Replies keep their original
+placement: after the service's own transaction.
+
+**A hand-over that fails does not undo, or hide, a commit.** By the time the callback runs the ticket change is committed, so an exception from the `jobs` insert (or from
+the policy lookup that decides who to tell) would surface from the commit, make the request answer 500 for something that succeeded, and stop every later callback, which in a
+bulk update is every remaining ticket's mail. `handOffAfterCommit` therefore catches the `Throwable`, calls `report()` and carries on: the customer sees success, the next
+notification is still handed over, and the failure is in the log. Each hand-over is its own callback, so on ticket creation the customer confirmation and the operator alert
+fail independently. This is the dispatch side only. The queue worker is unchanged: a database error inside `shouldSend()` still propagates, fails the attempt and is retried
+(60 s, then 180 s). A failed hand-over is not retried (nothing was queued); the log line is the record, and for an alert the first real one is checked in the acceptance rows.
+
+**Re-decided when the worker runs the status mail** (`TicketStatusNotification::shouldSend`), in this order: the ticket still exists; the recipient is
+the ticket's requester; the ticket is still in the status being announced; **no later status change exists**; the recipient still passes the ticket policy's
+`view`. A suspended account is dropped earlier, by the existing H3 listener. The "no later change" rule is what stops two "Resolved" mails when an operator
+flips resolved, open, resolved inside the queue delay (only the mail for the newest change is sent), and stops "Waiting on you" arriving about a request
+that has since been resolved or closed. A database error here is not caught: it fails the attempt and the queue retries.
+
+**What the mails contain.** The alert: number, title, category, priority, requester name, a preview of the description cut to 200 characters, and a link to
+`operator.tickets.show`. The status mails: number, title, the customer label ([`RequesterTicketPresenter::STATUS_LABELS`](../../src/app/Http/Presenters/RequesterTicketPresenter.php)),
+what to do, and a link to `tickets.show`; "Resolved" says a reply reopens the request and that it is closed automatically after
+`TicketService::AUTO_CLOSE_HOURS` (72) hours. None carries an internal note, a reply, an attachment name, a requester address, SLA wording or the name of the
+person who changed the status.
+
+**User-authored text (F-3).** Laravel renders every `MailMessage` line, greeting and name from one Blade template twice: through CommonMark into the HTML part, and
+through plain `{{ }}` encoding plus one `html_entity_decode` into the text/plain part. A title or name containing `[text](https://elsewhere)`, `![x](https://elsewhere/p.png)`,
+`**` or a backtick used to become a live link, a remote image or formatting in the HTML part; and the first fix (a backslash before every punctuation character) showed those
+backslashes verbatim in the text part (S1 review M1). The representation that is right for both is a **numeric character reference**: CommonMark decodes `&#42;` to a literal `*`
+and never lets a reference stand for structure, and the text part's `html_entity_decode` turns it back into the typed character. All user-authored text in all five
+notifications therefore goes through [`MailText`](../../src/app/Support/Mail/MailText.php): `plain()` for a subject (one line, controls and bidirectional overrides removed),
+`escape()` for one piece of user text (the same, then every ASCII punctuation character as `&#NN;`, returned as an `HtmlString` that neither template encodes again) and
+`line()` for a line or greeting that mixes the template's own words, which keep their Markdown (`**Subject:**`), with escaped parts. No Markdown service, theme or view is
+replaced. A genuine backslash is `&#92;`, which CommonMark does not read as an escape character, so it is kept.
+The tests deliver each of the five notifications through the real mail channel and read both parts: the HTML part must contain the typed characters, link only to the
+application and have the same elements as the same message with innocuous text; the text part must hold the typed text exactly and be the same message as the innocuous one
+in every other character. The payloads are Markdown links, images, emphasis, code, raw HTML, autolinks, reference links, lists, tables, entities, every ASCII punctuation mark,
+Unicode and literal backslashes.
+Limits, stated: a bare `https://` in the text stays text in this HTML, but a mail client may link it itself; Laravel's renderer ends with `str_replace('\[', '[')` over the HTML
+part, so a backslash a person typed immediately before `[` is not shown there (the text part is untouched); a reply preview is one line (its line breaks used to survive; it is
+still the first 200 characters followed by `...`). Per-recipient links (operator mail linking to the operator page) remain WP5 work and are unchanged: the reply mail still links to `/tickets/{id}`.
+
+**Closed customer-surface mode (accepted for this release).** The customer mails (confirmation, reply, Waiting on you, Resolved) are not suppressed by `PORTAL_CUSTOMER_SURFACE_MODE`.
+In `closed` mode a customer's ticket routes are server-side 404s ([Customer Pilot Surface](./customer-pilot-surface.md)), so the link in such a mail leads nowhere (tested:
+`TicketStatusNotificationTest`, "closed customer-surface mode"). A customer cannot raise a request in closed mode, so only an operator working an older ticket reaches this, and
+production sets `pilot` before the first invitation. Suppressing the mail by mode would couple the notifications to customer-surface routing, which this release does not do.
+
+**`HELPDESK_NOTIFY_ADDRESS` is part of the production profile.** One valid address (not a list, not `example.com`/`.org`/`.net`), read through
+`helpdesk.notify_address`. `runtime:preflight` refuses it unset or malformed, and so do the queue and scheduler commands (A3), so a release cannot go
+live with the alert silently off (RE-H13). Local and test environments may leave it unset: the alert is skipped with a warning (an error in production,
+which the preflight should have prevented). The test suite pins it to empty in `tests/bootstrap.php`, so a value exported in the shell or the container cannot change what the ticket tests assert
+(guard: `tests/Unit/Configuration/TestEnvironmentPinTest.php`); a test that needs the alert sets `helpdesk.notify_address` itself. **The staging installation runs `APP_ENV=production` and is held to the same rule**; give it an owner-controlled
+address that the staging mail sink captures. Configuration proves the address is well formed; **that mail reaches it is proved only by a real alert**, which
+the first-install acceptance and the production acceptance each record. The alert is also the cheapest independent record of every ticket number issued, which
+is why the destination should be a mailbox that is kept ([EPIC-017 C6](../product/release-0.9-scope-and-architecture.md#73-ticket-number-continuity)).
