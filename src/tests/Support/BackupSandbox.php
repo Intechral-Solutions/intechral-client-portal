@@ -8,6 +8,7 @@ use App\Support\Backup\DumpReader;
 use App\Support\Rehearsal\RehearsalTarget;
 use Closure;
 use Illuminate\Encryption\Encrypter;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -40,6 +41,19 @@ final class BackupSandbox
     public static function stranger(): array
     {
         return self::$stranger ??= self::keyPair('stranger');
+    }
+
+    /**
+     * Close this test's database connections now. Each Pest test builds a new application, and the previous one (with
+     * its PDO connections) is only freed when PHP's cycle collector runs; these tests open several rehearsal connections
+     * each, so on a server with a low max_connections (50 in the compose `db` service) they can run out mid-suite.
+     */
+    public static function release(): void
+    {
+        foreach (['rehearsal_'.RehearsalTarget::PRIMARY, 'rehearsal_'.RehearsalTarget::RESTORE, null] as $name) {
+            DB::purge($name);
+        }
+        gc_collect_cycles();
     }
 
     public static function encrypter(string $key = self::APP_KEY): Encrypter

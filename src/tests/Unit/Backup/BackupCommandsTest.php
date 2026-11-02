@@ -16,6 +16,8 @@ beforeEach(function () {
     RehearsalSandbox::use();
 });
 
+afterEach(fn () => BackupSandbox::release());
+
 function asRehearsalPrimary(): void
 {
     config([

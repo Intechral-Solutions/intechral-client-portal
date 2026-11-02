@@ -22,8 +22,12 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    // The uploads changed the primary rehearsal database; the next baseline() rebuilds it.
-    RehearsalDatabase::clean(RehearsalTarget::restore());
+    try {
+        // The uploads changed the primary rehearsal database; the next baseline() rebuilds it.
+        RehearsalDatabase::clean(RehearsalTarget::restore());
+    } finally {
+        BackupSandbox::release();
+    }
 });
 
 it('makes sets that verify and restore while attachments are being uploaded', function () {

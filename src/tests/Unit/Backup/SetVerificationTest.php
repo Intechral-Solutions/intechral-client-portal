@@ -27,6 +27,8 @@ beforeEach(function () {
     $this->opened = BackupSandbox::copy($made['opened']);
 });
 
+afterEach(fn () => BackupSandbox::release());
+
 /** A copy of the sealed set, in its own parent, named by its id. */
 function sealedCopy(string $set): string
 {

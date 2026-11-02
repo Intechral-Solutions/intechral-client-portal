@@ -23,6 +23,8 @@ beforeEach(function () {
     $this->root = BackupSandbox::directory();
 });
 
+afterEach(fn () => BackupSandbox::release());
+
 /** Every entry under a backup root, relative. */
 function entries(string $root): array
 {

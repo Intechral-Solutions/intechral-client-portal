@@ -17,6 +17,8 @@ beforeEach(function () {
     $this->baseline = RehearsalSandbox::baseline();
 });
 
+afterEach(fn () => BackupSandbox::release());
+
 it('creates a sealed set that opens, verifies and restores with every check passing', function () {
     $result = BackupSandbox::create();
     $set = $result['directory'];

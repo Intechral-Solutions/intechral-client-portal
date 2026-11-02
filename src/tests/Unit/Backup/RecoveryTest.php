@@ -30,15 +30,19 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    // A recovered database carries no rehearsal marker, so the harness's guarded clean would (rightly) refuse it.
-    // Drop its tables here, after proving the connection is the rehearsal restore database.
-    $connection = $this->target->connection();
-    expect($connection->selectOne('select database() as d')->d)->toBe('intechral_client_portal_rehearsal_restore');
-    $connection->statement('set foreign_key_checks = 0');
-    foreach ($connection->select('show tables') as $row) {
-        $connection->statement('drop table `'.array_values((array) $row)[0].'`');
+    try {
+        // A recovered database carries no rehearsal marker, so the harness's guarded clean would (rightly) refuse it.
+        // Drop its tables here, after proving the connection is the rehearsal restore database.
+        $connection = $this->target->connection();
+        expect($connection->selectOne('select database() as d')->d)->toBe('intechral_client_portal_rehearsal_restore');
+        $connection->statement('set foreign_key_checks = 0');
+        foreach ($connection->select('show tables') as $row) {
+            $connection->statement('drop table `'.array_values((array) $row)[0].'`');
+        }
+        $connection->statement('set foreign_key_checks = 1');
+    } finally {
+        BackupSandbox::release();
     }
-    $connection->statement('set foreign_key_checks = 1');
 });
 
 function recovery(string $private, bool $maintenance = true, ?string $key = null): Recovery

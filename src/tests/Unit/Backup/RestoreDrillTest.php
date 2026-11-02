@@ -29,8 +29,12 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    config(['app.env' => 'testing']);
-    RehearsalDatabase::clean($this->restore);
+    try {
+        config(['app.env' => 'testing']);
+        RehearsalDatabase::clean($this->restore);
+    } finally {
+        BackupSandbox::release();
+    }
 });
 
 function drill(string $opened, ?string $key = null, int $legacy = 0, bool $keep = false): array
