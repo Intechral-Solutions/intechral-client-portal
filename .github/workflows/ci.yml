@@ -153,6 +153,17 @@ jobs:
           ./vendor/bin/pest tests/Feature/Admin/PermissionCacheDatabaseStoreTest.php --fail-on-skipped --log-junit "$report"
           php tests/Support/verify_database_cache_security.php "$report"
 
+      # WP-B1: tests/Unit/Backup run the MariaDB client tools (`mariadb-dump`, `mariadb`) against the compose db service, as the
+      # backup tooling does on the host. The runner has no MariaDB client (Ubuntu's 10.11 package replaces its MySQL client); gpg,
+      # tar and gzip are already there. docs/operations/backup-and-recovery.md.
+      - name: Install the MariaDB client tools (backup tests)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mariadb-client
+          mariadb-dump --version
+          gpg --version | head -n 1
+
       # tests/bootstrap.php pins the MariaDB testing database; TestDatabaseSafety refuses any other.
       # Redis is reachable here too, so the Redis variants run in the whole suite as well. The database-store
       # security group ran in its own mandatory step above and is not repeated.

@@ -131,6 +131,8 @@ After the comparison the harness backs up the primary (database and files), rest
 
 Rehearsal-only: the reserved databases, fixtures, the PHP dump and restore, the marker-based cleanup, `./dev rehearse*`. A production backup, restore and deployment package is a separate piece of work that must **rehearse its own tooling** with this harness, not reuse the dump.
 
+The production backup and restore tooling is [Backup and Recovery](../operations/backup-and-recovery.md) (WP-B1). It does not reuse this harness's PHP dump: it uses `mariadb-dump` and the `mariadb` client, and its restore drill (`backup:drill`) writes only to this harness's **restore** database and file root, under the same `TargetGuard` and lock.
+
 ## Review follow-ups
 
 The independent review (Opus 5.5) of R0.9-1A concluded **SAFE TO COMMIT**, with no Critical, High or Medium findings. Its findings are numbered J-1 to J-12. J-6 and J-7 (a code comment and this document's wording) were corrected with that commit. R0.9-1B completed the obligations that were due before it:
