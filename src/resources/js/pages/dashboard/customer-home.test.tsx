@@ -19,12 +19,11 @@ vi.mock('@inertiajs/react', () => ({
  * any.
  */
 const row = (id: number, title: string) => ({
-    id,
-    number: `TKT-000${id}`,
+    number: `TK-0000${id}-ABCDE`,
     title,
     createdAt: '2026-10-07T09:00:00+00:00',
     createdAtHuman: '1 day ago',
-    href: `/tickets/${id}`,
+    href: `/tickets/TK-0000${id}-ABCDE`,
     visit: 'document' as const,
 });
 
@@ -78,8 +77,8 @@ describe('the customer Home', () => {
         const waiting = screen.getByRole('region', { name: 'Waiting on you' });
         const link = within(waiting).getByRole('link', { name: /Which printer model/ });
 
-        expect(link).toHaveAttribute('href', '/tickets/1');
-        expect(link).toHaveTextContent('TKT-0001');
+        expect(link).toHaveAttribute('href', '/tickets/TK-00001-ABCDE');
+        expect(link).toHaveTextContent('TK-00001-ABCDE');
         expect(within(link).getByText('1 day ago')).toHaveAttribute(
             'datetime',
             '2026-10-07T09:00:00+00:00',
@@ -87,7 +86,7 @@ describe('the customer Home', () => {
 
         const open = screen.getByRole('region', { name: 'Your open requests' });
 
-        expect(within(open).getAllByRole('link', { name: /TKT-/ })).toHaveLength(2);
+        expect(within(open).getAllByRole('link', { name: /TK-/ })).toHaveLength(2);
         expect(within(open).getByText('In progress')).toBeInTheDocument();
         // A waiting request is a call to action in its own section: it carries no status chip.
         expect(within(waiting).queryByText('Open')).toBeNull();

@@ -265,7 +265,7 @@ it('needs no id for a wrapped array-named checkbox, and a lone one needs an aria
     expect($input->hasAttribute('id'))->toBeFalse()
         ->and($input->getAttribute('name'))->toBe('permissions[]')
         ->and(uiAccessibilityViolations($html))->toBe([])
-        ->and(uiAccessibilityViolations(uiRender('<x-ui.checkbox name="ticket_ids[]" id="ticket-cb-1" value="1" />')))->not->toBe([]);
+        ->and(uiAccessibilityViolations(uiRender('<x-ui.checkbox name="ticket_refs[]" id="ticket-cb-TK-00001-ABCDE" value="TK-00001-ABCDE" />')))->not->toBe([]);
 });
 
 it('keeps a group checkbox pattern truthful: role group, labelled, one group error, described by it', function () {

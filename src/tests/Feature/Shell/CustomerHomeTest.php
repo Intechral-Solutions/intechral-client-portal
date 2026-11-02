@@ -122,8 +122,8 @@ it('carries a deliberately small, allowlisted row: no requester, priority, SLA, 
 
     $props = customerHomeProps($user);
 
-    expect(array_keys($props['waitingOnYou'][0]))->toEqualCanonicalizing(['id', 'number', 'title', 'createdAt', 'createdAtHuman', 'href', 'visit'])
-        ->and(array_keys($props['openRequests'][0]))->toEqualCanonicalizing(['id', 'number', 'title', 'createdAt', 'createdAtHuman', 'href', 'visit', 'status', 'statusLabel']);
+    expect(array_keys($props['waitingOnYou'][0]))->toEqualCanonicalizing(['number', 'title', 'createdAt', 'createdAtHuman', 'href', 'visit'])
+        ->and(array_keys($props['openRequests'][0]))->toEqualCanonicalizing(['number', 'title', 'createdAt', 'createdAtHuman', 'href', 'visit', 'status', 'statusLabel']);
 
     // Keys, at any depth — never substrings of values, which are free text.
     $keys = customerHomeKeysDeep($props);

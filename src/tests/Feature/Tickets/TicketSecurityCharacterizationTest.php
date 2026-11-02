@@ -184,7 +184,7 @@ it('TARGET H1: the operator reply route (internal notes) still refuses the ticke
 
 it('BASELINE H1: replying to a missing ticket id is a 404', function () {
     $this->actingAs(ticketUser())
-        ->post(route('tickets.replies.store', ['ticket' => 999_999_999]), ['body' => 'x'])
+        ->post(route('tickets.replies.store', ['ticket' => 'TK-ZZZZZ-ZZZZZ']), ['body' => 'x'])
         ->assertNotFound();
 });
 
@@ -214,7 +214,7 @@ it('BASELINE H2: the owner downloads ticket-body and public-reply attachments by
     $f = ticketWithAttachments();
 
     foreach (['body' => 'BODY-BYTES', 'public' => 'PUBLIC-BYTES'] as $key => $bytes) {
-        $response = $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f[$key]));
+        $response = $this->actingAs($f['owner'])->get(ticketAttachmentUrl($f[$key]));
 
         $response->assertOk()->assertDownload($f[$key]->filename);
         expect($response->streamedContent())->toBe($bytes)
@@ -225,7 +225,7 @@ it('BASELINE H2: the owner downloads ticket-body and public-reply attachments by
 it('BASELINE H2: an operator downloads an internal-note attachment', function () {
     $f = ticketWithAttachments();
 
-    $response = $this->actingAs($f['operator'])->get(route('tickets.attachment.download', $f['internal']));
+    $response = $this->actingAs($f['operator'])->get(ticketAttachmentUrl($f['internal']));
 
     $response->assertOk()->assertDownload('internal-secret.txt');
     expect($response->streamedContent())->toBe('INTERNAL-SECRET-BYTES');
@@ -249,7 +249,7 @@ it('TARGET H2: attachment download follows Ticket, then parent reply, then attac
     $actual = [];
     foreach ($actors as $name => $actor) {
         foreach (['body', 'public', 'internal'] as $key) {
-            $actual[$name][$key] = $this->actingAs($actor)->get(route('tickets.attachment.download', $f[$key]))->getStatusCode();
+            $actual[$name][$key] = $this->actingAs($actor)->get(ticketAttachmentUrl($f[$key]))->getStatusCode();
         }
     }
 
@@ -262,7 +262,7 @@ it('TARGET H2: the ticket owner cannot fetch an internal-note attachment by gues
     $page = $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
     expect(json_encode(ticketOwnProps($page)))->not->toContain('internal-secret.txt');
 
-    $response = $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f['internal']));
+    $response = $this->actingAs($f['owner'])->get(ticketAttachmentUrl($f['internal']));
 
     $response->assertForbidden();
     expect($response->headers->get('Content-Disposition'))->toBeNull()
@@ -274,18 +274,18 @@ it('BASELINE H2: an unrelated customer is refused every attachment of a foreign 
     $customer = ticketUser();
 
     foreach (['body', 'public', 'internal'] as $key) {
-        $this->actingAs($customer)->get(route('tickets.attachment.download', $f[$key]))->assertForbidden();
+        $this->actingAs($customer)->get(ticketAttachmentUrl($f[$key]))->assertForbidden();
     }
 });
 
-it('BASELINE H2: existence answers are 403 for an existing foreign id, 404 for an unknown id, and 404 for an authorized row whose file is gone', function () {
+it('BASELINE H2: a viewer who cannot see the ticket gets 403 whatever the attachment id; an authorized viewer gets 404 for an unknown id and for a row whose file is gone', function () {
     $f = ticketWithAttachments();
 
-    $this->actingAs(ticketUser())->get(route('tickets.attachment.download', $f['public']))->assertForbidden();
-    $this->actingAs(ticketUser())->get(route('tickets.attachment.download', ['attachment' => 999_999_999]))->assertNotFound();
+    $this->actingAs(ticketUser())->get(ticketAttachmentUrl($f['public']))->assertForbidden();
+    $this->actingAs(ticketUser())->get(route('tickets.attachment.download', [$f['public']->ticket, 999_999_999]))->assertForbidden();
 
     Storage::disk('local')->delete($f['public']->path);
-    $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $f['public']))->assertNotFound();
+    $this->actingAs($f['owner'])->get(ticketAttachmentUrl($f['public']))->assertNotFound();
 });
 
 it('TARGET H2: an attachment whose parent reply belongs to another ticket is refused to everyone, operators included', function () {
@@ -300,8 +300,8 @@ it('TARGET H2: an attachment whose parent reply belongs to another ticket is ref
     $crossedPublic = ticketAttachment($f['ticket'], $foreignPublic, $f['operator'], 'crossed-public.txt', 'CROSSED');
 
     foreach ([$f['owner'], $f['operator'], ticketAgent()] as $actor) {
-        $this->actingAs($actor)->get(route('tickets.attachment.download', $crossedInternal))->assertForbidden();
-        $this->actingAs($actor)->get(route('tickets.attachment.download', $crossedPublic))->assertForbidden();
+        $this->actingAs($actor)->get(ticketAttachmentUrl($crossedInternal))->assertForbidden();
+        $this->actingAs($actor)->get(ticketAttachmentUrl($crossedPublic))->assertForbidden();
     }
 });
 

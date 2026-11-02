@@ -197,7 +197,8 @@ final class BaselineFixtures
     {
         $ticket = fn (int $id, int $owner, ?int $assignee, string $title, string $priority, string $status, array $extra = []) => array_merge([
             'id' => $id,
-            'ticket_number' => 'TKT-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT),
+            // A fixed, canonical reference (C6-R): deterministic for the baseline hash, never id-derived in production.
+            'ticket_number' => sprintf('TK-REH00-%05d', $id),
             'user_id' => $owner,
             'company_id' => null,
             'assignee_id' => $assignee,

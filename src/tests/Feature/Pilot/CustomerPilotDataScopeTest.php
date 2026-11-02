@@ -107,7 +107,7 @@ it('refuses internal-note attachments to a restricted account, on its own ticket
     pilotMode('pilot');
 
     foreach (['foreignInternal', 'foreignPublic', 'ownInternal'] as $name) {
-        foreach ([$this->actingAs($account)->get(route('tickets.attachment.download', $fx[$name])), $this->actingAs($account)->getJson(route('tickets.attachment.download', $fx[$name]))] as $response) {
+        foreach ([$this->actingAs($account)->get(ticketAttachmentUrl($fx[$name])), $this->actingAs($account)->getJson(ticketAttachmentUrl($fx[$name]))] as $response) {
             $response->assertForbidden();
             expect($response->getContent())->not->toContain('internal bytes')->not->toContain('foreign public bytes');
         }
@@ -243,7 +243,7 @@ it('keeps every business route closed to these accounts in closed mode, whatever
     $project = pilotProjectFor($account, 'Mine One');
     pilotMode('closed');
 
-    foreach (['/tickets', "/tickets/{$fx['own']->id}", "/attachments/{$fx['ownInternal']->id}/download", '/projects', "/projects/{$project['project']->id}", '/operator/tickets'] as $uri) {
+    foreach (['/tickets', "/tickets/{$fx['own']->ticket_number}", parse_url(ticketAttachmentUrl($fx['ownInternal']), PHP_URL_PATH), '/projects', "/projects/{$project['project']->id}", '/operator/tickets'] as $uri) {
         $this->actingAs($account)->get($uri)->assertNotFound();
         $this->actingAs($account)->getJson($uri)->assertNotFound();
     }
@@ -262,7 +262,7 @@ it('leaves an eligible operator with the broader ticket and project access it ha
     // Foreign ticket: the operator is sent to the operator view, and may read the internal attachment and post a note.
     $this->actingAs($operator)->get(route('tickets.show', $fx['foreign']))->assertStatus(302)->assertRedirect(route('operator.tickets.show', $fx['foreign']));
     $this->actingAs($operator)->get(route('operator.tickets.show', $fx['foreign']))->assertOk();
-    $this->actingAs($operator)->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertOk();
+    $this->actingAs($operator)->get(ticketAttachmentUrl($fx['foreignInternal']))->assertOk();
     $this->actingAs($operator)->post(route('operator.tickets.replies.store', $fx['foreign']), ['body' => 'operator internal', 'is_internal' => true])->assertRedirect();
     expect(TicketReply::where('body', 'operator internal')->firstOrFail()->is_internal)->toBeTrue();
 
@@ -277,7 +277,7 @@ it('leaves a custom role that was deliberately made eligible with its tickets.as
     $staff = pilotCustomRoleUser('eligible-staff', [...PermissionCatalogue::userDefaults(), 'portal.operator', 'tickets.assign', 'projects.admin']);
     pilotMode('pilot');
 
-    $this->actingAs($staff)->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertOk();
+    $this->actingAs($staff)->get(ticketAttachmentUrl($fx['foreignInternal']))->assertOk();
     $this->actingAs($staff)->get(route('tickets.show', $fx['foreign']))->assertRedirect(route('operator.tickets.show', $fx['foreign']));
     $this->actingAs($staff)->get("/projects/{$project['project']->id}")->assertOk()->assertInertia(fn (Assert $page) => $page->component('projects/show'));
 });
@@ -288,7 +288,7 @@ it('leaves legacy mode exactly as it was for the same accounts', function () {
     $project = pilotProjectFor(pilotCustomer(), 'Theirs Only');
     pilotMode('legacy');
 
-    $this->actingAs($account)->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertOk();
+    $this->actingAs($account)->get(ticketAttachmentUrl($fx['foreignInternal']))->assertOk();
     $this->actingAs($account)->get("/projects/{$project['project']->id}")->assertOk()->assertInertia(fn (Assert $page) => $page->component('projects/show'));
 });
 
@@ -300,17 +300,17 @@ it('widens and narrows scope on the next request when eligibility is granted and
     $project = pilotProjectFor(pilotCustomer(), 'Theirs Only');
     pilotMode('pilot');
 
-    $this->actingAs($account)->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertForbidden();
+    $this->actingAs($account)->get(ticketAttachmentUrl($fx['foreignInternal']))->assertForbidden();
     $this->actingAs($account)->get("/projects/{$project['project']->id}")->assertNotFound();
 
     User::findOrFail($account->id)->givePermissionTo('portal.operator');
     scopeNextRequest();
-    $this->actingAs(User::findOrFail($account->id))->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertOk();
+    $this->actingAs(User::findOrFail($account->id))->get(ticketAttachmentUrl($fx['foreignInternal']))->assertOk();
     $this->actingAs(User::findOrFail($account->id))->get("/projects/{$project['project']->id}")->assertOk();
 
     User::findOrFail($account->id)->revokePermissionTo('portal.operator');
     scopeNextRequest();
-    $this->actingAs(User::findOrFail($account->id))->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertForbidden();
+    $this->actingAs(User::findOrFail($account->id))->get(ticketAttachmentUrl($fx['foreignInternal']))->assertForbidden();
     $this->actingAs(User::findOrFail($account->id))->get("/projects/{$project['project']->id}")->assertNotFound();
 });
 
@@ -319,9 +319,9 @@ it('narrows an operator to a customer on the next request when the operator role
     $user = pilotOperator();
     pilotMode('pilot');
 
-    $this->actingAs($user)->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertOk();
+    $this->actingAs($user)->get(ticketAttachmentUrl($fx['foreignInternal']))->assertOk();
 
     User::findOrFail($user->id)->removeRole('operator');
     scopeNextRequest();
-    $this->actingAs(User::findOrFail($user->id))->get(route('tickets.attachment.download', $fx['foreignInternal']))->assertForbidden();
+    $this->actingAs(User::findOrFail($user->id))->get(ticketAttachmentUrl($fx['foreignInternal']))->assertForbidden();
 });

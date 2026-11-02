@@ -237,16 +237,16 @@ test.describe('as an operator', () => {
         // The embedded tracker's only remaining host is the OPERATOR ticket page (EPIC-011E WP7, §21; and
         // EPIC-017 WP2 "N2 continuity": `/tickets/{id}` became the requester-safe page with no time data, so
         // the tracker moved to `operator/tickets/show` until WP3 replaces it). Tickets have no delete route
-        // and DevSeeder seeds none per run, so this uses the seeder's idempotent fixture ticket (`TKT-E2E1`)
+        // and DevSeeder seeds none per run, so this uses the seeder's idempotent fixture ticket (`TK-E2E00-00001`)
         // rather than creating one here; teardown removes only the timer entries this test creates, never the
         // ticket. The queue is searched by number, so the fixture is found whatever else the database holds.
-        await page.goto('/operator/tickets?search=TKT-E2E1');
+        await page.goto('/operator/tickets?search=TK-E2E00-00001');
         await page
             .getByRole('row')
-            .filter({ hasText: 'TKT-E2E1' })
+            .filter({ hasText: 'TK-E2E00-00001' })
             .getByRole('link', { name: 'View' })
             .click();
-        await expect(page).toHaveURL(/\/operator\/tickets\/\d+$/);
+        await expect(page).toHaveURL(/\/operator\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
         const ticketUrl = page.url();
 
         // Start from the Blade tracker (the request passes the hardened context validation). The
@@ -254,12 +254,12 @@ test.describe('as an operator', () => {
         await page.getByRole('button', { name: /Start Timer/ }).click();
         await expect(page.getByText('Timer running')).toBeVisible();
         await expectRunningTimers(page, 1);
-        await expect(timerPill(page)).toContainText('TKT-E2E1');
+        await expect(timerPill(page)).toContainText('TK-E2E00-00001');
 
         // A document navigation into an Inertia page mounts React, which hydrates from Laravel.
         await page.goto('/time');
         await expectRunningTimers(page, 1);
-        await expect(timerPill(page)).toContainText('TKT-E2E1');
+        await expect(timerPill(page)).toContainText('TK-E2E00-00001');
         // The retired strip is gone from both renderers, and no duplicate affordance exists.
         await expect(page.locator('#timer-overlay')).toHaveCount(0);
         await expect(timerPill(page)).toHaveCount(1);
@@ -267,7 +267,7 @@ test.describe('as an operator', () => {
         // And back to Blade: the same server record, shown by the Blade pill.
         await page.goto(ticketUrl);
         await expectRunningTimers(page, 1);
-        await expect(timerPill(page)).toContainText('TKT-E2E1');
+        await expect(timerPill(page)).toContainText('TK-E2E00-00001');
         await expect(page.getByText('Timer running')).toBeVisible();
 
         // Stop through React so the timer is finished before cleanup runs.

@@ -110,9 +110,19 @@ class TicketController extends Controller
         ]);
     }
 
-    public function downloadAttachment(TicketAttachment $attachment)
+    /**
+     * The attachment is looked up BY the bound ticket (its `ticket_id`), so it covers the first message's files and every reply's,
+     * and an attachment id that belongs to another ticket is a 404, never that ticket's file. The policy then decides, unchanged:
+     * ticket visibility, and internal-note attachments only for those who may see internal notes.
+     */
+    public function downloadAttachment(Ticket $ticket, string $attachment)
     {
-        $this->authorize('downloadAttachment', [$attachment->ticket, $attachment]);
+        // First: someone who cannot see the ticket learns nothing about which attachment ids it has.
+        $this->authorize('view', $ticket);
+
+        $attachment = TicketAttachment::where('ticket_id', $ticket->id)->findOrFail($attachment);
+
+        $this->authorize('downloadAttachment', [$ticket, $attachment]);
 
         abort_unless(Storage::disk('local')->exists($attachment->path), 404);
 

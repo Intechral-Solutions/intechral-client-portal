@@ -170,8 +170,8 @@ it('lists no row for a project the viewer cannot open, even one still assigned t
 it('lists no ticket-kind task, whether or not TicketPolicy would open the ticket (Q6)', function () {
     // Until WP3 both rows were listed through the org tab, only the openable ticket linked.
     $this->orgUser->givePermissionTo('tasks.view_all');
-    $foreignTicket = Ticket::factory()->create(['user_id' => $this->owner->id, 'company_id' => $this->company->id, 'ticket_number' => 'TKT-7001']);
-    $ownTicket = Ticket::factory()->create(['user_id' => $this->orgUser->id, 'company_id' => $this->company->id, 'ticket_number' => 'TKT-7002']);
+    $foreignTicket = Ticket::factory()->create(['user_id' => $this->owner->id, 'company_id' => $this->company->id, 'ticket_number' => 'TK-T7001-AAAAA']);
+    $ownTicket = Ticket::factory()->create(['user_id' => $this->orgUser->id, 'company_id' => $this->company->id, 'ticket_number' => 'TK-T7002-AAAAA']);
     Task::factory()->standalone()->create(['ticket_id' => $foreignTicket->id, 'title' => 'On foreign ticket', 'assignee_id' => $this->orgUser->id]);
     Task::factory()->standalone()->create(['ticket_id' => $ownTicket->id, 'title' => 'On own ticket', 'assignee_id' => $this->orgUser->id, 'created_by' => $this->orgUser->id]);
 
@@ -179,7 +179,7 @@ it('lists no ticket-kind task, whether or not TicketPolicy would open the ticket
         $response = $this->actingAs($this->orgUser)->get(route('tasks.index', ['view' => $view, 'completion' => 'any']))->assertOk();
 
         expect(taskIndexRows($response))->toBe([], $view);
-        expect(json_encode($response->viewData('page')['props']['tasks']))->not->toContain('TKT-700');
+        expect(json_encode($response->viewData('page')['props']['tasks']))->not->toContain('TK-T700');
     }
 });
 

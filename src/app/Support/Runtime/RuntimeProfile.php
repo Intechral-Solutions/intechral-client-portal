@@ -80,6 +80,7 @@ final class RuntimeProfile
             'session.driver' => self::name(config('session.driver')),
             'mail.default' => self::name(config('mail.default')),
             'helpdesk.notify_address' => HelpdeskNotifyAddress::usable() === null ? 'missing' : 'configured',
+            'helpdesk.rereference_allowed' => config('helpdesk.rereference_allowed') === true ? 'open' : 'closed',
             'configuration_cached' => $configurationCached ?? app()->configurationIsCached(),
             'php' => PHP_VERSION,
         ];
@@ -332,8 +333,15 @@ final class RuntimeProfile
     private static function helpdesk(): array
     {
         $violation = HelpdeskNotifyAddress::violation();
+        $violations = $violation === null ? [] : [$violation];
 
-        return $violation === null ? [] : [$violation];
+        // C6-R (ADR-008): the legacy ticket-reference conversion gate exists only for the one staging conversion. A deployed runtime that
+        // still has it open is misconfigured, so the preflight fails and the cron workers refuse to start until it is closed.
+        if (config('helpdesk.rereference_allowed') === true) {
+            $violations[] = 'helpdesk.rereference_allowed must be false: the legacy ticket-reference conversion gate is closed after the staging conversion (TICKET_REREFERENCE_ALLOWED)';
+        }
+
+        return $violations;
     }
 
     /** A configuration NAME (an environment, a driver, a table): printable, bounded, and never a value an operator could have put a secret in. */

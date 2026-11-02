@@ -316,11 +316,13 @@ final class IntegritySnapshot
 
     private function ticketChecks(): void
     {
-        $this->check('ticket_number_differs_from_padded_id',
-            "select count(*) as n from tickets where ticket_number regexp '^TKT-[0-9]{4,}\$' and ticket_number <> concat('TKT-', lpad(id, 4, '0'))");
-        // EPIC-010D preflight P3b: a number above the highest id could be reissued by the allocator.
-        $this->check('epic_010d_p3b_number_above_max_id',
-            "select count(*) as n from tickets where ticket_number regexp '^TKT-[0-9]{4,}\$' and cast(substring(ticket_number, 5) as unsigned) > (select coalesce(max(id), 0) from tickets)");
+        // Release 0.9 C6-R (ADR-008): the public reference is random, so the old id-derived checks (number equals the padded id, number above
+        // the highest id) are meaningless. What a recovered or upgraded database must show instead: every reference is canonical (a legacy
+        // `TKT-` value left over means `tickets:rereference` has not run), and none is a duplicate even by case or padding.
+        $this->check('ticket_number_not_canonical',
+            "select count(*) as n from tickets where cast(ticket_number as binary) not regexp '^TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\$' or char_length(ticket_number) <> 14");
+        $this->check('ticket_number_duplicates',
+            'select count(*) as n from (select 1 from tickets group by lower(trim(ticket_number)) having count(*) > 1) x');
         // EPIC-010D preflight P4b: an attachment and its reply on different tickets.
         $this->check('epic_010d_p4b_attachment_reply_ticket_mismatch',
             'select count(*) as n from ticket_attachments a join ticket_replies r on r.id = a.reply_id where r.ticket_id <> a.ticket_id');
@@ -467,7 +469,6 @@ final class IntegritySnapshot
                                  where mhr.model_type = ? and mhr.model_id = t.assignee_id and p.name = 'tickets.assign' and p.guard_name = 'web')",
                 [$user, $user]
             ),
-            'epic_010d_p3a_numbers_not_in_service_form' => $one("select count(*) as n from tickets where ticket_number not regexp '^TKT-[0-9]{4,}\$'"),
             'epic_010d_p4_internal_note_attachments' => $one('select count(*) as n from ticket_attachments a join ticket_replies r on r.id = a.reply_id where r.is_internal = 1'),
             'tickets_by_status' => $this->grouped('select status as k, count(*) as n from tickets group by status'),
             'ticket_ids' => $this->db->table('tickets')->orderBy('id')->pluck('id')->map(fn ($v) => (int) $v)->all(),

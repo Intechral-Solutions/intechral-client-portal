@@ -46,7 +46,7 @@ spec files need that persona or how many cores the machine has. `playwright.conf
 | `e2e-login-flow@intechral.test` | user | `auth-migration.spec.ts` (invalid credentials, valid login, logout, password confirmation) | The test's subject is the login form itself, not a permission; using the reusable operator email would add this file's login churn to the same Fortify bucket every worker's own operator login already shares |
 | `e2e-profile-mutation@intechral.test` | user | `inertia-coexistence.spec.ts` (account-mutation test) | Edits its own name/email; a failure part-way must never leave the *shared* operator account looking like a different person for every later run |
 | `e2e-signout@intechral.test` | operator (all permissions) | `shell.spec.ts` (sign-out test) | Sessions are database-backed, so signing out destroys the session row presented; the test's assertion (no admin item leaks into a fully-permissioned account's menu) holds for any fully-permissioned account, not specifically the shared one |
-| `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`, `customer-helpdesk.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop) and the Helpdesk journeys 3–8 (below). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TKT-E2E2` request that is waiting on it, and **every** disposable `E2E-…` ticket the Helpdesk spec raises, which is what makes those tickets eligible for the suite-level cleanup |
+| `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`, `customer-helpdesk.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop) and the Helpdesk journeys 3–8 (below). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TK-E2E00-00002` request that is waiting on it, and **every** disposable `E2E-…` ticket the Helpdesk spec raises, which is what makes those tickets eligible for the suite-level cleanup |
 | `e2e-customer-other@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 8); `contextFor('customerOther')` | A second, unrelated customer, used only to prove isolation: it is refused `e2e-customer`'s ticket and attachments and never lists them. It creates no ticket |
 | `e2e-operational-member@intechral.test` | user + `projects.manage` (direct) | `shell.spec.ts`, `blade-shell.spec.ts`, `time-migration.spec.ts`, `tasks-migration.spec.ts`; `persona: 'operationalMember'` | A customer-scoped actor that still gets the **Operational** shell (`projects.manage` is an operator-surface capability), for specs whose subject is the rail, drawer, breadcrumb or timer pill and tray, which a plain customer no longer sees. It is the single owner of the member active-timer set that `time-migration.spec.ts` documents |
 | dynamically created manager (`e2e-wp3-manager-<timestamp>@intechral.test`) | user + `projects.manage` | `projects-migration.spec.ts` (membership test) | Created by the test itself to prove a *specific* non-admin manager's read-only membership view; a fresh, explicitly anonymous context (`contextFor('anonymous')`) is required so it doesn't inherit the project's authenticated `storageState` |
@@ -104,14 +104,14 @@ from the Blade account menu.
 ## Customer Helpdesk journeys (`customer-helpdesk.spec.ts`)
 
 EPIC-017 §25.3 journeys 3–8, plus two scenarios the epic's rulings add, in real Chromium against the
-React customer pages (`/tickets`, `/tickets/create`, `/tickets/{id}`) and the existing Blade operator
-page (`/operator/tickets/{id}`). It adds browser-level integration coverage only; every rule below is
+React customer pages (`/tickets`, `/tickets/create`, `/tickets/{reference}`) and the existing Blade operator
+page (`/operator/tickets/{reference}`). It adds browser-level integration coverage only; every rule below is
 owned by Pest and Vitest (EPIC-017 §25.1, §25.2) and is asserted here only as far as the browser makes
 it observable.
 
 | # | Test | What the browser proves |
 |---|---|---|
-| 3 | Create with an attachment | Submit through the real form; redirect to the detail page; the flash "Request TKT-… received." is announced in a status region; the ticket number is on the page; the attachment is listed with name and size; a real browser download and a direct request both return the uploaded bytes with `Content-Disposition: attachment`; no company field, no status/assignee/internal/timer controls |
+| 3 | Create with an attachment | Submit through the real form; redirect to the detail page; the flash "Request TK-… received." is announced in a status region; the ticket number is on the page; the attachment is listed with name and size; a real browser download and a direct request both return the uploaded bytes with `Content-Disposition: attachment`; no company field, no status/assignee/internal/timer controls |
 | 3b | Refused upload | An HTML document named `notes.txt` is refused by content, with the server's message under the attachments field and focus moved to it; the customer's input survives; the unique title then finds **no** ticket by list search, so nothing was created. It does not repeat the per-type matrix (`TicketAttachmentPolicyTest`) |
 | 4 | List, search, filter | Search by the unique title and a status filter put `search` and `status` in the URL; opening the match and pressing **Back** restores the URL, the search box, the status select and the row; a status the ticket does not have shows the filtered-empty state (the customer has other requests, so it is not "no requests yet"); widening finds it again; **All requests** on the detail page deliberately returns to the unfiltered `/tickets` |
 | 5 | Customer reply | An Inertia XHR (`X-Inertia`) submits the reply; it renders with the customer as author; "Reply sent." is announced; the new entry has focus; the composer, Send button state and file input are cleared; the status stays `open`; a reload still has it |
@@ -130,8 +130,8 @@ created or seeded for this spec. Extra contexts are always opened with `contextF
 the literal prefix `E2E-` plus 16 hex characters of per-ticket randomness. It is therefore eligible for
 the cleanup command (`E2E-` title and a seeded E2E customer as requester) and can never collide with
 another attempt, worker or run. Tests find their ticket by the URL captured from the create redirect or
-by that unique title: never by list position, row order or id arithmetic. `TKT-E2E1` and `TKT-E2E2` are
-never touched (the Home tests rely on `TKT-E2E2` staying `pending_user`). No time entry or task is
+by that unique title: never by list position, row order or id arithmetic. `TK-E2E00-00001` and `TK-E2E00-00002` are
+never touched (the Home tests rely on `TK-E2E00-00002` staying `pending_user`). No time entry or task is
 created or linked, which the cleanup command would refuse. Attachments are small in-memory `.txt`
 buffers, so there is nothing on disk for the test to manage; the server-side files are removed with
 their ticket.
@@ -163,7 +163,7 @@ before its job runs is discarded by `#[DeleteWhenMissingModels]` (see above), an
   other customer (reply or create-as): Pest/Vitest only.
 - Widths other than 1280×900 for these pages, and keyboard-only operation of the composer and filters. The Focused
   frame at 390/768/1280 in both themes is `customer-shell.spec.ts`'s `/tickets` (list) route only; `/tickets/create`
-  and `/tickets/{id}` are in no width matrix, and this spec drives them with a pointer. **Owned by EPIC-017 WP5**, as the
+  and `/tickets/{reference}` are in no width matrix, and this spec drives them with a pointer. **Owned by EPIC-017 WP5**, as the
   browser proof of exit criterion §33.1 (§16 widths, §17.1 keyboard), within the Release 0.9 customer-readiness scope
   (owner-confirmed 2026-10-11); until it exists §33.1 is not met
   ([EPIC-017 A2.10](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#a210-g3-b-review-follow-ups)).
@@ -250,7 +250,7 @@ Tickets have no delete route, so the suite's tickets are removed by a local/test
 case-sensitive prefix `E2E-`, **and** its requester is one of the seeded E2E customers,
 `e2e-customer@intechral.test` or `e2e-customer-other@intechral.test` (`DevSeeder`). Anything else is left alone:
 an ordinary ticket, an `e2e-…` in lower case, an `E2E-…` owned by the operator or any other account, and the seeded
-fixtures `TKT-E2E1` and `TKT-E2E2` (titled `E2E fixture: …`, so never eligible, whoever owns them). Replies,
+fixtures `TK-E2E00-00001` and `TK-E2E00-00002` (titled `E2E fixture: …`, so never eligible, whoever owns them). Replies,
 attachment rows and status histories go with the ticket through their existing `cascadeOnDelete` keys, and the
 ticket's private files go with it. Both conditions are checked again on the locked row just before it is removed
 (below), so a ticket renamed or reassigned after the run began is left alone.

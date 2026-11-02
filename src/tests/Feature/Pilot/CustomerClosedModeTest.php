@@ -70,9 +70,9 @@ it('refuses a closed customer every business route, verb and JSON request, discl
 
     $p = $fx['project']->id;
     $requests = [
-        ['GET', '/tickets'], ['GET', '/tickets/create'], ['GET', "/tickets/{$ticket->id}"],
+        ['GET', '/tickets'], ['GET', '/tickets/create'], ['GET', "/tickets/{$ticket->ticket_number}"],
         ['POST', '/tickets', ['title' => 'x', 'description' => 'x', 'category' => 'General', 'priority' => 'low']],
-        ['POST', "/tickets/{$ticket->id}/replies", ['body' => 'closed reply']],
+        ['POST', "/tickets/{$ticket->ticket_number}/replies", ['body' => 'closed reply']],
         ['GET', '/projects'], ['GET', "/projects/{$p}"], ['GET', "/projects/{$p}/board"], ['GET', "/projects/{$p}/milestones"],
         ['GET', '/my/invoices'], ['GET', "/my/invoices/{$invoice->id}"], ['GET', "/billing/invoices/{$invoice->id}/pay"],
         ['GET', '/time'], ['GET', '/tasks'], ['GET', '/pages'], ['GET', "/pages/{$page->slug}"],

@@ -169,3 +169,23 @@ it('treats a check that cannot run as a failure, never as a pass', function () {
 
     expect(differencesFrom($this->baseline))->toBe([]);
 });
+
+it('flags a ticket reference that is not canonical (legacy number or wrong case) and passes again once it is back', function () {
+    $connection = ($this->db)();
+    $rows = $connection->table('tickets')->orderBy('id')->limit(2)->get(['id', 'ticket_number']);
+    $connection->table('tickets')->where('id', $rows[0]->id)->update(['ticket_number' => 'TKT-0001']);
+    $connection->table('tickets')->where('id', $rows[1]->id)->update(['ticket_number' => strtolower($rows[1]->ticket_number)]);
+
+    try {
+        $snapshot = IntegritySnapshot::capture($this->primary);
+
+        expect($snapshot['checks']['ticket_number_not_canonical'])->toBe(2)
+            ->and(IntegritySnapshot::failures($snapshot))->toContain('ticket_number_not_canonical: 2');
+    } finally {
+        foreach ($rows as $row) {
+            $connection->table('tickets')->where('id', $row->id)->update(['ticket_number' => $row->ticket_number]);
+        }
+    }
+
+    expect(differencesFrom($this->baseline))->toBe([]);
+});

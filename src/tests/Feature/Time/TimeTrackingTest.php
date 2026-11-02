@@ -178,7 +178,7 @@ it('allows authorized embedded task and ticket timer contexts', function () {
         ->assertJsonPath('context.type', 'Task');
 
     $this->actingAs($user)
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
     expect(TimeEntry::where('ticket_id', $ticket->id)->exists())->toBeFalse();
@@ -186,7 +186,7 @@ it('allows authorized embedded task and ticket timer contexts', function () {
     $user->givePermissionTo('tickets.assign');
 
     $this->actingAs(User::findOrFail($user->id))
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()
         ->assertJsonPath('context.type', 'Ticket');
 });
@@ -224,7 +224,7 @@ it('identifies the context record by id on every timer context DTO', function ()
         ->assertJsonPath('context.type', 'Task')
         ->assertJsonPath('context.id', $task->id);
     $this->actingAs($user)
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()
         ->assertJsonPath('context.type', 'Ticket')
         ->assertJsonPath('context.id', $ticket->id);

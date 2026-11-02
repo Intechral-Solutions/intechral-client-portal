@@ -96,7 +96,7 @@ it('TARGET H5 (stale assignee, D2): the stale assignment stays through unrelated
     // Re-submitting the stale assignee fails eligibility, single and bulk; nothing is logged.
     $this->actingAs($operator)->put(route('operator.tickets.assign', $ticket), ['assignee_id' => $former->id])
         ->assertSessionHasErrors('assignee_id');
-    $this->actingAs($operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$ticket->id], 'action' => 'assign', 'assignee_id' => $former->id])
+    $this->actingAs($operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$ticket->ticket_number], 'action' => 'assign', 'assignee_id' => $former->id])
         ->assertSessionHasErrors('assignee_id');
     expect($ticket->fresh()->assignee_id)->toBe($former->id)
         ->and(Activity::forSubject($ticket)->count())->toBe(0);
@@ -137,7 +137,7 @@ it('BASELINE H5: customers cannot reach single or bulk assignment', function () 
 
     $this->actingAs($customer)->put(route('operator.tickets.assign', $ticket), ['assignee_id' => $customer->id])->assertForbidden();
     $this->actingAs($customer)->post(route('operator.tickets.bulk'), [
-        'ticket_ids' => [$ticket->id], 'action' => 'assign', 'assignee_id' => $customer->id,
+        'ticket_refs' => [$ticket->ticket_number], 'action' => 'assign', 'assignee_id' => $customer->id,
     ])->assertForbidden();
 
     expect($ticket->fresh()->assignee_id)->toBeNull();
@@ -152,7 +152,7 @@ it('TARGET H5: bulk assignment to an ineligible user is a validation error and n
     $t2 = ticketFor(ticketUser());
 
     $this->actingAs(ticketUser('operator'))
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => [$t1->id, $t2->id], 'action' => 'assign', 'assignee_id' => $customer->id])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$t1->ticket_number, $t2->ticket_number], 'action' => 'assign', 'assignee_id' => $customer->id])
         ->assertRedirect()
         ->assertSessionHasErrors('assignee_id');
 
@@ -166,7 +166,7 @@ it('TARGET H5: bulk assignment to an eligible user assigns every selected ticket
     $t2 = ticketFor(ticketUser());
 
     $this->actingAs(ticketUser('operator'))
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => [$t1->id, $t2->id], 'action' => 'assign', 'assignee_id' => $agent->id])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$t1->ticket_number, $t2->ticket_number], 'action' => 'assign', 'assignee_id' => $agent->id])
         ->assertRedirect()
         ->assertSessionHasNoErrors()
         ->assertSessionHas('status', 'Bulk action applied to 2 ticket(s).');
@@ -294,7 +294,7 @@ it('CHARACTERIZATION notifications: the reply mail carries the ticket number and
         ->and((string) $mail->greeting)->toBe('Hello Olivia Owner,')
         ->and(array_map('strval', $mail->introLines))->toContain('**Oscar Operator** wrote:')
         ->and(array_map('strval', $mail->introLines))->toContain(str_repeat('a', 200).'...')
-        ->and($mail->actionUrl)->toBe(url("/tickets/{$ticket->id}"));
+        ->and($mail->actionUrl)->toBe(route('tickets.show', $ticket));
 });
 
 // CONVERTED IN EPIC-017 WP2 (P2): the mail link stays `/tickets/{id}` (per-recipient links are WP5); for an

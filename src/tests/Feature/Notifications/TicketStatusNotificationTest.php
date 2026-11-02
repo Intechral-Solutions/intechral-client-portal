@@ -147,20 +147,20 @@ describe('over HTTP', function () {
         $b = ticketFor($other);
         $c = ticketFor($this->owner);
 
-        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$a->id, $b->id], 'action' => 'resolve'])->assertRedirect();
+        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$a->ticket_number, $b->ticket_number], 'action' => 'resolve'])->assertRedirect();
 
         Notification::assertSentToTimes($this->owner, TicketStatusNotification::class, 1);
         Notification::assertSentToTimes($other, TicketStatusNotification::class, 1);
 
         Notification::fake();
-        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$c->id], 'action' => 'close'])->assertRedirect();
+        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$c->ticket_number], 'action' => 'close'])->assertRedirect();
         Notification::assertNothingSent();
     });
 
     it('skips a bulk row that cannot make the transition without telling anyone about it', function () {
         $closed = ticketFor($this->owner, ['status' => 'closed']);
 
-        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$closed->id], 'action' => 'resolve'])->assertRedirect();
+        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$closed->ticket_number], 'action' => 'resolve'])->assertRedirect();
 
         expect($closed->fresh()->status)->toBe('closed');
         Notification::assertNothingSent();
@@ -225,7 +225,7 @@ describe('after commit, never on rollback', function () {
         });
         $this->withoutExceptionHandling();
 
-        expect(fn () => $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$a->id, $b->id], 'action' => 'resolve']))
+        expect(fn () => $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$a->ticket_number, $b->ticket_number], 'action' => 'resolve']))
             ->toThrow(RuntimeException::class);
 
         TicketStatusHistory::flushEventListeners();
@@ -268,7 +268,7 @@ describe('a failed hand-over after commit (review M2)', function () {
         $third = ticketFor($this->owner);
         $fake = ticketFailHandOff(TicketStatusNotification::class, fn ($notifiable) => $notifiable->is($this->owner));
 
-        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => [$first->id, $second->id, $third->id], 'action' => 'resolve'])
+        $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$first->ticket_number, $second->ticket_number, $third->ticket_number], 'action' => 'resolve'])
             ->assertRedirect()->assertSessionHas('status', 'Bulk action applied to 3 ticket(s).');
 
         expect(Ticket::whereIn('id', [$first->id, $second->id, $third->id])->pluck('status')->unique()->all())->toBe(['resolved']);

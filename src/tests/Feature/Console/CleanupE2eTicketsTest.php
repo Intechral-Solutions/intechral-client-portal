@@ -241,21 +241,21 @@ it('keeps the owners the command trusts equal to the identities DevSeeder seeds'
     }
 });
 
-it('never deletes the seeded fixture tickets TKT-E2E1 and TKT-E2E2, even beside eligible ones', function () {
+it('never deletes the seeded fixture tickets TK-E2E00-00001 and TK-E2E00-00002, even beside eligible ones', function () {
     $this->seed(DevSeeder::class);
     $owner = User::query()->where('email', 'e2e-customer@intechral.test')->firstOrFail();
-    $fixtures = Ticket::query()->whereIn('ticket_number', ['TKT-E2E1', 'TKT-E2E2'])->get();
+    $fixtures = Ticket::query()->whereIn('ticket_number', ['TK-E2E00-00001', 'TK-E2E00-00002'])->get();
     $eligible = e2eTicket($owner);
 
     expect($fixtures)->toHaveCount(2)
         // The distinction the command relies on: neither fixture title starts with the literal prefix.
         ->and($fixtures->every(fn (Ticket $ticket) => ! str_starts_with($ticket->title, 'E2E-')))->toBeTrue()
-        // TKT-E2E2 is owned by a seeded E2E customer, so only its title protects it.
-        ->and($fixtures->firstWhere('ticket_number', 'TKT-E2E2')->user_id)->toBe($owner->id);
+        // TK-E2E00-00002 is owned by a seeded E2E customer, so only its title protects it.
+        ->and($fixtures->firstWhere('ticket_number', 'TK-E2E00-00002')->user_id)->toBe($owner->id);
 
     e2eCleanup()->assertSuccessful()->expectsOutputToContain('Tickets deleted: 1');
 
-    expect(Ticket::query()->whereIn('ticket_number', ['TKT-E2E1', 'TKT-E2E2'])->count())->toBe(2)
+    expect(Ticket::query()->whereIn('ticket_number', ['TK-E2E00-00001', 'TK-E2E00-00002'])->count())->toBe(2)
         ->and(Ticket::query()->whereKey($eligible->id)->exists())->toBeFalse();
 });
 

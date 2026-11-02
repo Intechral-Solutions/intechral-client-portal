@@ -6,6 +6,7 @@
 **Planned:** 2026-09-24 (**Implemented** and **Verified:** 2026-09-24), against `epic-011e-projects-kanban` at `a09c723`
 **Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
 **Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 **Complete** (2026-09-24)
+**Superseded in part (2026-10-31):** Ticket numbering (H8, A3.5, P3a, P3b and the id-derived `TKT-{id}` allocator) is superseded by C6-R: random references `TK-XXXXX-XXXXX` ([ADR-008](../architecture/adr/ADR-008-ticket-public-reference.md)). The text below is kept as history.
 **Closeout:** [Closeout (2026-09-24)](#closeout-2026-09-24): lifecycle, what is verified now, first-production-release gate, final security and integrity contract
 **Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision; [Amendment 3 (2026-09-24)](#amendment-3-wp2-results-2026-09-24): WP2 results, assignment eligibility, notification gating and de-duplication, bulk validation, CSV policy, id-derived Ticket numbers, concurrency results, lifecycle assessment
 

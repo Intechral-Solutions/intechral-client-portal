@@ -195,3 +195,31 @@ it('reads a page in two queries, whatever the number of matching tickets', funct
     expect($one)->toBe(2)
         ->and($count())->toBe(2);
 });
+
+// ── C6-R: a typed reference is read tolerantly in the search box only ───────────────────────────
+
+it('finds the requester\'s own ticket by its reference typed loosely, and never another requester\'s', function (string $typed) {
+    $owner = ticketUser();
+    ticketFor($owner, ['title' => 'Mine', 'ticket_number' => 'TK-0123A-BCDEF']);
+    ticketFor($owner, ['title' => 'Other own', 'ticket_number' => 'TK-ZZZZZ-ZZZZZ']);
+    ticketFor(ticketUser(), ['title' => 'Not mine', 'ticket_number' => 'TK-0123A-BCDEG']);
+
+    expect(requesterSearchTitles($owner, ['search' => $typed]))->toBe(['Mine']);
+})->with([
+    'canonical' => ['TK-0123A-BCDEF'],
+    'lower case' => ['tk-0123a-bcdef'],
+    'without hyphens' => ['TK0123ABCDEF'],
+    'with spaces' => ['tk 0123a bcdef'],
+    'without the prefix' => ['0123abcdef'],
+    'O read as zero' => ['TK-O123A-BCDEF'],
+]);
+
+it('keeps the URL contract strict even though search is tolerant', function () {
+    $owner = ticketUser();
+    $ticket = ticketFor($owner, ['ticket_number' => 'TK-0123A-BCDEF']);
+
+    $this->actingAs($owner)->get('/tickets/tk-0123a-bcdef')->assertOk();
+    foreach (['TK0123ABCDEF', 'TK-O123A-BCDEF', '0123A-BCDEF', 'tk 0123a bcdef'] as $loose) {
+        $this->actingAs($owner)->get('/tickets/'.rawurlencode($loose))->assertNotFound();
+    }
+});

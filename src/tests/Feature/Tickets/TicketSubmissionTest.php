@@ -3,6 +3,7 @@
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\TicketCreatedNotification;
+use App\Support\Helpdesk\TicketReference;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -46,7 +47,7 @@ it('allows a user with tickets.create to view the create form', function () {
     $this->actingAs($user)->get(route('tickets.create'))->assertOk();
 });
 
-it('creates a ticket with a TKT-XXXX number', function () {
+it('creates a ticket with a TK-XXXXX-XXXXX reference', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
 
@@ -59,7 +60,7 @@ it('creates a ticket with a TKT-XXXX number', function () {
 
     $ticket = Ticket::first();
     expect($ticket)->not->toBeNull();
-    expect($ticket->ticket_number)->toMatch('/^TKT-\d{4}$/');
+    expect($ticket->ticket_number)->toMatch(TicketReference::PATTERN);
     expect($ticket->title)->toBe('My first ticket');
     expect($ticket->user_id)->toBe($user->id);
 });

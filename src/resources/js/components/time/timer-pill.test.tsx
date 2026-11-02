@@ -73,14 +73,23 @@ describe('one running timer', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date(NOW));
 
-        mount([timer({ context: { type: 'Ticket', id: 7, label: 'TKT-42', url: '/tickets/7' } })]);
+        mount([
+            timer({
+                context: {
+                    type: 'Ticket',
+                    id: 7,
+                    label: 'TK-00042-ABCDE',
+                    url: '/tickets/TK-00042-ABCDE',
+                },
+            }),
+        ]);
         await settle();
 
         expect(screen.getByText('0:00:10')).toBeInTheDocument();
-        expect(screen.getByText('Ticket: TKT-42')).toBeInTheDocument();
+        expect(screen.getByText('Ticket: TK-00042-ABCDE')).toBeInTheDocument();
         // The Stop action names what it will stop, so it is unambiguous out of context.
         expect(
-            screen.getByRole('button', { name: 'Stop timer: Ticket: TKT-42' }),
+            screen.getByRole('button', { name: 'Stop timer: Ticket: TK-00042-ABCDE' }),
         ).toBeInTheDocument();
         // One timer needs no disclosure chevron and no count badge.
         expect(screen.queryByText(/^\+\d/)).not.toBeInTheDocument();

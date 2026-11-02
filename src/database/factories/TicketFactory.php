@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Ticket;
 use App\Models\User;
+use App\Support\Helpdesk\TicketReferenceGenerator;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class TicketFactory extends Factory
@@ -17,10 +18,9 @@ class TicketFactory extends Factory
         $hours = Ticket::SLA_HOURS[$priority];
 
         return [
-            // Factory numbers are 'TKT-F' + six digits. TicketService numbers are 'TKT-' + digits
-            // (its ticket's id), so the two namespaces can never collide, and the seeded
-            // fixture 'TKT-E2E1' stays outside both. Tests that need a specific value pass one.
-            'ticket_number' => 'TKT-F'.str_pad($this->faker->unique()->numberBetween(1, 999999), 6, '0', STR_PAD_LEFT),
+            // A random canonical reference, like TicketService issues (C6-R); the model refuses anything else. The seeded fixtures are
+            // 'TK-E2E00-0000n'. Tests that need a specific value pass one.
+            'ticket_number' => app(TicketReferenceGenerator::class)->next(),
             'user_id' => User::factory(),
             'assignee_id' => null,
             'title' => $this->faker->sentence(6),

@@ -27,7 +27,6 @@ type VisitMode = 'inertia' | 'document';
 type Destination = { href: string; visit: VisitMode };
 
 type RequestRow = {
-    id: number;
     number: string;
     title: string;
     createdAt: string;
@@ -79,7 +78,7 @@ function RequestList({ rows }: { rows: (RequestRow | OpenRequestRow)[] }) {
     return (
         <ul className="divide-y divide-rule border-b border-rule">
             {rows.map((row) => (
-                <li key={row.id}>
+                <li key={row.number}>
                     <a
                         href={row.href}
                         className="flex items-center justify-between gap-4 px-1 py-3 transition-colors duration-motion-fast hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"

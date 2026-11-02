@@ -784,7 +784,7 @@ test.describe('Pagination', () => {
 // WCAG numbers on what a user sees. The claim is scoped to WP2's surfaces.
 //
 // Two kinds of evidence. REAL pages and records, where the application's supported routes can create the
-// state and delete it again (the seeded ticket TKT-E2E1, a draft invoice, a custom role, CMS pages). And a
+// state and delete it again (the seeded ticket TK-E2E00-00001, a draft invoice, a custom role, CMS pages). And a
 // GALLERY of every state rendered by the PRODUCTION partials (tests/Support/semantic_state_gallery.php) and
 // injected into a real page, for the states no supported route can create without leaving records (tickets
 // have no delete route and cannot be made overdue; only a draft invoice can be deleted; nothing cancels
@@ -1188,7 +1188,7 @@ test.describe('Semantic state on real Helpdesk pages (operator)', () => {
             await visit(page, '/operator/tickets', theme, viewport);
             const ds = await readDs(page, DS);
 
-            const row = inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' });
+            const row = inMain(page).getByRole('row').filter({ hasText: 'TK-E2E00-00001' });
             await expectMark(row.locator('[data-ticket-status]'), 'Open', 'info', 'circle', ds, `${where} queue status`);
 
             const priority = row.locator('[data-ticket-priority]');
@@ -1234,10 +1234,10 @@ test.describe('Semantic state on the operator ticket page: the embedded time tra
         // The ticket page's path, found once through the queue (searched by number) as an operator reaches it.
         // Each mode then loads that path directly: following the link would reload the document and drop the
         // theme `visit` applied.
-        await visit(page, '/operator/tickets?search=TKT-E2E1', 'light', XL);
-        const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
+        await visit(page, '/operator/tickets?search=TK-E2E00-00001', 'light', XL);
+        const href = await inMain(page).getByRole('row').filter({ hasText: 'TK-E2E00-00001' }).getByRole('link', { name: 'View' }).getAttribute('href');
         const requestPath = new URL(href ?? '', 'http://localhost').pathname;
-        expect(requestPath).toMatch(/^\/operator\/tickets\/\d+$/);
+        expect(requestPath).toMatch(/^\/operator\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
 
         for (const { theme, viewport } of MODES) {
             const where = `${theme} ${viewport.width}`;
@@ -1528,7 +1528,7 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
         test.setTimeout(420_000);
 
         await visit(page, '/operator/tickets', 'light', XL);
-        const href = await inMain(page).getByRole('row').filter({ hasText: 'TKT-E2E1' }).getByRole('link', { name: 'View' }).getAttribute('href');
+        const href = await inMain(page).getByRole('row').filter({ hasText: 'TK-E2E00-00001' }).getByRole('link', { name: 'View' }).getAttribute('href');
         const ticketPath = new URL(href ?? '', 'http://localhost').pathname;
 
         for (const [label, path] of [

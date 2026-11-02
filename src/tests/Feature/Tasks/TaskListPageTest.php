@@ -214,7 +214,7 @@ it('agrees with TaskPolicy on every task, listed or not, so the projection holds
 });
 
 it('leaks nothing unauthorized anywhere in the page props', function () {
-    $ticket = Ticket::factory()->create(['user_id' => $this->member->id, 'ticket_number' => 'TKT-4242']);
+    $ticket = Ticket::factory()->create(['user_id' => $this->member->id, 'ticket_number' => 'TK-T4242-AAAAA']);
     Task::factory()->standalone()->create(['title' => 'Ticket bound', 'ticket_id' => $ticket->id, 'assignee_id' => $this->member->id]);
     makeTask($this->visible->columns[1], ['title' => 'Dual bound', 'ticket_id' => $ticket->id, 'assignee_id' => $this->member->id, 'position' => 5]);
     Task::factory()->standalone()->create(['title' => 'With secret notes', 'description' => 'Secret notes', 'assignee_id' => $this->member->id, 'created_by' => $this->member->id]);
@@ -224,7 +224,7 @@ it('leaks nothing unauthorized anywhere in the page props', function () {
         $props = listProps($this->actingAs($this->member->fresh())->get(route('tasks.index', ['view' => $view, 'completion' => 'any'])));
         $json = json_encode(array_diff_key($props, array_flip(['auth', 'navigation', 'flash', 'errors', 'shell', 'ziggy', 'timer'])));
 
-        foreach (['Hidden Harbor', 'Hidden secret', 'Outsider private', 'Ticket bound', 'Dual bound', 'TKT-4242', 'Secret notes', 'email', 'created_by', 'project_id', 'ticket_id', 'canViewOrg'] as $forbidden) {
+        foreach (['Hidden Harbor', 'Hidden secret', 'Outsider private', 'Ticket bound', 'Dual bound', 'TK-T4242-AAAAA', 'Secret notes', 'email', 'created_by', 'project_id', 'ticket_id', 'canViewOrg'] as $forbidden) {
             // One needle per assertion, the diagnostic as the message: the earlier
             // `->not->toContain($forbidden, "{$view}: {$forbidden}")` passed unless BOTH strings were
             // present, and the second never is, so no leak could fail it (EPIC-015 review F4).

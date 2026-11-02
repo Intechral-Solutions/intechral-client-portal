@@ -24,7 +24,7 @@ use Throwable;
  *    runtime value, so it cannot authorise a run by itself;
  *  - it takes no argument and no option that selects tickets, users or patterns;
  *  - a ticket is eligible only when its title starts with the literal `E2E-` AND its requester is one of the
- *    seeded E2E customers below (DevSeeder). The seeded fixtures `TKT-E2E1` and `TKT-E2E2` are titled
+ *    seeded E2E customers below (DevSeeder). The seeded fixtures `TK-E2E00-00001` and `TK-E2E00-00002` are titled
  *    `E2E fixture: …` and are never eligible, whoever owns them;
  *  - a ticket with any linked time entry or task is REFUSED, and so is the whole run, before anything is
  *    deleted: `time_entries.ticket_id` and `tasks.ticket_id` are `nullOnDelete`, so deleting the ticket would

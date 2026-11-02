@@ -110,7 +110,7 @@ class DashboardController extends Controller
         return Inertia::render('dashboard/index', [
             'metrics' => $metrics,
             'recentTickets' => $recentTickets->map(fn (Ticket $ticket) => [
-                'id' => $ticket->id,
+                'number' => $ticket->ticket_number,
                 'subject' => $ticket->title,
                 'status' => $ticket->status,
                 'statusLabel' => str_replace('_', ' ', ucfirst($ticket->status)),
@@ -155,7 +155,6 @@ class DashboardController extends Controller
             ->get(['id', 'ticket_number', 'title', 'status', 'created_at']);
 
         $row = fn (Ticket $ticket, array $extra = []) => [
-            'id' => $ticket->id,
             'number' => $ticket->ticket_number,
             'title' => $ticket->title,
             'createdAt' => $ticket->created_at->toIso8601String(),

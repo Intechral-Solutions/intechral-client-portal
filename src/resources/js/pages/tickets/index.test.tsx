@@ -17,17 +17,18 @@ const statusOptions: TicketsIndexProps['statusOptions'] = [
     { value: 'closed', label: 'Closed' },
 ];
 
+const ref = (id: number) => `TK-${String(id).padStart(5, '0')}-ABCDE`;
+
 function row(id: number, overrides: Partial<RequesterTicketRow> = {}): RequesterTicketRow {
     return {
-        id,
-        number: `TKT-${id}`,
+        number: ref(id),
         title: `Request ${id}`,
         status: 'open',
         statusLabel: 'Open',
         priority: 'medium',
         createdAt: '2026-10-08T10:00:00Z',
         createdAtHuman: '2 hours ago',
-        href: `/tickets/${id}`,
+        href: `/tickets/${ref(id)}`,
         ...overrides,
     };
 }
@@ -77,9 +78,9 @@ it('lists each request as a link with its number, relative time, status and prio
 
     expect(within(item).getByRole('link', { name: 'Printer offline' })).toHaveAttribute(
         'href',
-        '/tickets/7',
+        '/tickets/TK-00007-ABCDE',
     );
-    expect(within(item).getByText('TKT-7')).toBeInTheDocument();
+    expect(within(item).getByText(ref(7))).toBeInTheDocument();
     expect(within(item).getByText('2 hours ago')).toHaveAttribute(
         'datetime',
         '2026-10-08T10:00:00Z',

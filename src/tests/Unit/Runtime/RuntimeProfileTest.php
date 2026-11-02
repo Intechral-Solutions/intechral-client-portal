@@ -91,6 +91,18 @@ it('refuses each way of leaving the approved profile, and says only that one thi
     'documentation operator alert destination' => ['documentation operator alert destination', ['helpdesk.notify_address' => 'ops@example.org'], 'helpdesk.notify_address is a documentation address'],
 ]);
 
+it('fails while the legacy ticket-reference conversion gate is open, and only then', function () {
+    config(['helpdesk.rereference_allowed' => true]);
+
+    expect(RuntimeProfile::configuration(true))->toBe(['helpdesk.rereference_allowed must be false: the legacy ticket-reference conversion gate is closed after the staging conversion (TICKET_REREFERENCE_ALLOWED)'])
+        ->and(RuntimeProfile::diagnostics(true)['helpdesk.rereference_allowed'])->toBe('open');
+
+    config(['helpdesk.rereference_allowed' => false]);
+
+    expect(RuntimeProfile::configuration(true))->toBe([])
+        ->and(RuntimeProfile::diagnostics(true)['helpdesk.rereference_allowed'])->toBe('closed');
+});
+
 it('accepts a surrounding-whitespace operator alert destination, as dispatch will trim it', function () {
     config(['helpdesk.notify_address' => "  helpdesk@provider.invalid \n"]);
 

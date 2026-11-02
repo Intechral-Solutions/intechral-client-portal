@@ -76,7 +76,7 @@ Coverage today: 205 rows in 33 tables and 4 real attachment files: users (operat
 
 - **schema** (tables, columns, column and table collations, primary and unique keys, non-unique indexes by table and column list, foreign keys with both their `ON DELETE` and `ON UPDATE` rules);
 - per-table **row counts** and a **digest of every row**, pinned to the baseline's columns so a candidate that adds a column does not change old rows' digests;
-- ~60 **checks that must be zero**: foreign-key orphans (declared and logical), attachment rows without files and files without rows, ticket numbers, tasks, milestones, dependencies, time entries and blocks, invoice arithmetic, the EPIC-010D preflight gates, the project audit. A check that **cannot run counts as a failure**: a snapshot never passes by being unable to look;
+- ~60 **checks that must be zero**: foreign-key orphans (declared and logical), attachment rows without files and files without rows, ticket references (canonical and unique; a legacy `TKT-` value left over fails until `tickets:rereference` has run), tasks, milestones, dependencies, time entries and blocks, invoice arithmetic, the EPIC-010D preflight gates, the project audit. A check that **cannot run counts as a failure**: a snapshot never passes by being unable to look;
 - **facts** that must not move (preflight figures, next ticket id, role grants, counts by status);
 - **files** (size and SHA-256);
 - the migrations recorded as run.
@@ -121,7 +121,7 @@ After the comparison the harness backs up the primary (database and files), rest
 - Fixtures only. Production-derived data in rehearsal is undecided (H8).
 - The backup is a **PHP logical dump** (the app container has no MariaDB client): base tables only; no views, triggers or routines (the schema has none). Not `mariadb-dump`.
 - `APP_KEY` and `.env` are not in the set; two-factor secrets in the database cannot be read back without the original key (H9, open).
-- The ticket-number high-water mark (§7.3) is not exercised.
+- There is no ticket-number high-water mark any more: C6 is superseded by C6-R (random references, [ADR-008](../architecture/adr/ADR-008-ticket-public-reference.md)); the checks above replace the id-derived number invariants.
 - Hosted CI: the first hosted run ([run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30) provisioned both rehearsal databases from `init-rehearsal.sql` on a fresh runner and the rehearsal and preservation Pest tests passed there (full suite 3,288 passed, 0 skipped). That is one run, not release approval; see [Release 0.9 status](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery).
 - A migration that removes something a snapshot check reads makes that check "unavailable", which fails the run until the harness is updated alongside the migration. That is intended.
 - The shared account's `ALL` on `portal` and the testing database is an existing property of the dev stack; the harness avoids them by guard, not by privilege.

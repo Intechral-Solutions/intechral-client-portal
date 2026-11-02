@@ -46,7 +46,7 @@ it('TARGET H6: action=status without a valid status is a validation error, never
     $before = ticketBulkState($tickets);
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status', ...$extra])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => array_map(fn ($t) => $t->ticket_number, $tickets), 'action' => 'status', ...$extra])
         ->assertRedirect()
         ->assertSessionHasErrors('status');
 
@@ -62,7 +62,7 @@ it('BASELINE H6: a valid backend-only action=status applies the transition', fun
     [$tickets] = ticketBulkPair();
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'status', 'status' => 'in_progress'])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => array_map(fn ($t) => $t->ticket_number, $tickets), 'action' => 'status', 'status' => 'in_progress'])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
@@ -74,7 +74,7 @@ it('TARGET H6 (D4): action=assign without a real assignee is a validation error 
     $before = ticketBulkState($tickets);
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'assign', ...$extra])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => array_map(fn ($t) => $t->ticket_number, $tickets), 'action' => 'assign', ...$extra])
         ->assertRedirect()
         ->assertSessionHasErrors('assignee_id')
         ->assertSessionMissing('status');
@@ -89,12 +89,12 @@ it('TARGET H6 (D4): action=assign without a real assignee is a validation error 
     'unknown user' => [['assignee_id' => 999_999_999]],
 ]);
 
-it('BASELINE H6: invalid action, empty selection and an unknown ticket id are validation errors with no mutation', function (array $payload, string $errorKey) {
+it('BASELINE H6: invalid action, empty selection and an unknown ticket reference are validation errors with no mutation', function (array $payload, string $errorKey) {
     [$tickets] = ticketBulkPair();
     $before = ticketBulkState($tickets);
-    $ids = array_map(fn ($t) => $t->id, $tickets);
+    $refs = array_map(fn ($t) => $t->ticket_number, $tickets);
 
-    $payload = array_map(fn ($value) => $value === 'IDS' ? $ids : ($value === 'IDS_PLUS_UNKNOWN' ? [...$ids, 999_999_999] : $value), $payload);
+    $payload = array_map(fn ($value) => $value === 'REFS' ? $refs : ($value === 'REFS_PLUS_UNKNOWN' ? [...$refs, 'TK-ZZZZZ-ZZZZZ'] : $value), $payload);
 
     $this->actingAs($this->operator)
         ->post(route('operator.tickets.bulk'), $payload)
@@ -102,10 +102,10 @@ it('BASELINE H6: invalid action, empty selection and an unknown ticket id are va
 
     expect(ticketBulkState($tickets))->toBe($before);
 })->with([
-    'invalid action' => [['ticket_ids' => 'IDS', 'action' => 'delete'], 'action'],
-    'missing action' => [['ticket_ids' => 'IDS'], 'action'],
-    'empty ticket_ids' => [['ticket_ids' => [], 'action' => 'close'], 'ticket_ids'],
-    'unknown ticket id in batch' => [['ticket_ids' => 'IDS_PLUS_UNKNOWN', 'action' => 'close'], 'ticket_ids.2'],
+    'invalid action' => [['ticket_refs' => 'REFS', 'action' => 'delete'], 'action'],
+    'missing action' => [['ticket_refs' => 'REFS'], 'action'],
+    'empty ticket_refs' => [['ticket_refs' => [], 'action' => 'close'], 'ticket_refs'],
+    'unknown ticket reference in batch' => [['ticket_refs' => 'REFS_PLUS_UNKNOWN', 'action' => 'close'], 'ticket_refs'],
 ]);
 
 it('CHARACTERIZATION H6: an impossible transition is skipped per ticket, yet the flash counts every selected ticket', function () {
@@ -113,7 +113,7 @@ it('CHARACTERIZATION H6: an impossible transition is skipped per ticket, yet the
     $closed = Ticket::factory()->closed()->for(ticketUser(), 'user')->create();
 
     $this->actingAs($this->operator)
-        ->post(route('operator.tickets.bulk'), ['ticket_ids' => [$open->id, $closed->id], 'action' => 'resolve'])
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$open->ticket_number, $closed->ticket_number], 'action' => 'resolve'])
         ->assertRedirect()
         ->assertSessionHas('status', 'Bulk action applied to 2 ticket(s).');
 
@@ -141,7 +141,7 @@ it('TARGET H6: single assign without an assignee key is a validation error, whil
 
 it('TARGET H6: the batch is all-or-nothing on a mid-loop failure, so a late error leaves no ticket half-changed', function () {
     [$tickets] = ticketBulkPair();
-    $ids = array_map(fn ($t) => $t->id, $tickets);
+    $refs = array_map(fn ($t) => $t->ticket_number, $tickets);
     $before = ticketBulkState($tickets);
     $failOn = $tickets[1]->id;
 
@@ -154,9 +154,49 @@ it('TARGET H6: the batch is all-or-nothing on a mid-loop failure, so a late erro
 
     $this->withoutExceptionHandling();
 
-    expect(fn () => $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_ids' => $ids, 'action' => 'close']))
+    expect(fn () => $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => $refs, 'action' => 'close']))
         ->toThrow(RuntimeException::class);
 
     TicketStatusHistory::flushEventListeners();
     expect(ticketBulkState($tickets))->toBe($before);
+});
+
+// ── C6-R: tickets are named by reference, never by the numeric key ───────────
+
+it('C6-R: a bulk action names tickets by reference; the numeric key is not a ticket name any more', function () {
+    [$tickets] = ticketBulkPair();
+    $before = ticketBulkState($tickets);
+
+    $this->actingAs($this->operator)
+        ->post(route('operator.tickets.bulk'), ['ticket_ids' => array_map(fn ($t) => $t->id, $tickets), 'action' => 'close'])
+        ->assertSessionHasErrors('ticket_refs');
+
+    expect(ticketBulkState($tickets))->toBe($before);
+
+    $this->actingAs($this->operator)
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => array_map(fn ($t) => $t->ticket_number, $tickets), 'action' => 'close'])
+        ->assertSessionHasNoErrors();
+
+    expect(Ticket::whereIn('id', array_map(fn ($t) => $t->id, $tickets))->pluck('status')->unique()->all())->toBe(['closed']);
+});
+
+it('C6-R: a reference that is malformed or no longer exists rejects the whole bulk batch and changes nothing', function (string $bad) {
+    [$tickets] = ticketBulkPair();
+    $before = ticketBulkState($tickets);
+
+    $this->actingAs($this->operator)
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$tickets[0]->ticket_number, $bad], 'action' => 'close'])
+        ->assertSessionHasErrors();
+
+    expect(ticketBulkState($tickets))->toBe($before);
+})->with(['unknown' => ['TK-ZZZZZ-ZZZZZ'], 'a legacy number' => ['TKT-0001'], 'a numeric id' => ['1'], 'lower case' => ['tk-zzzzz-zzzzz']]);
+
+it('C6-R: a reference listed twice is applied once', function () {
+    [$tickets] = ticketBulkPair();
+
+    $this->actingAs($this->operator)
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$tickets[0]->ticket_number, $tickets[0]->ticket_number], 'action' => 'close'])
+        ->assertSessionHasNoErrors();
+
+    expect($tickets[0]->fresh()->status)->toBe('closed')->and($tickets[1]->fresh()->status)->toBe('open');
 });

@@ -141,7 +141,7 @@ it('bulk-assigns tickets to an operator', function () {
 
     $this->actingAs($operator)
         ->post(route('operator.tickets.bulk'), [
-            'ticket_ids' => [$t1->id, $t2->id],
+            'ticket_refs' => [$t1->ticket_number, $t2->ticket_number],
             'action' => 'assign',
             'assignee_id' => $assignee->id,
         ])
@@ -162,7 +162,7 @@ it('bulk-closes tickets', function () {
 
     $this->actingAs($operator)
         ->post(route('operator.tickets.bulk'), [
-            'ticket_ids' => [$t1->id, $t2->id],
+            'ticket_refs' => [$t1->ticket_number, $t2->ticket_number],
             'action' => 'close',
         ])
         ->assertRedirect();
@@ -171,13 +171,13 @@ it('bulk-closes tickets', function () {
     expect($t2->fresh()->status)->toBe('closed');
 });
 
-it('validates ticket_ids are required for bulk action', function () {
+it('validates ticket_refs are required for bulk action', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
     $this->actingAs($operator)
         ->post(route('operator.tickets.bulk'), ['action' => 'close'])
-        ->assertSessionHasErrors('ticket_ids');
+        ->assertSessionHasErrors('ticket_refs');
 });
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -197,16 +197,16 @@ it('searches tickets by title in operator queue', function () {
         ->assertDontSee('Another Ticket Beta');
 });
 
-it('searches tickets by ticket number', function () {
+it('searches tickets by reference', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
     $user = User::factory()->create();
 
-    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-1234', 'title' => 'Number Ticket']);
-    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TKT-9999', 'title' => 'Other Ticket']);
+    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TK-1234A-BCDEF', 'title' => 'Number Ticket']);
+    Ticket::factory()->for($user, 'user')->create(['ticket_number' => 'TK-9999Z-ZZZZZ', 'title' => 'Other Ticket']);
 
     $this->actingAs($operator)
-        ->get(route('operator.tickets.index', ['search' => 'TKT-1234']))
+        ->get(route('operator.tickets.index', ['search' => 'tk 1234a bcdef']))
         ->assertOk()
         ->assertSee('Number Ticket')
         ->assertDontSee('Other Ticket');

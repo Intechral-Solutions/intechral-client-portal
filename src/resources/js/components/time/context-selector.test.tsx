@@ -53,3 +53,30 @@ it('reports a failed options request without disabling the type selector', async
     );
     expect(screen.getByLabelText('Context')).toBeEnabled();
 });
+
+it('hands a ticket choice back with its public reference so the id can travel with it', async () => {
+    vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+            ok: true,
+            json: vi
+                .fn()
+                .mockResolvedValue([
+                    { id: 5, label: 'TK-0123A-BCDEF — Printer', reference: 'TK-0123A-BCDEF' },
+                ]),
+        }),
+    );
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(<ContextSelector idPrefix="ticket" value={null} onChange={onChange} />);
+    await user.selectOptions(screen.getByLabelText('Context'), 'ticket');
+    await screen.findByRole('option', { name: /Printer/ });
+    await user.selectOptions(screen.getByLabelText('Record'), '5');
+
+    expect(onChange).toHaveBeenLastCalledWith({
+        kind: 'ticket',
+        id: 5,
+        reference: 'TK-0123A-BCDEF',
+    });
+});

@@ -135,7 +135,7 @@ function mtrDeliver(Closure $build, string $text): array
 /** The parts of a delivered message that differ between two otherwise identical messages: ticket numbers, ids, tokens and the random priority. */
 function mtrNormalise(string $body): string
 {
-    $body = preg_replace('/TKT-[A-Za-z0-9]+/', 'TKT-N', $body);
+    $body = preg_replace('/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}/', 'TK-N', $body);
     $body = preg_replace('~/(tickets|invitation)/[A-Za-z0-9]+~', '/$1/N', $body);
 
     return preg_replace('/Priority:\*\* \w+/', 'Priority:** P', $body);

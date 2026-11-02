@@ -478,4 +478,4 @@ use a custom role carrying the same permissions (`LastAccountAdministratorTest`)
    R0.9-2a).
 4. Whether the remaining items of the §11 R0.9-1D row (above) belong to this package.
 5. Still open and unrelated: Info-5 (customer-side visibility of suspended status), H5 to H10, and the ticket-number
-   high-water-mark design ([§7.3](../product/release-0.9-scope-and-architecture.md#73-ticket-number-continuity)).
+   high-water-mark design (closed: C6 is superseded by C6-R, [ADR-008](./adr/ADR-008-ticket-public-reference.md); there is no high-water mark).

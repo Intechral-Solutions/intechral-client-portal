@@ -18,7 +18,7 @@ import { expect, signedIn, test } from './support/auth';
  * with a literal `E2E-` prefix plus a per-ticket random token (`ticketTitle`), so a retry, a second
  * worker or a later run can never collide with, or bind to, another attempt's ticket. Tickets are
  * addressed only by the URL captured from the create redirect or by that unique title, never by list
- * position or id arithmetic. `TKT-E2E1` and `TKT-E2E2` are never touched, and no time entry or task is
+ * position or id arithmetic. `TK-E2E00-00001` and `TK-E2E00-00002` are never touched, and no time entry or task is
  * linked to anything created here (the cleanup command refuses a ticket that has either).
  *
  * **Cleanup.** None here, on purpose. Tickets and their private files are removed once, after the whole
@@ -48,7 +48,7 @@ function textFile(name: string, text: string) {
     return { name, mimeType: 'text/plain', buffer: Buffer.from(text, 'utf8') };
 }
 
-type Created = { id: number; number: string; url: string };
+type Created = { number: string; url: string };
 
 /** Raise a request through the real form (no attachment) and return what the redirect landed on. */
 async function createTicket(page: Page, title: string, description: string): Promise<Created> {
@@ -61,18 +61,18 @@ async function createTicket(page: Page, title: string, description: string): Pro
 }
 
 async function landedTicket(page: Page, title: string): Promise<Created> {
-    await expect(page).toHaveURL(/\/tickets\/\d+$/);
+    await expect(page).toHaveURL(/\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
 
     const url = new URL(page.url()).pathname;
     const number = (await page.locator('header p.font-mono').innerText()).trim();
 
-    return { id: Number(url.split('/').pop()), number, url };
+    return { number, url };
 }
 
 /** The operator's Blade page for one ticket, in a context that is signed in as the operator. */
 async function openOperatorTicket(page: Page, ticket: Created) {
-    await signedIn(page, `/operator/tickets/${ticket.id}`);
+    await signedIn(page, `/operator/tickets/${ticket.number}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
 
@@ -186,7 +186,7 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
         await page.getByRole('button', { name: 'Submit request' }).click();
 
         const created = await landedTicket(page, title);
-        expect(created.number).toMatch(/^TKT-\d{4,}$/);
+        expect(created.number).toMatch(/^TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
 
         // Confirmation: the server's flash, announced in a live region.
         await expect(
@@ -199,7 +199,7 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
         await expect(link).toBeVisible();
         await expect(link).toContainText(/\(\d+(\.\d+)? ?(B|KB)\)/);
         const attachmentHref = new URL((await link.getAttribute('href'))!).pathname;
-        expect(attachmentHref).toMatch(/\/attachments\/\d+\/download$/);
+        expect(attachmentHref).toMatch(/\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/);
 
         // A real browser download returns the bytes that were uploaded, as an attachment.
         const downloading = page.waitForEvent('download');
@@ -429,7 +429,7 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
             await expect(note.locator('[data-internal-note]')).toBeVisible();
             const noteLink = note.getByRole('link', { name: new RegExp(ticket.noteFileName) });
             noteHref = new URL((await noteLink.getAttribute('href'))!).pathname;
-            expect(noteHref).toMatch(/^\/attachments\/\d+\/download$/);
+            expect(noteHref).toMatch(/^\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/);
 
             // The operator may download it: the route works, so the customer's 403 below is authorization.
             const asOperator = await operator.request.get(noteHref);
@@ -515,7 +515,7 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
             expect((await page.request.get(ticket.url)).status()).toBe(403);
             expect((await page.request.get(ticket.attachmentHref)).status()).toBe(403);
             expect((await page.request.get(noteHref!)).status()).toBe(403);
-            expect((await page.request.get(`/operator/tickets/${ticket.id}`)).status()).toBe(403);
+            expect((await page.request.get(`/operator/tickets/${ticket.number}`)).status()).toBe(403);
 
             // In the browser: refused inside the customer frame, and nothing about the ticket leaks.
             const response = await page.goto(ticket.url);

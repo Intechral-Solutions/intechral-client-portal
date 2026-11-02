@@ -312,6 +312,16 @@ This section supersedes earlier text by dated addendum. Earlier text is not edit
 - **EPIC-017 section 3** states that development tickets are disposable. That describes development data only.
 - **Unchanged:** the EPIC-017 owner rulings and Amendment 2 ledger, the EPIC-017 G3-B implementation requirements, and the Release 1 boundary table. Roadmap owner ruling D4 (host not preselected) is unchanged.
 
+### Addendum 2026-10-31: C6-R supersedes C6 (ticket public reference)
+
+C6 (a previously communicated ticket number is never reissued after disaster recovery) is **superseded** by C6-R, decided by the owner on 2026-10-31 and recorded in [ADR-008](../architecture/adr/ADR-008-ticket-public-reference.md).
+
+- Tickets keep their internal numeric primary and foreign keys. Their customer-facing identity is a random, immutable reference `TK-XXXXX-XXXXX` (10 Crockford Base32 symbols, 50 bits) stored in `tickets.ticket_number`.
+- **Owner-accepted risk:** after recovery to an older consistent state, non-reuse of a public reference is probabilistic (at most L x M / 2^50 for L lost and M later-issued references; about 9e-8 for 1,000 and 100,000), not absolute. This replaces C6's guarantee. Reserved id blocks, ceiling renewal, off-host ceiling escrow and UUIDv7 are not part of Release 0.9.
+- Unchanged: a restore requires an identified, consistent, verified backup set (sections 7.1 and 8). Recovery adds stale-identity safeguards (references-only ticket routes, nested attachment URLs, session invalidation, queue review, attachment isolation) and verifies canonical format, uniqueness and id-to-reference identity instead of sequential numbers.
+- Existing data: the intended production install is fresh and separate from the existing production portal; no real customer-facing `TKT-` reference from this portal is known. Before deployment this is verified (`tickets:rereference --check`, empty production ticket table, sandbox-only mail history). Staging's disposable tickets are re-referenced by `tickets:rereference`.
+- Obsolete by this addendum: any statement in this document or in EPIC-010D that ticket numbers are derived from the id, never reissued, or checked against a high-water mark. They remain as history.
+
 ## 13. Evidence basis
 
 Facts above were read in the repository during R0.9-0 and the independent review: the foreign-key matrix from all migrations, the application's delete paths, `RoleSeeder` and the role controllers, the invitation and SSO code, the Fortify setup, ticket creation, and the vendored Fortify, Spatie, Laravel notification and Stripe code.

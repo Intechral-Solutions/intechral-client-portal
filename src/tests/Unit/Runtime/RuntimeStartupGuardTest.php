@@ -70,6 +70,12 @@ describe('an invalid production configuration', function () {
             ->and($refused->getMessage())->toContain("Refusing to start `{$command}`")->toContain("cache.default is 'redis'")->toContain('Nothing was started, reserved or run');
     })->with(RSG_GUARDED);
 
+    it('refuses each guarded command while the legacy ticket-reference conversion gate is open', function (string $command) {
+        rsgProduction(['helpdesk.rereference_allowed' => true]);
+
+        expect(fn () => rsgStart($command))->toThrow(RuntimeProfileRefused::class, 'helpdesk.rereference_allowed must be false');
+    })->with(RSG_GUARDED);
+
     it('refuses configuration that is not cached', function () {
         rsgProduction(cached: false);
 

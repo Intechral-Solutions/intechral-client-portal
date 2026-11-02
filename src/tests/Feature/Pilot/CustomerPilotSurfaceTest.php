@@ -62,9 +62,9 @@ it('keeps the Helpdesk visibility rules: another customer’s ticket and interna
     $internal = ticketAttachment($ticket, $internalReply, $operator, 'internal.txt', 'operator-only bytes');
     pilotMode('pilot');
 
-    $this->actingAs($owner)->get(route('tickets.attachment.download', $own))->assertOk();
-    $this->actingAs($owner)->get(route('tickets.attachment.download', $internal))->assertForbidden();
-    $this->actingAs($stranger)->get(route('tickets.attachment.download', $own))->assertForbidden();
+    $this->actingAs($owner)->get(ticketAttachmentUrl($own))->assertOk();
+    $this->actingAs($owner)->get(ticketAttachmentUrl($internal))->assertForbidden();
+    $this->actingAs($stranger)->get(ticketAttachmentUrl($own))->assertForbidden();
     $this->actingAs($stranger)->get(route('tickets.show', $ticket))->assertForbidden();
     $this->actingAs($stranger)->post(route('tickets.replies.store', $ticket), ['body' => 'intrusion'])->assertForbidden();
 
@@ -85,7 +85,7 @@ it('keeps operator Helpdesk work, including internal attachments, in pilot mode'
 
     $this->actingAs($operator)->get(route('operator.tickets.index'))->assertOk();
     $this->actingAs($operator)->get(route('operator.tickets.show', $ticket))->assertOk();
-    $this->actingAs($operator)->get(route('tickets.attachment.download', $internal))->assertOk();
+    $this->actingAs($operator)->get(ticketAttachmentUrl($internal))->assertOk();
     $this->actingAs($operator)->post(route('operator.tickets.replies.store', $ticket), ['body' => 'Working on it'])->assertRedirect();
 });
 

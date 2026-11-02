@@ -54,7 +54,7 @@ it('refuses a ticket timer to its own requester, writing nothing', function () {
     $before = ticketTimeSnapshot();
 
     $this->actingAs($owner)
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
 
@@ -68,7 +68,7 @@ it('refuses a manual ticket entry to its own requester, writing nothing', functi
     $before = ticketTimeSnapshot();
 
     $this->actingAs($owner)
-        ->post(route('time.store'), ticketTimeEntryPayload(['ticket_id' => $ticket->id]))
+        ->post(route('time.store'), ticketTimeEntryPayload(ticketTimeContext($ticket)))
         ->assertSessionHasErrors('ticket_id');
 
     expect(ticketTimeSnapshot())->toBe($before);
@@ -80,7 +80,7 @@ it('refuses a customer the ticket context for every other ticket too', function 
     $stranger = ticketUser();
 
     $this->actingAs($stranger)
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
 
@@ -93,12 +93,12 @@ it('allows ticket time to an operator who can view the ticket, by capability and
     $agent = ticketAgent();
 
     $this->actingAs($agent)
-        ->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()
         ->assertJsonPath('context.id', $ticket->id);
 
     $this->actingAs($agent)
-        ->post(route('time.store'), ticketTimeEntryPayload(['ticket_id' => $ticket->id]))
+        ->post(route('time.store'), ticketTimeEntryPayload(ticketTimeContext($ticket)))
         ->assertSessionHasNoErrors();
 
     expect(TimeEntry::where('user_id', $agent->id)->where('ticket_id', $ticket->id)->count())->toBe(2);
@@ -146,7 +146,8 @@ it('refuses a customer edit that KEEPS an entry on its ticket, whether or not ti
 
     $payload = ['date' => today()->toDateString(), 'hours' => 8, 'description' => 'Inflated'];
     if ($resubmit) {
-        $payload['ticket_id'] = $ticket->id;
+        // The id travels with its reference, so the refusal below is the eligibility rule and not the reference rule.
+        $payload = [...$payload, ...ticketTimeContext($ticket)];
     }
 
     $this->actingAs($owner)
@@ -166,7 +167,7 @@ it('refuses a customer moving an existing entry INTO a ticket context', function
     $before = ticketTimeSnapshot();
 
     $this->actingAs($owner)
-        ->put(route('time.update', $entry), ticketTimeEntryPayload(['ticket_id' => $ticket->id]))
+        ->put(route('time.update', $entry), ticketTimeEntryPayload(ticketTimeContext($ticket)))
         ->assertSessionHasErrors('ticket_id');
 
     expect(ticketTimeSnapshot())->toBe($before);

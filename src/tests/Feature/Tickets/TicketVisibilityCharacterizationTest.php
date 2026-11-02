@@ -90,7 +90,7 @@ it('TARGET H4: every row on a customer list is a ticket the customer may open (n
     $listed = ticketOwnProps($this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk())['tickets']['data'];
 
     expect(collect($listed)->pluck('title')->sort()->values()->all())->toBe(['Peer own ticket', 'Peer unlinked ticket'])
-        ->and(collect($listed)->every(fn (array $row) => Gate::forUser($f['peer'])->allows('view', Ticket::findOrFail($row['id']))))->toBeTrue();
+        ->and(collect($listed)->every(fn (array $row) => Gate::forUser($f['peer'])->allows('view', Ticket::where('ticket_number', $row['number'])->firstOrFail())))->toBeTrue();
 });
 
 it('BASELINE H4: /tickets is an operator\'s own-requests list, while the operator still opens any ticket', function () {
@@ -206,8 +206,8 @@ it('TARGET H9: the agent reaches the ticket (P2: the operator page) and every at
     // who is not the requester is sent to the operator page, which they open.
     $this->actingAs($f['agent'])->get(route('tickets.show', $f['ticket']))->assertRedirect(route('operator.tickets.show', $f['ticket']));
     $this->actingAs($f['agent'])->get(route('operator.tickets.show', $f['ticket']))->assertOk();
-    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['publicAttachment']))->assertOk();
-    $this->actingAs($f['agent'])->get(route('tickets.attachment.download', $f['internalAttachment']))->assertOk();
+    $this->actingAs($f['agent'])->get(ticketAttachmentUrl($f['publicAttachment']))->assertOk();
+    $this->actingAs($f['agent'])->get(ticketAttachmentUrl($f['internalAttachment']))->assertOk();
 });
 
 // FLIPPED IN EPIC-017 WP2 (O1, N1): the ticket's OWNER used to be allowed to time it (`TicketPolicy::view`
@@ -221,17 +221,17 @@ it('TARGET H9: the agent starts a timer on, and is offered, a ticket assigned to
         ->assertOk()
         ->assertJsonPath('0.id', $f['ticket']->id);
     $this->actingAs($f['agent'])
-        ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($f['ticket']))
         ->assertSuccessful()
         ->assertJsonPath('context.id', $f['ticket']->id);
 
     $this->actingAs($f['customer'])
-        ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($f['ticket']))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
 
     $this->actingAs($f['owner'])
-        ->postJson(route('time.timer.start'), ['ticket_id' => $f['ticket']->id])
+        ->postJson(route('time.timer.start'), ticketTimeContext($f['ticket']))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('ticket_id');
 

@@ -222,7 +222,7 @@ export function TicketsIndexPage({
                             className="divide-y divide-rule border-y border-rule"
                         >
                             {tickets.data.map((ticket) => (
-                                <RequestRow key={ticket.id} ticket={ticket} />
+                                <RequestRow key={ticket.number} ticket={ticket} />
                             ))}
                         </ul>
                     </>

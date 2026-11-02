@@ -76,9 +76,12 @@ Route::middleware(['auth', 'can:roles.view'])->prefix('admin')->name('roles.')->
         ->name('destroy');
 });
 
-// Ticket attachment download (auth only — policy check inside controller)
+// Ticket attachment download (auth only; the policy check is inside the controller). Nested under the ticket's public reference (C6-R):
+// there is deliberately no numeric-only attachment URL. `{attachment}` is a plain number, resolved against the ticket in the controller
+// (NOT by scoped binding: Ticket::attachments() leaves out reply attachments).
 Route::middleware('auth')
-    ->get('/attachments/{attachment}/download', [TicketController::class, 'downloadAttachment'])
+    ->get('/tickets/{ticket}/attachments/{attachment}', [TicketController::class, 'downloadAttachment'])
+    ->whereNumber('attachment')
     ->name('tickets.attachment.download');
 
 // Tickets (user-facing) — literal routes before wildcard {ticket}

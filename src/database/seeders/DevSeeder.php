@@ -127,35 +127,29 @@ class DevSeeder extends Seeder
         // rules). `firstOrCreate` on a fixed ticket number keeps this call safe to run
         // repeatedly; the E2E suite only starts and stops timers against it and cleans those
         // up, never the ticket itself.
-        Ticket::firstOrCreate(
-            ['ticket_number' => 'TKT-E2E1'],
-            [
-                'user_id' => $operator->id,
-                'title' => 'E2E fixture: embedded time tracker',
-                'description' => 'Seeded fixture for the Blade-embedded time tracker browser test.',
-                'category' => 'General',
-                'priority' => 'low',
-                'status' => 'open',
-                'sla_due_at' => now()->addDays(30),
-            ]
-        );
+        $this->fixtureTicket('TKT-E2E1', 'TK-E2E00-00001', [
+            'user_id' => $operator->id,
+            'title' => 'E2E fixture: embedded time tracker',
+            'description' => 'Seeded fixture for the Blade-embedded time tracker browser test.',
+            'category' => 'General',
+            'priority' => 'low',
+            'status' => 'open',
+            'sla_due_at' => now()->addDays(30),
+        ]);
 
         // A fixed, idempotent request that is waiting on `e2e-customer`, so the customer Home has a
         // deterministic "Waiting on you" row to render in the browser. Its title deliberately does not
         // start with `E2E-`: that prefix is reserved for tickets a run creates, which the Helpdesk
         // package's cleanup command removes. This one is owned by the seeder and never removed.
-        Ticket::firstOrCreate(
-            ['ticket_number' => 'TKT-E2E2'],
-            [
-                'user_id' => $customer->id,
-                'title' => 'E2E fixture: waiting on the customer',
-                'description' => 'Seeded fixture so the customer Home has a request waiting on its owner.',
-                'category' => 'General',
-                'priority' => 'low',
-                'status' => 'pending_user',
-                'sla_due_at' => now()->addDays(30),
-            ]
-        );
+        $this->fixtureTicket('TKT-E2E2', 'TK-E2E00-00002', [
+            'user_id' => $customer->id,
+            'title' => 'E2E fixture: waiting on the customer',
+            'description' => 'Seeded fixture so the customer Home has a request waiting on its owner.',
+            'category' => 'General',
+            'priority' => 'low',
+            'status' => 'pending_user',
+            'sla_due_at' => now()->addDays(30),
+        ]);
 
         $this->command->info('Dev accounts seeded:');
         $this->command->line('  operator@intechral.test / password  (operator)');
@@ -166,5 +160,29 @@ class DevSeeder extends Seeder
         $this->command->line('  e2e-customer@intechral.test / password         (user, Focused shell, E2E fixture)');
         $this->command->line('  e2e-customer-other@intechral.test / password   (user, Focused shell, E2E fixture)');
         $this->command->line('  e2e-operational-member@intechral.test / password (user + projects.manage, Operational shell, E2E fixture)');
+    }
+
+    /**
+     * A fixed fixture ticket under its fixed canonical reference (C6-R). A development database seeded before C6-R already holds the
+     * fixture under its legacy number; it is TAKEN OVER, not duplicated, by moving it to the fixed reference inside the one
+     * conversion window the model allows. Otherwise it is created if missing, as before.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function fixtureTicket(string $legacyNumber, string $reference, array $attributes): void
+    {
+        if (Ticket::where('ticket_number', $reference)->exists()) {
+            return;
+        }
+
+        $legacy = Ticket::where('ticket_number', $legacyNumber)->first();
+
+        if ($legacy !== null) {
+            Ticket::convertingLegacyReferences(fn () => $legacy->update(['ticket_number' => $reference]));
+
+            return;
+        }
+
+        Ticket::create(['ticket_number' => $reference, ...$attributes]);
     }
 }

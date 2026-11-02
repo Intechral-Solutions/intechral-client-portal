@@ -11,7 +11,12 @@ const entry: ConversationEntryData = {
     createdAt: '2026-10-08T10:00:00Z',
     createdAtHuman: '2 hours ago',
     attachments: [
-        { id: 9, filename: 'diagnostics.txt', size: '1.2 KB', href: '/attachments/9/download' },
+        {
+            id: 9,
+            filename: 'diagnostics.txt',
+            size: '1.2 KB',
+            href: '/tickets/TK-00012-ABCDE/attachments/9',
+        },
     ],
 };
 
@@ -48,7 +53,7 @@ it('links each attachment to its download as a document link, with the size', ()
 
     const link = screen.getByRole('link', { name: /diagnostics\.txt/ });
 
-    expect(link).toHaveAttribute('href', '/attachments/9/download');
+    expect(link).toHaveAttribute('href', '/tickets/TK-00012-ABCDE/attachments/9');
     expect(link).not.toHaveAttribute('data-inertia-link');
     expect(link).toHaveTextContent('(1.2 KB)');
 });

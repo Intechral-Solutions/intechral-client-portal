@@ -10,6 +10,8 @@ export type SelectedContext = {
     kind: ContextKind;
     id: number;
     label?: string;
+    /** Ticket contexts only: the public reference the id must travel with. */
+    reference?: string;
 } | null;
 
 type Props = {
@@ -109,7 +111,8 @@ export function ContextSelector({ idPrefix, value, onChange, disabled, error }: 
                         className="w-full"
                         onChange={(event) => {
                             const id = Number(event.target.value);
-                            onChange(id ? { kind, id } : null);
+                            const reference = items.find((item) => item.id === id)?.reference;
+                            onChange(id ? { kind, id, reference } : null);
                         }}
                     >
                         <option value="">

@@ -17,6 +17,8 @@ export type TimerStartPayload = {
     project_id?: number | null;
     task_id?: number | null;
     ticket_id?: number | null;
+    /** The ticket's public reference; the server refuses a `ticket_id` whose reference differs (C6-R). */
+    ticket_reference?: string | null;
     description?: string | null;
     billable?: boolean;
 };
@@ -46,11 +48,15 @@ export type TaskTimeSummary = {
 export type ContextOption = {
     id: number;
     label: string;
+    /** Ticket options only: sent back as `ticket_reference` with the id. */
+    reference?: string;
 };
 
 export type EntryContext = {
     kind: ContextKind;
     id: number;
+    /** Ticket contexts only. */
+    reference?: string;
     label: string;
     url: string | null;
 };
