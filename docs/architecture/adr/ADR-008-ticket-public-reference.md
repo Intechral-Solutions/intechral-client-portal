@@ -1,9 +1,9 @@
 # ADR-008: Ticket public reference (C6-R)
 
-**Date:** 2026-10-31  
-**Status:** Accepted (owner decision, 2026-10-31; Option B)  
-**Supersedes:** Release 0.9 decision C6 (a previously communicated ticket number is never reissued), by dated addendum in [the Release 0.9 scope](../../product/release-0.9-scope-and-architecture.md#12-supersession-record). The earlier C6 text is not edited.  
-**Related:** scope sections 7.1 and 8 (backup and restore); EPIC-010D A3.5, P3a and P3b (history, kept).
+- **Date:** 2026-10-31
+- **Status:** Accepted (owner decision, 2026-10-31; Option B)
+- **Supersedes:** Release 0.9 decision C6 (a previously communicated ticket number is never reissued), by dated addendum in [the Release 0.9 scope](../../product/release-0.9-scope-and-architecture.md#12-supersession-record). The earlier C6 text is not edited.
+- **Related:** scope sections 7.1 and 8 (backup and restore); EPIC-010D A3.5, P3a and P3b (history, kept).
 
 ## Context
 

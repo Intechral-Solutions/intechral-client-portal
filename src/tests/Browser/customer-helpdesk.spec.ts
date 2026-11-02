@@ -199,7 +199,9 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
         await expect(link).toBeVisible();
         await expect(link).toContainText(/\(\d+(\.\d+)? ?(B|KB)\)/);
         const attachmentHref = new URL((await link.getAttribute('href'))!).pathname;
-        expect(attachmentHref).toMatch(/\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/);
+        expect(attachmentHref).toMatch(
+            /\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/,
+        );
 
         // A real browser download returns the bytes that were uploaded, as an attachment.
         const downloading = page.waitForEvent('download');
@@ -429,7 +431,9 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
             await expect(note.locator('[data-internal-note]')).toBeVisible();
             const noteLink = note.getByRole('link', { name: new RegExp(ticket.noteFileName) });
             noteHref = new URL((await noteLink.getAttribute('href'))!).pathname;
-            expect(noteHref).toMatch(/^\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/);
+            expect(noteHref).toMatch(
+                /^\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\/attachments\/\d+$/,
+            );
 
             // The operator may download it: the route works, so the customer's 403 below is authorization.
             const asOperator = await operator.request.get(noteHref);
@@ -515,7 +519,9 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
             expect((await page.request.get(ticket.url)).status()).toBe(403);
             expect((await page.request.get(ticket.attachmentHref)).status()).toBe(403);
             expect((await page.request.get(noteHref!)).status()).toBe(403);
-            expect((await page.request.get(`/operator/tickets/${ticket.number}`)).status()).toBe(403);
+            expect((await page.request.get(`/operator/tickets/${ticket.number}`)).status()).toBe(
+                403,
+            );
 
             // In the browser: refused inside the customer frame, and nothing about the ticket leaks.
             const response = await page.goto(ticket.url);
@@ -523,7 +529,14 @@ test.describe('customer Helpdesk journeys 3–8 on one disposable ticket', () =>
             await expect(page.locator('[data-shell="focused"]')).toHaveCount(1);
             const refusedPage = await page.content();
             expect(refusedPage).not.toContain(ticket.title);
-            expect(refusedPage).not.toContain(ticket.number);
+            // The reference is the URL itself now, so a page may echo a URL this customer requested (the 403 page's
+            // "previous page" link points at the earlier operator-URL probe). That discloses nothing they did not type;
+            // anywhere ELSE the reference would be a leak, so only the requested paths are removed before checking.
+            const requestedPaths = new RegExp(
+                String.raw`\\?/(?:operator\\?/)?tickets\\?/${ticket.number}`,
+                'g',
+            );
+            expect(refusedPage.replace(requestedPaths, '')).not.toContain(ticket.number);
 
             // The list: absent, whatever order, and a search for its unique title exposes nothing.
             await page.goto('/tickets');
