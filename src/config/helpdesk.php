@@ -18,4 +18,18 @@ return [
 
     'notify_address' => env('HELPDESK_NOTIFY_ADDRESS'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy ticket-reference conversion gate (Release 0.9 C6-R, ADR-008)
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan tickets:rereference --apply` replaces pre-C6-R ticket numbers (`TKT-0001` ...) with `TK-XXXXX-XXXXX` references. It
+    | refuses to change anything unless this is true. Leave it unset (false) everywhere except the one staging conversion: set it for
+    | that run, then remove it. A fresh production install has no legacy rows, proves it with `tickets:rereference --check`, and never
+    | sets this. The command and this gate are Release 0.9 scaffolding.
+    |
+    */
+
+    'rereference_allowed' => filter_var(env('TICKET_REREFERENCE_ALLOWED', false), FILTER_VALIDATE_BOOL),
+
 ];

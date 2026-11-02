@@ -60,13 +60,13 @@ const props: DashboardPageProps = {
     ],
     recentTickets: [
         {
-            id: 7,
+            number: 'TK-00007-ABCDE',
             subject: 'Printer offline',
             status: 'open',
             statusLabel: 'Open',
             requesterName: 'Dana West',
             createdAtHuman: '2 hours ago',
-            href: '/tickets/7',
+            href: '/tickets/TK-00007-ABCDE',
             visit: 'document',
         },
     ],
@@ -176,7 +176,7 @@ describe('Home', () => {
         renderHome();
 
         const ticket = screen.getByRole('link', { name: /Printer offline/ });
-        expect(ticket).toHaveAttribute('href', '/tickets/7');
+        expect(ticket).toHaveAttribute('href', '/tickets/TK-00007-ABCDE');
         expect(within(ticket).getByText('Open')).toBeVisible();
         expect(within(ticket).getByText(/Dana West/)).toBeVisible();
     });

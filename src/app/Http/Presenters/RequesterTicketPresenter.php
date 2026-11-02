@@ -60,12 +60,11 @@ final class RequesterTicketPresenter
     /**
      * One list row. Category, assignee and SLA are deliberately not here (§19.1).
      *
-     * @return array{id: int, number: string, title: string, status: string, statusLabel: string, priority: string, createdAt: string, createdAtHuman: string, href: string}
+     * @return array{number: string, title: string, status: string, statusLabel: string, priority: string, createdAt: string, createdAtHuman: string, href: string}
      */
     public static function row(Ticket $ticket): array
     {
         return [
-            'id' => $ticket->id,
             'number' => $ticket->ticket_number,
             'title' => $ticket->title,
             'status' => $ticket->status,
@@ -97,7 +96,7 @@ final class RequesterTicketPresenter
                 'body' => $ticket->description,
                 'createdAt' => $ticket->created_at->toIso8601String(),
                 'createdAtHuman' => $ticket->created_at->diffForHumans(),
-                'attachments' => self::attachments($ticket->attachments->whereNull('reply_id')),
+                'attachments' => self::attachments($ticket, $ticket->attachments->whereNull('reply_id')),
             ],
             ...$public->map(fn (TicketReply $reply) => [
                 'key' => "reply-{$reply->id}",
@@ -106,13 +105,12 @@ final class RequesterTicketPresenter
                 'body' => $reply->body,
                 'createdAt' => $reply->created_at->toIso8601String(),
                 'createdAtHuman' => $reply->created_at->diffForHumans(),
-                'attachments' => self::attachments($reply->attachments->where('reply_id', $reply->id)),
+                'attachments' => self::attachments($ticket, $reply->attachments->where('reply_id', $reply->id)),
             ])->all(),
         ];
 
         return [
             'ticket' => [
-                'id' => $ticket->id,
                 'number' => $ticket->ticket_number,
                 'title' => $ticket->title,
                 'status' => $ticket->status,
@@ -170,7 +168,7 @@ final class RequesterTicketPresenter
      * @param  iterable<TicketAttachment>  $attachments
      * @return list<array{id: int, filename: string, size: string, href: string}>
      */
-    private static function attachments(iterable $attachments): array
+    private static function attachments(Ticket $ticket, iterable $attachments): array
     {
         $rows = [];
 
@@ -179,7 +177,7 @@ final class RequesterTicketPresenter
                 'id' => $attachment->id,
                 'filename' => $attachment->filename,
                 'size' => $attachment->formattedSize(),
-                'href' => route('tickets.attachment.download', $attachment),
+                'href' => route('tickets.attachment.download', [$ticket, $attachment]),
             ];
         }
 

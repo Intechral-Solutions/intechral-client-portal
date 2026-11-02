@@ -14,6 +14,10 @@ use App\Notifications\TicketStatusNotification;
 use App\Rules\AllowedTicketAttachment;
 use App\Shared\Pilot\CustomerPilotGate;
 use App\Support\Helpdesk\HelpdeskNotifyAddress;
+use App\Support\Helpdesk\TicketReference;
+use App\Support\Helpdesk\TicketReferenceExhausted;
+use App\Support\Helpdesk\TicketReferenceGenerator;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +43,9 @@ class TicketService
     /** Hours a ticket stays `resolved` before `tickets:auto-close` may close it; the Resolved mail tells the customer the same number. */
     public const AUTO_CLOSE_HOURS = 72;
 
+    /** References drawn per creation: at most this many before it fails closed (C6-R). */
+    public const REFERENCE_ATTEMPTS = 5;
+
     public const CLOSED_REPLY_MESSAGE = 'This request is closed. Raise a new request if you need more help.';
 
     public function create(User $user, array $data, array $files = []): Ticket
@@ -46,13 +53,12 @@ class TicketService
         $priority = $data['priority'];
         $hours = Ticket::SLA_HOURS[$priority];
 
-        // The row, its number and every attachment row commit together, and a file is written
+        // The row, its reference and every attachment row commit together, and a file is written
         // only inside that transaction; storeAttachments() deletes every written file when it
-        // rolls back (F-7). The database reserves the row identity first and the public number is
-        // derived from it (EPIC-010D H8), so no temporary number is ever visible.
+        // rolls back (F-7). The public reference is random and issued with the row (C6-R, ADR-008);
+        // the row's numeric id stays internal, and private files are stored under it.
         $ticket = $this->storeAttachments(function (array &$stored) use ($user, $data, $priority, $hours, $files) {
-            $ticket = Ticket::create([
-                'ticket_number' => 'TMP-'.bin2hex(random_bytes(6)),
+            $ticket = $this->createWithReference([
                 'user_id' => $user->id,
                 'title' => $data['title'],
                 'description' => $data['description'],
@@ -61,8 +67,6 @@ class TicketService
                 'status' => 'open',
                 'sla_due_at' => now()->addHours($hours),
             ]);
-
-            $ticket->update(['ticket_number' => $this->ticketNumberFor($ticket)]);
 
             foreach ($files as $file) {
                 $this->storeAttachment($ticket, null, $user, $file, $stored);
@@ -332,9 +336,28 @@ class TicketService
         $requester->notify(new TicketStatusNotification($ticket, $status, $historyId));
     }
 
-    private function ticketNumberFor(Ticket $ticket): string
+    /**
+     * Inserts the ticket under a fresh random reference. Each attempt is its own savepoint inside the caller's transaction, and ONLY
+     * a duplicate of the `ticket_number` unique index draws again; any other error propagates after one attempt. When every attempt
+     * collides it throws, and the caller's transaction rolls back whole (no row, file, mail or job).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function createWithReference(array $attributes): Ticket
     {
-        return 'TKT-'.str_pad((string) $ticket->id, 4, '0', STR_PAD_LEFT);
+        $generator = app(TicketReferenceGenerator::class);
+
+        for ($attempt = 1; $attempt <= self::REFERENCE_ATTEMPTS; $attempt++) {
+            try {
+                return DB::transaction(fn () => Ticket::create([...$attributes, 'ticket_number' => $generator->next()]));
+            } catch (QueryException $e) {
+                if (! TicketReference::isCollision($e)) {
+                    throw $e;
+                }
+            }
+        }
+
+        throw new TicketReferenceExhausted('No unique ticket reference could be issued in '.self::REFERENCE_ATTEMPTS.' attempts.');
     }
 
     /**

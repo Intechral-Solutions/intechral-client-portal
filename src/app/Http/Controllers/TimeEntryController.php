@@ -7,8 +7,8 @@ use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
 use App\Models\TimeEntryBlock;
-use App\Models\User;
 use App\Rules\AccessibleTimeContext;
+use App\Rules\TicketReferenceMatchesId;
 use App\Services\TimeEntryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -81,7 +81,7 @@ class TimeEntryController extends Controller
         $data = $request->validate([
             'date' => 'required|date|before_or_equal:today',
             'hours' => 'required|numeric|min:0.25|max:24',
-            ...$this->contextRules($request->user()),
+            ...$this->contextRules($request),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
@@ -104,7 +104,7 @@ class TimeEntryController extends Controller
             // whole-minute duration a timer produced, so edits only require that the
             // value still converts to at least one stored minute (0.01h = 0.6min -> 1).
             'hours' => 'required|numeric|min:0.01|max:24',
-            ...$this->contextRules($request->user(), $this->keepsTask($request, $entry)),
+            ...$this->contextRules($request, $this->keepsTask($request, $entry)),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
@@ -135,7 +135,7 @@ class TimeEntryController extends Controller
     public function timerStart(Request $request): JsonResponse
     {
         $data = $request->validate([
-            ...$this->contextRules($request->user()),
+            ...$this->contextRules($request),
             'description' => 'nullable|string|max:500',
             'billable' => 'nullable|boolean',
         ]);
@@ -221,13 +221,14 @@ class TimeEntryController extends Controller
 
             'ticket' => Ticket::where('assignee_id', $user->id)
                 ->whereIn('status', ['open', 'in_progress'])
-                ->orderBy('ticket_number')
+                ->orderBy('id')
                 ->limit(50)
                 ->get(['id', 'user_id', 'assignee_id', 'ticket_number', 'title'])
                 ->filter(fn ($ticket) => AccessibleTimeContext::allows($user, 'ticket', $ticket->id))
                 ->map(fn ($t) => [
                     'id' => $t->id,
                     'label' => $t->ticket_number.' — '.Str::limit($t->title, 40),
+                    'reference' => $t->ticket_number,
                 ]),
 
             default => collect(),
@@ -313,6 +314,7 @@ class TimeEntryController extends Controller
             return [
                 'type' => 'Ticket',
                 'id' => $entry->ticket_id,
+                'reference' => $entry->ticket->ticket_number,
                 'label' => $entry->ticket->ticket_number.' — '.Str::limit($entry->ticket->title, 40),
                 'url' => route('tickets.show', $entry->ticket),
             ];
@@ -360,6 +362,7 @@ class TimeEntryController extends Controller
             $context = [
                 'kind' => 'ticket',
                 'id' => $entry->ticket_id,
+                'reference' => $entry->ticket->ticket_number,
                 'label' => $entry->ticket->ticket_number,
                 'url' => route('tickets.show', $entry->ticket),
             ];
@@ -458,8 +461,10 @@ class TimeEntryController extends Controller
         return $entry->task_id !== null && is_numeric($taskId) && (int) $taskId === $entry->task_id;
     }
 
-    private function contextRules(User $user, bool $keepsTask = false): array
+    private function contextRules(Request $request, bool $keepsTask = false): array
     {
+        $user = $request->user();
+
         return [
             'project_id' => [
                 'nullable',
@@ -478,6 +483,8 @@ class TimeEntryController extends Controller
                 'integer',
                 'prohibits:project_id,task_id',
                 new AccessibleTimeContext($user, 'ticket'),
+                // C6-R: the id travels with the reference it was rendered with, so a stale id after a recovery cannot reach another ticket.
+                new TicketReferenceMatchesId($request->input('ticket_reference')),
             ],
         ];
     }

@@ -75,6 +75,6 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
             ->line("A new reply has been added to ticket **{$this->ticket->ticket_number}**.")
             ->line(MailText::line('**', MailText::escape($this->reply->user->name), '** wrote:'))
             ->line($preview)
-            ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
+            ->action('View Ticket', route('tickets.show', $this->ticket));
     }
 }

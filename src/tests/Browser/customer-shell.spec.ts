@@ -102,13 +102,13 @@ test('the Home reads in the customer order and shows the seeded request that is 
         'Your projects',
     ]);
 
-    // `TKT-E2E2` (DevSeeder) is owned by this customer and waiting on them.
+    // `TK-E2E00-00002` (DevSeeder) is owned by this customer and waiting on them.
     const waiting = page.getByRole('region', { name: 'Waiting on you' });
     const row = waiting.getByRole('link', { name: /E2E fixture: waiting on the customer/ });
 
     await expect(row).toBeVisible();
-    await expect(row).toContainText('TKT-E2E2');
-    await expect(row).toHaveAttribute('href', /\/tickets\/\d+$/);
+    await expect(row).toContainText('TK-E2E00-00002');
+    await expect(row).toHaveAttribute('href', /\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
 
     // Nothing operational: no priority, SLA, queue or requester vocabulary on a customer page.
     await expect(page.getByRole('main')).not.toContainText(

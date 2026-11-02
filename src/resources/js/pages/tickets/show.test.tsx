@@ -43,8 +43,7 @@ function props(
 ): TicketsShowProps {
     return {
         ticket: {
-            id: 12,
-            number: 'TKT-12',
+            number: 'TK-00012-ABCDE',
             title: 'Printer offline',
             status,
             statusLabel:
@@ -81,7 +80,7 @@ it('shows the request: number, title, customer status, priority, opened time and
     render(<TicketsShowPage {...props('pending_user')} />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Printer offline' })).toBeInTheDocument();
-    expect(screen.getByText('TKT-12')).toBeInTheDocument();
+    expect(screen.getByText('TK-00012-ABCDE')).toBeInTheDocument();
     expect(screen.getAllByText('Waiting on you').length).toBeGreaterThan(0);
     expect(screen.getByText('High')).toBeVisible();
     expect(screen.getByText('3 hours ago')).toHaveAttribute('datetime', '2026-10-08T08:00:00Z');
@@ -200,7 +199,7 @@ describe('sending a reply', () => {
         expect(submitted()).toHaveLength(1);
         expect(submitted()[0]).toMatchObject({
             method: 'post',
-            url: '/tickets/12/replies',
+            url: '/tickets/TK-00012-ABCDE/replies',
             options: { forceFormData: true, preserveScroll: true },
             data: { body: 'Here is a photo.', attachments: [file] },
         });
@@ -416,7 +415,12 @@ it('renders a hostile reply and attachment name as text', () => {
                 entry('reply-9', {
                     body: hostile,
                     attachments: [
-                        { id: 3, filename: hostile, size: '1 B', href: '/attachments/3/download' },
+                        {
+                            id: 3,
+                            filename: hostile,
+                            size: '1 B',
+                            href: '/tickets/TK-00012-ABCDE/attachments/3',
+                        },
                     ],
                 }),
             ]}

@@ -172,7 +172,7 @@ in every other character. The payloads are Markdown links, images, emphasis, cod
 Unicode and literal backslashes.
 Limits, stated: a bare `https://` in the text stays text in this HTML, but a mail client may link it itself; Laravel's renderer ends with `str_replace('\[', '[')` over the HTML
 part, so a backslash a person typed immediately before `[` is not shown there (the text part is untouched); a reply preview is one line (its line breaks used to survive; it is
-still the first 200 characters followed by `...`). Per-recipient links (operator mail linking to the operator page) remain WP5 work and are unchanged: the reply mail still links to `/tickets/{id}`.
+still the first 200 characters followed by `...`). Per-recipient links (operator mail linking to the operator page) remain WP5 work and are unchanged: the reply mail still links to `/tickets/{reference}`.
 
 **Closed customer-surface mode (accepted for this release).** The customer mails (confirmation, reply, Waiting on you, Resolved) are not suppressed by `PORTAL_CUSTOMER_SURFACE_MODE`.
 In `closed` mode a customer's ticket routes are server-side 404s ([Customer Pilot Surface](./customer-pilot-surface.md)), so the link in such a mail leads nowhere (tested:
@@ -185,5 +185,5 @@ live with the alert silently off (RE-H13). Local and test environments may leave
 which the preflight should have prevented). The test suite pins it to empty in `tests/bootstrap.php`, so a value exported in the shell or the container cannot change what the ticket tests assert
 (guard: `tests/Unit/Configuration/TestEnvironmentPinTest.php`); a test that needs the alert sets `helpdesk.notify_address` itself. **The staging installation runs `APP_ENV=production` and is held to the same rule**; give it an owner-controlled
 address that the staging mail sink captures. Configuration proves the address is well formed; **that mail reaches it is proved only by a real alert**, which
-the first-install acceptance and the production acceptance each record. The alert is also the cheapest independent record of every ticket number issued, which
-is why the destination should be a mailbox that is kept ([EPIC-017 C6](../product/release-0.9-scope-and-architecture.md#73-ticket-number-continuity)).
+the first-install acceptance and the production acceptance each record. The alert is a convenient independent record of every ticket reference issued, so the
+destination should be a mailbox that is kept; it is no longer the continuity mechanism C6 once relied on, which [ADR-008](./adr/ADR-008-ticket-public-reference.md) (C6-R) replaced.

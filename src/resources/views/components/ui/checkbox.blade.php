@@ -3,7 +3,7 @@
     `company-selector` and `login`). A checked box is a SELECTION colour, never a primary-action colour.
 
     <x-ui.checkbox name="is_internal" value="1">Internal note (not visible to submitter)</x-ui.checkbox>
-    <x-ui.checkbox name="ticket_ids[]" id="ticket-cb-7" value="7" aria-label="Select ticket TKT-0007" />
+    <x-ui.checkbox name="ticket_refs[]" id="ticket-cb-TK-7M2QX-0ABCD" value="TK-7M2QX-0ABCD" aria-label="Select ticket TK-7M2QX-0ABCD" />
 
     - With slot content the checkbox is WRAPPED in its own <label> (that label names it, so it needs no
       `id`); `class` then goes on the wrapper (layout only) and every other attribute on the <input>.

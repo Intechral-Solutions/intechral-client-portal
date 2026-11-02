@@ -55,7 +55,7 @@ describe('ticket assignment', function () {
             ->put(route('operator.tickets.assign', $ticket), ['assignee_id' => $this->suspendedAgent->id])
             ->assertSessionHasErrors(['assignee_id' => 'The selected assignee cannot be assigned tickets.']);
         $this->actingAs($this->operator)
-            ->post(route('operator.tickets.bulk'), ['ticket_ids' => [$ticket->id], 'action' => 'assign', 'assignee_id' => $this->suspendedAgent->id])
+            ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$ticket->ticket_number], 'action' => 'assign', 'assignee_id' => $this->suspendedAgent->id])
             ->assertSessionHasErrors('assignee_id');
 
         expect($ticket->fresh()->assignee_id)->toBeNull();

@@ -60,7 +60,7 @@ it('renders the unified list as the tasks/index component with a minimal DTO', f
 });
 
 it('never exposes an email, raw model attribute, or unrelated id on the tasks page', function () {
-    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TKT-9001']);
+    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TK-T9001-AAAAA']);
     makeTask($this->todo, ['assignee_id' => $this->admin->id]);
     Task::factory()->standalone()->create(['assignee_id' => $this->admin->id, 'description' => 'Secret notes']);
     Task::factory()->standalone()->create(['assignee_id' => $this->admin->id, 'ticket_id' => $ticket->id]);
@@ -100,7 +100,7 @@ it('lists no ticket-kind task, whatever its status, even to its assignee and tic
     // Rewritten in EPIC-014 WP3 (§16.3). Until then this pinned a ticket row's status as coming
     // from its raw status field. Ticket-kind tasks have left the Tasks workspace (§9.1); their
     // status semantics stay pinned at the model/presenter level (ProjectPinnedBehaviorTest).
-    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TKT-9002']);
+    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TK-T9002-AAAAA']);
     Task::factory()->standalone()->create(['title' => 'Ticket work', 'ticket_id' => $ticket->id, 'status' => 'done', 'assignee_id' => $this->admin->id, 'created_by' => $this->admin->id]);
 
     foreach (['mine', 'all'] as $view) {
@@ -112,7 +112,7 @@ it('lists no ticket-kind task, whatever its status, even to its assignee and tic
 // ── context.kind mapping ──────────────────────────────────────────────────────
 
 it('reports kind and context.kind for the two surfaced kinds, and no ticket row at all', function () {
-    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TKT-9003']);
+    $ticket = Ticket::factory()->create(['user_id' => $this->admin->id, 'ticket_number' => 'TK-T9003-AAAAA']);
     makeTask($this->todo, ['title' => 'Board row', 'assignee_id' => $this->admin->id]);
     Task::factory()->standalone()->create(['title' => 'Standalone row', 'assignee_id' => $this->admin->id]);
     Task::factory()->standalone()->create(['title' => 'Ticket row', 'ticket_id' => $ticket->id, 'assignee_id' => $this->admin->id]);

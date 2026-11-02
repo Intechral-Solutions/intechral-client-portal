@@ -35,13 +35,14 @@ const NOTICES: Record<NonNullable<ReplyState['notice']>, string> = {
  * then, so a request that was simply closed already never steals it.
  */
 export function ReplySection({
-    ticketId,
+    ticketReference,
     reply,
     policy,
     canCreate,
     onSent,
 }: {
-    ticketId: number;
+    /** The ticket's public reference: the reply URL is addressed by it, never by the numeric key. */
+    ticketReference: string;
     reply: ReplyState;
     policy: AttachmentPolicy;
     canCreate: boolean;
@@ -62,7 +63,7 @@ export function ReplySection({
     function submit(event: FormEvent) {
         event.preventDefault();
 
-        form.post(store.url(ticketId), {
+        form.post(store.url(ticketReference), {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {

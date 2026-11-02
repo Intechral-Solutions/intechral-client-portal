@@ -45,7 +45,8 @@ type Metric = {
 };
 
 type Ticket = {
-    id: number;
+    /** The ticket's public reference; the numeric key is never sent. */
+    number: string;
     subject: string;
     status: string;
     statusLabel: string;
@@ -281,7 +282,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                         {recentTickets.length ? (
                             <ul className="divide-y divide-rule border-b border-rule">
                                 {recentTickets.map((ticket) => (
-                                    <li key={ticket.id}>
+                                    <li key={ticket.number}>
                                         <DestinationLink
                                             href={ticket.href}
                                             visit={ticket.visit}

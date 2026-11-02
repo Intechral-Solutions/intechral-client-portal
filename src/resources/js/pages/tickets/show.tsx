@@ -123,7 +123,7 @@ export function TicketsShowPage({
                 </section>
 
                 <ReplySection
-                    ticketId={ticket.id}
+                    ticketReference={ticket.number}
                     reply={reply}
                     policy={attachmentPolicy}
                     canCreate={abilities.create}

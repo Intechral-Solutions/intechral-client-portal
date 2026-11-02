@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { vi } from 'vitest';
@@ -370,4 +370,43 @@ it('shows the same Stop whatever shell hosts the page: the page reads no present
 
     expect(await screen.findByRole('button', { name: 'Stop timer: Weekly sync' })).toBeVisible();
     expect(document.querySelector('[data-shell-timer]')).toBeNull();
+});
+
+// ── C6-R: a ticket id travels with its public reference ───────────────────────────────────────
+
+it('starts a ticket timer with the ticket id AND its reference, and none for other contexts', async () => {
+    const starts: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init?: RequestInit) => {
+            if (url.includes('/time/context-options')) {
+                return json([
+                    { id: 5, label: 'TK-0123A-BCDEF — Printer', reference: 'TK-0123A-BCDEF' },
+                ]);
+            }
+
+            if (url.endsWith('/time/timer/start') && init?.method === 'POST') {
+                starts.push(JSON.parse(String(init.body)));
+
+                return json(runningTimer({ id: 9 }));
+            }
+
+            return json([]);
+        }),
+    );
+    const user = userEvent.setup();
+    renderTimePage();
+
+    const form = (await screen.findByText('Start timer', { selector: 'button' })).closest('form')!;
+    await user.selectOptions(within(form).getByLabelText('Context'), 'ticket');
+    await user.selectOptions(await within(form).findByLabelText('Record'), '5');
+    await user.click(within(form).getByRole('button', { name: 'Start timer' }));
+
+    await waitFor(() => expect(starts).toHaveLength(1));
+    expect(starts[0]).toMatchObject({
+        ticket_id: 5,
+        ticket_reference: 'TK-0123A-BCDEF',
+        project_id: null,
+        task_id: null,
+    });
 });

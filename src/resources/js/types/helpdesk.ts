@@ -11,7 +11,7 @@ export type TicketStatusValue = 'open' | 'in_progress' | 'pending_user' | 'resol
 export type TicketPriorityValue = 'low' | 'medium' | 'high' | 'critical';
 
 export type RequesterTicketRow = {
-    id: number;
+    /** The public reference (`TK-XXXXX-XXXXX`): the ticket's only public identity. The numeric key is never sent. */
     number: string;
     title: string;
     status: TicketStatusValue;
@@ -58,7 +58,7 @@ export type ConversationEntryData = {
 };
 
 export type RequesterTicketDetail = {
-    id: number;
+    /** The public reference (`TK-XXXXX-XXXXX`): the ticket's only public identity. The numeric key is never sent. */
     number: string;
     title: string;
     status: TicketStatusValue;

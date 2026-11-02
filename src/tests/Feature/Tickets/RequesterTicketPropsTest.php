@@ -39,11 +39,11 @@ afterEach(function () {
     ticketCleanFakeStorage();
 });
 
-const PROPS_ROW_KEYS = ['id', 'number', 'title', 'status', 'statusLabel', 'priority', 'createdAt', 'createdAtHuman', 'href'];
+const PROPS_ROW_KEYS = ['number', 'title', 'status', 'statusLabel', 'priority', 'createdAt', 'createdAtHuman', 'href'];
 
 /** Every key path the detail page may carry, own props only (`*` is a list index). */
 const PROPS_DETAIL_PATHS = [
-    'ticket', 'ticket.id', 'ticket.number', 'ticket.title', 'ticket.status', 'ticket.statusLabel', 'ticket.priority',
+    'ticket', 'ticket.number', 'ticket.title', 'ticket.status', 'ticket.statusLabel', 'ticket.priority',
     'ticket.category', 'ticket.createdAt', 'ticket.createdAtHuman', 'ticket.handledBy',
     'conversation', 'conversation.*', 'conversation.*.key', 'conversation.*.kind', 'conversation.*.author',
     'conversation.*.author.name', 'conversation.*.body', 'conversation.*.createdAt', 'conversation.*.createdAtHuman',
@@ -163,7 +163,7 @@ it('keeps the internal attachment download refused to the requester', function (
     $f = propsFixture();
     $internal = TicketAttachment::where('ticket_id', $f['ticket']->id)->where('filename', 'internal-attachment-sentinel.pdf')->sole();
 
-    $this->actingAs($f['owner'])->get(route('tickets.attachment.download', $internal))->assertForbidden();
+    $this->actingAs($f['owner'])->get(ticketAttachmentUrl($internal))->assertForbidden();
 });
 
 it('sends the list page exactly the allowlisted row keys and no operator-only field', function (string $viewer) {
@@ -176,7 +176,7 @@ it('sends the list page exactly the allowlisted row keys and no operator-only fi
     expect(array_keys($own))->toEqualCanonicalizing(['tickets', 'filters', 'statusOptions', 'hasRequests', 'canCreate'])
         ->and(array_keys($own['tickets']['data'][0]))->toBe(PROPS_ROW_KEYS)
         ->and(array_keys($own['filters']))->toBe(['search', 'status'])
-        ->and($own['tickets']['data'][0])->toMatchArray(['id' => $f['ticket']->id, 'statusLabel' => 'Waiting on you', 'href' => route('tickets.show', $f['ticket'])]);
+        ->and($own['tickets']['data'][0])->toMatchArray(['number' => $f['ticket']->ticket_number, 'statusLabel' => 'Waiting on you', 'href' => route('tickets.show', $f['ticket'])]);
 
     $serialized = json_encode($own);
     foreach (PROPS_SENTINELS as $sentinel) {

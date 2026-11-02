@@ -52,13 +52,19 @@ type EntryFormData = {
     project_id: number | null;
     task_id: number | null;
     ticket_id: number | null;
+    ticket_reference: string | null;
     description: string;
     billable: boolean;
 };
 
 function contextFromEntry(entry?: TimeEntryData): SelectedContext {
     return entry?.context
-        ? { kind: entry.context.kind, id: entry.context.id, label: entry.context.label }
+        ? {
+              kind: entry.context.kind,
+              id: entry.context.id,
+              label: entry.context.label,
+              reference: entry.context.reference,
+          }
         : null;
 }
 
@@ -69,6 +75,7 @@ function setFormContext(
     setData('project_id', context?.kind === 'project' ? context.id : null);
     setData('task_id', context?.kind === 'task' ? context.id : null);
     setData('ticket_id', context?.kind === 'ticket' ? context.id : null);
+    setData('ticket_reference', context?.kind === 'ticket' ? (context.reference ?? null) : null);
 }
 
 function formatDuration(totalMinutes: number) {
@@ -156,6 +163,7 @@ function TimerStartForm() {
                 project_id: context?.kind === 'project' ? context.id : null,
                 task_id: context?.kind === 'task' ? context.id : null,
                 ticket_id: context?.kind === 'ticket' ? context.id : null,
+                ticket_reference: context?.kind === 'ticket' ? (context.reference ?? null) : null,
                 description: description.trim() || null,
                 billable,
             });
@@ -216,6 +224,8 @@ function EntryForm({ entry, onSaved }: { entry?: TimeEntryData; onSaved?: () => 
         project_id: entry?.context?.kind === 'project' ? entry.context.id : null,
         task_id: entry?.context?.kind === 'task' ? entry.context.id : null,
         ticket_id: entry?.context?.kind === 'ticket' ? entry.context.id : null,
+        ticket_reference:
+            entry?.context?.kind === 'ticket' ? (entry.context.reference ?? null) : null,
         description: entry?.description ?? '',
         billable: entry?.billable ?? true,
     });

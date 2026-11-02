@@ -9,7 +9,7 @@
  * `in_progress` and leave it alone. Without the lock each worker would read `pending_user` and
  * record its own transition.
  *
- * Like the H8 probe (TicketNumberCharacterizationTest), it must end RefreshDatabase's transaction
+ * Like the H8 probe (TicketReferenceIssuingTest), it must end RefreshDatabase's transaction
  * so the workers can see its rows, and it deletes them in a finally block. It seeds no roles, so
  * nothing but its own user and ticket is ever committed; a user with no permission is a customer.
  * TICKET_REPLY_RACE_WORKERS turns the dial up for a one-off soak.

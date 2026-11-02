@@ -45,7 +45,7 @@
                 @if ($ticket->attachments->isNotEmpty())
                 <div class="mt-4 pt-4 border-t flex flex-wrap gap-2 border-rule">
                     @foreach ($ticket->attachments as $att)
-                    <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
+                    <x-ui.button :href="route('tickets.attachment.download', [$ticket, $att])" variant="secondary" size="sm">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
                     </x-ui.button>
                     @endforeach
@@ -69,7 +69,7 @@
                 @if ($reply->attachments->isNotEmpty())
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2 border-rule">
                     @foreach ($reply->attachments as $att)
-                    <x-ui.button :href="route('tickets.attachment.download', $att)" variant="secondary" size="sm">
+                    <x-ui.button :href="route('tickets.attachment.download', [$ticket, $att])" variant="secondary" size="sm">
                         {{ $att->filename }} ({{ $att->formattedSize() }})
                     </x-ui.button>
                     @endforeach
@@ -193,6 +193,7 @@
             <x-time-tracker
                 context-type="ticket"
                 :context-id="$ticket->id"
+                :context-reference="$ticket->ticket_number"
                 :context-label="$ticket->ticket_number"
                 :context-url="route('operator.tickets.show', $ticket)"
             />

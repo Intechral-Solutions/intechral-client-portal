@@ -142,8 +142,10 @@ describe('newestTimer', () => {
 describe('labels', () => {
     it('prefers the context, falls back to the description, then to a constant', () => {
         expect(
-            pillLabel(timer({ context: { type: 'Ticket', id: 3, label: 'TKT-9', url: '/t/3' } })),
-        ).toBe('Ticket: TKT-9');
+            pillLabel(
+                timer({ context: { type: 'Ticket', id: 3, label: 'TK-00009-ABCDE', url: '/t/3' } }),
+            ),
+        ).toBe('Ticket: TK-00009-ABCDE');
         expect(pillLabel(timer({ description: 'Refactoring' }))).toBe('Refactoring');
         expect(pillLabel(timer())).toBe('Untitled timer');
     });

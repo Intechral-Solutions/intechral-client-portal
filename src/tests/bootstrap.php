@@ -12,6 +12,8 @@ $testEnvironment = [
     // EPIC-017 O3: unset means "no operator alert". A value inherited from the shell or the container would make every ticket test send
     // a second notification and change what they assert. Tests that need the alert set the config key themselves.
     'HELPDESK_NOTIFY_ADDRESS' => '',
+    // C6-R: the legacy ticket-reference conversion gate is closed in tests; a value inherited from the shell would fail the runtime profile.
+    'TICKET_REREFERENCE_ALLOWED' => 'false',
 ];
 
 foreach ($testEnvironment as $name => $value) {

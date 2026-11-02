@@ -81,8 +81,8 @@ it('names the operator queue selection checkboxes, filters and bulk controls', f
     $xpath = uiDom($html);
 
     expect(uiAccessibleName($xpath, uiOne($xpath, '//input[@id="select-all"]')))->toBe('Select all tickets on this page')
-        ->and(uiAccessibleName($xpath, uiOne($xpath, '//input[@name="ticket_ids[]"]')))->toBe('Select ticket '.$ticket->ticket_number)
-        ->and(uiOne($xpath, '//input[@name="ticket_ids[]"]')->getAttribute('id'))->toBe('ticket-cb-'.$ticket->id)
+        ->and(uiAccessibleName($xpath, uiOne($xpath, '//input[@name="ticket_refs[]"]')))->toBe('Select ticket '.$ticket->ticket_number)
+        ->and(uiOne($xpath, '//input[@name="ticket_refs[]"]')->getAttribute('id'))->toBe('ticket-cb-'.$ticket->ticket_number)
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//select[@name="status"]')))->toBe('Status')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//select[@name="priority"]')))->toBe('Priority')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//select[@name="assignee"]')))->toBe('Assignee')

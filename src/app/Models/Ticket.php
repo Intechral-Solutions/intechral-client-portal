@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Support\Helpdesk\TicketReference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
+use LogicException;
 
 class Ticket extends Model
 {
@@ -31,6 +34,66 @@ class Ticket extends Model
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
+
+    /** True only inside {@see convertingLegacyReferences()}: the one window in which a stored reference may change. */
+    private static bool $convertingLegacyReferences = false;
+
+    protected static function booted(): void
+    {
+        // C6-R: only a canonical reference is ever issued, and once issued it never changes (ADR-008). The single exception is the
+        // guarded release-0.9 conversion of a legacy value (`tickets:rereference`): a non-canonical value becoming a canonical one,
+        // inside its scope. Anything else, a canonical value included, is a bug and throws.
+        static::creating(function (Ticket $ticket) {
+            if (! TicketReference::isCanonical($ticket->ticket_number)) {
+                throw new InvalidArgumentException('A ticket is created with a canonical TK-XXXXX-XXXXX reference.');
+            }
+        });
+
+        static::updating(function (Ticket $ticket) {
+            if (! $ticket->isDirty('ticket_number')) {
+                return;
+            }
+
+            if (self::$convertingLegacyReferences
+                && ! TicketReference::isCanonical($ticket->getOriginal('ticket_number'))
+                && TicketReference::isCanonical($ticket->ticket_number)) {
+                return;
+            }
+
+            throw new LogicException('A ticket reference is immutable once issued.');
+        });
+    }
+
+    /** Opens the one window in which a legacy reference may be replaced by a canonical one. Used by `tickets:rereference` and by DevSeeder, which takes over a legacy development fixture. */
+    public static function convertingLegacyReferences(callable $callback): mixed
+    {
+        self::$convertingLegacyReferences = true;
+
+        try {
+            return $callback();
+        } finally {
+            self::$convertingLegacyReferences = false;
+        }
+    }
+
+    // ── Routing ──────────────────────────────────────────────
+
+    /** The public identity in every URL is the reference, never the numeric key (C6-R). */
+    public function getRouteKeyName(): string
+    {
+        return 'ticket_number';
+    }
+
+    /**
+     * Strict: only a canonical reference resolves, and a value that is not one is refused before the database is touched. A numeric id,
+     * a legacy `TKT-` number or any other spelling is a 404, so a stale link after recovery cannot reach a different ticket.
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $reference = $field === null || $field === 'ticket_number' ? TicketReference::canonicalize($value) : null;
+
+        return $reference === null ? null : $this->where('ticket_number', $reference)->first();
+    }
 
     // ── Relationships ────────────────────────────────────────
 
@@ -107,10 +170,11 @@ class Ticket extends Model
         // themselves rather than acting as LIKE wildcards. The backslash is escaped first.
         $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term).'%';
 
-        return $query->where(function ($q) use ($like, $includeInternal) {
+        return $query->where(function ($q) use ($like, $term, $includeInternal) {
             $q->where('title', 'like', $like)
                 ->orWhere('description', 'like', $like)
                 ->orWhere('ticket_number', 'like', $like)
+                ->when(TicketReference::fromSearch($term), fn ($q, $reference) => $q->orWhere('ticket_number', $reference))
                 ->orWhereHas('replies', fn ($r) => $r->where('body', 'like', $like)
                     ->when(! $includeInternal, fn ($r) => $r->where('is_internal', false)));
         });

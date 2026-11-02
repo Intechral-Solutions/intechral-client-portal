@@ -79,7 +79,7 @@ Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is
 ## Module Tables
 
 ### Tickets Module
-- `tickets` — id, user_id, company_id nullable, ticket_number, title, description, category, priority, status, assignee_id
+- `tickets` — id, user_id, company_id nullable, ticket_number (the unique public reference `TK-XXXXX-XXXXX`, random and immutable, [ADR-008](./adr/ADR-008-ticket-public-reference.md); the numeric id stays internal), title, description, category, priority, status, assignee_id
 - `ticket_replies` — ticket_id, user_id, body, is_internal
 - `ticket_attachments` — ticket_id, reply_id nullable, path, filename, size, mime_type
 - `ticket_status_histories` — ticket_id, user_id, old_status, new_status

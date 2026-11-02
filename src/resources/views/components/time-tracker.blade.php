@@ -6,6 +6,7 @@
         $contextId    — the record's primary key
         $contextLabel — short display name (e.g. ticket number, task title)
         $contextUrl   — URL to the record (for back-link in the overlay tile)
+        $contextReference — ticket context only: the ticket's public reference, sent with the id (C6-R)
 --}}
 @php
     use App\Models\TimeEntry;
@@ -48,7 +49,8 @@
      data-context-type="{{ $contextType }}"
      data-context-id="{{ $contextId }}"
      data-context-label="{{ $contextLabel }}"
-     data-context-url="{{ $contextUrl }}">
+     data-context-url="{{ $contextUrl }}"
+     data-context-reference="{{ $contextReference ?? '' }}">
 
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Time Tracked</h3>
@@ -104,7 +106,10 @@
             var payload = {};
             if (contextType === 'project') payload.project_id = contextId;
             if (contextType === 'task')    payload.task_id    = contextId;
-            if (contextType === 'ticket')  payload.ticket_id  = contextId;
+            if (contextType === 'ticket') {
+                payload.ticket_id        = contextId;
+                payload.ticket_reference = card.dataset.contextReference || null;
+            }
 
             var label = btn.textContent;
             btn.disabled = true;

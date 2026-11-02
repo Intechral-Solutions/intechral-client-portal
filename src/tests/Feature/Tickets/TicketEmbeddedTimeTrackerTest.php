@@ -33,7 +33,11 @@ it('shows the operator the ticket time, the recent entries and an in-context Sta
         ->assertSee('Ticket Coworker')->assertSee('1h')->getContent();
 
     // The button element, not the script's selector for it (which is on the page either way).
-    expect($html)->toMatch('/<button[^>]*data-time-tracker-start/');
+    expect($html)->toMatch('/<button[^>]*data-time-tracker-start/')
+        // C6-R: the tracker sends the id together with the ticket's public reference, so both are rendered on its card.
+        ->and($html)->toContain('data-context-id="'.$ticket->id.'"')
+        ->and($html)->toContain('data-context-reference="'.$ticket->ticket_number.'"')
+        ->and($html)->toContain('payload.ticket_reference');
 });
 
 it('shows a running timer of the operator as Stop, and not as Start', function () {
@@ -52,7 +56,7 @@ it('starts and stops the ticket timer through the existing endpoints the embed u
     $agent = ticketAgent();
     $ticket = Ticket::factory()->create(['user_id' => ticketUser()->id, 'status' => 'open']);
 
-    $entryId = $this->actingAs($agent)->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+    $entryId = $this->actingAs($agent)->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()->assertJsonPath('context.id', $ticket->id)->json('id');
     $this->actingAs($agent)->postJson(route('time.timer.stop', $entryId))->assertOk();
 
@@ -66,6 +70,6 @@ it('does not give the tracker to the requester: their page has no tracker, and s
 
     $this->actingAs($owner)->get(route('tickets.show', $ticket))->assertOk()
         ->assertDontSee('Ticket Coworker')->assertDontSee('data-time-tracker', false);
-    $this->actingAs($owner)->postJson(route('time.timer.start'), ['ticket_id' => $ticket->id])
+    $this->actingAs($owner)->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertUnprocessable()->assertJsonValidationErrors('ticket_id');
 });

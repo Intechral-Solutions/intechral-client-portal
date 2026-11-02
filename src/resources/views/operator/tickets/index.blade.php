@@ -74,7 +74,7 @@
                 @forelse ($tickets as $ticket)
                 <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-4 py-3">
-                        <x-ui.checkbox name="ticket_ids[]" id="ticket-cb-{{ $ticket->id }}" value="{{ $ticket->id }}"
+                        <x-ui.checkbox name="ticket_refs[]" id="ticket-cb-{{ $ticket->ticket_number }}" value="{{ $ticket->ticket_number }}"
                                        aria-label="Select ticket {{ $ticket->ticket_number }}" class="ticket-cb" />
                     </td>
                     <td class="px-4 py-3">
