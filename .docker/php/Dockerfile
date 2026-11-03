@@ -83,6 +83,15 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /tmp/npm-cache /tmp/playwright-version /root/.npm
 
+# MariaDB client tools (`mariadb-dump`, `mariadb`) for the backup and restore tooling and its tests
+# (Release 0.9 WP-B1, docs/operations/backup-and-recovery.md). The hosts run `mariadb-dump` 11.4; Debian
+# trixie ships the 11.8 client, which dumps from and loads into the 11.4 server in the same format.
+# A separate late layer, so the Node and Playwright layers above stay cached.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends mariadb-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # PHP configuration
 COPY .docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY .docker/php/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf

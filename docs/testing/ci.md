@@ -79,6 +79,10 @@ the app and building the image would only add minutes. The environment follows t
   `intechral_client_portal_testing`, `..._rehearsal` and `..._rehearsal_restore` exist. A fresh runner builds a fresh
   volume, so `init-testing.sql` and `init-rehearsal.sql` must have run; a gap is reported as a provisioning failure, not as
   an unrelated test failure.
+- **MariaDB client tools (WP-B1).** `tests/Unit/Backup/*` run `mariadb-dump` and `mariadb` against the rehearsal databases, as
+  the backup tooling does on the host. The runner has no MariaDB client, so a step installs Ubuntu's `mariadb-client` (10.11)
+  before Pest; locally the `app` image carries the Debian 11.8 client (`docker compose build app`). See
+  [Backup and Recovery](../operations/backup-and-recovery.md#8-tests-and-negative-controls).
 - **`git diff --check`** locally inspects uncommitted changes. A clean checkout has none, so CI
   checks what the change introduces: on a PR, `HEAD` is GitHub's merge commit and `HEAD^1` is `main`.
   (The tree as a whole is not whitespace-clean — some older docs and one Blade view — so a whole-tree

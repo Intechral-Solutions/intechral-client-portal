@@ -50,7 +50,12 @@ function pceOutput(Process $process): array
 
     $lines = explode("\n", trim($process->getOutput()));
 
-    return json_decode(end($lines), true, flags: JSON_THROW_ON_ERROR);
+    try {
+        return json_decode(end($lines), true, flags: JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        // A child that exited 0 but whose last stdout line is not its JSON result: say what it printed (this branch is bounded to the last 1500 characters; a child prints no secrets).
+        throw new RuntimeException('child printed no JSON result as its last stdout line. stdout: '.substr($process->getOutput(), -1500).' | stderr: '.substr($process->getErrorOutput(), -1500), 0, $e);
+    }
 }
 
 function pceFresh(array $store, int $userId, array $permissions, array $options = [], array $env = []): array
