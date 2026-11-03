@@ -18,8 +18,11 @@ use Spatie\Permission\PermissionRegistrar;
 
 require __DIR__.'/../../vendor/autoload.php';
 
+require_once __DIR__.'/permission_cache_trace.php';
+
 $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+permissionCacheChildFailsLoudly();
 
 $store = json_decode($argv[1] ?? '{}', true, flags: JSON_THROW_ON_ERROR);
 $permission = (string) ($argv[2] ?? '');

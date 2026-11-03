@@ -34,3 +34,21 @@ function permissionCacheTraceRead(string $barrier): array
         array_values(array_filter(explode("\n", (string) file_get_contents($path)))),
     );
 }
+
+/**
+ * Make an uncaught exception in a child process a FAILED child, not a quiet success.
+ *
+ * A script that boots the application with `$app->make(Kernel::class)->bootstrap()` gets Laravel's console exception handler, which renders
+ * the exception to STDOUT and then lets the process exit with status 0 (verified: `throw` after bootstrap exits 0). A child that dies this way
+ * (for example when a cache write waits out `innodb_lock_wait_timeout`) therefore passes the harness's exit-status check, and the test sees a
+ * stdout whose last line is exception text instead of its JSON result: a `JsonException: Syntax error` that names nothing. Call this right
+ * after the bootstrap: it replaces that handler, writes the exception class and message to STDERR and exits 1, so the harness reports the
+ * child's real failure. It changes no outcome of a child that succeeds.
+ */
+function permissionCacheChildFailsLoudly(): void
+{
+    set_exception_handler(function (Throwable $e): never {
+        fwrite(STDERR, get_class($e).': '.$e->getMessage().' at '.basename($e->getFile()).':'.$e->getLine().($e->getPrevious() ? ' (previous: '.get_class($e->getPrevious()).': '.$e->getPrevious()->getMessage().')' : '')."\n");
+        exit(1);
+    });
+}
