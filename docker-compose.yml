@@ -94,8 +94,10 @@ services:
     container_name: portal_mailpit
     restart: unless-stopped
     ports:
-      - "8025:8025"   # Web UI
-      - "1025:1025"   # SMTP
+      # Loopback only. Host 1025 is deliberately NOT used: it belongs to a separate local mail service. Containers still reach
+      # Mailpit at mailpit:1025 on the compose network (MAIL_HOST=mailpit, MAIL_PORT=1025); only the host side moved.
+      - "127.0.0.1:8025:8025"    # Web UI
+      - "127.0.0.1:11025:1025"   # SMTP (host 11025 -> container 1025)
     networks:
       - portal
 

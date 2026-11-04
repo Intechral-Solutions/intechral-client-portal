@@ -647,7 +647,7 @@ doctor_http() {
     fi
 
     local pair port name
-    for pair in "4242 nginx" "3306 mariadb" "6379 redis" "8025 mailpit-web" "1025 mailpit-smtp"; do
+    for pair in "4242 nginx" "3306 mariadb" "6379 redis" "8025 mailpit-web" "11025 mailpit-smtp"; do
         port="${pair%% *}" name="${pair#* }"
         if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
             d_ok "port $port open ($name)"

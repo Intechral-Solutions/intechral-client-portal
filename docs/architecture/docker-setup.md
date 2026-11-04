@@ -8,7 +8,7 @@
 | `nginx` | `nginx:1.25-alpine` | `4242` | Web server |
 | `db` | `mariadb:11.4.13` | `3306` | Primary database (production version) |
 | `redis` | `redis:7-alpine` | `6379` | Cache / sessions / queues |
-| `mailpit` | `axllent/mailpit` | `8025` (UI), `1025` (SMTP) | Local email testing |
+| `mailpit` | `axllent/mailpit` | `8025` (UI), `11025` (SMTP) — both bound to `127.0.0.1` | Local email testing |
 | `queue` | `php:8.5-fpm` (custom) | — | Laravel queue worker |
 
 ## Project Structure
@@ -181,8 +181,9 @@ A machine with no data worth keeping needs nothing: `./dev up` creates the new v
 **The testing and rehearsal databases** in the new volume start empty and are recreated by the init scripts. They are disposable (the Pest suite and the migration rehearsal rebuild their own contents), so nothing in them needs carrying across.
 
 ### Mailpit
-- SMTP on port `1025` — configure `MAIL_HOST=mailpit`, `MAIL_PORT=1025` in `.env`
-- Web UI on `http://localhost:8025`
+- SMTP inside the compose network is `mailpit:1025` — keep `MAIL_HOST=mailpit`, `MAIL_PORT=1025` in `.env` (the app and queue containers do not use the host port)
+- SMTP from the host (a script or another tool on this machine) is `127.0.0.1:11025`. Host port 1025 is intentionally not published, so Mailpit cannot collide with another local mail service that uses it
+- Web UI on `http://localhost:8025` (bound to loopback)
 - All outgoing mail in dev is caught here
 
 ## Running the Test Suite
