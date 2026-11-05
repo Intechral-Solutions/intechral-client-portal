@@ -173,6 +173,10 @@ it('never offers a restricted account the operator application: no queue item, n
         ->and($items)->toContain('helpdesk.requests')->toContain('projects.all')
         ->and($items)->not->toContain('helpdesk.queue')->not->toContain('helpdesk.reports')->not->toContain('projects.create');
 
+    // Helpdesk opens on the Queue for an operator, so a stray tickets.assign must not move this account's default there.
+    $helpdesk = collect(json_decode(json_encode($response->viewData('page')), true)['props']['navigation']['workspaces'])->firstWhere('key', 'helpdesk');
+    expect($helpdesk['href'])->toBe(route('tickets.index'))->and($helpdesk['visit'])->toBe('inertia');
+
     foreach (['/operator/tickets', '/operator/tickets/reports', '/projects/create'] as $uri) {
         $this->actingAs($account)->get($uri)->assertNotFound();
     }
@@ -187,6 +191,8 @@ it('never offers a restricted account the operator application: no queue item, n
         ->flatMap(fn (array $workspace) => collect($workspace['context'] ?? [])->flatMap(fn (array $section) => $section['items'] ?? []))
         ->pluck('key')->all();
     expect($eligibleItems)->toContain('helpdesk.queue')->toContain('projects.create');
+    expect(collect(json_decode(json_encode($eligible->viewData('page')), true)['props']['navigation']['workspaces'])->firstWhere('key', 'helpdesk')['href'])
+        ->toBe(route('operator.tickets.index'));
 });
 
 // ── Projects ──────────────────────────────────────────────────────────────────

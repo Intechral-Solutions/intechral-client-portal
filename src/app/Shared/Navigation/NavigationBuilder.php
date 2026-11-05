@@ -236,6 +236,19 @@ final class NavigationBuilder
     {
         $views = [];
 
+        // A restricted customer holding `tickets.assign` is offered no operator queue (R0.9-CS1): its routes are refused.
+        $works = $user->can('tickets.assign') && ! CustomerPilotGate::restricts($user);
+
+        // The workspace opens on its first surviving view, so an operator lands on the Queue and a customer-only
+        // user, who has no Queue, still lands on My requests. The Focused "Support" entry is keyed to
+        // `helpdesk.requests` below, so it is unaffected by this order.
+        if ($works) {
+            $views[] = $this->item('helpdesk.queue', 'Queue', route('operator.tickets.index'), 'document', [
+                'operator.tickets.index',
+                'operator.tickets.show',
+            ]);
+        }
+
         if ($user->can('tickets.view')) {
             $views[] = $this->item('helpdesk.requests', 'My requests', route('tickets.index'), 'inertia', [
                 'tickets.index',
@@ -244,12 +257,7 @@ final class NavigationBuilder
             ]);
         }
 
-        // A restricted customer holding `tickets.assign` is offered no operator queue (R0.9-CS1): its routes are refused.
-        if ($user->can('tickets.assign') && ! CustomerPilotGate::restricts($user)) {
-            $views[] = $this->item('helpdesk.queue', 'Queue', route('operator.tickets.index'), 'document', [
-                'operator.tickets.index',
-                'operator.tickets.show',
-            ]);
+        if ($works) {
             $views[] = $this->item('helpdesk.reports', 'Reports', route('operator.tickets.reports'), 'document', [
                 'operator.tickets.reports',
             ]);
