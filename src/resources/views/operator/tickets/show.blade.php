@@ -1,6 +1,13 @@
 @extends('layouts.app', ['title' => $ticket->ticket_number . ' — Operator'])
 
 @section('content')
+@php
+    // A legacy ticket may have no SLA deadline at all; say so instead of printing an empty value.
+    $slaText = $ticket->sla_due_at?->format('d M Y H:i') ?? 'none set';
+    // A refused submit refills the date only if it is still inside the form's own bounds, so the browser never blocks a plain reply on it.
+    $dueOld = (string) old('due_at');
+    $dueOld = ($dueOld >= $dueMin && $dueOld <= $dueMax) ? $dueOld : '';
+@endphp
 <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 space-y-6">
 
     {{-- Back --}}
@@ -66,6 +73,16 @@
                     </div>
                 </div>
                 <div class="text-text">{!! nl2br(e($reply->body)) !!}</div>
+                @if ($reply->dueDateChange)
+                {{-- Release 1.0: operator-only. The requester page never loads or serializes due-date changes. --}}
+                <p data-due-date-change class="mt-3 pt-3 border-t text-xs text-text-secondary border-rule">
+                    Due date changed from
+                    <span class="font-medium text-text">{{ $reply->dueDateChange->previous_override_at ? $reply->dueDateChange->previous_override_at->format('d M Y H:i') : 'the SLA deadline ('.$slaText.')' }}</span>
+                    to
+                    <span class="font-medium text-text">{{ $reply->dueDateChange->new_override_at ? $reply->dueDateChange->new_override_at->format('d M Y H:i') : 'the SLA deadline ('.$slaText.')' }}</span>
+                    ({{ $dueZone }})
+                </p>
+                @endif
                 @if ($reply->attachments->isNotEmpty())
                 <div class="mt-3 pt-3 border-t flex flex-wrap gap-2 border-rule">
                     @foreach ($reply->attachments as $att)
@@ -83,9 +100,44 @@
                 <h2 class="text-sm font-semibold mb-4 text-text">Add Reply / Note</h2>
                 <form method="POST" action="{{ route('operator.tickets.replies.store', $ticket) }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
-                    <x-ui.textarea name="body" rows="5" required placeholder="Write your reply&hellip;" class="w-full"></x-ui.textarea>
+                    <x-ui.textarea name="body" rows="5" required placeholder="Write your reply&hellip;" class="w-full">{{ old('body') }}</x-ui.textarea>
                     <x-ui.field-error for="body" />
-                    <x-ui.checkbox name="is_internal" value="1">Internal note (not visible to submitter)</x-ui.checkbox>
+                    <x-ui.checkbox name="is_internal" value="1" :checked="(bool) old('is_internal')">Internal note (not visible to submitter)</x-ui.checkbox>
+                    @can('adjustDueDate', $ticket)
+                    @if ($ticket->isOpen())
+                    {{-- Release 1.0: an optional part of this reply or note, never a separate edit. The message above is the recorded reason. --}}
+                    <details data-due-date-adjust class="rounded-lg border p-4 border-rule" @if (old('due_action', 'keep') !== 'keep' || $errors->has('due_at') || $errors->has('due_action')) open @endif>
+                        <summary class="cursor-pointer text-sm font-medium text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Change due date (optional)</summary>
+                        <div class="mt-4 space-y-4">
+                            <p class="text-sm text-text-secondary">
+                                Current due date: {{ $ticket->effectiveDueAt() ? $ticket->effectiveDueAt()->format('d M Y H:i').' '.$dueZone : 'none' }}
+                                ({{ $ticket->hasDueOverride() ? 'set by an operator' : 'SLA deadline' }}).
+                                Your message above is recorded as the reason.
+                            </p>
+                            <div class="space-y-1">
+                                <x-ui.label for="due_action">Due date</x-ui.label>
+                                <x-ui.select name="due_action" id="due_action" class="w-full" aria-describedby="due-date-hint">
+                                    <option value="keep" @selected(old('due_action', 'keep') === 'keep')>Keep the current due date</option>
+                                    <option value="set" @selected(old('due_action') === 'set')>Set a new due date</option>
+                                    @if ($ticket->hasDueOverride())
+                                    <option value="restore" @selected(old('due_action') === 'restore')>Restore the SLA deadline ({{ $slaText }})</option>
+                                    @endif
+                                </x-ui.select>
+                                <x-ui.field-error for="due_action" />
+                            </div>
+                            <div class="space-y-1">
+                                <x-ui.label for="due_at">New due date and time ({{ $dueZone }})</x-ui.label>
+                                <x-ui.input type="datetime-local" name="due_at" :value="$dueOld" min="{{ $dueMin }}" max="{{ $dueMax }}" class="w-full" aria-describedby="due-date-hint" />
+                                <x-ui.field-error for="due_at" />
+                            </div>
+                            <p id="due-date-hint" class="text-xs text-text-secondary">
+                                The date applies only with &ldquo;Set a new due date&rdquo;. Times are in {{ $dueZone }}, from now up to {{ $dueDays }} days ahead.
+                                Restoring the SLA deadline needs a message too. A public reply is visible to the submitter; the due-date change itself is not.
+                            </p>
+                        </div>
+                    </details>
+                    @endif
+                    @endcan
                     <div class="space-y-2">
                         <x-ui.input type="file" name="attachments[]" id="attachments" multiple
                                     aria-label="Attachments" aria-describedby="attachments-hint"
@@ -149,10 +201,18 @@
                 <dl class="space-y-2 text-sm">
                     <div><dt class="text-xs text-text-secondary">Category</dt><dd class="text-text">{{ $ticket->category }}</dd></div>
                     <div><dt class="text-xs text-text-secondary">Submitted</dt><dd class="text-text">{{ $ticket->created_at->format('d M Y H:i') }}</dd></div>
-                    @if ($ticket->sla_due_at)
+                    @if ($ticket->effectiveDueAt())
                     <div>
-                        <dt class="text-xs text-text-secondary">SLA Due</dt>
-                        <dd class="{{ $ticket->isOverdue() ? 'font-medium text-danger' : 'text-text' }}">{{ $ticket->sla_due_at->format('d M Y H:i') }}</dd>
+                        <dt class="text-xs text-text-secondary">Due ({{ $dueZone }})</dt>
+                        <dd class="{{ $ticket->isOverdue() ? 'font-medium text-danger' : 'text-text' }}">
+                            {{ $ticket->effectiveDueAt()->format('d M Y H:i') }}
+                            @unless ($ticket->hasDueOverride())
+                            <x-ui.tag class="ml-1 align-middle">SLA</x-ui.tag>
+                            @endunless
+                        </dd>
+                        @if ($ticket->hasDueOverride())
+                        <dd class="text-xs text-text-secondary">Original SLA: {{ $slaText }}</dd>
+                        @endif
                     </div>
                     @endif
                     @if ($ticket->resolved_at)

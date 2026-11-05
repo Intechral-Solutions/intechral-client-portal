@@ -7,6 +7,7 @@ use App\Http\Controllers\TicketController as UserTicketController;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\TicketService;
+use App\Support\Helpdesk\DueDateInput;
 use Illuminate\Http\Request;
 
 class TicketController extends Controller
@@ -29,7 +30,7 @@ class TicketController extends Controller
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('created_at', '<=', $request->date_to))
             ->orderByRaw("CASE status WHEN 'open' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'pending_user' THEN 3 WHEN 'resolved' THEN 4 ELSE 5 END")
             ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END")
-            ->orderBy('sla_due_at')
+            ->orderByEffectiveDue()
             ->paginate(30)
             ->withQueryString();
 
@@ -47,12 +48,19 @@ class TicketController extends Controller
             'statusHistories.user',
             'replies.user',
             'replies.attachments',
+            'replies.dueDateChange',
         ]);
 
         $operators = User::permission('tickets.assign')->active()->orderBy('name')->get();
         $categories = UserTicketController::CATEGORIES;
 
-        return view('operator.tickets.show', compact('ticket', 'operators', 'categories'));
+        // Release 1.0: the due-date form states its zone and bounds itself (the browser's zone is never consulted).
+        $dueZone = DueDateInput::zoneLabel();
+        $dueDays = TicketService::DUE_OVERRIDE_MAX_DAYS;
+        $dueMin = DueDateInput::format(now()->addMinute());
+        $dueMax = DueDateInput::format(now()->addDays($dueDays));
+
+        return view('operator.tickets.show', compact('ticket', 'operators', 'categories', 'dueZone', 'dueDays', 'dueMin', 'dueMax'));
     }
 
     public function updateStatus(Request $request, Ticket $ticket, TicketService $service)

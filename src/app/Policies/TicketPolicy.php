@@ -26,6 +26,15 @@ class TicketPolicy
     }
 
     /**
+     * Release 1.0: change the operational due date, as part of a reply or note. Operators only (`worksTickets`), on a ticket they
+     * can view. Never a requester: being able to reply is not being able to move the deadline.
+     */
+    public function adjustDueDate(User $user, Ticket $ticket): bool
+    {
+        return $this->worksTickets($user) && $this->view($user, $ticket);
+    }
+
+    /**
      * Internal notes and their attachments. Without a Ticket this answers the class-level
      * question ("may this actor see internal content of the Tickets they can view?"), which is
      * what a search over an already visibility-scoped query needs.

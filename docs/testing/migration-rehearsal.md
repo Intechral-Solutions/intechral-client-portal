@@ -87,7 +87,7 @@ Coverage today: 205 rows in 33 tables and 4 real attachment files: users (operat
 
 A candidate is selected **by name** (`--candidate=2026_10_12_000001_example`), never by path, wildcard or `all`. It must be in `database/rehearsal/candidates.php` (the review record: summary, SHA-256, declared `schema` changes in the manifest notation, declared `data` tables), present in `database/migrations`, sort after the pinned baseline, and its file must still hash to the recorded SHA-256. Duplicates, stale manifest entries and anything else are refused with exit 2 before the database is touched.
 
-The manifest holds the three **R0.9-1B** candidates (see [Release 0.9 preservation migrations](#release-09-preservation-migrations-r09-1b)). `./dev rehearse` with no `--candidate` exercises none of them and says so.
+The manifest holds the three **R0.9-1B** candidates (see [Release 0.9 preservation migrations](#release-09-preservation-migrations-r09-1b)) and the **Release 1.0** ticket due-date candidate `2026_11_04_120000_add_ticket_due_date_override` (additive: one nullable column, one audit table, one unique index; rehearsed with `./dev rehearse --candidate=2026_11_04_120000_add_ticket_due_date_override`, no record changed, backup round trip identical). `./dev rehearse` with no `--candidate` exercises none of them and says so.
 
 Schema notation: `table+`/`table-`, `column+`/`column-`/`column~` (type, nullability), `collation~:t.c`, `tablecollation~:t`, `primary~`, `unique+`/`unique-`, `index+:t(a,b)`/`index-:t(a,b)`, `fk+`/`fk-:t.c->p.c:DELETE/UPDATE` (an added or removed key states both rules), `fk~:t.c->p.c:OLD>NEW` (ON DELETE) and `fku~:t.c->p.c:OLD>NEW` (ON UPDATE). A rename of an index is not a change.
 

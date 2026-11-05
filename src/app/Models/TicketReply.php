@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TicketReply extends Model
 {
@@ -30,6 +31,12 @@ class TicketReply extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The due-date adjustment this reply or note carries (Release 1.0), if any. Operator-only. */
+    public function dueDateChange(): HasOne
+    {
+        return $this->hasOne(TicketDueDateChange::class, 'reply_id');
     }
 
     public function attachments(): HasMany

@@ -75,4 +75,22 @@ return [
         ],
         'data' => [],
     ],
+
+    '2026_11_04_120000_add_ticket_due_date_override' => [
+        'summary' => 'Release 1.0: add the nullable tickets.due_override_at, the ticket_due_date_changes audit table (one change per reply, composite foreign key to the reply and its ticket) and the unique (ticket_id, id) index on ticket_replies that key needs.',
+        'sha256' => '7f60fb22ac769668efede1a847e9410cd02dc6aa7ac0c2c27fa419db6317044b',
+        'schema' => [
+            'column+:tickets.due_override_at',
+            'unique+:ticket_replies(ticket_id,id)',
+            'table+:ticket_due_date_changes',
+            'fk+:ticket_due_date_changes.ticket_id->tickets.id:CASCADE/RESTRICT',
+            'fk+:ticket_due_date_changes.user_id->users.id:SET NULL/RESTRICT',
+            'fk+:ticket_due_date_changes.ticket_id,reply_id->ticket_replies.ticket_id,id:CASCADE/RESTRICT',
+            'unique+:ticket_due_date_changes(reply_id)',
+            'index+:ticket_due_date_changes(ticket_id,created_at)',
+            'index+:ticket_due_date_changes(ticket_id,reply_id)',
+            'index+:ticket_due_date_changes(user_id)',
+        ],
+        'data' => [],
+    ],
 ];

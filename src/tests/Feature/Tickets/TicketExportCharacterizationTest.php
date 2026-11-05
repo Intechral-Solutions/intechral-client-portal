@@ -19,7 +19,7 @@ require_once __DIR__.'/TicketTestHelpers.php';
  * (deferred behavior recorded as fact).
  */
 
-const TICKET_CSV_HEADER = ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due'];
+const TICKET_CSV_HEADER = ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due'];
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -55,7 +55,7 @@ it('BASELINE H7: header row, content type and filename; no BOM', function () {
 
     expect(ticketParseCsv($csv)[0])->toBe(TICKET_CSV_HEADER)
         ->and(str_starts_with($csv, "\xEF\xBB\xBF"))->toBeFalse()
-        ->and(strtok($csv, "\n"))->toBe('"Ticket #",Title,Category,Priority,Status,Submitter,Assignee,Created,Resolved,"SLA Due"')
+        ->and(strtok($csv, "\n"))->toBe('"Ticket #",Title,Category,Priority,Status,Submitter,Assignee,Created,Resolved,"SLA Due","Effective Due"')
         ->and($response->headers->get('Content-Type'))->toStartWith('text/csv')
         ->and($response->headers->get('Content-Disposition'))->toBe('attachment; filename="tickets-2026-09-24.csv"');
 });

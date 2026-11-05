@@ -268,7 +268,7 @@ it('draws the operator ticket detail Overdue mark with the shared status and the
 
     expect($html)->not->toMatch('/#fef2f2|#dc2626/')
         ->and(semMark(uiOne($xpath, '//*[@data-overdue-status]')))->toMatchArray(['Overdue', 'text-danger', 'square'])
-        ->and(uiClasses(uiOne($xpath, '//dt[normalize-space()="SLA Due"]/following-sibling::dd')))->toContain('text-danger');
+        ->and(uiClasses(uiOne($xpath, '//dt[normalize-space()="Due (UTC)"]/following-sibling::dd[1]')))->toContain('text-danger');
 });
 
 // CONVERTED IN EPIC-017 WP2 (N5): Overdue is an operator-only signal (§13). The member's ticket page used to

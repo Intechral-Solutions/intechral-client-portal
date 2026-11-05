@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Helpdesk\TicketReference;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,8 +30,10 @@ class Ticket extends Model
         'closed_at',
     ];
 
+    // `due_override_at` is deliberately NOT fillable: it changes only through TicketService::addReply(), with its history row.
     protected $casts = [
         'sla_due_at' => 'datetime',
+        'due_override_at' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
@@ -50,6 +53,11 @@ class Ticket extends Model
         });
 
         static::updating(function (Ticket $ticket) {
+            // Release 1.0: the original SLA deadline is fixed at creation. An operator's working due date is `due_override_at`.
+            if ($ticket->isDirty('sla_due_at')) {
+                throw new LogicException('The SLA deadline is immutable once set; adjust the due date override instead.');
+            }
+
             if (! $ticket->isDirty('ticket_number')) {
                 return;
             }
@@ -127,6 +135,11 @@ class Ticket extends Model
         return $this->hasMany(TicketAttachment::class)->whereNull('reply_id');
     }
 
+    public function dueDateChanges(): HasMany
+    {
+        return $this->hasMany(TicketDueDateChange::class)->orderBy('created_at')->orderBy('id');
+    }
+
     public function statusHistories(): HasMany
     {
         return $this->hasMany(TicketStatusHistory::class)->orderBy('created_at');
@@ -134,10 +147,24 @@ class Ticket extends Model
 
     // ── Helpers ──────────────────────────────────────────────
 
+    /** The operational due date: the operator's override when there is one, otherwise the original SLA deadline. */
+    public function effectiveDueAt(): ?CarbonInterface
+    {
+        return $this->due_override_at ?? $this->sla_due_at;
+    }
+
+    public function hasDueOverride(): bool
+    {
+        return $this->due_override_at !== null;
+    }
+
+    /** Operationally overdue: past the EFFECTIVE due date while still open. */
     public function isOverdue(): bool
     {
-        return $this->sla_due_at !== null
-            && $this->sla_due_at->isPast()
+        $due = $this->effectiveDueAt();
+
+        return $due !== null
+            && $due->isPast()
             && ! in_array($this->status, ['resolved', 'closed']);
     }
 
@@ -153,11 +180,17 @@ class Ticket extends Model
         return $query->where('user_id', $user->id);
     }
 
+    /** SQL twin of {@see self::isOverdue()}. */
     public function scopeOverdue($query)
     {
-        return $query->whereNotNull('sla_due_at')
-            ->where('sla_due_at', '<', now())
+        return $query->whereRaw('COALESCE(due_override_at, sla_due_at) < ?', [now()])
             ->whereNotIn('status', ['resolved', 'closed']);
+    }
+
+    /** Soonest effective due date first; a ticket with neither date sorts first, as it did when only `sla_due_at` existed. */
+    public function scopeOrderByEffectiveDue($query)
+    {
+        return $query->orderByRaw('COALESCE(due_override_at, sla_due_at)');
     }
 
     /**
