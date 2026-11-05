@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Shared\Navigation\NavigationBuilder;
 use App\Shared\Permissions\PermissionCatalogue;
+use App\Shared\Shell\ShellPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -327,12 +328,57 @@ it('never leaks an operator or administrative destination to a user-role actor',
     }
 });
 
+it('opens the Helpdesk workspace on the Queue for an operator and on My requests for a customer', function () {
+    $agent = workspaces(navigationFor(actor('user', ['tickets.assign']), 'dashboard'))['helpdesk'];
+    $items = contextItems($agent);
+
+    // The workspace opens on its first surviving view: the Blade queue for someone who works tickets.
+    expect($agent['href'])->toBe(route('operator.tickets.index'))
+        ->and($agent['visit'])->toBe('document')
+        // Nothing was removed: the labels and destinations are exactly what they were, only the order changed.
+        ->and(array_column($items, 'label'))->toBe(['Queue', 'My requests', 'Reports'])
+        ->and($items['helpdesk.queue']['href'])->toBe(route('operator.tickets.index'))
+        ->and($items['helpdesk.requests']['href'])->toBe(route('tickets.index'))
+        ->and($items['helpdesk.requests']['visit'])->toBe('inertia')
+        ->and($items['helpdesk.reports']['href'])->toBe(route('operator.tickets.reports'));
+
+    // A customer-only user has no queue to open on: unchanged.
+    $customer = workspaces(navigationFor(actor('user'), 'dashboard'))['helpdesk'];
+
+    expect($customer['href'])->toBe(route('tickets.index'))
+        ->and($customer['visit'])->toBe('inertia')
+        ->and(array_column(contextItems($customer), 'label'))->toBe(['My requests']);
+
+    // The full-permission operator role is the same shape.
+    expect(workspaces(navigationFor(actor('operator'), 'dashboard'))['helpdesk']['href'])->toBe(route('operator.tickets.index'));
+});
+
+it('keeps the Focused Support entry on My requests even for an account that also works tickets', function () {
+    $agent = actor('user', ['tickets.assign']);
+    $request = Request::create(route('dashboard', [], false));
+    $request->setUserResolver(fn () => $agent);
+    $request->setRouteResolver(fn () => app('router')->getRoutes()->getByName('dashboard'));
+
+    $focused = collect(app(NavigationBuilder::class)->build($request, ShellPresentation::Focused)['workspaces'])->keyBy('key');
+
+    expect($focused['helpdesk']['href'])->toBe(route('tickets.index'))
+        ->and($focused['helpdesk']['visit'])->toBe('inertia');
+});
+
+it('keeps the Queue, My requests and Reports routes active on their own routes after the reorder', function () {
+    $agent = actor('user', ['tickets.assign']);
+
+    expect(navigationActiveKeysDeep(navigationFor($agent, 'operator.tickets.index')))->toBe(['helpdesk', 'helpdesk.queue'])
+        ->and(navigationActiveKeysDeep(navigationFor($agent, 'tickets.index')))->toBe(['helpdesk', 'helpdesk.requests'])
+        ->and(navigationActiveKeysDeep(navigationFor($agent, 'operator.tickets.reports')))->toBe(['helpdesk', 'helpdesk.reports']);
+});
+
 it('filters contextual entries recursively by sub-capability', function () {
     $agent = workspaces(navigationFor(actor('user', ['tickets.assign']), 'dashboard'));
     $plain = workspaces(navigationFor(actor('user'), 'dashboard'));
 
     expect(array_keys(contextItems($agent['helpdesk'])))->toBe([
-        'helpdesk.requests', 'helpdesk.queue', 'helpdesk.reports',
+        'helpdesk.queue', 'helpdesk.requests', 'helpdesk.reports',
     ])->and(array_keys(contextItems($plain['helpdesk'])))->toBe(['helpdesk.requests']);
 
     $reporter = workspaces(navigationFor(actor('user', ['time.view_all']), 'dashboard'));
@@ -579,9 +625,10 @@ it('preserves the visit mode of every destination through the reshape', function
         'home' => 'inertia',
         'projects' => 'inertia',
         'tasks' => 'inertia',
-        // EPIC-017 WP2: "My requests" is a React page, and the workspace follows its first view. The
-        // queue and reports, still Blade, keep `document` (asserted below).
-        'helpdesk' => 'inertia',
+        // Release 1.0: the workspace follows its first view, and an operator's first view is the Blade queue
+        // (`document`). "My requests" stays a React page (`inertia`, asserted below and for a customer in
+        // 'opens the Helpdesk workspace on the Queue...').
+        'helpdesk' => 'document',
         'time' => 'inertia',
         'directory' => 'document',
         'finance' => 'document',
