@@ -75,7 +75,7 @@ class TicketReportController extends Controller
 
         $callback = function () use ($tickets) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due'], escape: '');
+            fputcsv($out, ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due'], escape: '');
 
             foreach ($tickets as $t) {
                 // Free-text and user-controlled cells are formula-neutralized (EPIC-010D H7);
@@ -91,6 +91,7 @@ class TicketReportController extends Controller
                     $t->created_at->toDateTimeString(),
                     $t->resolved_at?->toDateTimeString() ?? '',
                     $t->sla_due_at?->toDateTimeString() ?? '',
+                    $t->effectiveDueAt()?->toDateTimeString() ?? '',
                 ], escape: '');
             }
             fclose($out);

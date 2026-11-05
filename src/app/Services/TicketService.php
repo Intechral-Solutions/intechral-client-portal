@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
+use App\Models\TicketDueDateChange;
 use App\Models\TicketReply;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
@@ -13,10 +14,12 @@ use App\Notifications\TicketRepliedNotification;
 use App\Notifications\TicketStatusNotification;
 use App\Rules\AllowedTicketAttachment;
 use App\Shared\Pilot\CustomerPilotGate;
+use App\Support\Helpdesk\DueDateAdjustment;
 use App\Support\Helpdesk\HelpdeskNotifyAddress;
 use App\Support\Helpdesk\TicketReference;
 use App\Support\Helpdesk\TicketReferenceExhausted;
 use App\Support\Helpdesk\TicketReferenceGenerator;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -47,6 +50,9 @@ class TicketService
     public const REFERENCE_ATTEMPTS = 5;
 
     public const CLOSED_REPLY_MESSAGE = 'This request is closed. Raise a new request if you need more help.';
+
+    /** Release 1.0: the furthest ahead an operator may set a due date, in days from now. */
+    public const DUE_OVERRIDE_MAX_DAYS = 365;
 
     public function create(User $user, array $data, array $files = []): Ticket
     {
@@ -95,18 +101,25 @@ class TicketService
      *    status change, history row or notification;
      *  - a customer reply on `pending_user` / `resolved` moves the ticket to `in_progress` / `open`
      *    through transition(), so the history row names the customer, in the same transaction;
-     *  - an operator reply never changes status and is accepted on any status (unchanged).
+     *  - an operator reply never changes status and is accepted on any status (unchanged);
+     *  - Release 1.0: an operator may attach a {@see DueDateAdjustment}. The reply or note, any attachments, the new override and its
+     *    history row commit together under the same lock, or none of them does. A customer may not: refused before any write.
      *
      * Files are written inside the transaction and deleted if it rolls back (F-7). Notifications
      * are sent only after commit.
      */
-    public function addReply(Ticket $ticket, User $user, string $body, bool $isInternal, array $files = []): TicketReply
+    public function addReply(Ticket $ticket, User $user, string $body, bool $isInternal, array $files = [], ?DueDateAdjustment $dueDate = null): TicketReply
     {
         // R0.9-CS1: a restricted customer replying with a stray `tickets.assign` is still a customer (closed-ticket
         // refusal, status lifecycle), exactly as TicketPolicy treats them.
         $isCustomer = ! $user->can('tickets.assign') || CustomerPilotGate::restricts($user);
 
-        [$reply, $current] = $this->storeAttachments(function (array &$stored) use ($ticket, $user, $body, $isInternal, $files, $isCustomer) {
+        // Release 1.0: the same rule as TicketPolicy::adjustDueDate, held again here so no caller can reach the write without it.
+        if ($dueDate !== null && $isCustomer) {
+            throw new AuthorizationException('Only an operator may change a ticket due date.');
+        }
+
+        [$reply, $current] = $this->storeAttachments(function (array &$stored) use ($ticket, $user, $body, $isInternal, $files, $isCustomer, $dueDate) {
             $current = Ticket::query()->lockForUpdate()->findOrFail($ticket->getKey());
 
             if ($isCustomer && $current->status === 'closed') {
@@ -121,6 +134,10 @@ class TicketService
 
             foreach ($files as $file) {
                 $this->storeAttachment($current, $reply, $user, $file, $stored);
+            }
+
+            if ($dueDate !== null) {
+                $this->adjustDueDate($current, $reply, $user, $dueDate);
             }
 
             $next = $isCustomer ? (self::CUSTOMER_REPLY_TRANSITIONS[$current->status] ?? null) : null;
@@ -139,6 +156,55 @@ class TicketService
         }
 
         return $reply;
+    }
+
+    /**
+     * Release 1.0: set or clear the operator due date on the LOCKED, committed row, and record who changed what, tied to the reply that
+     * explains it. Runs inside addReply's transaction, so a refusal here (a ValidationException) rolls the reply back too.
+     *
+     * Allowed only while the ticket is open; a new date must be in the future and at most DUE_OVERRIDE_MAX_DAYS ahead; a restore is
+     * always allowed when there is something to restore (even though the SLA deadline it returns to may be in the past).
+     */
+    private function adjustDueDate(Ticket $current, TicketReply $reply, User $actor, DueDateAdjustment $adjustment): void
+    {
+        if (! $current->isOpen()) {
+            throw ValidationException::withMessages(['due_action' => 'The due date of a resolved or closed request cannot be changed.']);
+        }
+
+        $previous = $current->due_override_at;
+        $new = $adjustment->to;
+
+        if ($new === null) {
+            if ($previous === null) {
+                throw ValidationException::withMessages(['due_action' => 'There is no adjusted due date to restore; the SLA deadline already applies.']);
+            }
+        } else {
+            $now = now();
+
+            if ($new->lessThanOrEqualTo($now)) {
+                throw ValidationException::withMessages(['due_at' => 'The new due date must be in the future.']);
+            }
+
+            if ($new->greaterThan(now()->addDays(self::DUE_OVERRIDE_MAX_DAYS))) {
+                throw ValidationException::withMessages(['due_at' => 'The new due date can be at most '.self::DUE_OVERRIDE_MAX_DAYS.' days ahead.']);
+            }
+
+            if ($previous !== null && $previous->equalTo($new)) {
+                throw ValidationException::withMessages(['due_at' => 'That is already the due date.']);
+            }
+        }
+
+        $current->due_override_at = $new;
+        $current->save();
+
+        TicketDueDateChange::create([
+            'ticket_id' => $current->id,
+            'reply_id' => $reply->id,
+            'user_id' => $actor->id,
+            'previous_override_at' => $previous,
+            'new_override_at' => $new,
+            'created_at' => now(),
+        ]);
     }
 
     /**

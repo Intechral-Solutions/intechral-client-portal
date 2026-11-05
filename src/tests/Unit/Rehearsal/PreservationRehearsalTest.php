@@ -40,10 +40,14 @@ function rehearseCandidates(array $candidates, array $options = []): array
     return [$exit, json_decode($buffer->fetch(), true)];
 }
 
-it('names exactly the three approved candidates, after the pinned baseline', function () {
+// Release 1.0 adds a fourth approved candidate (the ticket due-date override); it is rehearsed by the --candidate run in
+// docs/testing/migration-rehearsal.md and is deliberately NOT part of the R0.9 preservation set these tests pin.
+const RELEASE_1_0_CANDIDATES = ['2026_11_04_120000_add_ticket_due_date_override'];
+
+it('names exactly the approved candidates, after the pinned baseline', function () {
     $set = MigrationSet::repository();
 
-    expect($set->candidateNames())->toBe(PRESERVATION_CANDIDATES)
+    expect($set->candidateNames())->toBe([...PRESERVATION_CANDIDATES, ...RELEASE_1_0_CANDIDATES])
         ->and($set->select(PRESERVATION_CANDIDATES))->toHaveCount(3)
         ->and(count($set->baselineNames()))->toBe(45);
 });
@@ -57,7 +61,7 @@ it('applies M1, M2 and M3 to the populated baseline, after the fixtures, changin
         ->and($report['migration']['applied'])->toBe(PRESERVATION_CANDIDATES)
         ->and($report['migration']['applied_after_fixtures'])->toBeTrue()
         ->and($report['migration']['populated_before'])->toBe(['migrations' => 45, 'fixture_rows' => 205, 'fixture_tables' => 33])
-        ->and($report['migration']['unexercised'])->toBe([])
+        ->and($report['migration']['unexercised'])->toBe(RELEASE_1_0_CANDIDATES)
         ->and($report['migration']['differences'])->toBe([])
         ->and($report['baseline']['failures'])->toBe([])
         ->and($report['restore']['matches_primary'])->toBeTrue()

@@ -65,7 +65,7 @@
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Priority</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Status</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Assignee</th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">SLA Due</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Due ({{ \App\Support\Helpdesk\DueDateInput::zoneLabel() }})</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Submitted</th>
                     <th scope="col" class="relative px-4 py-3"><span class="sr-only">View</span></th>
                 </tr>
@@ -87,9 +87,19 @@
                         {{ $ticket->assignee?->name ?? '—' }}
                     </td>
                     <td class="px-4 py-3 text-sm {{ $ticket->isOverdue() ? 'font-medium text-danger' : 'text-text-secondary' }}">
-                        {{ $ticket->sla_due_at?->format('d M H:i') ?? '—' }}
+                        {{ $ticket->effectiveDueAt()?->format('d M H:i') ?? '—' }}
+                        @if ($ticket->effectiveDueAt() && ! $ticket->hasDueOverride())
+                        <x-ui.tag class="ml-1 align-middle">SLA</x-ui.tag>
+                        @endif
                         @if ($ticket->isOverdue())
                         @include('tickets._overdue_status', ['class' => 'ml-1'])
+                        @endif
+                        @if ($ticket->hasDueOverride())
+                        {{-- Release 1.0: a native disclosure, so the original SLA is reachable by keyboard, touch and screen reader. --}}
+                        <details class="mt-1 text-xs font-normal text-text-secondary">
+                            <summary class="cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">Adjusted</summary>
+                            <p>Original SLA: {{ $ticket->sla_due_at?->format('d M H:i') ?? 'none set' }}</p>
+                        </details>
                         @endif
                     </td>
                     <td class="px-4 py-3 text-sm text-text-secondary">{{ $ticket->created_at->diffForHumans() }}</td>
