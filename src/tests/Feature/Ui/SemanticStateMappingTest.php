@@ -72,7 +72,7 @@ dataset('ticket lifecycle', [
     // status => [label, tone, glyph]   (§9.1; EPIC-017 §13 ended the P6 `dashed` substitute: Pending is the hourglass)
     'open' => ['open', 'Open', 'info', 'circle'],
     'in_progress' => ['in_progress', 'In Progress', 'info', 'half'],
-    'pending_user' => ['pending_user', 'Pending', 'neutral', 'hourglass'],
+    'pending_user' => ['pending_user', 'Waiting on customer', 'neutral', 'hourglass'],
     'resolved' => ['resolved', 'Resolved', 'success', 'check'],
     'closed' => ['closed', 'Closed', 'neutral', 'check'],
 ]);

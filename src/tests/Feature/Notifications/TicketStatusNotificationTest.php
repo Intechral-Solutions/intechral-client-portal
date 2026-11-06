@@ -269,7 +269,7 @@ describe('a failed hand-over after commit (review M2)', function () {
         $fake = ticketFailHandOff(TicketStatusNotification::class, fn ($notifiable) => $notifiable->is($this->owner));
 
         $this->actingAs($this->operator)->post(route('operator.tickets.bulk'), ['ticket_refs' => [$first->ticket_number, $second->ticket_number, $third->ticket_number], 'action' => 'resolve'])
-            ->assertRedirect()->assertSessionHas('status', 'Bulk action applied to 3 ticket(s).');
+            ->assertRedirect()->assertSessionHas('status', '3 tickets updated.');
 
         expect(Ticket::whereIn('id', [$first->id, $second->id, $third->id])->pluck('status')->unique()->all())->toBe(['resolved']);
         // The two hand-overs for the first customer failed and were reported; the second customer's was still made.

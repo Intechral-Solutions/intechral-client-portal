@@ -25,18 +25,26 @@
     <form method="GET" action="{{ route('operator.tickets.index') }}" class="mb-6 flex flex-wrap gap-2">
         <x-ui.input type="search" name="search" :value="request('search')"
                     placeholder="Search&hellip;" class="min-w-45" />
-        @foreach (['status' => ['open', 'in_progress', 'pending_user', 'resolved', 'closed'], 'priority' => ['low', 'medium', 'high', 'critical']] as $field => $opts)
-        <x-ui.select :name="$field" :aria-label="ucfirst($field)">
-            <option value="">All {{ ucfirst($field) }}s</option>
-            @foreach ($opts as $opt)
-            <option value="{{ $opt }}" {{ request($field) === $opt ? 'selected' : '' }}>
-                {{ str_replace('_', ' ', ucfirst($opt)) }}
-            </option>
+        <x-ui.select name="status" aria-label="Status">
+            <option value="">All statuses</option>
+            @foreach (\App\Models\Ticket::STATUSES as $opt)
+            <option value="{{ $opt }}" {{ request('status') === $opt ? 'selected' : '' }}>{{ \App\Models\Ticket::operatorStatusLabel($opt) }}</option>
             @endforeach
         </x-ui.select>
-        @endforeach
+        <x-ui.select name="priority" aria-label="Priority">
+            <option value="">All priorities</option>
+            @foreach (['low', 'medium', 'high', 'critical'] as $opt)
+            <option value="{{ $opt }}" {{ request('priority') === $opt ? 'selected' : '' }}>{{ ucfirst($opt) }}</option>
+            @endforeach
+        </x-ui.select>
+        <x-ui.select name="category" aria-label="Category">
+            <option value="">All categories</option>
+            @foreach ($categories as $opt)
+            <option value="{{ $opt }}" {{ request('category') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+            @endforeach
+        </x-ui.select>
         <x-ui.select name="assignee" aria-label="Assignee">
-            <option value="">All Assignees</option>
+            <option value="">All assignees</option>
             @foreach ($operators as $op)
             <option value="{{ $op->id }}" {{ request('assignee') == $op->id ? 'selected' : '' }}>{{ $op->name }}</option>
             @endforeach
@@ -44,7 +52,7 @@
         <x-ui.input type="date" name="date_from" :value="request('date_from')" aria-label="Submitted from" />
         <x-ui.input type="date" name="date_to" :value="request('date_to')" aria-label="Submitted to" />
         <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
-        @if (request()->hasAny(['search', 'status', 'priority', 'assignee', 'date_from', 'date_to']))
+        @if (request()->hasAny(['search', 'status', 'priority', 'category', 'assignee', 'date_from', 'date_to']))
         <x-ui.button :href="route('operator.tickets.index')" variant="secondary">Clear</x-ui.button>
         @endif
     </form>
