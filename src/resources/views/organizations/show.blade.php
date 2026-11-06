@@ -20,6 +20,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
+        <div class="space-y-6">
         {{-- Info card --}}
         <div class="rounded-lg border p-5 space-y-3 bg-surface border-rule">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Details</h2>
@@ -35,6 +36,11 @@
                 <p class="text-xs text-text-muted">Created</p>
                 <p class="text-sm text-text-secondary">{{ $organization->created_at->format('M j, Y') }}</p>
             </div>
+        </div>
+
+        @if ($relationship !== null)
+        @include('organizations._relationship')
+        @endif
         </div>
 
         {{-- Members --}}

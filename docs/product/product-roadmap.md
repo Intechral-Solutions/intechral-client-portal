@@ -339,6 +339,8 @@ The release-engineering track (RE-0 to RE-5) runs **alongside** the product step
 > - **Order unchanged:** Helpdesk MVP → Directory → Finance → Advanced Projects.
 > - **Foundation:** the `@shadcn/lint` adoption (PR #29) is merged and current; there is no external precondition. WP1 starts from the clean integrated `main`.
 
+> **Forward note (2026-11-06): Managed Organizations (MO) is the immediate Release 1.0 sequence.** The MO-0 discovery and its independent architecture review chose a thin managed relationship between organizations over a Directory consolidation first. Order: **MO-1A** (operator-managed partner and customer links, [implemented, awaiting review](./release-1.0-managed-organizations-mo-1a.md)), then **MO-2** (organization admins manage their own members and invitations), **MO-3** (partner admins manage customer organizations), **MO-4A/B** (explicit ticket organization, then partner support access, behind an Opus design gate). These precede the EPIC-017 WP3/WP4 operator renderer conversions, which stay planned and are not dependent on them. The Directory consolidation, Person records and the Billing Account are unchanged in intent and remain later; no new foreign key points into `crm_companies`, so they stay possible. Management never grants access: owner-only ticket visibility and project membership are unchanged until a package changes them deliberately, with tests. The historical text above is left as the record.
+
 **Why this order and not another.**
 - **Helpdesk still leads.**
   - It has no hard dependency left.

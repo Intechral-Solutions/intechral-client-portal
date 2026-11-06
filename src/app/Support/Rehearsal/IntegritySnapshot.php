@@ -118,6 +118,7 @@ final class IntegritySnapshot
         $this->taskChecks();
         $this->timeChecks();
         $this->invoiceChecks();
+        $this->organizationChecks($schema);
         $files = $this->fileChecks();
 
         $digests = $this->digests($schema['columns']);
@@ -312,6 +313,32 @@ final class IntegritySnapshot
                 ." and not exists (select 1 from `{$parent}` p where p.id = c.`{$column}`)"
             );
         }
+    }
+
+    /**
+     * Release 1.0 (MO-1A): the managed-organization rules, each a count that must be ZERO. Run only once the migration has
+     * added the columns, so a rehearsal that stops before it (or the baseline snapshot) simply has no such checks; a check
+     * that appears after a migration is not a difference, a non-zero one is a failure.
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    private function organizationChecks(array $schema): void
+    {
+        $columns = $schema['columns']['organizations'] ?? [];
+
+        if (! isset($columns['managed_by_organization_id'], $columns['can_manage_customers'])) {
+            return;
+        }
+
+        $this->check('organizations:managed_by_non_partner', 'select count(*) as n from organizations o join organizations m on m.id = o.managed_by_organization_id where m.can_manage_customers = 0');
+        $this->check('organizations:partner_that_is_managed', 'select count(*) as n from organizations where can_manage_customers = 1 and managed_by_organization_id is not null');
+        $this->check('organizations:manages_itself', 'select count(*) as n from organizations where managed_by_organization_id = id');
+        $this->check(
+            'organizations:relationship_without_single_company',
+            'select count(*) as n from organizations o
+             where (o.can_manage_customers = 1 or o.managed_by_organization_id is not null)
+               and (select count(*) from crm_companies k where k.organization_id = o.id) <> 1'
+        );
     }
 
     private function ticketChecks(): void
