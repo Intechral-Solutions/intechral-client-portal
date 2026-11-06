@@ -20,6 +20,7 @@ use App\Http\Controllers\Operator\TicketReportController;
 use App\Http\Controllers\Operator\TimeReportController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
+use App\Http\Controllers\Organization\OrganizationRelationshipController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
@@ -276,6 +277,14 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     Route::post('/{organization}/members', [OrganizationMemberController::class, 'store'])->name('members.store');
     Route::put('/{organization}/members/{user}/role', [OrganizationMemberController::class, 'updateRole'])->name('members.role');
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
+
+    // Release 1.0 (MO-1A): partner designation and managed-customer links. Operator-only (OrganizationPolicy needs portal.operator AND
+    // crm.manage; the route's `can:crm.manage` is only the first gate). The id is a plain integer, never a bound model: see the controller.
+    Route::put('/{organizationId}/partner', [OrganizationRelationshipController::class, 'designate'])->whereNumber('organizationId')->name('partner.designate');
+    Route::delete('/{organizationId}/partner', [OrganizationRelationshipController::class, 'remove'])->whereNumber('organizationId')->name('partner.remove');
+    Route::post('/{organizationId}/customers', [OrganizationRelationshipController::class, 'link'])->whereNumber('organizationId')->name('customers.link');
+    Route::put('/{organizationId}/manager', [OrganizationRelationshipController::class, 'assign'])->whereNumber('organizationId')->name('manager.assign');
+    Route::delete('/{organizationId}/manager', [OrganizationRelationshipController::class, 'unlink'])->whereNumber('organizationId')->name('manager.unlink');
 });
 
 // CMS — operator page management (literal routes before {page} wildcard)

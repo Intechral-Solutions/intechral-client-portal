@@ -87,6 +87,7 @@ function guardTargetInventory(): array
         'operator/tickets/index.blade.php',
         'operator/tickets/reports.blade.php',
         'operator/tickets/show.blade.php',
+        'organizations/_relationship.blade.php',
         'organizations/index.blade.php',
         'organizations/show.blade.php',
         'pagination/direction-d.blade.php',
@@ -488,7 +489,7 @@ it('keeps the Level B target inventory exact, and says what to do when a view is
 
     expect($message)->toBe('')
         ->and($inventory)->toBe($discovered)
-        ->and(count($inventory))->toBe(56);
+        ->and(count($inventory))->toBe(57);
 });
 
 it('draws the inventory only from the §17.2 roots, and lists every file once', function () {
@@ -593,9 +594,9 @@ it('Level B: the Focused shell partials carry the same Direction D rules as the 
     }
 
     expect(implode("\n", $violations))->toBe('')
-        // They are scanned, never inventoried: the exact Level B membership stays exact (56 after EPIC-017 WP2).
+        // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship).
         ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
-        ->and(count(guardTargetInventory()))->toBe(56);
+        ->and(count(guardTargetInventory()))->toBe(57);
 });
 
 it('keeps every allowlist entry reasoned and still needed', function () {

@@ -93,4 +93,27 @@ return [
         ],
         'data' => [],
     ],
+
+    '2026_11_06_120000_add_organization_management_relationship' => [
+        'summary' => 'Release 1.0 (MO-1A): add organizations.managed_by_organization_id (nullable self-reference, ON DELETE RESTRICT) and organizations.can_manage_customers (boolean, default 0), with one CHECK constraint (a partner cannot be managed). No backfill: every existing organization stays unmanaged and not a partner.',
+        'sha256' => '17e9658299145a7b2d3992d5822c174829c6c1367b7a708040f83e3779c21ee8',
+        'schema' => [
+            'column+:organizations.managed_by_organization_id',
+            'column+:organizations.can_manage_customers',
+            'index+:organizations(managed_by_organization_id)',
+            'fk+:organizations.managed_by_organization_id->organizations.id:RESTRICT/RESTRICT',
+        ],
+        'data' => [],
+    ],
+
+    '2026_11_06_120100_unique_company_organization_link' => [
+        'summary' => 'Release 1.0 (MO-1A): make crm_companies.organization_id unique (one company per organization; NULLs stay allowed). Refuses to run, changing nothing, if any organization is linked to two companies. Tightening; rehearsed on its own.',
+        'sha256' => '46bf6933acb0e76611e25967772426365123bacdeed9458991e0b7d19911fb08',
+        'schema' => [
+            'unique+:crm_companies(organization_id)',
+            // InnoDB drops the plain index the foreign key was using once a unique key covers the same column (found by this rehearsal).
+            'index-:crm_companies(organization_id)',
+        ],
+        'data' => [],
+    ],
 ];

@@ -42,7 +42,11 @@ function rehearseCandidates(array $candidates, array $options = []): array
 
 // Release 1.0 adds a fourth approved candidate (the ticket due-date override); it is rehearsed by the --candidate run in
 // docs/testing/migration-rehearsal.md and is deliberately NOT part of the R0.9 preservation set these tests pin.
-const RELEASE_1_0_CANDIDATES = ['2026_11_04_120000_add_ticket_due_date_override'];
+const RELEASE_1_0_CANDIDATES = [
+    '2026_11_04_120000_add_ticket_due_date_override',
+    '2026_11_06_120000_add_organization_management_relationship',
+    '2026_11_06_120100_unique_company_organization_link',
+];
 
 it('names exactly the approved candidates, after the pinned baseline', function () {
     $set = MigrationSet::repository();

@@ -340,7 +340,11 @@ it('sends the create page its exact props, with no company selector data even fo
     $member = ticketUser();
     $organization = Organization::factory()->create(['owner_id' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
-    CrmCompany::factory()->count(2)->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
+    // MO-1A: one company per organization (unique key), so a multi-company member belongs to two organizations.
+    $second = Organization::factory()->create(['owner_id' => $operator->id]);
+    $second->members()->attach($member, ['role' => 'member']);
+    CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
+    CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $second->id]);
 
     $response = $this->actingAs($member)->get(route('tickets.create'))->assertOk();
     $own = ticketOwnProps($response);

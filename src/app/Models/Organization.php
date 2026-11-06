@@ -19,6 +19,16 @@ class Organization extends Model
         'owner_id',
     ];
 
+    /**
+     * `managed_by_organization_id` and `can_manage_customers` (Release 1.0, MO-1A) are deliberately NOT fillable: they change
+     * only through App\Services\OrganizationRelationships, which enforces the relationship rules under lock and audits the
+     * change. There is deliberately no Eloquent relation for them either: a relation would run through the tenant scope and
+     * silently undercount for an account the scope filters, and no query that decides an integrity rule may do that.
+     */
+    protected $casts = [
+        'can_manage_customers' => 'boolean',
+    ];
+
     protected static function booted(): void
     {
         static::addGlobalScope(new OrganizationMembershipScope);

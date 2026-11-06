@@ -8,6 +8,7 @@ This section holds the canonical product, information-architecture, and roadmap 
 | [Information Architecture](./information-architecture.md) | Target navigation, workspace boundaries, core concepts (current vs target vs open), relationships, terminology migration |
 | [Product Roadmap](./product-roadmap.md) | The governing strategic sequence (NOW / NEXT / LATER / FUTURE / FINAL HARDENING), dependencies, and the immediate stabilization package |
 | [Release 0.9: Scope and Architecture Gate](./release-0.9-scope-and-architecture.md) | The invitation-only early-access release on durable production data: ratified decisions, scope, data lifecycle, migration and rollback contract, and open decisions. Supersedes the roadmap's disposable-data assumptions for the Release 0.9 production database. |
+| [Release 1.0: Managed Organizations, MO-1A](./release-1.0-managed-organizations-mo-1a.md) | The operator-managed relationship between a partner organization and its customer organizations: decision, data model, invariants, authorization, migration and rollback, preflight, and the remaining MO packages. |
 
 ## How these relate to the rest of the documentation
 

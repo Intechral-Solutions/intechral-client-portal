@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use App\Auth\ActiveUserProvider;
 use App\Models\Invoice;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Ticket;
 use App\Notifications\SkipSuspendedRecipients;
 use App\Policies\InvoicePolicy;
+use App\Policies\OrganizationPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
@@ -104,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+        // Release 1.0 (MO-1A): who may edit the relationship between organizations; no other organization ability is defined.
+        Gate::policy(Organization::class, OrganizationPolicy::class);
         // EPIC-014 WP1: registered for the domain boundary; no route authorizes through it yet.
         Gate::policy(Task::class, TaskPolicy::class);
 

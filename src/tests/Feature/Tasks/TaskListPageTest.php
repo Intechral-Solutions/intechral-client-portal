@@ -448,7 +448,10 @@ it('offers organizations only through visible projects and the actor\'s own CRM 
     $org = Organization::factory()->create(['owner_id' => $this->operator->id]);
     $org->members()->attach($this->member, ['role' => 'member']);
     $visibleCompany = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'organization_id' => $org->id, 'name' => 'Seen Co']);
-    $hiddenCompany = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'organization_id' => $org->id, 'name' => 'Behind Hidden Co']);
+    // MO-1A: one company per organization (unique key), so the second company has its own organization, which the member also belongs to.
+    $hiddenOrg = Organization::factory()->create(['owner_id' => $this->operator->id]);
+    $hiddenOrg->members()->attach($this->member, ['role' => 'member']);
+    $hiddenCompany = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'organization_id' => $hiddenOrg->id, 'name' => 'Behind Hidden Co']);
     $otherTenant = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'name' => 'Other Tenant Co']);
     $this->visible->companies()->attach([$visibleCompany->id, $otherTenant->id]);
     $this->hidden->companies()->attach($hiddenCompany);

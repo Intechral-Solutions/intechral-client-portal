@@ -66,8 +66,12 @@ Standard Spatie tables: `roles`, `permissions`, `model_has_roles`, `model_has_pe
 | id | bigint PK | |
 | name | varchar(255) | Copied from the CRM company when promoted |
 | slug | varchar(255) unique | URL-safe identifier |
-| owner_id | bigint FK users | User who owns the organization |
+| owner_id | bigint FK users | Provenance only: the user who created or promoted the organization. It is **not** an authorization grant; access follows `organization_members` and the tenant scopes |
+| managed_by_organization_id | bigint unsigned FK organizations, nullable | Release 1.0 (MO-1A): the partner organization that administratively manages this one. Self-reference, `ON DELETE RESTRICT`, indexed. NULL for every existing row |
+| can_manage_customers | boolean, default 0 | Release 1.0 (MO-1A): the organization is designated a partner |
 | created_at / updated_at | timestamps | |
+
+**Managed-organization relationship (Release 1.0, MO-1A).** An administrative link only: it grants nobody access to tickets, projects, time or invoices, and no authorization decision reads it. The manager must be a partner, a partner cannot itself be managed (CHECK `organizations_partner_not_managed_check`), nothing manages itself (enforced by the service; MariaDB cannot put a CHECK on `id`), there is one level and one manager, and both ends must have exactly one CRM company. `crm_companies.organization_id` is UNIQUE (`crm_companies_organization_id_unique`; NULLs allowed). Written only by `App\Services\OrganizationRelationships`, by operators holding both `portal.operator` and `crm.manage`. See [the MO-1A record](../product/release-1.0-managed-organizations-mo-1a.md).
 
 ### `organization_members`
 Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is unique; a user may belong to multiple organizations.
