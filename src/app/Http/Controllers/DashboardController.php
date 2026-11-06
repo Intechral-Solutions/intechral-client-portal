@@ -113,7 +113,10 @@ class DashboardController extends Controller
                 'number' => $ticket->ticket_number,
                 'subject' => $ticket->title,
                 'status' => $ticket->status,
-                'statusLabel' => str_replace('_', ' ', ucfirst($ticket->status)),
+                // HD-P1: operators read the operator vocabulary; a customer on this page keeps their previous wording.
+                'statusLabel' => $user->can('tickets.assign')
+                    ? Ticket::operatorStatusLabel($ticket->status)
+                    : str_replace('_', ' ', ucfirst($ticket->status)),
                 'requesterName' => $ticket->user?->name,
                 'createdAtHuman' => $ticket->created_at->diffForHumans(),
                 'href' => $user->can('tickets.assign')

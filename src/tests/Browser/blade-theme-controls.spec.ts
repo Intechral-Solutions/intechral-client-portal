@@ -1039,7 +1039,7 @@ test.describe('Semantic state: every state, rendered by the production partials'
             const tickets: [string, string, string, string][] = [
                 ['open', 'Open', 'info', 'circle'],
                 ['in_progress', 'In Progress', 'info', 'half'],
-                ['pending_user', 'Pending', 'neutral', 'hourglass'],
+                ['pending_user', 'Waiting on customer', 'neutral', 'hourglass'],
                 ['resolved', 'Resolved', 'success', 'check'],
                 ['closed', 'Closed', 'neutral', 'check'],
             ];

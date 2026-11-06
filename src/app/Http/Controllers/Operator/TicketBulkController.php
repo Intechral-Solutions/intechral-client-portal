@@ -30,8 +30,9 @@ class TicketBulkController extends Controller
         $action = $validated['action'];
 
         // Everything that can reject the request runs before the first mutation, and the batch
-        // commits or rolls back as one.
-        $count = DB::transaction(function () use ($validated, $action, $service, $actor) {
+        // commits or rolls back as one. A ticket whose workflow cannot make the move is skipped and reported;
+        // any other failure rolls the whole batch back, so "failed" is never a partial state.
+        [$applied, $skipped] = DB::transaction(function () use ($validated, $action, $service, $actor) {
             if ($action === 'assign') {
                 $service->assertAssignable((int) $validated['assignee_id']);
             }
@@ -43,25 +44,47 @@ class TicketBulkController extends Controller
                 throw ValidationException::withMessages(['ticket_refs' => 'One or more selected tickets no longer exist.']);
             }
 
+            $applied = 0;
+            $skipped = [];
+
             foreach ($tickets as $ticket) {
-                match ($action) {
-                    'assign' => $service->assign($ticket, (int) $validated['assignee_id'], $actor),
-                    'close' => $this->safeTransition($service, $ticket, $actor, 'closed'),
-                    'resolve' => $this->safeTransition($service, $ticket, $actor, 'resolved'),
-                    'status' => $this->safeTransition($service, $ticket, $actor, $validated['status']),
+                if ($action === 'assign') {
+                    $service->assign($ticket, (int) $validated['assignee_id'], $actor);
+                    $applied++;
+
+                    continue;
+                }
+
+                $target = match ($action) {
+                    'close' => 'closed',
+                    'resolve' => 'resolved',
+                    'status' => $validated['status'],
                 };
+
+                if ($ticket->canTransitionTo($target)) {
+                    $service->transition($ticket, $actor, $target);
+                    $applied++;
+                } else {
+                    $skipped[] = $ticket->ticket_number.' ('.Ticket::operatorStatusLabel($ticket->status).' → '.Ticket::operatorStatusLabel($target).' is not allowed)';
+                }
             }
 
-            return $tickets->count();
+            return [$applied, $skipped];
         });
 
-        return back()->with('status', "Bulk action applied to {$count} ticket(s).");
-    }
+        $summary = $applied === 1 ? '1 ticket updated.' : "{$applied} tickets updated.";
 
-    private function safeTransition(TicketService $service, Ticket $ticket, $actor, string $newStatus): void
-    {
-        if ($ticket->canTransitionTo($newStatus)) {
-            $service->transition($ticket, $actor, $newStatus);
+        if ($skipped === []) {
+            return back()->with('status', $summary);
         }
+
+        $detail = 'Skipped '.count($skipped).': '.implode('; ', $skipped).'.';
+
+        // Nothing changed: say so as an error rather than a success banner.
+        if ($applied === 0) {
+            return back()->withErrors(['bulk' => 'No tickets were updated. '.$detail]);
+        }
+
+        return back()->with('status', $summary.' '.$detail);
     }
 }

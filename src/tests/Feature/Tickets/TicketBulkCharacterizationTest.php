@@ -108,18 +108,30 @@ it('BASELINE H6: invalid action, empty selection and an unknown ticket reference
     'unknown ticket reference in batch' => [['ticket_refs' => 'REFS_PLUS_UNKNOWN', 'action' => 'close'], 'ticket_refs'],
 ]);
 
-it('CHARACTERIZATION H6: an impossible transition is skipped per ticket, yet the flash counts every selected ticket', function () {
+it('HD-P1: an impossible transition is skipped per ticket and the flash reports applied and skipped separately', function () {
     $open = ticketFor(ticketUser());
     $closed = Ticket::factory()->closed()->for(ticketUser(), 'user')->create();
 
     $this->actingAs($this->operator)
         ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$open->ticket_number, $closed->ticket_number], 'action' => 'resolve'])
         ->assertRedirect()
-        ->assertSessionHas('status', 'Bulk action applied to 2 ticket(s).');
+        ->assertSessionHas('status', fn ($m) => str_starts_with($m, '1 ticket updated. Skipped 1: '.$closed->ticket_number.' (Closed → Resolved is not allowed)'));
 
     expect($open->fresh()->status)->toBe('resolved')
         ->and($closed->fresh()->status)->toBe('closed')
         ->and(TicketStatusHistory::where('ticket_id', $closed->id)->count())->toBe(0);
+});
+
+it('HD-P1: a bulk action that changes nothing is reported as an error, not a success', function () {
+    $closed = Ticket::factory()->closed()->for(ticketUser(), 'user')->create();
+
+    $this->actingAs($this->operator)
+        ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$closed->ticket_number], 'action' => 'resolve'])
+        ->assertRedirect()
+        ->assertSessionMissing('status')
+        ->assertSessionHasErrors('bulk');
+
+    expect($closed->fresh()->status)->toBe('closed');
 });
 
 it('TARGET H6: single assign without an assignee key is a validation error, while an explicit blank still unassigns', function () {

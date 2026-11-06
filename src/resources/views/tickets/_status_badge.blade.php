@@ -3,18 +3,18 @@
     x-ui.status primitive only draws a tone, a glyph and a label. Labels and status values are unchanged.
 
     `pending_user` uses the hourglass (EPIC-017 §13, WP2), ending the EPIC-016 P6 `dashed` substitute. The
-    operator label stays "Pending" until P4 (WP3). An unknown status falls back to neutral.
+    operator label is "Waiting on customer" (HD-P1, Ticket::OPERATOR_STATUS_LABELS). An unknown status falls back to neutral.
 
     @param string $status
 --}}
 @php
 $map = [
-    'open'         => ['tone' => 'info',    'glyph' => 'circle', 'label' => 'Open'],
-    'in_progress'  => ['tone' => 'info',    'glyph' => 'half',   'label' => 'In Progress'],
-    'pending_user' => ['tone' => 'neutral', 'glyph' => 'hourglass', 'label' => 'Pending'],
-    'resolved'     => ['tone' => 'success', 'glyph' => 'check',  'label' => 'Resolved'],
-    'closed'       => ['tone' => 'neutral', 'glyph' => 'check',  'label' => 'Closed'],
+    'open'         => ['tone' => 'info',    'glyph' => 'circle', 'label' => \App\Models\Ticket::operatorStatusLabel('open')],
+    'in_progress'  => ['tone' => 'info',    'glyph' => 'half',   'label' => \App\Models\Ticket::operatorStatusLabel('in_progress')],
+    'pending_user' => ['tone' => 'neutral', 'glyph' => 'hourglass', 'label' => \App\Models\Ticket::operatorStatusLabel('pending_user')],
+    'resolved'     => ['tone' => 'success', 'glyph' => 'check',  'label' => \App\Models\Ticket::operatorStatusLabel('resolved')],
+    'closed'       => ['tone' => 'neutral', 'glyph' => 'check',  'label' => \App\Models\Ticket::operatorStatusLabel('closed')],
 ];
-$entry = $map[$status] ?? ['tone' => 'neutral', 'glyph' => 'circle', 'label' => ucfirst($status)];
+$entry = $map[$status] ?? ['tone' => 'neutral', 'glyph' => 'circle', 'label' => \App\Models\Ticket::operatorStatusLabel($status)];
 @endphp
 <x-ui.status :tone="$entry['tone']" :glyph="$entry['glyph']" data-ticket-status="{{ $status }}">{{ $entry['label'] }}</x-ui.status>

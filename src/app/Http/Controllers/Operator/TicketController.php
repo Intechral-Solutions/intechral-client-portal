@@ -34,7 +34,9 @@ class TicketController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        return view('operator.tickets.index', compact('tickets', 'operators', 'assignableOperators'));
+        $categories = UserTicketController::CATEGORIES;
+
+        return view('operator.tickets.index', compact('tickets', 'operators', 'assignableOperators', 'categories'));
     }
 
     public function show(Ticket $ticket, TicketService $service)
@@ -73,7 +75,7 @@ class TicketController extends Controller
 
         $service->transition($ticket, auth()->user(), $validated['status']);
 
-        return back()->with('status', "Ticket status updated to \"{$validated['status']}\".");
+        return back()->with('status', 'Ticket status updated to "'.Ticket::operatorStatusLabel($validated['status']).'".');
     }
 
     public function assign(Request $request, Ticket $ticket, TicketService $service)
