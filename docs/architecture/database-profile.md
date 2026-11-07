@@ -73,6 +73,13 @@ exception class and SQLSTATE (a query exception's message carries the host, data
 `UPDATE_DATABASE_PROFILE_MANIFEST=1` and review the diff. The manifest was generated from the disposable host-parity database after migrating
 with the new configuration (59 foreign keys), and it equals the development database's schema.
 
+**Across releases.** The verifier is exact and **release-local**: a build compares the live foreign keys with the manifest committed in that same build, so an older build rolled
+back onto a newer schema reports every foreign key the newer one added, and no manifest in the newer build can change that. The newer build instead carries a reviewed record of
+its additions (`database/profile/rollback/<release>.json`, with the older release's manifest pinned by SHA-256) and `php artisan database:rollback-assessment`, which fails closed
+unless the rollback target directory is that release, the ran-migration set is exactly the build's, the live foreign keys equal this build's manifest and differ from the older release's by exactly the reviewed
+keys, every added column is write-compatible, the CHECK constraints are the reviewed ones and the queue holds nothing the older release cannot run. It is a narrow contract for one target, not a schema comparison. A migration that adds a foreign key therefore updates
+both files. This never makes the older verifier pass: [Rolling the Release 1.0 code back to Release 0.9](../operations/rollback-1.0-to-0.9.md).
+
 ## 4. Migration-time guard (production only)
 
 `App\Support\Database\MigrationProfileGuard` listens to the migrator's `MigrationsStarted` and `MigrationsEnded` for an **`up`** run, on the connection
