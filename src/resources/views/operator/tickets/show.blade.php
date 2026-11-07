@@ -164,7 +164,7 @@
                         <option value="{{ $s }}"
                                 {{ $ticket->status === $s ? 'selected' : '' }}
                                 {{ $ticket->canTransitionTo($s) || $ticket->status === $s ? '' : 'disabled' }}>
-                            {{ str_replace('_', ' ', ucfirst($s)) }}
+                            {{ \App\Models\Ticket::operatorStatusLabel($s) }}
                         </option>
                         @endforeach
                     </x-ui.select>
@@ -228,8 +228,8 @@
                 <ol class="space-y-2">
                     @foreach ($ticket->statusHistories as $h)
                     <li class="text-xs text-text-secondary">
-                        <span class="font-medium text-text">{{ str_replace('_', ' ', $h->old_status) }}</span>
-                        &rarr; <span class="font-medium text-text">{{ str_replace('_', ' ', $h->new_status) }}</span>
+                        <span class="font-medium text-text">{{ \App\Models\Ticket::operatorStatusLabel($h->old_status) }}</span>
+                        &rarr; <span class="font-medium text-text">{{ \App\Models\Ticket::operatorStatusLabel($h->new_status) }}</span>
                         {{ $h->user ? 'by ' . $h->user->name : '(auto)' }}
                         &middot; {{ $h->created_at->diffForHumans() }}
                     </li>

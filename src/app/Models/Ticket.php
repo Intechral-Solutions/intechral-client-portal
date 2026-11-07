@@ -226,6 +226,20 @@ class Ticket extends Model
         'closed' => ['open'],
     ];
 
+    /** Operator-facing status vocabulary (persisted values are unchanged). The customer wording lives in RequesterTicketPresenter. */
+    public const OPERATOR_STATUS_LABELS = [
+        'open' => 'Open',
+        'in_progress' => 'In Progress',
+        'pending_user' => 'Waiting on customer',
+        'resolved' => 'Resolved',
+        'closed' => 'Closed',
+    ];
+
+    public static function operatorStatusLabel(string $status): string
+    {
+        return self::OPERATOR_STATUS_LABELS[$status] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
     public function canTransitionTo(string $newStatus): bool
     {
         return in_array($newStatus, self::TRANSITIONS[$this->status] ?? []);

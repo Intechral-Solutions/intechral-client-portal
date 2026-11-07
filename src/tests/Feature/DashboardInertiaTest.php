@@ -114,3 +114,16 @@ it('ships exactly the four DTO props §25.1 names, and nothing WP7 fabricated', 
         'crmSummary',
     ]);
 });
+
+it('HD-P1: the operator dashboard labels a waiting ticket in the operator vocabulary, leaving the stored value alone', function () {
+    $this->seedRolesAndPermissions();
+    $operator = User::factory()->create();
+    $operator->assignRole('operator');
+    Ticket::factory()->for(User::factory()->create(), 'user')->create(['status' => 'pending_user']);
+
+    $this->actingAs($operator)
+        ->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('recentTickets.0.status', 'pending_user')
+            ->where('recentTickets.0.statusLabel', 'Waiting on customer'));
+});
