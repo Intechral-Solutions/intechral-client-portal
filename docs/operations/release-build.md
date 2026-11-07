@@ -181,7 +181,7 @@ contains executable files, mostly 0755). Nothing in the archive is group- or wor
 sha256sum -c "$A.sha256"                                              # OK
 tar -tzf "$A" | cut -d/ -f1 | sort -u | tr '\n' ' '; echo             # exactly: RELEASE app artisan bootstrap composer.json composer.lock config database public resources routes scripts vendor
 for p in artisan vendor/autoload.php public/index.php public/.htaccess public/build/manifest.json bootstrap/app.php \
-         bootstrap/cache/packages.php scripts/cron/portal-cron.sh database/profile/foreign-keys.json config/portal.php RELEASE; do
+         bootstrap/cache/packages.php scripts/cron/portal-cron.sh database/profile/foreign-keys.json database/profile/rollback/0.9.json database/profile/releases/0.9/foreign-keys.json config/portal.php RELEASE; do
   tar -tzf "$A" | grep -qx "$p" && echo "ok  $p" || echo "MISSING $p"; done                       # no MISSING
 tar -tzf "$A" | grep -vE '^vendor/' | grep -cE '(^|/)\.env($|\.)'                               # 0   (no environment file, outside vendor)
 tar -tzf "$A" | grep -vE '^vendor/' | grep -cE '(^|/)\.git/'                                    # 0   (no repository)
