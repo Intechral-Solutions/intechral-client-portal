@@ -77,7 +77,7 @@ with the new configuration (59 foreign keys), and it equals the development data
 back onto a newer schema reports every foreign key the newer one added, and no manifest in the newer build can change that. The newer build instead carries a reviewed record of
 its additions (`database/profile/rollback/<release>.json`, with the older release's manifest pinned by SHA-256) and `php artisan database:rollback-assessment`, which fails closed
 unless the rollback target directory is that release, the ran-migration set is exactly the build's, the live foreign keys equal this build's manifest and differ from the older release's by exactly the reviewed
-keys, every added column is write-compatible, the CHECK constraints are the reviewed ones and the queue holds nothing the older release cannot run. It is a narrow contract for one target, not a schema comparison. A migration that adds a foreign key therefore updates
+keys, every added column is write-compatible, the CHECK constraints are the reviewed ones, no organization administrator approval remains in either approval column (the older release cannot clear one) and the queue holds nothing the older release cannot run. It is a narrow contract for one target, not a schema comparison. A migration that adds a foreign key therefore updates
 both files. This never makes the older verifier pass: [Rolling the Release 1.0 code back to Release 0.9](../operations/rollback-1.0-to-0.9.md).
 
 ## 4. Migration-time guard (production only)

@@ -8,7 +8,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('organizations:preflight {--json : Print the report as JSON}')]
-#[Description('Read-only report on organization, company and membership data ahead of the managed-organization migrations: duplicate company links, organizations without a company, admin and operator-held admin memberships, multi-organization users, attributed tickets (Release 1.0, MO-1A)')]
+#[Description('Read-only report on organization, company and membership data ahead of the managed-organization migrations: duplicate company links, organizations without a company, admin and operator-held admin memberships, the administrator-approval inventory, multi-organization users, attributed tickets (Release 1.0, MO-1A, MO-2A1)')]
 class OrganizationPreflightCommand extends Command
 {
     public function handle(OrganizationPreflight $preflight): int
@@ -29,6 +29,17 @@ class OrganizationPreflightCommand extends Command
             $this->line('Managed relationships: not migrated yet (the MO-1A columns do not exist).');
         } else {
             $this->line("Managed relationships: {$report['relationships']['partners']} partner(s), {$report['relationships']['managed']} managed organization(s)");
+        }
+
+        if ($report['adminApproval'] === null) {
+            $this->line('Administrator approval: not migrated yet (the MO-2A1 columns do not exist).');
+        } else {
+            $a = $report['adminApproval'];
+            $this->line(sprintf(
+                'Administrator approval: %d unapproved, %d approved and active, %d approved but suspended, %d operator-held; %d organization(s) without an approved administrator',
+                count($a['unapprovedAdministrators']), count($a['approvedActiveCustomerAdministrators']), count($a['approvedSuspendedAdministrators']),
+                count($a['operatorHeldAdministrators']), count($a['organizationsWithoutApprovedAdministrator'])
+            ));
         }
 
         foreach ($report['failures'] as $failure) {

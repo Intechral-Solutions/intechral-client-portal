@@ -59,6 +59,14 @@ class AssessRollbackCompatibility extends Command
                 'partner_organizations' => (int) $db->table('organizations')->where('can_manage_customers', true)->count(),
             ];
 
+            // Release 0.9 cannot clear an administrator approval it does not know about: none may be left, complete or not.
+            $approvals = $this->administratorApprovals();
+            $facts += [
+                'approvals_complete' => count(array_filter($approvals, fn (array $row) => $row['complete'])),
+                'approvals_incomplete' => count(array_filter($approvals, fn (array $row) => ! $row['complete'])),
+            ];
+            array_push($problems, ...RollbackCompatibility::approvalProblems($approvals));
+
             if ($facts['managed_organizations'] + $facts['partner_organizations'] > 0) {
                 $warnings[] = "{$facts['partner_organizations']} partner and {$facts['managed_organizations']} managed organization(s) exist. They grant no access under release {$release}, but company deletion must stay frozen for the whole rollback window, and organizations:preflight must pass before the re-upgrade (docs/operations/rollback-1.0-to-0.9.md)";
             }
@@ -167,6 +175,26 @@ class AssessRollbackCompatibility extends Command
         }
 
         return $live;
+    }
+
+    /**
+     * Every membership with a value in EITHER approval column, complete or not (empty before the MO-2A1 columns exist: the declared-column
+     * and migration checks report that). Ids only.
+     *
+     * @return list<array{organization_id: int, user_id: int, complete: bool}>
+     */
+    private function administratorApprovals(): array
+    {
+        if (! Schema::hasColumn('organization_members', 'admin_approved_at') || ! Schema::hasColumn('organization_members', 'admin_approved_by')) {
+            return [];
+        }
+
+        return DB::table('organization_members')
+            ->where(fn ($query) => $query->whereNotNull('admin_approved_at')->orWhereNotNull('admin_approved_by'))
+            ->orderBy('organization_id')->orderBy('user_id')
+            ->get(['organization_id', 'user_id', 'admin_approved_at', 'admin_approved_by'])
+            ->map(fn ($row) => ['organization_id' => (int) $row->organization_id, 'user_id' => (int) $row->user_id, 'complete' => $row->admin_approved_at !== null && $row->admin_approved_by !== null])
+            ->all();
     }
 
     /** @return list<string> "table.constraint" of every CHECK constraint in the schema */

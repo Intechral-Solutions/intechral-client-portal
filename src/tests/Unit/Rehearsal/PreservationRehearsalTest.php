@@ -46,6 +46,7 @@ const RELEASE_1_0_CANDIDATES = [
     '2026_11_04_120000_add_ticket_due_date_override',
     '2026_11_06_120000_add_organization_management_relationship',
     '2026_11_06_120100_unique_company_organization_link',
+    '2026_11_07_090000_add_organization_admin_approval',
 ];
 
 it('names exactly the approved candidates, after the pinned baseline', function () {

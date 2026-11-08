@@ -2,6 +2,7 @@
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\OrganizationMembership;
 use App\Support\Database\RollbackCompatibility;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -66,17 +67,18 @@ function raJob(string $display, ?string $command = null, ?int $reservedAt = null
 }
 
 const RA_EXPECTED = [
+    'unexpected foreign key: organization_members.admin_approved_by->users.id (RESTRICT/RESTRICT)',
     'unexpected foreign key: organizations.managed_by_organization_id->organizations.id (RESTRICT/RESTRICT)',
     'unexpected foreign key: ticket_due_date_changes.ticket_id,reply_id->ticket_replies.ticket_id,id (CASCADE/RESTRICT)',
     'unexpected foreign key: ticket_due_date_changes.ticket_id->tickets.id (CASCADE/RESTRICT)',
     'unexpected foreign key: ticket_due_date_changes.user_id->users.id (SET NULL/RESTRICT)',
 ];
 
-it('passes on the migrated schema, predicts the four lines the Release 0.9 verifier will print, and claims neither that verifier passes nor a whole-schema verification', function () {
+it('passes on the migrated schema, predicts the five lines the Release 0.9 verifier will print, and claims neither that verifier passes nor a whole-schema verification', function () {
     $this->artisan("database:rollback-assessment --target-dir={$this->target}")
         ->expectsOutputToContain('Assessment passed for release 0.9 (32ec62f5c034b6394950203941e170d830b4669c)')
         ->expectsOutputToContain('a narrow contract, not a verification of the whole schema')
-        ->expectsOutputToContain('is EXPECTED to report exactly these 4 line(s)')
+        ->expectsOutputToContain('is EXPECTED to report exactly these 5 line(s)')
         ->expectsOutputToContain(RA_EXPECTED[0])
         ->expectsOutputToContain(RA_EXPECTED[1])
         ->expectsOutputToContain('it will still exit non-zero')
@@ -107,10 +109,72 @@ it('reports the facts as JSON, including the relationship counts, and is read-on
         ->and($report['target'])->toBe(['release' => '0.9', 'commit' => '32ec62f5c034b6394950203941e170d830b4669c'])
         ->and($report['expected_target_verifier_output'])->toBe(RA_EXPECTED)
         ->and($report['expected_sha256'])->toBe(hash('sha256', implode("\n", RA_EXPECTED)))
-        ->and($report['facts'])->toBe(['ran_migrations' => DB::table('migrations')->count(), 'queue_connection' => 'database', 'queued_jobs' => 0, 'reserved_jobs' => 0, 'failed_jobs' => 0, 'managed_organizations' => 1, 'partner_organizations' => 1])
+        ->and($report['facts'])->toBe(['ran_migrations' => DB::table('migrations')->count(), 'queue_connection' => 'database', 'queued_jobs' => 0, 'reserved_jobs' => 0, 'failed_jobs' => 0, 'managed_organizations' => 1, 'partner_organizations' => 1, 'approvals_complete' => 0, 'approvals_incomplete' => 0])
         ->and(implode("\n", $report['warnings']))->toContain('company deletion must stay frozen for the whole rollback window')
         ->and($report['note'])->toContain('does not make the target release')->and($report['note'])->toContain('does not verify every column')
         ->and($count())->toBe($before);
+});
+
+it('refuses the rollback while ANY administrator approval value is present, complete or half-written, on any membership, and passes once none is', function () {
+    $organization = Organization::factory()->create();
+    $operator = User::factory()->create();
+    $member = User::factory()->create();
+    $stamp = now()->startOfSecond();
+
+    $scenarios = [
+        'a complete approval on an administrator' => ['admin', $stamp, $operator->id, '1 complete, 0 incomplete'],
+        'a complete approval left on a member row' => ['member', $stamp, $operator->id, '1 complete, 0 incomplete'],
+        'an approval time without an approver' => ['admin', $stamp, null, '0 complete, 1 incomplete'],
+        'an approver without an approval time' => ['member', null, $operator->id, '0 complete, 1 incomplete'],
+    ];
+
+    foreach ($scenarios as $name => [$role, $at, $by, $counts]) {
+        DB::table('organization_members')->insert([
+            'organization_id' => $organization->id, 'user_id' => $member->id, 'role' => $role,
+            'admin_approved_at' => $at, 'admin_approved_by' => $by, 'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+
+        $report = raAssess($this->target);
+        expect($report['passed'])->toBeFalse($name)
+            ->and(implode('
+', $report['problems']))->toContain("rollback blocked: 1 organization membership(s) carry an administrator-approval value ({$counts})")
+            ->and(implode('
+', $report['problems']))->toContain("organization:user {$organization->id}:{$member->id}")
+            ->and($report['expected_target_verifier_output'])->toBe([], "{$name}: nothing is predicted for a refused assessment")
+            ->and($report['expected_sha256'])->toBeNull();
+
+        // `--expected` fails and prints no lines to compare, so nothing can be read as clearance.
+        $exit = Artisan::call('database:rollback-assessment', ['--expected' => true, '--target-dir' => $this->target]);
+        expect($exit)->toBe(1)->and(Artisan::output())->not->toContain('unexpected foreign key');
+        $this->artisan("database:rollback-assessment --target-dir={$this->target}")->expectsOutputToContain('rollback blocked: 1 organization membership(s)')->assertFailed();
+
+        DB::table('organization_members')->where('user_id', $member->id)->delete();
+        expect(raAssess($this->target)['passed'])->toBeTrue("{$name}: with the row gone the assessment passes again");
+    }
+
+    // The same with no row at all, and with a plain membership that carries no approval value: both pass.
+    DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $member->id, 'role' => 'admin', 'created_at' => $stamp, 'updated_at' => $stamp]);
+    $clean = raAssess($this->target);
+    expect($clean['passed'])->toBeTrue()->and($clean['facts']['approvals_complete'])->toBe(0)->and($clean['facts']['approvals_incomplete'])->toBe(0);
+});
+
+it('passes again after the operator revokes the approval through the service: the documented way out', function () {
+    $this->seedRolesAndPermissions();
+    $operator = User::factory()->create()->assignRole('operator');
+    $admin = User::factory()->create()->assignRole('user');
+    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization->members()->attach($admin, ['role' => 'admin']);
+
+    app(OrganizationMembership::class)->approve($organization, $admin, $operator);
+
+    $blocked = raAssess($this->target);
+    expect($blocked['passed'])->toBeFalse()->and($blocked['facts']['approvals_complete'])->toBe(1);
+
+    app(OrganizationMembership::class)->revokeApproval($organization, $admin, $operator, confirmNoAdministrator: true);
+
+    $cleared = raAssess($this->target);
+    expect($cleared['passed'])->toBeTrue()->and($cleared['facts']['approvals_complete'])->toBe(0)
+        ->and($cleared['expected_target_verifier_output'])->toBe(RA_EXPECTED);
 });
 
 it('fails closed without the rollback target directory, and on a directory that is not the reviewed release', function () {

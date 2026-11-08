@@ -116,4 +116,16 @@ return [
         ],
         'data' => [],
     ],
+
+    '2026_11_07_090000_add_organization_admin_approval' => [
+        'summary' => 'Release 1.0 (MO-2A1): add organization_members.admin_approved_at (nullable datetime) and organization_members.admin_approved_by (nullable reference to users, ON DELETE RESTRICT). No backfill: every existing membership stays unapproved. No CHECK: the previous release can change a role without clearing an approval.',
+        'sha256' => '7def6c2bab63df2f3094ef2b4fe306ff1df487ecfa5324320a2fb697962ec25e',
+        'schema' => [
+            'column+:organization_members.admin_approved_at',
+            'column+:organization_members.admin_approved_by',
+            'index+:organization_members(admin_approved_by)',
+            'fk+:organization_members.admin_approved_by->users.id:RESTRICT/RESTRICT',
+        ],
+        'data' => [],
+    ],
 ];

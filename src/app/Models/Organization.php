@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\OrganizationAuthority;
 use App\Shared\Scopes\OrganizationMembershipScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -60,7 +61,12 @@ class Organization extends Model
         return $this->members()->where('user_id', $user->id)->exists();
     }
 
-    public function isAdmin(User $user): bool
+    /**
+     * Whether the user's membership has the ADMINISTRATOR ROLE. Role only: it says nothing about approval, and it grants nothing.
+     * (Called isAdmin() before MO-2A1, a name that read like authority; it had no callers.) What counts as an approved
+     * administrator is defined once, in {@see OrganizationAuthority}.
+     */
+    public function hasAdminRole(User $user): bool
     {
         return $this->members()
             ->where('user_id', $user->id)

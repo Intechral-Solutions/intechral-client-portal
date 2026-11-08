@@ -308,6 +308,28 @@ final class RollbackCompatibility
         return $problems;
     }
 
+    /**
+     * Organization administrator approvals (MO-2A1) that must be revoked before the code goes back to Release 0.9. That release does not
+     * know `admin_approved_at` / `admin_approved_by`: it can demote a member without clearing the approval and re-promote the row later,
+     * and the revived approval is indistinguishable from a genuine one (the stamp is older than the row's last change, which only a
+     * diagnostic can show). So the rollback is refused while ANY value is present in EITHER column: complete, half-written or otherwise
+     * damaged. The way out is the explicit, audited revocation on the organization page, one membership at a time, not editing rows.
+     *
+     * @param  list<array{organization_id: int, user_id: int, complete: bool}>  $rows  every membership with a value in either approval column
+     * @return list<string>
+     */
+    public static function approvalProblems(array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $incomplete = count(array_filter($rows, fn (array $row) => ! $row['complete']));
+        $shown = array_map(fn (array $row) => "{$row['organization_id']}:{$row['user_id']}", array_slice($rows, 0, 10));
+
+        return ['rollback blocked: '.count($rows).' organization membership(s) carry an administrator-approval value ('.(count($rows) - $incomplete)." complete, {$incomplete} incomplete). Release 0.9 knows no approval and could demote and re-promote such a member without clearing it, reviving the authority with no audit entry. Revoke every one on the organization page first, one membership at a time (organization:user ".implode(', ', $shown).(count($rows) > 10 ? ', and '.(count($rows) - 10).' more' : '').')'];
+    }
+
     /** @param array{nullable: bool, default: ?string} $shape */
     private static function describeColumn(array $shape): string
     {

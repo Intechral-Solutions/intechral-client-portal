@@ -277,6 +277,8 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     Route::post('/{organization}/members', [OrganizationMemberController::class, 'store'])->name('members.store');
     Route::put('/{organization}/members/{user}/role', [OrganizationMemberController::class, 'updateRole'])->name('members.role');
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
+    Route::post('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'approve'])->name('members.approve');
+    Route::delete('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'revokeApproval'])->name('members.approval.revoke');
 
     // Release 1.0 (MO-1A): partner designation and managed-customer links. Operator-only (OrganizationPolicy needs portal.operator AND
     // crm.manage; the route's `can:crm.manage` is only the first gate). The id is a plain integer, never a bound model: see the controller.
