@@ -178,14 +178,16 @@ it('prevents organization member management across tenant boundaries', function 
 
     expect($orgB->members()->whereKey($newMember->id)->exists())->toBeFalse();
 
+    // MO-2A1: membership is operator-only (portal.operator AND crm.manage). Before, a customer holding crm.manage who was an
+    // administrator of the organization could add members to it (and make them administrators). Role is not authority.
     $this->actingAs($manager)
         ->post(route('organizations.members.store', $orgA), [
             'user_id' => $newMember->id,
             'role' => 'member',
         ])
-        ->assertRedirect();
+        ->assertForbidden();
 
-    expect($orgA->members()->whereKey($newMember->id)->exists())->toBeTrue();
+    expect($orgA->members()->whereKey($newMember->id)->exists())->toBeFalse();
 });
 
 it('rejects cross-tenant company identifiers during contact ticket and project writes', function () {

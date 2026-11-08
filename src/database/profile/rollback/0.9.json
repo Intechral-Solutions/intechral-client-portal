@@ -22,9 +22,11 @@
     "migrations_after_target": [
         "2026_11_04_120000_add_ticket_due_date_override",
         "2026_11_06_120000_add_organization_management_relationship",
-        "2026_11_06_120100_unique_company_organization_link"
+        "2026_11_06_120100_unique_company_organization_link",
+        "2026_11_07_090000_add_organization_admin_approval"
     ],
     "additive_foreign_keys": {
+        "organization_members.admin_approved_by->users.id": "RESTRICT/RESTRICT",
         "organizations.managed_by_organization_id->organizations.id": "RESTRICT/RESTRICT",
         "ticket_due_date_changes.ticket_id->tickets.id": "CASCADE/RESTRICT",
         "ticket_due_date_changes.ticket_id,reply_id->ticket_replies.ticket_id,id": "CASCADE/RESTRICT",
@@ -42,6 +44,14 @@
         "organizations.can_manage_customers": {
             "nullable": false,
             "default": "0"
+        },
+        "organization_members.admin_approved_at": {
+            "nullable": true,
+            "default": null
+        },
+        "organization_members.admin_approved_by": {
+            "nullable": true,
+            "default": null
         }
     },
     "additive_check_constraints": {
@@ -59,6 +69,7 @@
     ],
     "queued_classes_added_since_target": [],
     "expected_target_verifier_output": [
+        "unexpected foreign key: organization_members.admin_approved_by->users.id (RESTRICT/RESTRICT)",
         "unexpected foreign key: organizations.managed_by_organization_id->organizations.id (RESTRICT/RESTRICT)",
         "unexpected foreign key: ticket_due_date_changes.ticket_id,reply_id->ticket_replies.ticket_id,id (CASCADE/RESTRICT)",
         "unexpected foreign key: ticket_due_date_changes.ticket_id->tickets.id (CASCADE/RESTRICT)",

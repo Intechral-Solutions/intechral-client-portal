@@ -10,6 +10,7 @@ This section holds the canonical product, information-architecture, and roadmap 
 | [Release 0.9: Scope and Architecture Gate](./release-0.9-scope-and-architecture.md) | The invitation-only early-access release on durable production data: ratified decisions, scope, data lifecycle, migration and rollback contract, and open decisions. Supersedes the roadmap's disposable-data assumptions for the Release 0.9 production database. |
 | [Release 1.0: Managed Organizations, MO-1A](./release-1.0-managed-organizations-mo-1a.md) | The operator-managed relationship between a partner organization and its customer organizations: decision, data model, invariants, authorization, migration and rollback, preflight, and the remaining MO packages. |
 | [Release 1.0: identity and release notes](./release-1.0-notes.md) | How Release 1.0 is identified (the build's `RELEASE` file and a git tag), what changed since Release 0.9, the deployment facts, the rollback pointer and the gates still open. |
+| [Release 1.0: Managed Organizations, MO-2A1](./release-1.0-managed-organizations-mo-2a1.md) | Operator-only membership hardening and explicit administrator approval: role versus approval, the canonical authority predicate, the last-approved-administrator rule and its exceptional revocation, audit, migration, the rollback refusal while any approval remains, and the mandatory MO-2B security requirement. |
 
 ## How these relate to the rest of the documentation
 

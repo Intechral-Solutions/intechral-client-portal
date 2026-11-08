@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\User;
-use App\Shared\Permissions\BuiltInRoles;
-use App\Shared\Permissions\PermissionCatalogue;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -47,7 +45,7 @@ final class OrganizationPreflight
 
         $companiesWithoutOrganization = DB::table('crm_companies')->whereNull('organization_id')->count();
 
-        $operators = $this->operatorIds();
+        $operators = OrganizationAuthority::operatorIds();
         $admins = DB::table('organization_members')
             ->join('users', 'users.id', '=', 'organization_members.user_id')
             ->where('organization_members.role', 'admin')
@@ -87,6 +85,7 @@ final class OrganizationPreflight
         }
 
         $relationships = $this->relationships($failures);
+        $adminApproval = $this->adminApproval($failures, $warnings, $operators);
 
         return [
             'duplicateLinks' => $duplicates,
@@ -99,6 +98,7 @@ final class OrganizationPreflight
             'multiOrganizationUsers' => $multiOrganization,
             'attributedTickets' => $attributed,
             'relationships' => $relationships,
+            'adminApproval' => $adminApproval,
             'failures' => $failures,
             'warnings' => $warnings,
         ];
@@ -139,34 +139,90 @@ final class OrganizationPreflight
         ];
     }
 
+    /**
+     * The administrator-approval inventory (MO-2A1), or null before the migration. Ids only: no email appears here, so the section is
+     * safe to keep as evidence. It changes nothing and approves nobody; approval is the operator's explicit, per-membership act.
+     *
+     * "Counted" is the definition in {@see OrganizationAuthority}: role admin, approved, active account, not an operator.
+     *
+     * @param  list<string>  $failures
+     * @param  list<string>  $warnings
+     * @param  list<int>  $operators
+     * @return array<string, mixed>|null
+     */
+    private function adminApproval(array &$failures, array &$warnings, array $operators): ?array
+    {
+        if (! Schema::hasColumn('organization_members', 'admin_approved_at') || ! Schema::hasColumn('organization_members', 'admin_approved_by')) {
+            return null;
+        }
+
+        $rows = DB::table('organization_members as m')
+            ->join('users as u', 'u.id', '=', 'm.user_id')
+            ->orderBy('m.organization_id')->orderBy('m.user_id')
+            ->get(['m.organization_id as org', 'm.user_id as uid', 'm.role', 'm.updated_at as updated', 'm.admin_approved_at as at', 'm.admin_approved_by as by', 'u.disabled_at as disabled']);
+
+        $pair = fn (object $row): array => ['organization_id' => (int) $row->org, 'user_id' => (int) $row->uid];
+        $isOperator = fn (object $row): bool => in_array((int) $row->uid, $operators, true);
+        $isAdmin = fn (object $row): bool => $row->role === 'admin';
+        $record = fn (object $row): string => OrganizationAuthority::approvalRecord($row->at, $row->by);
+        $approved = fn (object $row): bool => $record($row) === OrganizationAuthority::APPROVAL_COMPLETE;
+        $hasApproval = fn (object $row): bool => $record($row) !== OrganizationAuthority::APPROVAL_NONE;
+        $active = fn (object $row): bool => $row->disabled === null;
+
+        $of = fn (callable $test): array => $rows->filter($test)->map($pair)->values()->all();
+
+        $counted = $rows->filter(fn ($row) => $isAdmin($row) && $approved($row) && $active($row) && ! $isOperator($row));
+        $organizationsWithCounted = $counted->pluck('org')->map(fn ($id) => (int) $id)->unique();
+
+        $report = [
+            'unapprovedAdministrators' => $of(fn ($row) => $isAdmin($row) && ! $approved($row)),
+            'approvedActiveCustomerAdministrators' => $counted->map($pair)->values()->all(),
+            'approvedSuspendedAdministrators' => $of(fn ($row) => $isAdmin($row) && $approved($row) && ! $active($row)),
+            'operatorHeldAdministrators' => $of(fn ($row) => $isAdmin($row) && $isOperator($row)),
+            'approvedButNowOperator' => $of(fn ($row) => $approved($row) && $isOperator($row)),
+            'approvedButNotAdministrator' => $of(fn ($row) => $hasApproval($row) && ! $isAdmin($row)),
+            'incompleteApprovals' => $of(fn ($row) => $record($row) === OrganizationAuthority::APPROVAL_INCOMPLETE),
+            // DIAGNOSTIC, not proof. MO-2A1 stamps `admin_approved_at` and `updated_at` with one instant and every later membership
+            // write either keeps the role or clears the approval, so a membership row changed AFTER its approval means the previous
+            // release (which cannot write either column) touched it: for instance a demote then re-promote that revived the approval.
+            // The reverse proves nothing: an untouched or deliberately restored row looks clean.
+            'changedAfterApproval' => $of(fn ($row) => $row->at !== null && $row->updated !== null && Carbon::parse($row->updated)->gt(Carbon::parse($row->at))),
+            'organizationsWithoutApprovedAdministrator' => DB::table('organizations')->orderBy('id')->pluck('id')
+                ->map(fn ($id) => (int) $id)->reject(fn (int $id) => $organizationsWithCounted->contains($id))->values()->all(),
+            'multiOrganizationAdministrators' => $rows->filter($isAdmin)->groupBy('uid')->filter(fn ($group) => $group->count() > 1)
+                ->map(fn ($group, $uid) => ['user_id' => (int) $uid, 'organizations' => $group->count()])->values()->all(),
+        ];
+
+        if ($report['incompleteApprovals'] !== []) {
+            $failures[] = count($report['incompleteApprovals']).' membership(s) have an approval time without an approver, or the reverse. They count as no approval. The previous release cannot write either column, so this is not a rollback effect: investigate, then revoke each one before relying on approvals.';
+        }
+
+        if ($report['approvedButNotAdministrator'] !== []) {
+            $failures[] = count($report['approvedButNotAdministrator']).' membership(s) carry an approval record but are not administrators (older code can demote without clearing it, and a later promotion would then revive the approval). They do not count. Revoke each approval before delegation is ever enabled.';
+        }
+
+        if ($report['changedAfterApproval'] !== []) {
+            $failures[] = count($report['changedAfterApproval']).' membership(s) were changed after they were approved (membership updated_at is later than admin_approved_at), which this release never does: older code probably touched them, and may have revived a cleared approval. Diagnostic evidence only, not proof either way (a clean result proves nothing). Revoke each approval and approve again only after review.';
+        }
+
+        if ($report['unapprovedAdministrators'] !== []) {
+            $warnings[] = count($report['unapprovedAdministrators']).' administrator membership(s) are not approved and hold no delegated authority. Approve only the exact memberships the owner has reviewed; nothing approves them automatically.';
+        }
+
+        if ($report['approvedButNowOperator'] !== []) {
+            $warnings[] = count($report['approvedButNowOperator']).' approved membership(s) belong to an account that is now an operator. They do not count; revoke the approval.';
+        }
+
+        if ($report['approvedSuspendedAdministrators'] !== []) {
+            $warnings[] = count($report['approvedSuspendedAdministrators']).' approved administrator(s) are suspended. They do not count while suspended and count again, with their approval, on reactivation.';
+        }
+
+        return $report;
+    }
+
     /** @return list<int> */
     private function ids(string $sql): array
     {
         return array_map(fn ($row) => (int) $row->id, DB::select($sql));
-    }
-
-    /**
-     * Ids of the accounts that count as operators: the `portal.operator` capability (eligibility) or the `operator` role (the
-     * name the tenant scopes still test), directly or through a role. Straight from the tables, never the permission cache.
-     *
-     * @return list<int>
-     */
-    private function operatorIds(): array
-    {
-        $direct = DB::table('model_has_permissions')
-            ->join('permissions', 'permissions.id', '=', 'model_has_permissions.permission_id')
-            ->where('model_has_permissions.model_type', User::class)
-            ->where('permissions.name', PermissionCatalogue::PORTAL_OPERATOR)
-            ->pluck('model_has_permissions.model_id');
-
-        $viaRole = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->leftJoin('role_has_permissions', 'role_has_permissions.role_id', '=', 'roles.id')
-            ->leftJoin('permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-            ->where('model_has_roles.model_type', User::class)
-            ->where(fn ($query) => $query->where('roles.name', BuiltInRoles::OPERATOR)->orWhere('permissions.name', PermissionCatalogue::PORTAL_OPERATOR))
-            ->pluck('model_has_roles.model_id');
-
-        return $direct->merge($viaRole)->map(fn ($id) => (int) $id)->unique()->values()->all();
     }
 }

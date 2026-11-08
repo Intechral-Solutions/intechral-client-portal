@@ -191,20 +191,8 @@ class CrmService
         });
     }
 
-    public function addMember(Organization $org, User $user, string $role = 'member'): void
-    {
-        $org->members()->syncWithoutDetaching([$user->id => ['role' => $role]]);
-    }
-
-    public function updateMemberRole(Organization $org, User $user, string $role): void
-    {
-        $org->members()->updateExistingPivot($user->id, ['role' => $role]);
-    }
-
-    public function removeMember(Organization $org, User $user): void
-    {
-        $org->members()->detach($user->id);
-    }
+    // Organization membership (add, promote, demote, remove, approve) lives in App\Services\OrganizationMembership (MO-2A1): it takes
+    // the organization lock, keeps the last approved administrator, and audits. There is deliberately no second way to write it here.
 
     // ── Private ───────────────────────────────────────────
 

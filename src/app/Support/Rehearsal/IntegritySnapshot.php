@@ -119,6 +119,7 @@ final class IntegritySnapshot
         $this->timeChecks();
         $this->invoiceChecks();
         $this->organizationChecks($schema);
+        $this->membershipChecks($schema);
         $files = $this->fileChecks();
 
         $digests = $this->digests($schema['columns']);
@@ -339,6 +340,22 @@ final class IntegritySnapshot
              where (o.can_manage_customers = 1 or o.managed_by_organization_id is not null)
                and (select count(*) from crm_companies k where k.organization_id = o.id) <> 1'
         );
+    }
+
+    /** Release 1.0 (MO-2A1): only once the approval columns exist. Both are zero on any database the application itself wrote. */
+    private function membershipChecks(array $schema): void
+    {
+        $columns = $schema['columns']['organization_members'] ?? [];
+
+        if (! isset($columns['admin_approved_at'], $columns['admin_approved_by'])) {
+            return;
+        }
+
+        // An approval is meaningful only on an administrator row. The service clears it with every role change, but the previous
+        // release can change a role without knowing it, so a database that went through a rollback may legitimately differ here.
+        $this->check('organization_members:approved_not_admin', "select count(*) as n from organization_members where admin_approved_at is not null and role <> 'admin'");
+        // The two columns are written together and cleared together; the previous release writes neither.
+        $this->check('organization_members:approval_incomplete', 'select count(*) as n from organization_members where (admin_approved_at is null) <> (admin_approved_by is null)');
     }
 
     private function ticketChecks(): void

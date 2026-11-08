@@ -76,6 +76,13 @@ Standard Spatie tables: `roles`, `permissions`, `model_has_roles`, `model_has_pe
 ### `organization_members`
 Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is unique; a user may belong to multiple organizations.
 
+| Column | Type | Notes |
+|--------|------|-------|
+| admin_approved_at | datetime, nullable | Release 1.0 (MO-2A1): when an operator approved this membership as an administrator. NULL for every historical row |
+| admin_approved_by | bigint unsigned FK users, nullable | The approving operator. `ON DELETE RESTRICT` |
+
+**`role = admin` grants nothing; approval is separate.** An *approved administrator* is a membership with `role = admin`, a **complete** approval record (`admin_approved_at` **and** `admin_approved_by` both set; one without the other counts for nothing), an active account, and no operator eligibility (defined once, in `App\Services\OrganizationAuthority`). Approval is an explicit, audited operator act (`App\Services\OrganizationMembership`); promoting never approves and demoting always clears it. There is deliberately **no CHECK** tying approval to `role = admin`: the previous release can change a role without knowing the approval, so a database that went through a rollback may hold an approval on a non-administrator row. Such a row is ignored (it never counts), **fails `organizations:preflight`** (as does a half-written record, or a membership whose `updated_at` is later than its `admin_approved_at`), and **blocks `database:rollback-assessment`**, which refuses while either column holds any value anywhere: an operator revokes each approval on the organization page first. See [the MO-2A1 record](../product/release-1.0-managed-organizations-mo-2a1.md).
+
 > **Note:** A separate `organization_roles` table is planned but not yet built. Org role management is currently handled via the `role` column on `organization_members`.
 
 > **Data scoping:** `crm_companies.organization_id` is the direct tenant key. Organizations are scoped through `organization_members`, and CRM contacts are scoped through their company. Tickets, projects, invoices, and time entries do not contain `organization_id`; they retain their existing ownership, membership, client, and policy boundaries. Platform operators bypass tenant scopes. `Project` visibility specifically is `project_members` membership or `projects.admin`; `project_company` is visibility metadata only and never grants access on its own (EPIC-011E D2).

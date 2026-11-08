@@ -11,9 +11,9 @@ final class RcAfterCommitFixture implements ShouldQueueAfterCommit {}
 /*
  * Release 1.0 (RE-C1): the reviewed rollback declaration for Release 0.9 and the fail-closed assessment built on it.
  *
- * The facts being pinned were measured against the REAL Release 0.9 build (commit 32ec62f) on a disposable database on 2026-11-06:
- * after this build's three migrations its `database:verify` reports exactly the four `unexpected foreign key` lines recorded in the
- * declaration, and its `runtime:preflight` reports the same four (so it never issues an A2 challenge). The older build cannot be
+ * The facts being pinned were measured against the REAL Release 0.9 build (commit 32ec62f) on a disposable database on 2026-11-06, and re-captured with MO-2A1's migration on 2026-11-08:
+ * after this build's four migrations its `database:verify` reports exactly the five `unexpected foreign key` lines recorded in the
+ * declaration, and its `runtime:preflight` reports the same five (so it never issues an A2 challenge). The older build cannot be
  * changed, and tolerating the foreign keys in THIS build's manifest could not make it pass. These tests therefore check the
  * assessment, never a tolerance: every refusal is a negative control that unexpected schema drift is rejected.
  *
@@ -91,12 +91,12 @@ it('has exactly the additions the three sources agree on: the manifest differenc
         ->and(array_filter(rcTarget(), fn (string $rules, string $key) => (rcCurrent()[$key] ?? null) !== $rules, ARRAY_FILTER_USE_BOTH))->toBe([], 'and none changed its actions');
 });
 
-it('reproduces what the real Release 0.9 verifier reported: four unexpected foreign key lines and nothing else', function () {
+it('reproduces what the real Release 0.9 verifier reported: five unexpected foreign key lines and nothing else', function () {
     $expected = RollbackCompatibility::expectedTargetVerifierOutput(rcTarget(), rcCurrent());
 
     // Captured from the real build, not computed: this is the evidence the computation must keep reproducing.
     expect($expected)->toBe(rcDeclaration()['expected_target_verifier_output'])
-        ->and($expected)->toHaveCount(4)
+        ->and($expected)->toHaveCount(5)
         ->and(collect($expected)->every(fn (string $line) => str_starts_with($line, 'unexpected foreign key: ')))->toBeTrue();
 });
 
@@ -311,6 +311,24 @@ it('rejects a declaration that lists something this build does not add, that has
         ->and(implode("\n", rcProblems(declaration: $wildcard)))->toContain('unreviewed additive foreign key: organizations.managed_by_organization_id')
         ->and(implode("\n", rcProblems(declaration: $wildcard)))->toContain('declared additive foreign key * (*) is not an addition')
         ->and(implode("\n", rcProblems(declaration: $alreadyInTarget)))->toContain('is not an addition of this build');
+});
+
+it('refuses the rollback while any administrator approval value remains, and names how many are complete and how many are not', function () {
+    $row = fn (int $organization, int $user, bool $complete) => ['organization_id' => $organization, 'user_id' => $user, 'complete' => $complete];
+
+    expect(RollbackCompatibility::approvalProblems([]))->toBe([], 'no approval value anywhere is the only pass');
+
+    $one = RollbackCompatibility::approvalProblems([$row(3, 7, true)]);
+    expect($one)->toHaveCount(1)
+        ->and($one[0])->toContain('rollback blocked: 1 organization membership(s) carry an administrator-approval value (1 complete, 0 incomplete)')
+        ->and($one[0])->toContain('organization:user 3:7')
+        ->and($one[0])->toContain('Revoke every one on the organization page');
+
+    $mixed = RollbackCompatibility::approvalProblems([$row(3, 7, true), $row(3, 8, false), $row(4, 9, false)]);
+    expect($mixed[0])->toContain('3 organization membership(s)')->and($mixed[0])->toContain('(1 complete, 2 incomplete)');
+
+    $many = RollbackCompatibility::approvalProblems(array_map(fn (int $user) => $row(1, $user, true), range(1, 12)));
+    expect($many[0])->toContain('1:10')->and($many[0])->not->toContain('1:11')->and($many[0])->toContain('and 2 more');
 });
 
 it('rejects a recorded older-verifier output that this build no longer reproduces', function () {

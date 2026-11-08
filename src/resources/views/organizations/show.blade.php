@@ -47,8 +47,106 @@
         <div class="lg:col-span-2 rounded-lg border overflow-hidden bg-surface border-rule">
             <div class="px-5 py-4 border-b border-rule">
                 <h2 class="text-sm font-semibold text-text">Members</h2>
+                @if ($memberships !== null)
+                <p class="mt-1 text-xs text-text-muted">The administrator role grants nothing by itself. An administrator holds delegated authority only after an operator approves that membership, and no delegated authority is active in this release.</p>
+                @endif
             </div>
 
+            @if ($memberships !== null)
+            <div class="px-5 pt-4"><x-ui.field-error for="membership" /></div>
+            @php($approvedCount = $memberships->where('counts', true)->count())
+            <table class="w-full text-sm">
+                <tbody class="divide-y divide-rule">
+                    @forelse ($memberships as $member)
+                    @php($lastApproved = $member->counts && $approvedCount === 1)
+                    <tr>
+                        <td class="px-5 py-3 align-top">
+                            <p class="font-medium text-text">{{ $member->name }}</p>
+                            <p class="text-xs text-text-muted">{{ $member->email }}</p>
+                            @if ($member->operator)
+                            <p class="mt-1 text-xs text-text-muted">Operator account: acts with platform authority, not through this membership.</p>
+                            @endif
+                            @if (! $member->active)
+                            <p class="mt-1 text-xs text-text-muted">Account suspended.</p>
+                            @endif
+                        </td>
+                        <td class="px-5 py-3 align-top">
+                            <x-ui.tag>{{ ucfirst($member->role) }}</x-ui.tag>
+                            @if ($member->role === 'admin')
+                                @if ($member->counts)
+                                <p class="mt-2 text-xs text-text">Approved administrator</p>
+                                <p class="text-xs text-text-muted">by {{ $member->approver_name ?? 'an operator' }}, {{ \Illuminate\Support\Carbon::parse($member->admin_approved_at)->format('M j, Y') }}</p>
+                                @elseif ($member->approved)
+                                <p class="mt-2 text-xs text-text">Approved, not in effect</p>
+                                <p class="text-xs text-text-muted">{{ $member->operator ? 'The account is an operator.' : 'The account is suspended.' }} Approved {{ \Illuminate\Support\Carbon::parse($member->admin_approved_at)->format('M j, Y') }}.</p>
+                                @else
+                                <p class="mt-2 text-xs text-text-muted">Not approved: holds no delegated authority.</p>
+                                @endif
+                            @elseif ($member->hasApprovalData)
+                            <p class="mt-2 text-xs text-text-muted">Has an approval record but is not an administrator; it is ignored. Revoke it to clear the record.</p>
+                            @endif
+                            @if ($member->incomplete)
+                            <p class="mt-2 text-xs text-text">Incomplete approval record</p>
+                            <p class="text-xs text-text-muted">{{ $member->admin_approved_at === null ? 'An approver is recorded but no approval time.' : 'An approval time is recorded but no approver.' }} It does not count as an approval. Revoke it, then approve again if the owner has reviewed this administrator.</p>
+                            @endif
+                        </td>
+                        <td class="px-5 py-3 align-top text-right">
+                            <div class="flex flex-col items-end gap-2">
+                                <div class="flex items-center justify-end gap-3">
+                                    @if ($member->role === 'admin' && ! $member->hasApprovalData && $member->refusal === null)
+                                    <form method="POST" action="{{ route('organizations.members.approve', [$organization, $member->id]) }}">
+                                        @csrf
+                                        <x-ui.button type="submit" variant="secondary" size="sm">Approve administrator</x-ui.button>
+                                    </form>
+                                    @endif
+                                    {{-- Toggle role. Promoting never approves; demoting clears any approval. --}}
+                                    @if ($lastApproved)
+                                    <x-ui.button variant="ghost" size="sm" disabled>Make Member</x-ui.button>
+                                    @else
+                                    <form method="POST" action="{{ route('organizations.members.role', [$organization, $member->id]) }}">
+                                        @csrf @method('PUT')
+                                        <input type="hidden" name="role" value="{{ $member->role === 'admin' ? 'member' : 'admin' }}">
+                                        <x-ui.button type="submit" variant="ghost" size="sm">
+                                            Make {{ $member->role === 'admin' ? 'Member' : 'Admin' }}
+                                        </x-ui.button>
+                                    </form>
+                                    @endif
+                                    {{-- Remove --}}
+                                    @if ($lastApproved)
+                                    <x-ui.button variant="ghost" tone="danger" size="sm" disabled>Remove</x-ui.button>
+                                    @else
+                                    <form method="POST" action="{{ route('organizations.members.destroy', [$organization, $member->id]) }}"
+                                          onsubmit="return confirm('Remove {{ addslashes($member->name) }}?')">
+                                        @csrf @method('DELETE')
+                                        <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Remove</x-ui.button>
+                                    </form>
+                                    @endif
+                                </div>
+                                @if ($lastApproved)
+                                <p class="max-w-xs text-xs text-text-muted">The only approved administrator: approve another before demoting or removing them.</p>
+                                @endif
+                                @if ($member->hasApprovalData)
+                                {{-- Revoking is the exceptional, separately-confirmed way to take authority away, and the only way to leave none. --}}
+                                <form method="POST" action="{{ route('organizations.members.approval.revoke', [$organization, $member->id]) }}" class="flex flex-col items-end gap-2">
+                                    @csrf @method('DELETE')
+                                    @if ($lastApproved)
+                                    <x-ui.checkbox name="confirm_no_administrator" value="1" required>I understand this leaves {{ $organization->name }} with no approved administrator.</x-ui.checkbox>
+                                    @endif
+                                    <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Revoke approval</x-ui.button>
+                                </form>
+                                @endif
+                                @if ($member->role === 'admin' && ! $member->hasApprovalData && $member->refusal !== null)
+                                <p class="max-w-xs text-xs text-text-muted">Cannot be approved: {{ ['suspended' => 'the account is suspended', 'operator' => 'the account is an operator'][$member->refusal] ?? 'not an administrator' }}.</p>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No members yet.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+            @else
             <table class="w-full text-sm">
                 <tbody class="divide-y divide-rule">
                     @forelse ($organization->members as $member)
@@ -60,33 +158,16 @@
                         <td class="px-5 py-3">
                             <x-ui.tag>{{ ucfirst($member->pivot->role) }}</x-ui.tag>
                         </td>
-                        <td class="px-5 py-3 text-right">
-                            <div class="flex items-center justify-end gap-3">
-                                {{-- Toggle role --}}
-                                <form method="POST" action="{{ route('organizations.members.role', [$organization, $member]) }}">
-                                    @csrf @method('PUT')
-                                    <input type="hidden" name="role" value="{{ $member->pivot->role === 'admin' ? 'member' : 'admin' }}">
-                                    <x-ui.button type="submit" variant="ghost" size="sm">
-                                        Make {{ $member->pivot->role === 'admin' ? 'Member' : 'Admin' }}
-                                    </x-ui.button>
-                                </form>
-                                {{-- Remove --}}
-                                <form method="POST" action="{{ route('organizations.members.destroy', [$organization, $member]) }}"
-                                      onsubmit="return confirm('Remove {{ addslashes($member->name) }}?')">
-                                    @csrf @method('DELETE')
-                                    <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Remove</x-ui.button>
-                                </form>
-                            </div>
-                        </td>
                     </tr>
                     @empty
                     <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No members yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
+            @endif
 
             {{-- Add member form --}}
-            @if ($availableUsers->isNotEmpty())
+            @if ($memberships !== null && $availableUsers->isNotEmpty())
             <div class="border-t px-5 py-4 border-rule">
                 <form method="POST" action="{{ route('organizations.members.store', $organization) }}" class="flex gap-2">
                     @csrf
@@ -97,7 +178,7 @@
                     </x-ui.select>
                     <x-ui.select name="role" aria-label="Organization role">
                         <option value="member">Member</option>
-                        <option value="admin">Admin</option>
+                        <option value="admin">Admin (not approved)</option>
                     </x-ui.select>
                     <x-ui.button type="submit">Add</x-ui.button>
                 </form>

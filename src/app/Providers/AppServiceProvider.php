@@ -106,7 +106,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
-        // Release 1.0 (MO-1A): who may edit the relationship between organizations; no other organization ability is defined.
+        // Release 1.0 (MO-1A, MO-2A1): who may edit the relationship between organizations and manage their members; both operator-only.
         Gate::policy(Organization::class, OrganizationPolicy::class);
         // EPIC-014 WP1: registered for the domain boundary; no route authorizes through it yet.
         Gate::policy(Task::class, TaskPolicy::class);

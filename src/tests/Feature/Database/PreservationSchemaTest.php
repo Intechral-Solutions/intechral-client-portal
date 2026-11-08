@@ -52,6 +52,8 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'project_members.user_id -> users' => 'CASCADE/RESTRICT (project_members_user_id_foreign)',
         'social_accounts.user_id -> users' => 'CASCADE/RESTRICT (social_accounts_user_id_foreign)',
         'time_entry_blocks.user_id -> users' => 'CASCADE/RESTRICT (time_entry_blocks_user_id_foreign)',
+        // Release 1.0 (MO-2A1): added later by its own migration, RESTRICT from the start (the approving operator is provenance).
+        'organization_members.admin_approved_by -> users' => 'RESTRICT/RESTRICT (organization_members_admin_approved_by_foreign)',
         // Nullable pointers: the record stays and the pointer is cleared.
         'cms_pages.updated_by -> users' => 'SET NULL/RESTRICT (cms_pages_updated_by_foreign)',
         'invitations.invited_by -> users' => 'SET NULL/RESTRICT (invitations_invited_by_foreign)',

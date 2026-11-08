@@ -35,34 +35,35 @@ Merged on `main` up to `fec5c81`:
 | Help Desk **due-date overrides** (PR #50): an operator moves a ticket's working due date as part of a reply, with a history row; the original SLA deadline is kept | new ability `adjustDueDate`; one nullable column, one table | nothing |
 | Help Desk **opens on the Queue** for operators (PR #51) | default destination of the Help Desk workspace | nothing |
 | **Managed organizations, MO-1A** (PR #52): an operator designates a partner organization and links customer organizations to it. Administrative only: it grants nobody access to anything | Partner relationship panel on the organization page; `organizations:preflight`; a company of a partner or managed organization cannot be deleted; company promotion is transactional | nothing |
+| **Managed organizations, MO-2A1** (approved for PR submission after independent closure review; not yet merged or deployed): operators only. Organization membership moves into one audited service, and an organization administrator becomes an **approved** administrator only through an explicit operator act (role is not approval). Grants nobody access to anything | Membership and approval controls on the organization page; `organizations:preflight` gains an approval inventory and integrity failures; the member routes now need `portal.operator` **and** `crm.manage` and an active account | nothing (a customer holding `crm.manage` used to be able to add members; it now answers 403) |
 | Development tooling (the Mailpit host port) | none | none |
 
 **Customer surface:** unchanged. The customer-pilot allowlist, the permission catalogue and the built-in roles are the same as in Release 0.9, so there is nothing for `roles:sync` to apply.
 
-**Not in this release yet:** administrator approval and operator membership hardening (MO-2A1, under review), organization invitations (MO-2A2), customer-facing delegation (MO-2B), and anything of MO-3 and MO-4.
+**Not in this release yet:** organization invitations (MO-2A2), customer-facing delegation (MO-2B), and anything of MO-3 and MO-4.
 
 ## Deployment facts
 
 | Fact | Detail |
 |---|---|
-| Migrations (3) | `2026_11_04_120000_add_ticket_due_date_override` (additive), `2026_11_06_120000_add_organization_management_relationship` (additive), `2026_11_06_120100_unique_company_organization_link` (**tightening**: refuses to run, changing nothing, if an organization has two companies) |
-| Before the last migration | run `art organizations:preflight` on the real data and have the owner review any `failure` ([MO-1A record](./release-1.0-managed-organizations-mo-1a.md#existing-data-preflight)) |
+| Migrations (4) | `2026_11_04_120000_add_ticket_due_date_override` (additive), `2026_11_06_120000_add_organization_management_relationship` (additive), `2026_11_06_120100_unique_company_organization_link` (**tightening**: refuses to run, changing nothing, if an organization has two companies), `2026_11_07_090000_add_organization_admin_approval` (additive: two nullable columns on `organization_members` and one foreign key; no backfill, no approval is ever created by it) |
+| Before the unique-link migration | run `art organizations:preflight` on the real data and have the owner review any `failure` ([MO-1A record](./release-1.0-managed-organizations-mo-1a.md#existing-data-preflight)). After the approval migration the same command also inventories administrator approvals ([MO-2A1 record](./release-1.0-managed-organizations-mo-2a1.md)); a historical administrator is unapproved until an operator approves that exact membership |
 | New commands | `organizations:preflight`, `database:rollback-assessment` |
 | Configuration | no new keys |
 | Queue | no new queued class; the six Release 0.9 classes only (pinned by a test). Restart workers after the swap as usual |
-| Rehearsal | the three migrations are pinned candidates and were rehearsed alone and together; re-run `./dev rehearse` after any edit to one |
+| Rehearsal | the four migrations are pinned candidates and were rehearsed alone and together; re-run `./dev rehearse` after any edit to one |
 | Rollback record | `database/profile/rollback/0.9.json` and the pinned `database/profile/releases/0.9/foreign-keys.json` ship in the archive; any package that adds a foreign key, column, CHECK, queued class or migration updates them in the same change |
 
 ## Rolling back
 
-Rolling the code back to Release 0.9 is **not** an ordinary rollback: the unmodified 0.9 build reports four `unexpected foreign key` lines in `database:verify` and `runtime:preflight`, and its
+Rolling the code back to Release 0.9 is **not** an ordinary rollback: the unmodified 0.9 build reports five `unexpected foreign key` lines in `database:verify` and `runtime:preflight`, and its
 `--issue` refuses to issue an A2 challenge (a real A2 is still possible by issuing the challenge through `RuntimeChallenges::issue()`). There are two supported ways back:
 
-- **Mode 1, code-only** (data kept): an exceptional, reviewed operation: assess on Release 1.0 after the producers are stopped and the queue is drained, pre-check the old verifier's exact output, swap, then a real A2 whose accepted violations are exactly the four lines. The old verifier **exits non-zero** and the procedure never says otherwise.
+- **Mode 1, code-only** (data kept): an exceptional, reviewed operation: assess on Release 1.0 after the producers are stopped and the queue is drained, pre-check the old verifier's exact output, swap, then a real A2 whose accepted violations are exactly the five lines. The old verifier **exits non-zero** and the procedure never says otherwise.
 - **Mode 2, restore the verified pre-upgrade backup**: the old gates pass unchanged, and **every write since that backup is discarded**. A backup taken just before the rollback is *not* a Mode 2 source.
 
 Mode 1 starts only after a written **step 0**: a verified pre-upgrade backup (identifier and digest), the completed rehearsal record, the owner's confirmation that delegation was never enabled, the approved target, an owner-defined maximum window and a **company-deletion freeze** (the 0.9 build cannot enforce it; it is a procedure with an operator inventory, acknowledgements and read-only monitoring). When managed relationships exist, an extra verified backup of the 1.0 state is mandatory.
-Mode 1 is prohibited once MO-2B delegation has been enabled (a persistent database marker, to be built with MO-2B, will make the assessment refuse). **Before** a code-only rollback through older membership code, all administrator approvals must be revoked explicitly (audited, idempotent, by an authorized operator); the assessment refuses while any approval timestamp remains once the approval schema exists. After any rollback, `organizations:preflight` must pass before the re-upgrade (repairs go through the application's relationship service, never SQL), and administrators need renewed review and explicit approval before delegation is enabled. The reviewed procedure,
+Mode 1 is prohibited once MO-2B delegation has been enabled (a persistent database marker, to be built with MO-2B, will make the assessment refuse). **Before** a code-only rollback through older membership code, all administrator approvals must be revoked explicitly (audited, idempotent, by an authorized operator, one membership at a time on the organization page): `database:rollback-assessment` **refuses while either approval column holds any value**, complete or half-written, so a code-only rollback is prohibited until none remains. After any rollback, `organizations:preflight` must pass before the re-upgrade (repairs go through the application's relationship service, never SQL), and administrators need renewed review and explicit approval before delegation is enabled. The reviewed procedure,
 its evidence, the re-upgrade and the integration requirements for later packages are in [Rolling the Release 1.0 code back to Release 0.9](../operations/rollback-1.0-to-0.9.md).
 
 ## Gates that must be closed before Release 1.0 upgrades an authoritative environment
