@@ -117,10 +117,11 @@ it('names the ticket-detail selects by their existing headings and the file inpu
         ->and(uiOne($xpath, '//select[@name="status"]')->getAttribute('aria-labelledby'))->toBe('ticket-status-heading')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//select[@name="assignee_id"]')))->toBe('Assignee')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//textarea[@name="body"]')))->toBe('Write your reply…')
-        // HD-C1: the checkbox became a pressed-state button whose name is its visible word plus a screen-reader tail.
-        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('aria-pressed'))->toBe('false')
+        // HD-C1: the checkbox became a state button whose name is its visible word plus a screen-reader tail (no aria-pressed).
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->hasAttribute('aria-pressed'))->toBeFalse()
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('data-state'))->toBe('visible')
         ->and(uiOne($xpath, '//*[@data-visibility-button]')->hasAttribute('aria-label'))->toBeFalse()
-        ->and(preg_replace('/\s+/', ' ', trim(uiOne($xpath, '//*[@data-visibility-button]')->textContent)))->toBe('Visible to submitter Hidden from submitter')
+        ->and(preg_replace('/\s+/', ' ', trim(uiOne($xpath, '//*[@data-visibility-button]')->textContent)))->toBe('Visible to submitter. Activate to hide it. Hidden from submitter. Activate to make it visible.')
         ->and(uiAccessibleName($xpath, $file))->toBe('Attachments')
         ->and($file->getAttribute('name'))->toBe('attachments[]')
         ->and($file->getAttribute('aria-describedby'))->toBe('attachments-hint')

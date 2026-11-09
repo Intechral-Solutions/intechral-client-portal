@@ -4,7 +4,7 @@
  * Release 1.0 (HD-C1): the operator Helpdesk composer. The "Internal note" checkbox became a Visible/Hidden toggle and the due-date
  * disclosure became one inline button. This file pins what the SERVER renders and keeps true:
  *
- *   - the markup contract the progressive script reads and the accessible semantics (a pressed button, a tooltip, no colour-only state);
+ *   - the markup contract the progressive script reads and the accessible semantics (a state button named by its words, a tooltip, no colour-only state);
  *   - that the posted fields are exactly the existing contract (`is_internal`, `due_action`, `due_at`), refilled after a refusal;
  *   - that nothing about authorization, validation or the reply transaction moved.
  *
@@ -48,14 +48,16 @@ function composerPage(Ticket $ticket, $user): DOMXPath
 
 // ── The visibility toggle ────────────────────────────────────────────────────────────────────────
 
-it('replaces the internal-note checkbox with a pressed-state button that starts Visible', function () {
+it('replaces the internal-note checkbox with a state button that starts Visible', function () {
     $page = composerPage($this->ticket, $this->operator);
     $button = uiOne($page, '//*[@data-visibility-button]');
     $input = uiOne($page, '//input[@name="is_internal"]');
 
     expect($button->tagName)->toBe('button')
         ->and($button->getAttribute('type'))->toBe('button')
-        ->and($button->getAttribute('aria-pressed'))->toBe('false')
+        // The state is data-state and the NAME; there is deliberately no aria-pressed to announce it a second time (or contradict it).
+        ->and($button->hasAttribute('aria-pressed'))->toBeFalse()
+        ->and($button->getAttribute('data-state'))->toBe('visible')
         // The name is the visible word plus a screen-reader tail (WCAG 2.5.3), not a separate label that could disagree with it.
         ->and($button->hasAttribute('aria-label'))->toBeFalse()
         ->and($input->getAttribute('type'))->toBe('hidden')
@@ -74,13 +76,13 @@ it('shows both states in words and glyphs, never as colour alone, with a tooltip
         ->and($page->query('.//svg[@data-glyph="eye"]', $button)->length)->toBe(1)
         ->and($page->query('.//svg[@data-glyph="eye-off"]', $button)->length)->toBe(1)
         // Each state's visible word starts its accessible name; the tail is screen-reader-only.
-        ->and(preg_replace('/\s+/', ' ', trim($button->textContent)))->toBe('Visible to submitter Hidden from submitter')
-        ->and(trim(uiOne($page, '(//*[@data-visibility-button]/span)[1]/span[@class="sr-only"]')->textContent))->toBe('to submitter')
-        ->and(trim(uiOne($page, '(//*[@data-visibility-button]/span)[2]/span[@class="sr-only"]')->textContent))->toBe('from submitter')
+        ->and(preg_replace('/\s+/', ' ', trim($button->textContent)))->toBe('Visible to submitter. Activate to hide it. Hidden from submitter. Activate to make it visible.')
+        ->and(trim(uiOne($page, '(//*[@data-visibility-button]/span)[1]/span[@class="sr-only"]')->textContent))->toBe('to submitter. Activate to hide it.')
+        ->and(trim(uiOne($page, '(//*[@data-visibility-button]/span)[2]/span[@class="sr-only"]')->textContent))->toBe('from submitter. Activate to make it visible.')
         ->and(preg_replace('/\s+/', ' ', trim($tooltip->textContent)))->toBe('Visible to submitter Not visible to submitter');
 });
 
-it('comes back pressed (Hidden) with is_internal = 1 after a refused internal note', function () {
+it('comes back Hidden (data-state) with is_internal = 1 after a refused internal note', function () {
     $this->actingAs($this->operator)->from($this->show)->post(route('operator.tickets.replies.store', $this->ticket), [
         'body' => 'Internal draft.', 'is_internal' => '1',
         'attachments' => [UploadedFile::fake()->create('payload.exe', 10, 'application/x-msdownload')],
@@ -88,7 +90,8 @@ it('comes back pressed (Hidden) with is_internal = 1 after a refused internal no
 
     $page = composerPage($this->ticket, $this->operator);
 
-    expect(uiOne($page, '//*[@data-visibility-button]')->getAttribute('aria-pressed'))->toBe('true')
+    expect(uiOne($page, '//*[@data-visibility-button]')->getAttribute('data-state'))->toBe('hidden')
+        ->and(uiOne($page, '//*[@data-visibility-button]')->hasAttribute('aria-pressed'))->toBeFalse()
         ->and(uiOne($page, '//input[@name="is_internal"]')->getAttribute('value'))->toBe('1');
 });
 

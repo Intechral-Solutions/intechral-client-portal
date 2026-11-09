@@ -387,7 +387,7 @@ test.describe('Helpdesk as an operator', () => {
 
             // HD-C1: the checkbox became the Visible/Hidden toggle and the due-date control; both are asserted in
             // operator-composer-controls.spec.ts (computed token colours, light and dark).
-            await expect(inMain(page).getByRole('button', { name: /^(Visible to|Hidden from) submitter$/ })).toBeVisible();
+            await expect(inMain(page).getByRole('button', { name: /^(Visible to|Hidden from) submitter\. Activate to / })).toBeVisible();
 
             await expectControlContract(page, tokens);
         }

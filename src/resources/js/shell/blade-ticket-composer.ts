@@ -4,7 +4,7 @@
  * **It owns presentation and inference, never rules.** Laravel still authorizes the reply and the due-date change, validates the
  * date, and applies reply + change in one transaction. This file only:
  *
- * - flips the visibility toggle and the hidden `is_internal` input it stands for (pressed = Hidden = `1`);
+ * - flips the visibility toggle and the hidden `is_internal` input it stands for (`data-state="hidden"` = Hidden = `1`; no `aria-pressed`);
  * - turns what the operator did with the due-date control into the EXISTING `due_action` / `due_at` fields:
  *   nothing → `keep` (and no `due_at`); a different date → `set` + that wall-clock text; the explicit button → `restore`;
  * - draws the effective or pending date with its urgency, and keeps the urgency current while the page stays open;
@@ -61,6 +61,8 @@ function initTooltips(root: ParentNode): void {
 // ── Visibility toggle ────────────────────────────────────────────────────────────────────────────────
 
 function initVisibility(root: ParentNode): void {
+    const announcer = document.querySelector<HTMLElement>('[data-composer-announcer]');
+
     for (const host of root.querySelectorAll<HTMLElement>('[data-visibility-toggle]')) {
         const button = host.querySelector<HTMLButtonElement>('[data-visibility-button]');
         const input = host.querySelector<HTMLInputElement>('[data-visibility-input]');
@@ -69,16 +71,27 @@ function initVisibility(root: ParentNode): void {
             continue;
         }
 
-        // The hidden input is the value that is posted; the button must show it, whatever the markup said.
+        // The hidden input is the value that is posted; the button must show it, whatever the markup said. The state is `data-state`
+        // (styling and the other state's words); the accessible NAME carries it, so there is no `aria-pressed` to contradict it.
         const apply = (hidden: boolean) => {
-            button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+            button.dataset.state = hidden ? 'hidden' : 'visible';
             input.value = hidden ? '1' : '0';
         };
 
         apply(input.value === '1');
 
         button.addEventListener('click', () => {
-            apply(button.getAttribute('aria-pressed') !== 'true');
+            const hidden = button.dataset.state !== 'hidden';
+
+            apply(hidden);
+
+            // The focused button's name changes, which not every screen reader re-reads: say it in the polite live region too.
+            if (announcer) {
+                announcer.textContent = '';
+                announcer.textContent = hidden
+                    ? 'Hidden from submitter. This will be an internal note.'
+                    : 'Visible to submitter.';
+            }
         });
     }
 }
@@ -356,6 +369,13 @@ function initDueDate(root: ParentNode): void {
     function commit(): boolean {
         const value = input!.value;
 
+        // Untouched since the editor opened: whatever stood (a pending date, a pending restore, or the original) stands. This is
+        // first so an empty field that merely mirrors a date-less display (a pending restore on a ticket with no SLA deadline) is
+        // not read as a deliberate clearing. A half-typed field also reads as empty, but it is not unchanged: `badInput` says so.
+        if (!input!.validity.badInput && value === (shown()?.wall ?? '')) {
+            return true;
+        }
+
         if (value === '') {
             if (input!.validity.badInput) {
                 setError('Enter a complete date and time, or press Escape to cancel.');
@@ -378,12 +398,6 @@ function initDueDate(root: ParentNode): void {
             setError(`Enter a real date and time in ${zone}.`);
 
             return false;
-        }
-
-        if (shown()?.wall === value) {
-            // Untouched since the editor opened (a pending date, or the SLA date of a pending restore): keep it as it is. This comes
-            // first so a pending restore is never read as "back to the original" when the two dates happen to be the same minute.
-            return true;
         }
 
         if (sameAsOriginal(value)) {
@@ -415,6 +429,13 @@ function initDueDate(root: ParentNode): void {
         return true;
     }
 
+    // The panel covers the button, so focus must never rest on it while the panel is open and cannot close: a value that cannot be
+    // taken keeps focus in the field, and Escape works from the button as it does from inside the panel.
+    function cancelEditor(): void {
+        pending = before;
+        closeEditor(true);
+    }
+
     // The button stays in place while the panel is open and works as its toggle: a click takes what the field holds (or, if that
     // cannot be taken, leaves the panel open with the reason) and closes it.
     trigger.addEventListener('click', () => {
@@ -426,6 +447,8 @@ function initDueDate(root: ParentNode): void {
 
         if (commit()) {
             closeEditor(true);
+        } else {
+            input.focus();
         }
     });
 
@@ -454,15 +477,16 @@ function initDueDate(root: ParentNode): void {
         }
     });
 
-    // The editor closes on Escape from anywhere inside it (the input or one of its buttons).
-    editor.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            pending = before;
-            closeEditor(true);
-        }
-    });
+    // The editor closes on Escape from anywhere inside it (the input or one of its buttons), and from the button it covers.
+    for (const surface of [editor, trigger]) {
+        surface.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && editing) {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelEditor();
+            }
+        });
+    }
 
     input.addEventListener('input', describeEditorValue);
 
@@ -504,6 +528,12 @@ function initDueDate(root: ParentNode): void {
             }
 
             if (!commit()) {
+                // Focus left an invalid field for the covered button (Shift+Tab): put it back, beside the reason. A click elsewhere on the
+                // page is not taken back from the operator.
+                if (document.activeElement === trigger) {
+                    input.focus();
+                }
+
                 return;
             }
 
@@ -532,13 +562,18 @@ function initDueDate(root: ParentNode): void {
         }
     });
 
+    // A refused post's server message marks the button invalid; once the operator undoes or restores it no longer applies.
+    const clearServerInvalid = () => trigger.removeAttribute('aria-invalid');
+
     restore?.addEventListener('click', () => {
+        clearServerInvalid();
         pending = { kind: 'restore' };
         announce(`Due date will return to the SLA deadline when you post the update.`);
         closeEditor(true);
     });
 
     discard?.addEventListener('click', () => {
+        clearServerInvalid();
         pending = null;
         announce('Due date change cleared.');
         closeEditor(true);

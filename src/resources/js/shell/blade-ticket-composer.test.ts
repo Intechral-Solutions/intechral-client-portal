@@ -23,6 +23,9 @@ interface Options {
     action?: string;
     at?: string;
     timeZone?: string;
+    slaText?: string;
+    /** A refused post marks the date button invalid (the server rendered `aria-invalid="true"` on it). */
+    serverInvalid?: boolean;
 }
 
 function epochOf(wall: string | null | undefined, zone = 'UTC'): string {
@@ -43,7 +46,10 @@ function mount(options: Options = {}) {
         action = 'keep',
         at = '',
         timeZone = 'UTC',
+        slaText = sla ? '05 Nov 2026 10:00' : 'none set',
+        serverInvalid = false,
     } = options;
+    const shown = action === 'restore' ? sla : action === 'set' ? at : original;
 
     document.body.innerHTML = `
         <form id="reply" action="/reply" method="post">
@@ -51,28 +57,33 @@ function mount(options: Options = {}) {
             <div role="group" aria-label="Update options">
                 <div data-visibility-toggle data-tooltip-host>
                     <input type="hidden" name="is_internal" value="${internal ? '1' : '0'}" data-visibility-input>
-                    <button type="button" data-visibility-button aria-pressed="${internal}" aria-label="Hidden from submitter">
-                        <span>Visible</span><span>Hidden</span>
+                    <button type="button" data-visibility-button data-state="${internal ? 'hidden' : 'visible'}">
+                        <span>Visible<span class="sr-only"> to submitter. Activate to hide it.</span></span>
+                        <span>Hidden<span class="sr-only"> from submitter. Activate to make it visible.</span></span>
                     </button>
                     <span id="visibility-toggle-tip" role="tooltip">tip</span>
                 </div>
                 <div data-due-control data-tooltip-host
                      data-timezone="${timeZone}" data-zone-label="UTC" data-server-now="${NOW}" data-max-days="30"
                      data-original-wall="${original ?? ''}" data-original-epoch="${epochOf(original)}"
-                     data-sla-wall="${sla ?? ''}" data-sla-epoch="${epochOf(sla)}" data-sla-text="05 Nov 2026 10:00"
+                     data-sla-wall="${sla ?? ''}" data-sla-epoch="${epochOf(sla)}" data-sla-text="${slaText}"
                      data-has-override="${hasOverride ? '1' : '0'}">
                     <input type="hidden" name="due_action" value="${action}" data-due-action>
                     <input type="hidden" name="due_at" value="${at}" data-due-at>
-                    <button type="button" data-due-trigger data-urgency="none" aria-expanded="false">
-                        <span data-due-text>x</span><span data-due-zone>UTC</span><span data-due-pending-mark hidden>Pending</span>
+                    <button type="button" data-due-trigger data-urgency="none"${action === 'keep' ? '' : ` data-pending="${action}"`}${serverInvalid ? ' aria-invalid="true"' : ''}
+                            aria-expanded="false" aria-controls="due-date-editor" aria-describedby="due-date-tip due-date-editor-message">
+                        <span class="sr-only">Due date:</span>
+                        <span data-due-text>${shown || 'No due date'}</span><span data-due-zone${shown ? '' : ' hidden'}>UTC</span><span data-due-pending-mark${action === 'keep' ? ' hidden' : ''}>Pending</span>
                     </button>
-                    <div id="due-date-editor" data-due-editor hidden>
-                        <input type="datetime-local" data-due-input form="due-date-editor-detached">
-                        <p data-due-relative></p>
+                    <div id="due-date-editor" data-due-editor hidden role="group" aria-labelledby="due-date-editor-title">
+                        <p id="due-date-editor-title">Change due date</p>
+                        <input type="datetime-local" data-due-input form="due-date-editor-detached" aria-label="Due date and time (UTC)"
+                               aria-describedby="due-date-editor-help due-date-editor-message">
+                        <p id="due-date-editor-help" data-due-relative></p>
                         <p id="due-date-editor-message" role="alert" hidden></p>
                         <div data-due-actions${action === 'keep' && !hasOverride ? ' hidden' : ''}>
-                            ${hasOverride ? '<button type="button" data-due-restore>Restore SLA</button>' : ''}
-                            <button type="button" data-due-discard hidden>Undo change</button>
+                            ${hasOverride ? `<button type="button" data-due-restore${action === 'restore' ? ' hidden' : ''}>Restore SLA</button>` : ''}
+                            <button type="button" data-due-discard${action === 'keep' ? ' hidden' : ''}>Undo change</button>
                         </div>
                     </div>
                     <span id="due-date-tip" role="tooltip" data-due-tip></span>
@@ -133,30 +144,49 @@ afterEach(() => {
 });
 
 describe('the visibility toggle', () => {
-    it('starts Visible: not pressed, is_internal = 0', () => {
+    it('starts Visible: data-state visible, is_internal = 0', () => {
         const { toggle, isInternal } = mount();
 
-        expect(toggle.getAttribute('aria-pressed')).toBe('false');
+        expect(toggle.dataset.state).toBe('visible');
         expect(isInternal.value).toBe('0');
     });
 
-    it('starts Hidden when a refused post had an internal note: pressed, is_internal = 1', () => {
+    it('starts Hidden when a refused post had an internal note: data-state hidden, is_internal = 1', () => {
         const { toggle, isInternal } = mount({ internal: true });
 
-        expect(toggle.getAttribute('aria-pressed')).toBe('true');
+        expect(toggle.dataset.state).toBe('hidden');
         expect(isInternal.value).toBe('1');
     });
 
-    it('toggles on click and keeps the posted value equal to the pressed state', () => {
+    it('toggles on click and keeps the posted value equal to the state', () => {
         const { toggle, isInternal } = mount();
 
         toggle.click();
-        expect(toggle.getAttribute('aria-pressed')).toBe('true');
+        expect(toggle.dataset.state).toBe('hidden');
         expect(isInternal.value).toBe('1');
 
         toggle.click();
-        expect(toggle.getAttribute('aria-pressed')).toBe('false');
+        expect(toggle.dataset.state).toBe('visible');
         expect(isInternal.value).toBe('0');
+    });
+
+    it('never sets aria-pressed (the accessible name carries the state), before or after a click', () => {
+        const { toggle } = mount();
+
+        expect(toggle.hasAttribute('aria-pressed')).toBe(false);
+        toggle.click();
+        expect(toggle.hasAttribute('aria-pressed')).toBe(false);
+        toggle.click();
+        expect(toggle.hasAttribute('aria-pressed')).toBe(false);
+    });
+
+    it('says the new state in the polite live region, since the focused name changing is not always re-read', () => {
+        const { toggle, announcer } = mount();
+
+        toggle.click();
+        expect(announcer.textContent).toBe('Hidden from submitter. This will be an internal note.');
+        toggle.click();
+        expect(announcer.textContent).toBe('Visible to submitter.');
     });
 
     it('is a button that never submits the form by itself', () => {
@@ -813,12 +843,327 @@ describe('the due-date control — urgency and the live clock', () => {
         expect(tip.textContent).toContain('Pending');
     });
 
-    it('uses the server clock, not a wrong device clock', () => {
-        // Device is 3 hours ahead of the server: the deadline is still 24 hours away on the server's clock.
+    it('uses the server clock, not a device clock that runs ahead', () => {
+        // The deadline is 6 hours away on the server's clock (green). A device 3 hours ahead would see only 3 hours (yellow).
         vi.setSystemTime(NOW + 3 * HOUR);
-        const { trigger } = mount();
-        vi.setSystemTime(NOW + 3 * HOUR);
+        const { trigger, tip } = mount({ original: '2026-11-04T16:00', sla: '2026-11-04T16:00' });
 
         expect(trigger.dataset.urgency).toBe('ok');
+        expect(tip.textContent).toBe('Due in 6 hours');
+    });
+
+    it('uses the server clock, not a device clock that runs behind', () => {
+        // The deadline is 3 hours away on the server's clock (yellow). A device 3 hours behind would see 6 hours (green).
+        vi.setSystemTime(NOW - 3 * HOUR);
+        const { trigger, tip } = mount({ original: '2026-11-04T13:00', sla: '2026-11-04T13:00' });
+
+        expect(trigger.dataset.urgency).toBe('soon');
+        expect(tip.textContent).toBe('Due in 3 hours');
+    });
+});
+
+describe('the due-date control — a pending change that the open editor must not disturb', () => {
+    /** A legacy ticket: an override date, but no SLA deadline to go back to. A pending restore shows "No due date". */
+    function legacyRestore() {
+        const parts = mount({ hasOverride: true, original: '2026-11-06T09:00', sla: null });
+
+        parts.trigger.click();
+        parts.restore!.click();
+
+        expect(parts.action.value).toBe('restore');
+        expect(parts.text.textContent).toBe('No due date');
+
+        parts.trigger.click();
+        expect(parts.input.value).toBe('');
+
+        return parts;
+    }
+
+    function expectRestoreStands({ action, at, mark, text }: ReturnType<typeof mount>) {
+        expect(action.value).toBe('restore');
+        expect(at.value).toBe('');
+        expect(mark.hidden).toBe(false);
+        expect(text.textContent).toBe('No due date');
+    }
+
+    it('keeps a pending restore with no SLA deadline when the untouched editor is closed with Enter', () => {
+        const parts = legacyRestore();
+
+        key(parts.input, 'Enter');
+
+        expect(parts.editor.hidden).toBe(true);
+        expectRestoreStands(parts);
+    });
+
+    it('keeps a pending restore with no SLA deadline when focus leaves the untouched editor', () => {
+        const parts = legacyRestore();
+        const other = document.createElement('button');
+        document.body.append(other);
+
+        other.focus();
+        vi.runOnlyPendingTimers();
+
+        expect(parts.editor.hidden).toBe(true);
+        expectRestoreStands(parts);
+    });
+
+    it('keeps a pending restore with no SLA deadline when the form is posted with the untouched editor open', () => {
+        const parts = legacyRestore();
+        const event = new Event('submit', { bubbles: true, cancelable: true });
+
+        parts.form.dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(false);
+        expectRestoreStands(parts);
+    });
+
+    it('keeps a pending restore with no SLA deadline when the date button is pressed over the untouched editor', () => {
+        const parts = legacyRestore();
+
+        parts.trigger.click();
+
+        expect(parts.editor.hidden).toBe(true);
+        expectRestoreStands(parts);
+    });
+
+    it('does not take a half-typed field for an untouched one: the reason is shown and nothing changes', () => {
+        const parts = legacyRestore();
+
+        // The browser reports a half-typed datetime-local as an empty value with badInput.
+        Object.defineProperty(parts.input, 'validity', {
+            value: { badInput: true },
+            configurable: true,
+        });
+        key(parts.input, 'Enter');
+
+        expect(parts.editor.hidden).toBe(false);
+        expect(parts.error.hidden).toBe(false);
+        expect(parts.error.textContent).toContain('complete');
+        expect(parts.input.getAttribute('aria-invalid')).toBe('true');
+        expectRestoreStands(parts);
+    });
+
+    it('still clears a pending date when the operator empties the field on purpose', () => {
+        const { trigger, input, action, at, mark, editor } = mount();
+
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        key(input, 'Enter');
+        expect(action.value).toBe('set');
+
+        trigger.click();
+        expect(input.value).toBe('2026-11-08T16:45');
+        type(input, '');
+        key(input, 'Enter');
+
+        expect(editor.hidden).toBe(true);
+        expect(action.value).toBe('keep');
+        expect(at.value).toBe('');
+        expect(mark.hidden).toBe(true);
+    });
+
+    it('keeps a pending restore on a ticket that has an SLA date through an untouched Enter, whatever the override date', () => {
+        const { trigger, input, action, at, restore, text } = mount({
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+        });
+
+        trigger.click();
+        restore!.click();
+        trigger.click();
+        expect(input.value).toBe('2026-11-05T10:00');
+        key(input, 'Enter');
+
+        expect(action.value).toBe('restore');
+        expect(at.value).toBe('');
+        expect(text.textContent).toBe('05 Nov 2026 10:00');
+    });
+
+    it('keeps a pending restore on a ticket that has an SLA date when focus leaves the untouched editor', () => {
+        const { trigger, restore, action } = mount({
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+        });
+        const other = document.createElement('button');
+        document.body.append(other);
+
+        trigger.click();
+        restore!.click();
+        trigger.click();
+        other.focus();
+        vi.runOnlyPendingTimers();
+
+        expect(action.value).toBe('restore');
+    });
+
+    it('still turns a pending restore into a set when a different date is typed', () => {
+        const { trigger, input, restore, action, at } = mount({
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+        });
+
+        trigger.click();
+        restore!.click();
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        key(input, 'Enter');
+
+        expect(action.value).toBe('set');
+        expect(at.value).toBe('2026-11-08T16:45');
+    });
+});
+
+describe('the due-date control — a value that cannot be taken keeps the operator in the field', () => {
+    const PAST = '2026-11-03T10:00';
+
+    it('keeps focus in the field, marked invalid, when Enter is pressed over a value that cannot be taken', () => {
+        const { trigger, input, editor, error } = mount();
+
+        trigger.click();
+        type(input, PAST);
+        key(input, 'Enter');
+
+        expect(editor.hidden).toBe(false);
+        expect(error.hidden).toBe(false);
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(document.activeElement).toBe(input);
+    });
+
+    it('returns focus to the field, and keeps the panel open, when focus moves to the covered date button over such a value', () => {
+        const { trigger, input, editor, error, action } = mount();
+
+        trigger.click();
+        type(input, PAST);
+        trigger.focus();
+        expect(document.activeElement).toBe(trigger);
+        vi.runOnlyPendingTimers();
+
+        expect(editor.hidden).toBe(false);
+        expect(error.hidden).toBe(false);
+        expect(document.activeElement).toBe(input);
+        expect(action.value).toBe('keep');
+    });
+
+    it('does not take focus back from a click elsewhere on the page, and leaves the panel open with the reason', () => {
+        const { trigger, input, editor, error } = mount();
+        const other = document.createElement('button');
+        document.body.append(other);
+
+        trigger.click();
+        type(input, PAST);
+        other.focus();
+        vi.runOnlyPendingTimers();
+
+        expect(editor.hidden).toBe(false);
+        expect(error.hidden).toBe(false);
+        expect(document.activeElement).toBe(other);
+    });
+
+    it('keeps focus in the field when the date button is pressed over such a value', () => {
+        const { trigger, input, editor, error } = mount();
+
+        trigger.click();
+        type(input, PAST);
+        trigger.focus();
+        trigger.click();
+
+        expect(editor.hidden).toBe(false);
+        expect(error.hidden).toBe(false);
+        expect(document.activeElement).toBe(input);
+    });
+
+    it('still commits and closes when a valid value is left for somewhere else', () => {
+        const { trigger, input, editor, action, at } = mount();
+        const other = document.createElement('button');
+        document.body.append(other);
+
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        other.focus();
+        vi.runOnlyPendingTimers();
+
+        expect(editor.hidden).toBe(true);
+        expect(action.value).toBe('set');
+        expect(at.value).toBe('2026-11-08T16:45');
+        expect(document.activeElement).toBe(other);
+    });
+
+    it('cancels the edit with Escape pressed on the covered date button: the earlier pending change stands', () => {
+        const { trigger, input, editor, action, at, text } = mount();
+
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        key(input, 'Enter');
+
+        trigger.click();
+        type(input, PAST);
+        key(input, 'Enter');
+        trigger.focus();
+        const event = key(trigger, 'Escape');
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(editor.hidden).toBe(true);
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(action.value).toBe('set');
+        expect(at.value).toBe('2026-11-08T16:45');
+        expect(text.textContent).toBe('08 Nov 2026 16:45');
+        expect(document.activeElement).toBe(trigger);
+    });
+
+    it('does nothing for Escape on the date button while the panel is closed', () => {
+        const { trigger, editor, action } = mount();
+
+        const event = key(trigger, 'Escape');
+
+        expect(event.defaultPrevented).toBe(false);
+        expect(editor.hidden).toBe(true);
+        expect(action.value).toBe('keep');
+    });
+});
+
+describe('the due-date control — a refused post marks the date button invalid', () => {
+    it('keeps the mark while the operator only looks at, or cancels out of, the editor', () => {
+        const { trigger, input } = mount({
+            serverInvalid: true,
+            action: 'set',
+            at: '2026-11-08T16:45',
+        });
+
+        trigger.click();
+        key(input, 'Escape');
+
+        expect(trigger.getAttribute('aria-invalid')).toBe('true');
+    });
+
+    it('clears the mark when the pending change is undone', () => {
+        const { trigger, discard, action } = mount({
+            serverInvalid: true,
+            action: 'set',
+            at: '2026-11-08T16:45',
+        });
+
+        expect(trigger.getAttribute('aria-invalid')).toBe('true');
+        trigger.click();
+        discard.click();
+
+        expect(action.value).toBe('keep');
+        expect(trigger.hasAttribute('aria-invalid')).toBe(false);
+    });
+
+    it('clears the mark when the SLA deadline is restored instead', () => {
+        const { trigger, restore, action } = mount({
+            serverInvalid: true,
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+            action: 'set',
+            at: '2026-11-08T16:45',
+        });
+
+        expect(trigger.getAttribute('aria-invalid')).toBe('true');
+        trigger.click();
+        restore!.click();
+
+        expect(action.value).toBe('restore');
+        expect(trigger.hasAttribute('aria-invalid')).toBe(false);
     });
 });

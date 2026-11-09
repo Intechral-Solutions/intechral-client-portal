@@ -53,6 +53,8 @@ const toggle = (page: Page) => page.locator('[data-visibility-button]');
 const trigger = (page: Page) => page.locator('[data-due-trigger]');
 const dueInput = (page: Page) => page.getByLabel(/^Due date and time/);
 const message = (page: Page) => page.getByPlaceholder(/Write your reply/);
+const pendingMark = (page: Page) => trigger(page).locator('[data-due-pending-mark]');
+const panelOf = (page: Page) => page.locator('[data-due-editor]');
 
 const css = (locator: Locator, property: string) =>
     locator.evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);
@@ -84,7 +86,7 @@ async function pickDue(page: Page, local: string) {
 }
 
 test.describe('the Visible / Hidden toggle', () => {
-    test('is a pressed-state button, with a tooltip on hover and on keyboard focus', async ({
+    test('is a button whose name is its state, with a tooltip on hover and on keyboard focus', async ({
         page,
         contextFor,
     }) => {
@@ -98,13 +100,26 @@ test.describe('the Visible / Hidden toggle', () => {
             const button = toggle(operator);
             const tip = operator.locator('#visibility-toggle-tip');
 
-            await expect(button).toHaveAttribute('aria-pressed', 'false');
+            // No pressed state: the name carries the state, so a screen reader hears it once and never as "Hidden, pressed".
+            await expect(button).not.toHaveAttribute('aria-pressed', /.*/);
+            await expect(button).toHaveAttribute('data-state', 'visible');
             await expect(button).toContainText('Visible');
             await expect(tip).toBeHidden();
-            // The accessible name is the visible word plus a screen-reader tail, and it agrees with the pressed state.
+            // The accessible name is the visible word plus a screen-reader tail: exactly one name, the other state's words are out of
+            // the accessibility tree, and the tree shows no "pressed" state.
             await expect(
-                operator.getByRole('button', { name: 'Visible to submitter', pressed: false }),
+                operator.getByRole('button', {
+                    name: 'Visible to submitter. Activate to hide it.',
+                    exact: true,
+                }),
             ).toBeVisible();
+            await expect(
+                operator.getByRole('button', { name: /Hidden from submitter/ }),
+            ).toHaveCount(0);
+            await expect(button).toMatchAriaSnapshot(
+                '- button "Visible to submitter. Activate to hide it."',
+            );
+            expect(await button.ariaSnapshot()).not.toContain('pressed');
 
             // Pointer: the tooltip says what the state means; pressing hides the reply from the submitter.
             await button.hover();
@@ -122,9 +137,20 @@ test.describe('the Visible / Hidden toggle', () => {
             await button.hover();
             await button.click();
             await expect(
-                operator.getByRole('button', { name: 'Hidden from submitter', pressed: true }),
+                operator.getByRole('button', {
+                    name: 'Hidden from submitter. Activate to make it visible.',
+                    exact: true,
+                }),
             ).toBeVisible();
-            await expect(button).toHaveAttribute('aria-pressed', 'true');
+            await expect(
+                operator.getByRole('button', { name: /Visible to submitter/ }),
+            ).toHaveCount(0);
+            await expect(button).toMatchAriaSnapshot(
+                '- button "Hidden from submitter. Activate to make it visible."',
+            );
+            expect(await button.ariaSnapshot()).not.toContain('pressed');
+            await expect(button).not.toHaveAttribute('aria-pressed', /.*/);
+            await expect(button).toHaveAttribute('data-state', 'hidden');
             await expect(operator.locator('[data-visibility-input]')).toHaveValue('1');
             await expect(button).toContainText('Hidden');
             await expect(tip).toHaveText('Not visible to submitter', { useInnerText: true });
@@ -138,12 +164,45 @@ test.describe('the Visible / Hidden toggle', () => {
             await expect(tip).toBeVisible();
             await expect(tip).toHaveText('Not visible to submitter', { useInnerText: true });
             await operator.keyboard.press('Space');
-            await expect(button).toHaveAttribute('aria-pressed', 'false');
+            await expect(button).toHaveAttribute('data-state', 'visible');
             await expect(operator.locator('[data-visibility-input]')).toHaveValue('0');
             await expect(tip).toHaveText('Visible to submitter', { useInnerText: true });
             await operator.keyboard.press('Escape');
             await expect(tip).toBeHidden();
             await expect(button).toBeFocused();
+        } finally {
+            await context.close();
+        }
+    });
+
+    test('posts is_internal=0 while Visible (a public reply) and is_internal=1 once Hidden (an internal note)', async ({
+        page,
+        contextFor,
+    }) => {
+        const number = await createTicket(page, ticketTitle('toggle posts'));
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await openOperatorTicket(operator, number);
+
+            const postedInternal = async (label: string) => {
+                const request = operator.waitForRequest(
+                    (r) => r.method() === 'POST' && r.url().endsWith('/replies'),
+                );
+                await message(operator).fill(label);
+                await operator.getByRole('button', { name: 'Post Update' }).click();
+                const body = (await (await request).postData()) ?? '';
+
+                return /name="is_internal"\r?\n\r?\n(\d)/.exec(body)?.[1];
+            };
+
+            expect(await postedInternal(`Public ${randomBytes(4).toString('hex')}`)).toBe('0');
+            await expect(operator.getByText('Reply added.')).toBeVisible();
+
+            await toggle(operator).click();
+            await expect(toggle(operator)).toHaveAttribute('data-state', 'hidden');
+            expect(await postedInternal(`Internal ${randomBytes(4).toString('hex')}`)).toBe('1');
         } finally {
             await context.close();
         }
@@ -164,7 +223,7 @@ test.describe('the Visible / Hidden toggle', () => {
                 await applyTheme(operator, theme, `toggle ${theme}`);
                 const button = toggle(operator);
 
-                if ((await button.getAttribute('aria-pressed')) === 'true') {
+                if ((await button.getAttribute('data-state')) === 'hidden') {
                     await button.click();
                 }
 
@@ -271,6 +330,7 @@ test.describe('the inline due-date control', () => {
             await expect(trigger(operator).locator('[data-due-text]')).toHaveText(original);
             await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
             await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+            await expect(pendingMark(operator)).toBeHidden();
 
             // Enter finishes the local edit and does NOT submit the form.
             const wanted = inFuture(30 * HOUR);
@@ -281,7 +341,8 @@ test.describe('the inline due-date control', () => {
             await expect(operator.locator('[data-due-action]')).toHaveValue('set');
             await expect(operator.locator('[data-due-at]')).toHaveValue(wanted);
             await expect(trigger(operator)).toHaveAttribute('data-pending', 'set');
-            await expect(trigger(operator)).toContainText('Pending');
+            await expect(pendingMark(operator)).toBeVisible();
+            await expect(pendingMark(operator)).toHaveText('Pending');
 
             // Nothing was saved: a fresh load still shows the original date.
             await openOperatorTicket(operator, number);
@@ -314,6 +375,7 @@ test.describe('the inline due-date control', () => {
             await operator.keyboard.press('Escape');
 
             await pickDue(operator, inFuture(30 * HOUR));
+            await expect(pendingMark(operator)).toBeVisible();
             const pendingBox = (await trigger(operator).boundingBox())!;
 
             // Pending: Undo is in the panel. It is a small text action, not a third segment, so the joined controls do not change.
@@ -343,6 +405,7 @@ test.describe('the inline due-date control', () => {
             await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
             await expect(operator.locator('[data-due-at]')).toHaveValue('');
             await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+            await expect(pendingMark(operator)).toBeHidden();
         } finally {
             await context.close();
         }
@@ -400,6 +463,7 @@ test.describe('the inline due-date control', () => {
             await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
             await expect(operator.locator('[data-due-at]')).toHaveValue('');
             await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+            await expect(pendingMark(operator)).toBeHidden();
         } finally {
             await context.close();
         }
@@ -486,7 +550,8 @@ test.describe('the inline due-date control', () => {
                         .toBe(await tokenColour(operator, state.edge, 'border-top-color'));
                     // Pending reads as pending: a dashed edge and the word, not only the colour.
                     await expect(button).toHaveCSS('border-top-style', 'dashed');
-                    await expect(button).toContainText('Pending');
+                    await expect(pendingMark(operator)).toBeVisible();
+                    await expect(pendingMark(operator)).toHaveText('Pending');
 
                     // The exact relative time is the description, on hover and on keyboard focus.
                     await button.focus();
@@ -708,6 +773,147 @@ test.describe('the inline due-date control', () => {
             await expect(dueInput(operator)).toBeFocused();
             await operator.keyboard.press('Escape');
             await expect(trigger(operator)).toBeFocused();
+        } finally {
+            await context.close();
+        }
+    });
+
+    test('an invalid edit keeps focus in the field: Shift+Tab never rests on the covered button, and Escape cancels cleanly', async ({
+        page,
+        contextFor,
+    }) => {
+        const number = await createTicket(page, ticketTitle('due invalid focus'));
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await openOperatorTicket(operator, number);
+            const panel = panelOf(operator);
+
+            await trigger(operator).click();
+            await dueInput(operator).fill('2020-01-01T09:00');
+            await operator.keyboard.press('Enter');
+            await expect(panel).toBeVisible();
+            await expect(dueInput(operator)).toBeFocused();
+            await expect(dueInput(operator)).toHaveAttribute('aria-invalid', 'true');
+
+            // Shift+Tab out through the field's own segments and past its start: the button it covers is the next stop back, and focus
+            // must come back to the field (or stay inside the panel), never rest on that button while the panel is open.
+            for (let step = 0; step < 8; step++) {
+                await operator.keyboard.press('Shift+Tab');
+                await expect(panel).toBeVisible();
+                await expect(dueInput(operator)).toBeFocused();
+                await expect(trigger(operator)).not.toBeFocused();
+                await expect(dueInput(operator)).toHaveAttribute('aria-invalid', 'true');
+            }
+
+            // Escape closes it from here: nothing pending, the original date stands, focus is on the date button.
+            await operator.keyboard.press('Escape');
+            await expect(panel).toBeHidden();
+            await expect(trigger(operator)).toBeFocused();
+            await expect(trigger(operator)).toHaveAttribute('aria-expanded', 'false');
+            await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
+            await expect(operator.locator('[data-due-at]')).toHaveValue('');
+            await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+            await expect(pendingMark(operator)).toBeHidden();
+        } finally {
+            await context.close();
+        }
+    });
+
+    test('Restore SLA and Undo change are reached by Tab inside the panel and, on Enter, close it and return focus to the date button', async ({
+        page,
+        contextFor,
+    }) => {
+        const number = await createTicket(page, ticketTitle('due actions'));
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await openOperatorTicket(operator, number);
+
+            // An override must exist for "Restore SLA" to be offered: post one.
+            await message(operator).fill(`Giving more time ${randomBytes(4).toString('hex')}.`);
+            await pickDue(operator, inFuture(30 * HOUR));
+            await operator.getByRole('button', { name: 'Post Update' }).click();
+            await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
+
+            const restore = operator.locator('[data-due-restore]');
+            const undo = operator.locator('[data-due-discard]');
+            const tabTo = async (target: Locator) => {
+                for (
+                    let step = 0;
+                    step < 14 && !(await target.evaluate((el) => el === document.activeElement));
+                    step++
+                ) {
+                    await operator.keyboard.press('Tab');
+                }
+
+                await expect(target).toBeFocused();
+            };
+
+            // A new pending date: both actions are on offer. Tab reaches Restore SLA; Enter takes it.
+            await pickDue(operator, inFuture(50 * HOUR));
+            await trigger(operator).click();
+            await expect(restore).toBeVisible();
+            await expect(undo).toBeVisible();
+            await tabTo(restore);
+            await operator.keyboard.press('Enter');
+            await expect(panelOf(operator)).toBeHidden();
+            await expect(trigger(operator)).toBeFocused();
+            await expect(trigger(operator)).toHaveAttribute('data-pending', 'restore');
+            await expect(pendingMark(operator)).toBeVisible();
+            await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
+
+            // With the restore pending only Undo is left; Enter on it puts the override back and returns focus to the button.
+            await trigger(operator).click();
+            await expect(restore).toBeHidden();
+            await tabTo(undo);
+            await operator.keyboard.press('Enter');
+            await expect(panelOf(operator)).toBeHidden();
+            await expect(trigger(operator)).toBeFocused();
+            await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+            await expect(pendingMark(operator)).toBeHidden();
+            await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
+        } finally {
+            await context.close();
+        }
+    });
+
+    test('a click outside commits a valid value and closes the panel; an invalid one leaves it open with the reason and focus where the operator clicked', async ({
+        page,
+        contextFor,
+    }) => {
+        const number = await createTicket(page, ticketTitle('due outside click'));
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await openOperatorTicket(operator, number);
+            const wanted = inFuture(45 * HOUR);
+
+            await trigger(operator).click();
+            await dueInput(operator).fill(wanted);
+            await message(operator).click();
+            await expect(panelOf(operator)).toBeHidden();
+            await expect(message(operator)).toBeFocused();
+            await expect(operator.locator('[data-due-action]')).toHaveValue('set');
+            await expect(operator.locator('[data-due-at]')).toHaveValue(wanted);
+            await expect(pendingMark(operator)).toBeVisible();
+
+            // Invalid: the panel stays, says why, and focus stays in the message (it is not dragged back into the field).
+            await trigger(operator).click();
+            await dueInput(operator).fill('2020-01-01T09:00');
+            await message(operator).click();
+            await expect(message(operator)).toBeFocused();
+            await expect(panelOf(operator)).toBeVisible();
+            await expect(operator.locator('#due-date-editor-message')).toContainText('future');
+            await expect(dueInput(operator)).toHaveAttribute('aria-invalid', 'true');
+            await operator.waitForTimeout(250); // past the editor's deferred focus check
+            await expect(message(operator)).toBeFocused();
+            await expect(dueInput(operator)).not.toBeFocused();
+            // The earlier, valid pending date was not replaced by the refused one.
+            await expect(operator.locator('[data-due-at]')).toHaveValue(wanted);
         } finally {
             await context.close();
         }

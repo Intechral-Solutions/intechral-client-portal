@@ -32,8 +32,9 @@ The reply form's controls are presentation over the unchanged contract above. Th
 (`x-ui.visibility-toggle`, `x-ui.due-date-control`) driven by `resources/js/shell/blade-ticket-composer.ts`; the page is still Blade, with no
 new endpoint, no auto-save and no due-date-only submit. The submit button reads **Post Update**.
 
-- **Visibility.** A pressed-state button, "Visible" (eye) or "Hidden" (eye-off), posting `is_internal` = `0` / `1`. Pressed means Hidden, an
-  internal note. It is rendered only for an actor who passes `TicketPolicy::viewInternal`; the reply controller still demotes the flag for
+- **Visibility.** A plain button whose accessible name is its state, "Visible" (eye) or "Hidden" (eye-off), posting `is_internal` = `0` / `1`
+  (`data-state="visible"` / `"hidden"`; there is deliberately no `aria-pressed`, which would announce the state twice). Hidden means an
+  internal note; a polite live-region message announces each change. It is rendered only for an actor who passes `TicketPolicy::viewInternal`; the reply controller still demotes the flag for
   any actor who does not, so the control can grant nothing.
 - **Due date.** One button showing the effective date and zone (or "No due date"). Clicking it opens a small **editor panel laid
   over the button** (its field lands where the button was; a popover, "Change due date", with the zone, one native `datetime-local` field and a muted relative-time line);

@@ -1,6 +1,7 @@
+import { execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 import { expect, signedIn, test } from './support/auth';
 
@@ -64,6 +65,8 @@ async function openOperatorTicket(page: Page, number: string) {
 }
 
 const trigger = (page: Page) => page.locator('[data-due-trigger]');
+const pendingMark = (page: Page) => trigger(page).locator('[data-due-pending-mark]');
+const reply = (page: Page) => page.getByPlaceholder(/Write your reply/);
 const dueInput = (page: Page) => page.getByLabel(/^Due date and time/);
 
 /** HD-C1: open the inline editor, type a wall-clock date (UTC), and finish the local edit with Enter. */
@@ -98,6 +101,7 @@ test('an operator moves the due date with a public reply; the requester sees non
         // Pending until posted: nothing has been saved yet.
         await expect(trigger(operator)).toContainText(printed(target));
         await expect(trigger(operator)).toHaveAttribute('data-pending', 'set');
+        await expect(pendingMark(operator)).toBeVisible();
         await expect(operator.locator('[data-due-date-change]')).toHaveCount(0);
 
         await operator.getByRole('button', { name: 'Post Update' }).click();
@@ -174,10 +178,19 @@ test('a refused adjustment keeps the internal note internal, the date pending an
         await expect(operator.locator('[data-due-date-change]')).toHaveCount(0);
         await expect(operator.getByPlaceholder(/Write your reply/)).toHaveValue(note);
         const hidden = operator.locator('[data-visibility-button]');
-        await expect(hidden).toHaveAttribute('aria-pressed', 'true');
+        await expect(hidden).toHaveAttribute('data-state', 'hidden');
+        await expect(hidden).not.toHaveAttribute('aria-pressed', /.*/);
         await expect(operator.locator('[data-visibility-input]')).toHaveValue('1');
         await expect(trigger(operator)).toHaveAttribute('data-pending', 'set');
+        await expect(pendingMark(operator)).toBeVisible();
         await expect(trigger(operator)).toContainText(printed(daysAhead(-2)));
+
+        // The server's refusal marks the date button invalid; changing the pending change (Undo) retires that mark.
+        await expect(trigger(operator)).toHaveAttribute('aria-invalid', 'true');
+        await trigger(operator).click();
+        await operator.locator('[data-due-discard]').click();
+        await expect(trigger(operator)).not.toHaveAttribute('aria-invalid', /.*/);
+        await expect(pendingMark(operator)).toBeHidden();
 
         // The requester never saw the note.
         await signedIn(page, ticket.url);
@@ -205,6 +218,7 @@ test('restoring the SLA deadline is a recorded, reasoned change', async ({ page,
         await operator.locator('[data-due-restore]').click();
         // Pending until posted, and the contract fields say restore with no date.
         await expect(trigger(operator)).toHaveAttribute('data-pending', 'restore');
+        await expect(pendingMark(operator)).toBeVisible();
         await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
         await expect(operator.locator('[data-due-at]')).toHaveValue('');
 
@@ -214,6 +228,7 @@ test('restoring the SLA deadline is a recorded, reasoned change', async ({ page,
         await expect(operator.locator('[data-due-restore]')).toBeHidden();
         await operator.locator('[data-due-discard]').click();
         await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+        await expect(pendingMark(operator)).toBeHidden();
         await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
         await trigger(operator).click();
         await expect(operator.locator('[data-due-restore]')).toBeVisible();
@@ -230,5 +245,148 @@ test('restoring the SLA deadline is a recorded, reasoned change', async ({ page,
         await expect(operator.getByText(/Original SLA:/)).toHaveCount(0);
     } finally {
         await operatorContext.close();
+    }
+});
+
+/**
+ * Runs a PHP statement through tinker in the app directory, against the database the server under test uses (the same helper
+ * `projects-migration.spec.ts` has). Used once, to make a LEGACY ticket: the SLA deadline is immutable through the model, so the
+ * column is cleared with the query builder, on the one row named by the number this test captured from the redirect.
+ */
+function artisan(php: string) {
+    return execSync(`php artisan tinker --execute='${php}'`, {
+        cwd: process.env.PORTAL_APP_DIR ?? '/var/www/app',
+        encoding: 'utf8',
+    });
+}
+
+/**
+ * A ticket that carries a due-date override but has NO SLA deadline (a ticket from before SLA deadlines existed): raised through the
+ * real form, given its override through the operator UI, then its `sla_due_at` cleared. Opens it for the operator and returns it.
+ */
+async function legacyOverrideTicket(page: Page, context: BrowserContext, label: string) {
+    const ticket = await createTicket(page, ticketTitle(label));
+    const operator = await context.newPage();
+    await openOperatorTicket(operator, ticket.number);
+
+    const target = daysAhead(6);
+    await reply(operator).fill('Extending, then the SLA deadline goes away.');
+    await pickDue(operator, target);
+    await operator.getByRole('button', { name: 'Post Update' }).click();
+    await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
+
+    const cleared = artisan(
+        `echo "cleared=".\\DB::table("tickets")->where("ticket_number", "${ticket.number}")->whereNotNull("due_override_at")->update(["sla_due_at" => null]);`,
+    );
+    expect(cleared).toContain('cleared=1');
+
+    await openOperatorTicket(operator, ticket.number);
+    await expect(trigger(operator)).toContainText(printed(target));
+    await expect(operator.getByText(/Original SLA:/)).toBeVisible();
+
+    return { ticket, operator };
+}
+
+/** Take "Restore SLA" on the legacy ticket: the date goes to "No due date" and a restore is pending, with the editor closed. */
+async function restorePending(operator: Page) {
+    await trigger(operator).click();
+    await expect(operator.locator('[data-due-restore]')).toContainText('none set');
+    await operator.locator('[data-due-restore]').click();
+    await expectRestorePending(operator);
+}
+
+/** The pending restore still stands: the button says there is no date, Pending is shown, and the posted fields say restore. */
+async function expectRestorePending(operator: Page) {
+    await expect(trigger(operator).locator('[data-due-text]')).toHaveText('No due date');
+    await expect(trigger(operator)).toHaveAttribute('data-pending', 'restore');
+    await expect(pendingMark(operator)).toBeVisible();
+    await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
+    await expect(operator.locator('[data-due-at]')).toHaveValue('');
+}
+
+/** After the restore was posted: no date, no override, nothing pending, and the change is in the history. */
+async function expectRestorePosted(operator: Page) {
+    await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
+    await expect(trigger(operator).locator('[data-due-text]')).toHaveText('No due date');
+    await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+    await expect(pendingMark(operator)).toBeHidden();
+    await expect(operator.getByText(/Original SLA:/)).toHaveCount(0);
+    await expect(operator.locator('[data-due-date-change]')).toHaveCount(2); // the override, then its restore
+    await expect(operator.locator('[data-due-date-change]').last()).toContainText(
+        'the SLA deadline',
+    );
+}
+
+test('a pending restore on a ticket with no SLA deadline survives an untouched, empty editor and is posted', async ({
+    page,
+    contextFor,
+}) => {
+    // The editor's field mirrors a date-less display, so it opens EMPTY. Leaving it empty and untouched must never be read as
+    // "clear the pending change" (that would silently turn the restore back into keep).
+    const context = await contextFor('operator', { viewport: DESKTOP });
+
+    try {
+        const { operator } = await legacyOverrideTicket(page, context, 'restore without sla');
+        await restorePending(operator);
+
+        // Enter on the untouched, empty field.
+        await trigger(operator).click();
+        await expect(dueInput(operator)).toHaveValue('');
+        await dueInput(operator).press('Enter');
+        await expect(dueInput(operator)).toBeHidden();
+        await expectRestorePending(operator);
+
+        // Focus leaving the editor.
+        await trigger(operator).click();
+        await expect(dueInput(operator)).toHaveValue('');
+        await reply(operator).focus();
+        await expect(dueInput(operator)).toBeHidden();
+        await expectRestorePending(operator);
+
+        // "Post Update" pressed with the editor still open: the post carries the restore and succeeds.
+        await reply(operator).fill('Back to the SLA, which this ticket never had.');
+        await trigger(operator).click();
+        await expect(dueInput(operator)).toBeVisible();
+        await operator.getByRole('button', { name: 'Post Update' }).click();
+        await expectRestorePosted(operator);
+    } finally {
+        await context.close();
+    }
+});
+
+test('a pending restore on a ticket with no SLA deadline survives Tab to "Post Update" with the editor open, and is posted by keyboard', async ({
+    page,
+    contextFor,
+}) => {
+    const context = await contextFor('operator', { viewport: DESKTOP });
+
+    try {
+        const { operator } = await legacyOverrideTicket(page, context, 'restore keyboard');
+        await restorePending(operator);
+        await reply(operator).fill('Posted from the keyboard.');
+
+        // The editor is open on its empty field; Tab leaves it through its own controls (the field's segments, the picker, Undo) to
+        // the Post Update button, and Enter posts. Leaving the editor commits it, and it must commit to "unchanged".
+        await trigger(operator).click();
+        await expect(dueInput(operator)).toBeFocused();
+        await expect(dueInput(operator)).toHaveValue('');
+
+        const post = operator.getByRole('button', { name: 'Post Update' });
+
+        for (
+            let step = 0;
+            step < 14 && !(await post.evaluate((el) => el === document.activeElement));
+            step++
+        ) {
+            await operator.keyboard.press('Tab');
+        }
+
+        await expect(post).toBeFocused();
+        await expect(dueInput(operator)).toBeHidden();
+        await expectRestorePending(operator);
+        await operator.keyboard.press('Enter');
+        await expectRestorePosted(operator);
+    } finally {
+        await context.close();
     }
 });

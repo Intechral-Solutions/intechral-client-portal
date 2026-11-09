@@ -95,7 +95,9 @@ async function operatorReply(
     if (reply.internal) {
         const hidden = page.locator('[data-visibility-button]');
         await hidden.click();
-        await expect(hidden).toHaveAttribute('aria-pressed', 'true');
+        await expect(hidden).toHaveAttribute('data-state', 'hidden');
+        await expect(hidden).not.toHaveAttribute('aria-pressed', /.*/);
+        await expect(page.locator('[data-visibility-input]')).toHaveValue('1');
     }
     if (reply.file) await page.getByLabel('Attachments').setInputFiles(reply.file);
 

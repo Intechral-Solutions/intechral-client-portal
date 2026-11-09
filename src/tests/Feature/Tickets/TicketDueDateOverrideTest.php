@@ -258,6 +258,25 @@ it('restores the SLA deadline, even when that deadline is already in the past', 
         ->and($change->new_override_at)->toBeNull();
 });
 
+it('restores a legacy override that has no SLA deadline to: the override clears, the change is recorded, the reply is stored', function () {
+    $legacy = ticketFor($this->owner, ['status' => 'open', 'sla_due_at' => null]);
+    $legacy->forceFill(['due_override_at' => Carbon::parse('2026-11-09 08:00:00')])->saveQuietly();
+
+    dueDatePost($legacy, $this->operator, ['body' => 'Back to no deadline.', 'is_internal' => '0', 'due_action' => 'restore'])
+        ->assertRedirect()->assertSessionDoesntHaveErrors();
+
+    $legacy = $legacy->fresh();
+    $reply = $legacy->replies()->sole();
+    $change = $reply->dueDateChange;
+    expect($reply->body)->toBe('Back to no deadline.')
+        ->and($legacy->due_override_at)->toBeNull()
+        ->and($legacy->hasDueOverride())->toBeFalse()
+        ->and($legacy->sla_due_at)->toBeNull()
+        ->and($legacy->effectiveDueAt())->toBeNull()
+        ->and($change->previous_override_at->toDateTimeString())->toBe('2026-11-09 08:00:00')
+        ->and($change->new_override_at)->toBeNull();
+});
+
 it('refuses an adjustment on a resolved or closed ticket, but still takes the reply when none is asked for', function (string $status) {
     $ticket = ticketFor($this->owner, ['status' => $status, 'resolved_at' => now()->subHour(), 'closed_at' => $status === 'closed' ? now() : null]);
 
@@ -409,7 +428,8 @@ it('redisplays a refused form with the message, the hidden choice and the pendin
     $xpath = uiDom($html);
     expect($html)->toContain('My long explanation.')
         ->and(uiOne($xpath, '//input[@name="is_internal"]')->getAttribute('value'))->toBe('1')
-        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('aria-pressed'))->toBe('true')
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('data-state'))->toBe('hidden')
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->hasAttribute('aria-pressed'))->toBeFalse()
         ->and(uiOne($xpath, '//input[@name="due_at"]')->getAttribute('value'))->toBe('2026-11-10T14:30')
         ->and(uiOne($xpath, '//input[@name="due_action"]')->getAttribute('value'))->toBe('set')
         ->and(trim(uiOne($xpath, '//*[@data-due-text]')->textContent))->toBe('10 Nov 2026 14:30')
@@ -456,6 +476,22 @@ it('says "none set" instead of printing an empty value for a legacy ticket with 
     $this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()
         ->assertSee('Original SLA: none set')->assertSee('data-sla-text="none set"', false)->assertSee('data-due-restore', false)->assertDontSee('SLA deadline ()', false);
     $this->actingAs($this->operator)->get(route('operator.tickets.index'))->assertOk()->assertSee('Original SLA: none set');
+});
+
+it('renders the control of a legacy ticket with an override and no SLA deadline: empty SLA wall, override flagged, Restore SLA says none set', function () {
+    $legacy = ticketFor($this->owner, ['status' => 'open', 'sla_due_at' => null]);
+    $legacy->forceFill(['due_override_at' => Carbon::parse('2026-11-09 08:00:00')])->saveQuietly();
+
+    $xpath = uiDom($this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()->getContent());
+    $control = uiOne($xpath, '//*[@data-due-control]');
+    $restore = uiOne($xpath, '//*[@data-due-restore]');
+
+    expect($control->getAttribute('data-sla-wall'))->toBe('')
+        ->and($control->getAttribute('data-sla-epoch'))->toBe('')
+        ->and($control->getAttribute('data-has-override'))->toBe('1')
+        ->and($control->getAttribute('data-sla-text'))->toBe('none set')
+        ->and(preg_replace('/\s+/', ' ', trim($restore->textContent)))->toBe('Restore SLA none set')
+        ->and($restore->getAttribute('title'))->toBe('Restore the original SLA deadline (none set)');
 });
 
 // ── Requester boundary ───────────────────────────────────────────────────────────────────────────
