@@ -375,7 +375,7 @@ test.describe('Helpdesk as an operator', () => {
         for (const { theme, viewport } of MODES) {
             const tokens = await visit(page, href!, theme, viewport);
 
-            await expectInk(inMain(page).getByRole('button', { name: 'Post Reply' }), tokens);
+            await expectInk(inMain(page).getByRole('button', { name: 'Post Update' }), tokens);
             await expectSecondary(inMain(page).getByRole('button', { name: 'Update Status' }), tokens);
             await expectSecondary(inMain(page).getByRole('button', { name: 'Update Assignee' }), tokens);
 
@@ -385,8 +385,9 @@ test.describe('Helpdesk as an operator', () => {
             await expect(inMain(page).getByRole('textbox', { name: 'Write your reply…' })).toBeVisible();
             await expect(inMain(page).getByLabel('Attachments')).toBeVisible();
 
-            const internal = inMain(page).getByRole('checkbox', { name: /Internal note/ });
-            expect(await style(internal, 'accent-color')).toBe(tokens.accent);
+            // HD-C1: the checkbox became the Visible/Hidden toggle and the due-date control; both are asserted in
+            // operator-composer-controls.spec.ts (computed token colours, light and dark).
+            await expect(inMain(page).getByRole('button', { name: /^(Visible to|Hidden from) submitter$/ })).toBeVisible();
 
             await expectControlContract(page, tokens);
         }

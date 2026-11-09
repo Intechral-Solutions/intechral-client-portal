@@ -18,7 +18,7 @@
  * It supersedes EPIC-016 WP3's `BladeThemeNormalizationTest` (a migration-completion check). That file's rules and
  * all of its fixtures live here now, plus the permanent rules it did not carry (B5, B7, A1-A5), and its known
  * gaps are closed: single-quoted and bound `style`, `white` / `black` with every colour-bearing prefix, and an
- * EXACT target membership instead of `>= 59` (56 since EPIC-017 WP2 deleted the three customer ticket views).
+ * EXACT target membership instead of `>= 59` (56 since EPIC-017 WP2 deleted the three customer ticket views; 59 since the two HD-C1 composer controls).
  *
  * Each rule has fixtures it MUST catch and near-misses it must NOT, so no rule can be vacuous (EPIC-013 A13.13).
  */
@@ -59,6 +59,7 @@ function guardTargetInventory(): array
         'components/ui/alert.blade.php',
         'components/ui/button.blade.php',
         'components/ui/checkbox.blade.php',
+        'components/ui/due-date-control.blade.php',
         'components/ui/field-error.blade.php',
         'components/ui/input.blade.php',
         'components/ui/label.blade.php',
@@ -68,6 +69,7 @@ function guardTargetInventory(): array
         'components/ui/status.blade.php',
         'components/ui/tag.blade.php',
         'components/ui/textarea.blade.php',
+        'components/ui/visibility-toggle.blade.php',
         'crm/companies/_form.blade.php',
         'crm/companies/create.blade.php',
         'crm/companies/edit.blade.php',
@@ -489,7 +491,7 @@ it('keeps the Level B target inventory exact, and says what to do when a view is
 
     expect($message)->toBe('')
         ->and($inventory)->toBe($discovered)
-        ->and(count($inventory))->toBe(57);
+        ->and(count($inventory))->toBe(59);
 });
 
 it('draws the inventory only from the §17.2 roots, and lists every file once', function () {
@@ -596,7 +598,7 @@ it('Level B: the Focused shell partials carry the same Direction D rules as the 
     expect(implode("\n", $violations))->toBe('')
         // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship).
         ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
-        ->and(count(guardTargetInventory()))->toBe(57);
+        ->and(count(guardTargetInventory()))->toBe(59);
 });
 
 it('keeps every allowlist entry reasoned and still needed', function () {

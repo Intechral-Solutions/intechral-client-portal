@@ -63,7 +63,16 @@ async function openOperatorTicket(page: Page, number: string) {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
 
-const disclosure = (page: Page) => page.locator('details[data-due-date-adjust]');
+const trigger = (page: Page) => page.locator('[data-due-trigger]');
+const dueInput = (page: Page) => page.getByLabel(/^Due date and time/);
+
+/** HD-C1: open the inline editor, type a wall-clock date (UTC), and finish the local edit with Enter. */
+async function pickDue(page: Page, local: string) {
+    await trigger(page).click();
+    await dueInput(page).fill(local);
+    await dueInput(page).press('Enter');
+    await expect(trigger(page)).toBeVisible();
+}
 
 test('an operator moves the due date with a public reply; the requester sees none of it', async ({
     page,
@@ -79,17 +88,19 @@ test('an operator moves the due date with a public reply; the requester sees non
         const target = daysAhead(5);
         const reason = `We agreed more time ${randomBytes(4).toString('hex')}.`;
 
-        // Optional and collapsed: it is a part of the reply form, not an edit workflow of its own.
-        await expect(disclosure(operator)).toBeVisible();
-        expect(await disclosure(operator).evaluate((el) => (el as HTMLDetailsElement).open)).toBe(
-            false,
-        );
-        await disclosure(operator).locator('summary').click();
+        // Optional and compact: a button in the reply form showing the current date, with the editor closed.
+        await expect(trigger(operator)).toBeVisible();
+        await expect(dueInput(operator)).toBeHidden();
 
         await operator.getByPlaceholder(/Write your reply/).fill(reason);
-        await operator.getByLabel('Due date', { exact: true }).selectOption('set');
-        await operator.getByLabel(/^New due date and time/).fill(target);
-        await operator.getByRole('button', { name: 'Post Reply' }).click();
+        await pickDue(operator, target);
+
+        // Pending until posted: nothing has been saved yet.
+        await expect(trigger(operator)).toContainText(printed(target));
+        await expect(trigger(operator)).toHaveAttribute('data-pending', 'set');
+        await expect(operator.locator('[data-due-date-change]')).toHaveCount(0);
+
+        await operator.getByRole('button', { name: 'Post Update' }).click();
 
         await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
 
@@ -101,10 +112,8 @@ test('an operator moves the due date with a public reply; the requester sees non
         await expect(operator.getByText(/Original SLA:/)).toBeVisible();
 
         // Restoring is offered now that there is an override.
-        await disclosure(operator).locator('summary').click();
-        await expect(
-            operator.getByLabel('Due date', { exact: true }).locator('option[value="restore"]'),
-        ).toHaveCount(1);
+        await trigger(operator).click();
+        await expect(operator.locator('[data-due-restore]')).toHaveCount(1);
 
         // The queue shows the effective date, labelled UTC, with the original behind "Adjusted".
         await signedIn(operator, `/operator/tickets?search=${ticket.number}`);
@@ -131,7 +140,7 @@ test('an operator moves the due date with a public reply; the requester sees non
     }
 });
 
-test('a refused adjustment keeps the internal note internal and shows the reason', async ({
+test('a refused adjustment keeps the internal note internal, the date pending and shows the reason', async ({
     page,
     contextFor,
 }) => {
@@ -143,16 +152,18 @@ test('a refused adjustment keeps the internal note internal and shows the reason
         await openOperatorTicket(operator, ticket.number);
 
         const note = `Internal only ${randomBytes(4).toString('hex')}.`;
-        await disclosure(operator).locator('summary').click();
         await operator.getByPlaceholder(/Write your reply/).fill(note);
-        await operator.getByLabel(/Internal note/).check();
-        await operator.getByLabel('Due date', { exact: true }).selectOption('set');
-        // A date in the past: the browser's own min check is bypassed so the server rule is what answers.
-        await operator.getByLabel(/^New due date and time/).fill(daysAhead(-2));
-        await operator.locator('form[action$="/replies"]').evaluate((f) => {
-            (f as HTMLFormElement).noValidate = true;
+        await operator.locator('[data-visibility-button]').click();
+
+        // The inline editor refuses a past date itself; a stale or hand-built post is what the server rule answers. Put the
+        // contract fields where the control would, with a date in the past.
+        await operator.locator('[data-due-action]').evaluate((el) => {
+            (el as HTMLInputElement).value = 'set';
         });
-        await operator.getByRole('button', { name: 'Post Reply' }).click();
+        await operator.locator('[data-due-at]').evaluate((el, value) => {
+            (el as HTMLInputElement).value = value;
+        }, daysAhead(-2));
+        await operator.getByRole('button', { name: 'Post Update' }).click();
 
         await expect(operator.locator('#due_at-error')).toHaveText(
             'The new due date must be in the future.',
@@ -162,8 +173,11 @@ test('a refused adjustment keeps the internal note internal and shows the reason
         // note, so a second click cannot publish it (and email it) as a public reply.
         await expect(operator.locator('[data-due-date-change]')).toHaveCount(0);
         await expect(operator.getByPlaceholder(/Write your reply/)).toHaveValue(note);
-        await expect(operator.getByLabel(/Internal note/)).toBeChecked();
-        await expect(disclosure(operator)).toHaveAttribute('open', '');
+        const hidden = operator.locator('[data-visibility-button]');
+        await expect(hidden).toHaveAttribute('aria-pressed', 'true');
+        await expect(operator.locator('[data-visibility-input]')).toHaveValue('1');
+        await expect(trigger(operator)).toHaveAttribute('data-pending', 'set');
+        await expect(trigger(operator)).toContainText(printed(daysAhead(-2)));
 
         // The requester never saw the note.
         await signedIn(page, ticket.url);
@@ -181,17 +195,19 @@ test('restoring the SLA deadline is a recorded, reasoned change', async ({ page,
         const operator = await operatorContext.newPage();
         await openOperatorTicket(operator, ticket.number);
 
-        await disclosure(operator).locator('summary').click();
         await operator.getByPlaceholder(/Write your reply/).fill('Extending for now.');
-        await operator.getByLabel('Due date', { exact: true }).selectOption('set');
-        await operator.getByLabel(/^New due date and time/).fill(daysAhead(7));
-        await operator.getByRole('button', { name: 'Post Reply' }).click();
+        await pickDue(operator, daysAhead(7));
+        await operator.getByRole('button', { name: 'Post Update' }).click();
         await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
 
-        await disclosure(operator).locator('summary').click();
         await operator.getByPlaceholder(/Write your reply/).fill('Back to the original deadline.');
-        await operator.getByLabel('Due date', { exact: true }).selectOption('restore');
-        await operator.getByRole('button', { name: 'Post Reply' }).click();
+        await trigger(operator).click();
+        await operator.locator('[data-due-restore]').click();
+        // Pending until posted, and the contract fields say restore with no date.
+        await expect(trigger(operator)).toHaveAttribute('data-pending', 'restore');
+        await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
+        await expect(operator.locator('[data-due-at]')).toHaveValue('');
+        await operator.getByRole('button', { name: 'Post Update' }).click();
         await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
 
         await expect(operator.locator('[data-due-date-change]')).toHaveCount(2);

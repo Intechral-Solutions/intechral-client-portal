@@ -26,6 +26,30 @@ deadline is never changed.
   `DueDateInput` parses strictly and refuses a wall-clock time that does not exist; an ambiguous one means its first occurrence.
 - Visibility: the change line appears only on the operator ticket page. The requester presenter, props and reply mail carry no due data.
 
+## Operator composer controls (HD-C1)
+
+The reply form's controls are presentation over the unchanged contract above. They are two Blade components
+(`x-ui.visibility-toggle`, `x-ui.due-date-control`) driven by `resources/js/shell/blade-ticket-composer.ts`; the page is still Blade, with no
+new endpoint, no auto-save and no due-date-only submit. The submit button reads **Post Update**.
+
+- **Visibility.** A pressed-state button, "Visible" (eye) or "Hidden" (eye-off), posting `is_internal` = `0` / `1`. Pressed means Hidden, an
+  internal note. It is rendered only for an actor who passes `TicketPolicy::viewInternal`; the reply controller still demotes the flag for
+  any actor who does not, so the control can grant nothing.
+- **Due date.** One button showing the effective date and zone (or "No due date"), which swaps in place for a `datetime-local` editor. The
+  script infers the existing fields: untouched → `keep` (no `due_at`); a different date → `set` + that wall-clock text; the explicit
+  "Restore SLA" button (offered only while an override exists) → `restore` (no `due_at`). Returning to the original date clears the change.
+  The change stays pending, shown by a dashed edge and a "Pending" mark, until **Post Update**; the message stays required.
+- **Editor.** Enter finishes the local edit (it never submits the form); Escape cancels it; focus leaving it commits it. It is detached from
+  the form (`form` names no form), so it is never posted and the browser never blocks a plain reply on it. An unfinished or refused value
+  (half-typed, past, beyond the horizon) keeps the editor open with the reason, and a post made while it is open finishes or stops.
+- **Zone.** A typed date is read in `app.timezone` (an IANA name sent as `data-timezone`) by `lib/due-deadline.ts`, which mirrors
+  `DueDateInput::parse`: the browser's zone is never consulted. "Now" is the browser clock corrected by the server's clock at page load.
+- **Urgency** of the effective or pending deadline: **green** more than 4 h left; **yellow** from 4 h before through 1 h after the deadline,
+  inclusive; **red** more than 1 h overdue; **neutral** no deadline. Each level has its own glyph, and the exact relative time ("Due in 3
+  hours", "Overdue by 30 minutes") is the tooltip/description. It re-reads every 30 s while the tab is visible.
+- **After a refused post** the visibility, the pending date or restore and the server's reason are redisplayed (`old()`); a date is kept as
+  long as it is a real wall-clock time, so the request is not silently lost.
+
 ## Display and reporting
 
 - Operator queue and ticket page say "Due". Without an override the date carries a small "SLA" tag; with one, the tag is gone and the

@@ -117,7 +117,10 @@ it('names the ticket-detail selects by their existing headings and the file inpu
         ->and(uiOne($xpath, '//select[@name="status"]')->getAttribute('aria-labelledby'))->toBe('ticket-status-heading')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//select[@name="assignee_id"]')))->toBe('Assignee')
         ->and(uiAccessibleName($xpath, uiOne($xpath, '//textarea[@name="body"]')))->toBe('Write your reply…')
-        ->and(uiAccessibleName($xpath, uiOne($xpath, '//input[@name="is_internal"]')))->toBe('Internal note (not visible to submitter)')
+        // HD-C1: the checkbox became a pressed-state button whose name is its visible word plus a screen-reader tail.
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('aria-pressed'))->toBe('false')
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->hasAttribute('aria-label'))->toBeFalse()
+        ->and(preg_replace('/\s+/', ' ', trim(uiOne($xpath, '//*[@data-visibility-button]')->textContent)))->toBe('Visible to submitter Hidden from submitter')
         ->and(uiAccessibleName($xpath, $file))->toBe('Attachments')
         ->and($file->getAttribute('name'))->toBe('attachments[]')
         ->and($file->getAttribute('aria-describedby'))->toBe('attachments-hint')
