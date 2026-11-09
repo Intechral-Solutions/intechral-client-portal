@@ -83,7 +83,7 @@ async function operatorSetStatus(page: Page, ticket: Created, status: string) {
     await expect(page.getByRole('combobox', { name: 'Status' })).toHaveValue(status);
 }
 
-/** Posts through the Blade reply form. `file` is attached when given; `internal` ticks the note box. */
+/** Posts through the Blade reply form. `file` is attached when given; `internal` presses the Hidden toggle (it starts Visible). */
 async function operatorReply(
     page: Page,
     ticket: Created,
@@ -92,10 +92,16 @@ async function operatorReply(
     await openOperatorTicket(page, ticket);
     await page.getByPlaceholder(/Write your reply/).fill(reply.body);
 
-    if (reply.internal) await page.getByLabel(/Internal note/).check();
+    if (reply.internal) {
+        const hidden = page.locator('[data-visibility-button]');
+        await hidden.click();
+        await expect(hidden).toHaveAttribute('data-state', 'hidden');
+        await expect(hidden).not.toHaveAttribute('aria-pressed', /.*/);
+        await expect(page.locator('[data-visibility-input]')).toHaveValue('1');
+    }
     if (reply.file) await page.getByLabel('Attachments').setInputFiles(reply.file);
 
-    await page.getByRole('button', { name: 'Post Reply' }).click();
+    await page.getByRole('button', { name: 'Post Update' }).click();
     await expect(page.getByText('Reply added.')).toBeVisible();
 }
 

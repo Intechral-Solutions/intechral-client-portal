@@ -153,12 +153,14 @@ it('also refuses at the service when a customer author is handed an adjustment',
     expect($this->ticket->replies()->count())->toBe(0);
 });
 
-it('offers the due-date section to an operator and never to the requester page', function () {
+it('offers the due-date control to an operator and never to the requester page', function () {
     $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))
-        ->assertOk()->assertSee('Change due date (optional)')->assertSee('data-due-date-adjust', false);
+        ->assertOk()->assertSee('data-due-control', false)->assertSee('data-due-trigger', false)
+        ->assertSee('Change due date')->assertDontSee('data-due-date-adjust', false);
 
     $page = $this->actingAs($this->owner)->get(route('tickets.show', $this->ticket))->assertOk()->getContent();
-    expect($page)->not->toContain('due_action')->and($page)->not->toContain('Change due date')->and($page)->not->toContain('due_at');
+    expect($page)->not->toContain('due_action')->and($page)->not->toContain('Change due date')->and($page)->not->toContain('due_at')
+        ->and($page)->not->toContain('data-due-control');
 });
 
 // ── Every change needs a message ─────────────────────────────────────────────────────────────────
@@ -252,6 +254,25 @@ it('restores the SLA deadline, even when that deadline is already in the past', 
     $change = $ticket->replies()->sole()->dueDateChange;
     expect($ticket->due_override_at)->toBeNull()
         ->and($ticket->isOverdue())->toBeTrue()
+        ->and($change->previous_override_at->toDateTimeString())->toBe('2026-11-09 08:00:00')
+        ->and($change->new_override_at)->toBeNull();
+});
+
+it('restores a legacy override that has no SLA deadline to: the override clears, the change is recorded, the reply is stored', function () {
+    $legacy = ticketFor($this->owner, ['status' => 'open', 'sla_due_at' => null]);
+    $legacy->forceFill(['due_override_at' => Carbon::parse('2026-11-09 08:00:00')])->saveQuietly();
+
+    dueDatePost($legacy, $this->operator, ['body' => 'Back to no deadline.', 'is_internal' => '0', 'due_action' => 'restore'])
+        ->assertRedirect()->assertSessionDoesntHaveErrors();
+
+    $legacy = $legacy->fresh();
+    $reply = $legacy->replies()->sole();
+    $change = $reply->dueDateChange;
+    expect($reply->body)->toBe('Back to no deadline.')
+        ->and($legacy->due_override_at)->toBeNull()
+        ->and($legacy->hasDueOverride())->toBeFalse()
+        ->and($legacy->sla_due_at)->toBeNull()
+        ->and($legacy->effectiveDueAt())->toBeNull()
         ->and($change->previous_override_at->toDateTimeString())->toBe('2026-11-09 08:00:00')
         ->and($change->new_override_at)->toBeNull();
 });
@@ -385,16 +406,16 @@ it('shows the change under its reply on the operator page, and the restore wordi
 });
 
 it('offers "restore" only while an override exists, and nothing once the ticket is resolved', function () {
-    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertDontSee('value="restore"', false);
+    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertDontSee('data-due-restore', false);
 
     $this->ticket->forceFill(['due_override_at' => Carbon::parse('2026-11-10 14:30:00')])->saveQuietly();
-    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertSee('value="restore"', false);
+    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertSee('data-due-restore', false);
 
     $this->ticket->forceFill(['status' => 'resolved', 'resolved_at' => now()])->saveQuietly();
-    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertDontSee('data-due-date-adjust', false);
+    $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))->assertDontSee('data-due-control', false)->assertDontSee('data-due-restore', false);
 });
 
-it('redisplays a refused form with the message, the internal-note box and the choice kept, and a valid date refilled', function () {
+it('redisplays a refused form with the message, the hidden choice and the pending date kept', function () {
     $show = route('operator.tickets.show', $this->ticket);
 
     // The date is fine; the attachment is not, so the post is refused and the form comes back.
@@ -406,32 +427,71 @@ it('redisplays a refused form with the message, the internal-note box and the ch
     $html = $this->actingAs($this->operator)->get($show)->assertOk()->getContent();
     $xpath = uiDom($html);
     expect($html)->toContain('My long explanation.')
-        ->and(uiOne($xpath, '//input[@name="is_internal"]')->hasAttribute('checked'))->toBeTrue()
+        ->and(uiOne($xpath, '//input[@name="is_internal"]')->getAttribute('value'))->toBe('1')
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->getAttribute('data-state'))->toBe('hidden')
+        ->and(uiOne($xpath, '//*[@data-visibility-button]')->hasAttribute('aria-pressed'))->toBeFalse()
         ->and(uiOne($xpath, '//input[@name="due_at"]')->getAttribute('value'))->toBe('2026-11-10T14:30')
-        ->and(uiOne($xpath, '//select[@name="due_action"]/option[@selected]')->getAttribute('value'))->toBe('set');
+        ->and(uiOne($xpath, '//input[@name="due_action"]')->getAttribute('value'))->toBe('set')
+        ->and(trim(uiOne($xpath, '//*[@data-due-text]')->textContent))->toBe('10 Nov 2026 14:30')
+        ->and(uiOne($xpath, '//*[@data-due-trigger]')->getAttribute('data-pending'))->toBe('set');
 });
 
-it('does not refill a refused date that is outside the form\'s own bounds, so a plain reply is never blocked by it', function () {
+it('keeps a refused date as the pending change with the server message beside it, instead of silently dropping it', function () {
     $show = route('operator.tickets.show', $this->ticket);
 
+    // The editor input is detached from the form, so the browser never blocks a post on a stale date; the server refuses it, and the
+    // operator's request stays visible (as pending) next to the reason.
     $this->actingAs($this->operator)->from($show)
         ->post(route('operator.tickets.replies.store', $this->ticket), ['body' => 'My long explanation.', 'due_action' => 'set', 'due_at' => '2026-11-01T10:00'])
         ->assertRedirect($show);
 
     $page = $this->actingAs($this->operator)->get($show)->assertOk();
     $page->assertSee('My long explanation.')->assertSee('must be in the future');
-    expect(uiOne(uiDom($page->getContent()), '//input[@name="due_at"]')->getAttribute('value'))->toBe('');
+    $xpath = uiDom($page->getContent());
+    expect(uiOne($xpath, '//input[@name="due_at"]')->getAttribute('value'))->toBe('2026-11-01T10:00')
+        ->and(uiOne($xpath, '//input[@name="due_action"]')->getAttribute('value'))->toBe('set')
+        ->and(uiOne($xpath, '//*[@id="due_at-error"]')->textContent)->toContain('must be in the future')
+        ->and(uiOne($xpath, '//*[@data-due-trigger]')->getAttribute('aria-describedby'))->toContain('due_at-error');
+});
+
+it('does not refill an impossible date: the control falls back to keep and the server message stands', function () {
+    $show = route('operator.tickets.show', $this->ticket);
+
+    $this->actingAs($this->operator)->from($show)
+        ->post(route('operator.tickets.replies.store', $this->ticket), ['body' => 'My long explanation.', 'due_action' => 'set', 'due_at' => '2026-02-31T10:00'])
+        ->assertRedirect($show);
+
+    $xpath = uiDom($this->actingAs($this->operator)->get($show)->assertOk()->getContent());
+    expect(uiOne($xpath, '//input[@name="due_at"]')->getAttribute('value'))->toBe('')
+        ->and(uiOne($xpath, '//input[@name="due_action"]')->getAttribute('value'))->toBe('keep');
 });
 
 it('says "none set" instead of printing an empty value for a legacy ticket with no SLA deadline', function () {
     $legacy = ticketFor($this->owner, ['status' => 'open', 'sla_due_at' => null]);
-    $this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()
-        ->assertSee('Current due date: none')->assertDontSee('SLA deadline ()', false);
+    $xpath = uiDom($this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()->getContent());
+    expect(trim(uiOne($xpath, '//*[@data-due-text]')->textContent))->toBe('No due date')
+        ->and(uiOne($xpath, '//*[@data-due-control]')->getAttribute('data-original-wall'))->toBe('');
 
     $legacy->forceFill(['due_override_at' => now()->addDay()])->saveQuietly();
     $this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()
-        ->assertSee('Original SLA: none set')->assertSee('Restore the SLA deadline (none set)')->assertDontSee('SLA deadline ()', false);
+        ->assertSee('Original SLA: none set')->assertSee('data-sla-text="none set"', false)->assertSee('data-due-restore', false)->assertDontSee('SLA deadline ()', false);
     $this->actingAs($this->operator)->get(route('operator.tickets.index'))->assertOk()->assertSee('Original SLA: none set');
+});
+
+it('renders the control of a legacy ticket with an override and no SLA deadline: empty SLA wall, override flagged, Restore SLA says none set', function () {
+    $legacy = ticketFor($this->owner, ['status' => 'open', 'sla_due_at' => null]);
+    $legacy->forceFill(['due_override_at' => Carbon::parse('2026-11-09 08:00:00')])->saveQuietly();
+
+    $xpath = uiDom($this->actingAs($this->operator)->get(route('operator.tickets.show', $legacy))->assertOk()->getContent());
+    $control = uiOne($xpath, '//*[@data-due-control]');
+    $restore = uiOne($xpath, '//*[@data-due-restore]');
+
+    expect($control->getAttribute('data-sla-wall'))->toBe('')
+        ->and($control->getAttribute('data-sla-epoch'))->toBe('')
+        ->and($control->getAttribute('data-has-override'))->toBe('1')
+        ->and($control->getAttribute('data-sla-text'))->toBe('none set')
+        ->and(preg_replace('/\s+/', ' ', trim($restore->textContent)))->toBe('Restore SLA none set')
+        ->and($restore->getAttribute('title'))->toBe('Restore the original SLA deadline (none set)');
 });
 
 // ── Requester boundary ───────────────────────────────────────────────────────────────────────────
