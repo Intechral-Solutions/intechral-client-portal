@@ -2,6 +2,7 @@
 
 namespace App\Shared\Scopes;
 
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -20,7 +21,7 @@ class OrganizationMembershipScope implements Scope
 
         $user = Auth::user();
 
-        if ($user->hasRole('operator')) {
+        if (CustomerPilotGate::isOperator($user)) {
             return;
         }
 

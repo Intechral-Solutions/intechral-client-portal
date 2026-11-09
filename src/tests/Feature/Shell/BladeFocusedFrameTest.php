@@ -18,12 +18,15 @@ use App\Models\Invoice;
 use App\Models\User;
 use App\Services\InvoiceService;
 use App\Shared\Navigation\NavigationBuilder;
+use App\Shared\Permissions\PermissionCatalogue;
 use App\Shared\Shell\ShellPresentation;
 use App\Support\Initials;
 use Illuminate\Http\Request;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: these suites model a customer explicitly granted what the built-in `user` role no longer carries.
+    $this->grantUserRole(...PermissionCatalogue::RETIRED_USER_DEFAULTS);
 });
 
 function focusedFrameUser(string $role = 'user', array $permissions = []): User

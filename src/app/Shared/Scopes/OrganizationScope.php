@@ -2,6 +2,7 @@
 
 namespace App\Shared\Scopes;
 
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -12,7 +13,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Scope models that have a direct organization_id foreign key to all
  * organizations joined by the authenticated user. Platform operators bypass
- * tenant filtering and retain cross-organization visibility.
+ * tenant filtering and retain cross-organization visibility. "Operator" is the
+ * explicit `portal.operator` eligibility ({@see CustomerPilotGate::isOperator()}),
+ * never the built-in role's name: a custom-role operator has the same scope as the
+ * built-in one, and a customer holding other operational capabilities has none.
  *
  * Only apply this scope to models whose tables contain organization_id:
  *
@@ -31,7 +35,7 @@ class OrganizationScope implements Scope
 
         $user = Auth::user();
 
-        if ($user->hasRole('operator')) {
+        if (CustomerPilotGate::isOperator($user)) {
             return;
         }
 

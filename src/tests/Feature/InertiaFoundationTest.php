@@ -69,6 +69,8 @@ it('exposes flash once through the shared contract', function () {
 it('leaves existing blade pages as normal document responses', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    // R1-1: the invoice list needs an explicit billing.view; it is not a built-in `user` default.
+    $user->givePermissionTo('billing.view');
 
     // Projects index/create/edit are React pages as of EPIC-011E WP3, and tickets.index as of EPIC-017
     // WP2; the client invoice list is still Blade, so it is the coexistence example here.

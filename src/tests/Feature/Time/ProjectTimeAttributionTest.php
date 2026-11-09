@@ -53,6 +53,8 @@ require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
     $this->operator = makeUser('operator');
     $this->worker = makeUser();
     $this->projectA = makeProject(null, 'Project A');

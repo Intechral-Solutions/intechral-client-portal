@@ -170,9 +170,11 @@
                             {{ $op->name }}
                         </option>
                         @endforeach
-                        {{-- Release 0.9 (H3): a suspended assignee is not a choice, but the current value still shows. --}}
-                        @if ($ticket->assignee?->isSuspended())
-                        <option value="{{ $ticket->assignee_id }}" selected>{{ $ticket->assignee->name }} (suspended)</option>
+                        {{-- Release 0.9 (H3) / R1-1: an existing assignee who is no longer a choice (suspended, or an active account without
+                             portal.operator) is not offered as a new assignment, but the current value still shows, so submitting the form
+                             cannot silently turn it into "Unassigned". Unassigning stays the explicit "Unassigned" option. --}}
+                        @if ($ticket->assignee && ! $operators->contains('id', $ticket->assignee_id))
+                        <option value="{{ $ticket->assignee_id }}" selected>{{ $ticket->assignee->name }} ({{ $ticket->assignee->isSuspended() ? 'suspended' : 'not assignable' }})</option>
                         @endif
                     </x-ui.select>
                     <x-ui.field-error for="assignee_id" />

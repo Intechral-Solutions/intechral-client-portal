@@ -59,9 +59,9 @@ settings.view
 settings.manage
 ```
 
-**Known gap — `time.view_own`:** this permission exists in the catalogue and is granted by default to the `user` role (see below), but nothing in the live application currently checks it as an enforcement boundary. Implemented Time behavior is gated by `time.log` (may log/see one's own entries) and `time.view_all` (may see every user's entries); there is no code path where holding or lacking `time.view_own` changes what a request can do. EPIC-011E (Projects and Kanban Migration) reviewed this while auditing Time-adjacent contracts and deliberately did not reinterpret or wire it — that was out of its scope. Future permission-model work should either give `time.view_own` a real enforcement meaning or retire it from the catalogue; until then, treat `time.log` as the operative "see your own time" gate.
+**Known gap — `time.view_own`:** this permission exists in the catalogue and was granted by default to the `user` role until R1-1 (it is no longer a default), but nothing in the live application currently checks it as an enforcement boundary. Implemented Time behavior is gated by `time.log` (may log/see one's own entries) and `time.view_all` (may see every user's entries); there is no code path where holding or lacking `time.view_own` changes what a request can do. EPIC-011E (Projects and Kanban Migration) reviewed this while auditing Time-adjacent contracts and deliberately did not reinterpret or wire it — that was out of its scope. Future permission-model work should either give `time.view_own` a real enforcement meaning or retire it from the catalogue; until then, treat `time.log` as the operative "see your own time" gate.
 
-**Tasks — `tasks.view_all` and the inert `tasks.view_org` (EPIC-014 WP3):** `tasks.view_all` offers the **All Tasks** view (`TaskPolicy::viewAll`; the `tasks.all` navigation item; `/tasks?view=all`). It is a surface capability, never an object grant: the rows inside All Tasks are exactly the ones `TaskPolicy::view` allows (board tasks of projects the actor may view, and the actor's own standalone tasks), so holding it never reveals another user's standalone task, a project the actor cannot view, or a ticket-kind task. It is granted to `operator` through the usual all-permissions sync and is **not** in the `user` defaults; any role may be given it. `tasks.view_org` lost its only consumer when the "My organization" view was retired (EPIC-014 Q5): it stays in the catalogue and the `user` defaults, unused, as recorded permission debt (EPIC-014 §22 P1), the same treatment `projects.view_org` received in EPIC-011E. Existing development databases need `PermissionSeeder` and `RoleSeeder` re-run to pick up `tasks.view_all`.
+**Tasks — `tasks.view_all` and the inert `tasks.view_org` (EPIC-014 WP3):** `tasks.view_all` offers the **All Tasks** view (`TaskPolicy::viewAll`; the `tasks.all` navigation item; `/tasks?view=all`). It is a surface capability, never an object grant: the rows inside All Tasks are exactly the ones `TaskPolicy::view` allows (board tasks of projects the actor may view, and the actor's own standalone tasks), so holding it never reveals another user's standalone task, a project the actor cannot view, or a ticket-kind task. It is granted to `operator` through the usual all-permissions sync and is **not** in the `user` defaults; any role may be given it. `tasks.view_org` lost its only consumer when the "My organization" view was retired (EPIC-014 Q5): it stays in the catalogue, unused (no longer a `user` default since R1-1), as recorded permission debt (EPIC-014 §22 P1), the same treatment `projects.view_org` received in EPIC-011E. Existing development databases need `PermissionSeeder` and `RoleSeeder` re-run to pick up `tasks.view_all`.
 
 **Tasks — object authorization (`TaskPolicy`, EPIC-014 §7):** every `tasks.*` route authorizes through `App\Policies\TaskPolicy`, and the Tasks list computes its row abilities as a batched restatement of it (`TaskRowAbilities`, parity-tested). No permission beyond `tasks.view_all` is involved.
 
@@ -84,12 +84,15 @@ settings.manage
 - Intended for the service provider's internal team
 
 ### `user` (Platform User)
-- Minimal default permissions:
+- Minimal default permissions (the Release 1.0 customer minimum, R1-1):
   - `tickets.view`, `tickets.create`
   - `projects.view`
-  - `time.log`, `time.view_own`
-  - `billing.view` (own invoices only)
   - `cms.view`
+- No billing, time or organization-wide permission by default. `billing.view` (own invoices only: the list, the page and payment all
+  need it, plus ownership) and `time.log` are explicit grants to a direct customer, through a custom role or a direct grant; a
+  managed customer organization never inherits them. In pilot and closed mode the customer surface gate still answers 404 for the
+  billing and time routes and hides those capabilities from the browser, whatever has been granted; that is a route restriction,
+  separate from the capability checks that decide in legacy mode (see the R1-1 section of `customer-pilot-surface.md`).
 - Intended for the service provider's clients
 
 **Built-in roles are code-owned (Release 0.9, decision H4).** Their names and permissions are defined in
@@ -178,7 +181,7 @@ $query->whereIn('organization_id', $user->organizations()->select('organizations
 // CrmContact   -> company.organization_id
 ```
 
-Operators bypass these scopes. A non-operator with no memberships receives an empty tenant view. Tickets, projects, invoices, and time entries have no `organization_id` column and continue to use ownership, membership, invoice-client, and policy logic instead of the direct scope. For `Project` specifically that means `project_members` membership or `projects.admin`: a project's linked CRM company (`project_company`) is visibility metadata only and never grants access on its own (EPIC-011E D2).
+Operators bypass these scopes; "operator" is the explicit `portal.operator` eligibility (`CustomerPilotGate::isOperator`), not the built-in role's name (R1-1). A non-operator with no memberships receives an empty tenant view. Tickets, projects, invoices, and time entries have no `organization_id` column and continue to use ownership, membership, invoice-client, and policy logic instead of the direct scope. For `Project` specifically that means `project_members` membership or `projects.admin`: a project's linked CRM company (`project_company`) is visibility metadata only and never grants access on its own (EPIC-011E D2).
 
 ### Organization Permissions
 
@@ -195,7 +198,7 @@ org.manage_roles
 org.admin
 ```
 
-The built-in `user` role receives the `*.view_org` permissions. `tasks.view_org` is inert since EPIC-014 WP3 (see the Tasks note above). The `org.*` permissions exist in the catalogue, but organization-admin self-service routes are not yet implemented; current member management is under `crm.manage`.
+The built-in `user` role no longer receives the `*.view_org` permissions (R1-1); they remain in the catalogue, read by no code path, as recorded debt. `tasks.view_org` is inert since EPIC-014 WP3 (see the Tasks note above). The `org.*` permissions exist in the catalogue, but organization-admin self-service routes are not yet implemented; current member management is under `crm.manage`.
 
 ### Organization Tables
 

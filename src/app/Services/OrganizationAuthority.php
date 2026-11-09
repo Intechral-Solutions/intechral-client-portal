@@ -99,9 +99,9 @@ final class OrganizationAuthority
 
     /**
      * Ids of the accounts that count as operators: the `portal.operator` capability (eligibility) or the `operator` role (the
-     * name the tenant scopes still test), directly or through a role. Broader than "holds portal.operator" on purpose: an
-     * account that is operator by role name but whose capability has not been synchronized yet is still never an
-     * organization administrator. Straight from the tables, never the permission cache.
+     * built-in role's name, which the tenant scopes no longer test, R1-1), directly or through a role. Broader than "holds
+     * portal.operator" on purpose: an account that is operator by role name but whose capability has not been synchronized yet
+     * is still never an organization administrator. Straight from the tables, never the permission cache.
      *
      * @return list<int>
      */

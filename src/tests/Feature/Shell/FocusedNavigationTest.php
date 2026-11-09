@@ -22,6 +22,8 @@ use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: these suites model a customer explicitly granted what the built-in `user` role no longer carries.
+    $this->grantUserRole(...PermissionCatalogue::RETIRED_USER_DEFAULTS);
 });
 
 /**
@@ -41,7 +43,7 @@ function focusedNavActor(string $role = 'user', array $give = [], array $revoke 
         $user->assignRole($role);
     } else {
         $custom = Role::firstOrCreate(['name' => 'focused-nav-'.md5(implode(',', $revoke)), 'guard_name' => 'web']);
-        $custom->syncPermissions(array_values(array_diff(PermissionCatalogue::userDefaults(), $revoke)));
+        $custom->syncPermissions(array_values(array_diff(PermissionCatalogue::release09UserDefaults(), $revoke)));
         $user->assignRole($custom);
     }
 

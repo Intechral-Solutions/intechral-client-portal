@@ -291,6 +291,25 @@ it('exposes to the browser only what the mode uses', function () {
     expect(CustomerPilotGate::exposedPermissions($customer, PermissionCatalogue::userDefaults()))->toBe(PermissionCatalogue::userDefaults());
 });
 
+// R1-1: userDefaults() no longer carries the billing, time and organization-wide permissions, so the test above alone would pass even if
+// the filter were deleted for them. This one feeds the filter the permissions it exists to suppress, as an explicit grant would.
+it('suppresses time.log, billing.view and every other retired default from a customer, even when explicitly granted', function () {
+    $customer = pilotCustomer();
+    $granted = [...PermissionCatalogue::userDefaults(), ...PermissionCatalogue::RETIRED_USER_DEFAULTS, 'billing.manage', 'time.manage', 'crm.manage'];
+
+    pilotMode('pilot');
+    $pilot = CustomerPilotGate::exposedPermissions($customer, $granted);
+    expect($pilot)->toEqualCanonicalizing(['tickets.view', 'tickets.create', 'projects.view'])
+        ->and($pilot)->not->toContain('time.log', 'time.view_own', 'billing.view', 'billing.view_org', 'tickets.view_org', 'projects.view_org', 'tasks.view_org', 'cms.view');
+
+    pilotMode('closed');
+    expect(CustomerPilotGate::exposedPermissions($customer, $granted))->toBe([]);
+
+    // Legacy restricts nothing, so the same list passes through untouched (the pre-pilot behaviour).
+    pilotMode('legacy');
+    expect(CustomerPilotGate::exposedPermissions($customer, $granted))->toBe($granted);
+});
+
 it('offers closed customers Home only and pilot customers Home, Support and Projects', function () {
     pilotMode('closed');
     expect(CustomerPilotGate::workspaces())->toBe(['home']);

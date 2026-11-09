@@ -541,20 +541,25 @@ it('answers a rule refusal with a business message, 409 for JSON, and no change'
     expect(memRow($organization, $only)->role)->toBe('admin')->and(memRow($organization, $only)->admin_approved_at)->not->toBeNull();
 });
 
-it('keeps the custom-role operator inside the existing page limits: the routes still bind through the tenant scope, the service does not', function () {
+it('gives the custom-role operator the built-in operator\'s reach (R1-1): the routes bind through a tenant scope that keys on portal.operator, not the role name', function () {
     $organization = memOrg();
     $admin = memCustomer();
     memAttach($organization, $admin, 'admin');
     $lead = memCustomOperator();
 
-    // Known and deliberately not widened: the organization is resolved by route-model binding, and the scope keys on the role name.
-    $this->actingAs($lead)->post(route('organizations.members.approve', [$organization, $admin]))->assertNotFound();
-    $this->actingAs($lead)->get(route('organizations.show', $organization))->assertNotFound();
-    expect(memRow($organization, $admin)->admin_approved_at)->toBeNull();
+    // R1-1: the three organization scopes key on `portal.operator` ({@see CustomerPilotGate::isOperator()}), so the organization
+    // resolves for a custom-role operator exactly as it does for the built-in one. The capabilities (`crm.manage`) still decide.
+    $this->actingAs($lead)->get(route('organizations.show', $organization))->assertOk();
+    $this->actingAs($lead)->post(route('organizations.members.approve', [$organization, $admin]))->assertRedirect();
 
-    // An explicit actor holding the capabilities can still use the service.
-    expect(memService()->approve($organization, $admin, $lead))->toBeTrue()
-        ->and((int) memRow($organization, $admin)->admin_approved_by)->toBe($lead->id);
+    expect((int) memRow($organization, $admin)->admin_approved_by)->toBe($lead->id);
+
+    // Eligibility without the capability still does nothing.
+    $eligibleOnly = memCustomOperator(['portal.operator']);
+    $second = memCustomer();
+    memAttach($organization, $second, 'admin');
+    $this->actingAs($eligibleOnly)->post(route('organizations.members.approve', [$organization, $second]))->assertForbidden();
+    expect(memRow($organization, $second)->admin_approved_at)->toBeNull();
 });
 
 // ── Operator screen ──────────────────────────────────────────────────────────

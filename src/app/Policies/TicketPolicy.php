@@ -17,6 +17,18 @@ class TicketPolicy
 {
     public function view(User $user, Ticket $ticket): bool
     {
+        return $this->viewAsRequesterOrOperator($user, $ticket);
+    }
+
+    /**
+     * The two established ways to see a Ticket: being its requester, or working Tickets as an operator. Today `view` is
+     * exactly this. Authorization that REUSES Ticket visibility for something else (ticket-linked task visibility, time
+     * attribution to a ticket task: TaskPolicy, AccessibleTimeContext) asks this ability instead of `view`, so a later
+     * widening of `view` (partner support personnel, Release 1.0) can never also grant task visibility or time logging.
+     * A widening of `view` must NOT change this method; a new viewer class gets its own named ability.
+     */
+    public function viewAsRequesterOrOperator(User $user, Ticket $ticket): bool
+    {
         return $ticket->user_id === $user->id || $this->worksTickets($user);
     }
 

@@ -43,6 +43,8 @@ function warmQueries(callable $request): int
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
 });
 
 it('does not run per-project queries on the projects index', function () {

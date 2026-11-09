@@ -36,6 +36,10 @@ class DevSeeder extends Seeder
             ]
         );
         $user->assignRole('user');
+        // R1-1 test-fixture capability: the built-in `user` role no longer carries billing.view or time.log, so this persona is granted
+        // billing.view and time.log explicitly, as an operator would grant a direct customer (the legacy specs drive invoices and the
+        // member's own time through it). Specific to this seeded persona; `givePermissionTo` is idempotent.
+        $user->givePermissionTo(['billing.view', 'time.log']);
 
         // Dedicated identities for browser flows whose *subject* is real authentication
         // (POST-WP4 E2E hardening). Reusing `operator@intechral.test` for these would spend that
@@ -82,8 +86,8 @@ class DevSeeder extends Seeder
         // All three are real accounts that sign in through the login form, and all are `firstOrCreate`
         // by email, so re-seeding is idempotent and cannot collide with any other identity.
         //
-        // The two customers hold the built-in `user` role and nothing else, so they resolve to the
-        // Focused shell. `customerOther` is a second, unrelated customer: seeded now, used from the
+        // The two customers hold the built-in `user` role (`e2e-customer` also has the explicit billing.view and
+        // time.log grants above; `customerOther` is a plain customer), so they resolve to the Focused shell. `customerOther` is a second, unrelated customer: seeded now, used from the
         // next package by the Helpdesk isolation journey (it must be unable to see `customer`'s data).
         $customer = User::firstOrCreate(
             ['email' => 'e2e-customer@intechral.test'],
@@ -94,6 +98,9 @@ class DevSeeder extends Seeder
             ]
         );
         $customer->assignRole('user');
+        // R1-1 test-fixture capability: the built-in `user` role no longer carries billing.view or time.log, so this persona is granted
+        // billing.view and time.log explicitly, as an operator would grant a direct customer. Specific to this seeded persona; `givePermissionTo` is idempotent.
+        $customer->givePermissionTo(['billing.view', 'time.log']);
 
         $customerOther = User::firstOrCreate(
             ['email' => 'e2e-customer-other@intechral.test'],
@@ -118,7 +125,9 @@ class DevSeeder extends Seeder
             ]
         );
         $operationalMember->assignRole('user');
-        $operationalMember->givePermissionTo('projects.manage');
+        // R1-1 test-fixture capability: billing.view and time.log are explicit grants (see `user@` above), as the specs that use the
+        // timer pill and tray need time.log and the legacy invoice specs need billing.view.
+        $operationalMember->givePermissionTo(['projects.manage', 'billing.view', 'time.log']);
 
         // A fixed, idempotent fixture ticket (EPIC-011E WP7, §21): the task page's move to
         // React leaves the embedded Blade `x-time-tracker` with no remaining project/task host

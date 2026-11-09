@@ -114,7 +114,7 @@ final class CustomerSurfacePreflight
     }
 
     /**
-     * Active accounts and custom roles that hold a capability outside the customer defaults, other than
+     * Active accounts and custom roles that hold a capability outside the customer defaults (and the explicitly grantable ones), other than
      * `portal.operator` itself, while not being eligible.
      *
      * @param  list<int>  $eligible
@@ -125,6 +125,8 @@ final class CustomerSurfacePreflight
         $beyondCustomer = array_values(array_diff(
             PermissionCatalogue::all(),
             PermissionCatalogue::userDefaults(),
+            // R1-1: capabilities a direct customer may be granted explicitly (billing, time) are not "operational".
+            PermissionCatalogue::RETIRED_USER_DEFAULTS,
             [PermissionCatalogue::PORTAL_OPERATOR],
         ));
 

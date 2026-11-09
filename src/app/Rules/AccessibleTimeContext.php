@@ -40,7 +40,9 @@ class AccessibleTimeContext implements ValidationRule
 
     /**
      * Ticket-context time is operator work (EPIC-017 O1, N1): the actor must hold `tickets.assign`
-     * AND be able to view the ticket. Owning the ticket is not enough, so a requester can neither
+     * AND be an operator who can view the ticket (`viewInternal`: `tickets.assign`, not a restricted
+     * customer, and Ticket visibility; R1-1), so neither a customer holding a stray `tickets.assign`
+     * nor any later widening of `TicketPolicy::view` admits time. Owning the ticket is not enough, so a requester can neither
      * start a ticket timer nor record ticket time, whichever shell or page they use; the shell
      * presentation plays no part. This governs NEW ticket attribution, including an update that
      * keeps an entry on its ticket (TimeEntryController::update). Stopping an already-running timer
@@ -55,7 +57,7 @@ class AccessibleTimeContext implements ValidationRule
     {
         return $ticket !== null
             && Gate::forUser($user)->allows('tickets.assign')
-            && Gate::forUser($user)->allows('view', $ticket);
+            && Gate::forUser($user)->allows('viewInternal', $ticket);
     }
 
     /**
@@ -105,6 +107,7 @@ class AccessibleTimeContext implements ValidationRule
 
     private static function canViewTicket(User $user, ?Ticket $ticket): bool
     {
-        return $ticket !== null && Gate::forUser($user)->allows('view', $ticket);
+        // Not `view`: a wider ticket viewer must not gain time on a ticket task (R1-1). See TicketPolicy::viewAsRequesterOrOperator().
+        return $ticket !== null && Gate::forUser($user)->allows('viewAsRequesterOrOperator', $ticket);
     }
 }

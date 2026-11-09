@@ -54,7 +54,8 @@ it('adds tasks.view_all to the catalogue, grants it to operators only, and keeps
     expect(PermissionCatalogue::TASKS_VIEW_ALL)->toBe('tasks.view_all')
         ->and(PermissionCatalogue::all())->toContain('tasks.view_all', 'tasks.view_org')
         ->and(PermissionCatalogue::userDefaults())->not->toContain('tasks.view_all')
-        ->and(PermissionCatalogue::userDefaults())->toContain('tasks.view_org');
+        ->and(PermissionCatalogue::userDefaults())->not->toContain('tasks.view_org') // R1-1: retired, still in the catalogue
+        ->and(PermissionCatalogue::all())->toContain('tasks.view_org');
 
     expect(Role::findByName('operator')->hasPermissionTo('tasks.view_all'))->toBeTrue()
         ->and(Role::findByName('user')->hasPermissionTo('tasks.view_all'))->toBeFalse()

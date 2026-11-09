@@ -183,6 +183,8 @@ function matrixRequest($test, string $route, ?User $user, object $ctx): TestResp
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
 });
 
 it('enforces the actor-by-route matrix', function (string $route, string $actor, string|int $expected) {

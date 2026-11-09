@@ -183,7 +183,7 @@ it('keeps the capability profiles distinct', function () {
     }
 });
 
-it('seeds every reusable persona, and gives the Operational member exactly one direct capability', function () {
+it('seeds every reusable persona, and keeps the Operational member Operational through one direct operator-surface capability', function () {
     $seeder = (string) file_get_contents(base_path('database/seeders/DevSeeder.php'));
 
     foreach (reusablePersonaEmails() as $email) {
@@ -191,11 +191,14 @@ it('seeds every reusable persona, and gives the Operational member exactly one d
         expect($seeder)->toContain($email);
     }
 
-    // EPIC-017 WP1: the two customers are plain `user`s (Focused shell). The one persona that keeps the
-    // Operational shell does so through a single direct operator-surface capability, nothing broader.
-    expect(substr_count($seeder, "givePermissionTo('projects.manage')"))->toBe(1)
-        ->and($seeder)->toContain('$operationalMember->givePermissionTo')
-        ->and($seeder)->not->toContain('$customer->givePermissionTo')
+    // EPIC-017 WP1: the two customers are `user`s (Focused shell). The one persona that keeps the Operational shell does so through a
+    // single direct operator-surface capability, `projects.manage`, nothing broader. R1-1: the built-in `user` role no longer carries
+    // billing.view or time.log, so the personas the legacy specs drive through invoices and time are granted exactly those two,
+    // explicitly; `customerOther` stays a plain customer. The effective result is pinned by DevSeederPersonasTest.
+    expect(substr_count($seeder, "'projects.manage'"))->toBe(1)
+        ->and($seeder)->toContain("\$operationalMember->givePermissionTo(['projects.manage', 'billing.view', 'time.log'])")
+        ->and($seeder)->toContain("\$customer->givePermissionTo(['billing.view', 'time.log'])")
+        ->and($seeder)->toContain("\$user->givePermissionTo(['billing.view', 'time.log'])")
         ->and($seeder)->not->toContain('$customerOther->givePermissionTo');
 });
 

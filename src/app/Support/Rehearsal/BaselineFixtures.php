@@ -149,7 +149,7 @@ final class BaselineFixtures
         ]));
 
         $grants = [];
-        foreach ([1 => $all, 2 => PermissionCatalogue::userDefaults(), 3 => $agent] as $role => $names) {
+        foreach ([1 => $all, 2 => PermissionCatalogue::release09UserDefaults(), 3 => $agent] as $role => $names) {
             foreach ($names as $name) {
                 $grants[] = ['permission_id' => $permissionId($name), 'role_id' => $role];
             }

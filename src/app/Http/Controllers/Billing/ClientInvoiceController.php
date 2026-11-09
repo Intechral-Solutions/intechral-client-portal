@@ -10,6 +10,8 @@ class ClientInvoiceController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewOwn', Invoice::class);
+
         $invoices = Invoice::where('client_id', auth()->id())
             ->with('project')
             ->latest()

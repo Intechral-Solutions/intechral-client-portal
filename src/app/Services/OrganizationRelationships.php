@@ -29,7 +29,8 @@ use Illuminate\Support\Facades\Gate;
  * every rule is checked against the locked, current rows, never against a model the caller loaded earlier.
  *
  * Reads here are deliberately unscoped (`DB::table`, `withoutGlobalScopes`): OrganizationMembershipScope hides organizations
- * from any account that lacks the `operator` ROLE, so a scoped read would let a partner with customers look empty. They are
+ * from any account that is not operator-eligible (`portal.operator`, R1-1), so a scoped read, run in a session that is not
+ * eligible, would let a partner with customers look empty. They are
  * safe only because every mutation first passes {@see OrganizationPolicy} (portal.operator AND crm.manage); the read helpers
  * below must be called only for an actor who has passed it.
  *

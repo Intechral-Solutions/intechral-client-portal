@@ -11,6 +11,8 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
 });
 
 it('renders the personal time page with filtered minimal entry data and a full filtered total', function () {

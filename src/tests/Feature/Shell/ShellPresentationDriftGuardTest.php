@@ -52,12 +52,23 @@ function presentationUngatedExceptions(): array
     ];
 }
 
+/**
+ * The customer capabilities: the built-in `user` defaults plus what an authorized operator may grant a customer explicitly
+ * (R1-1: billing.view, time.log and the unused *.view_org). Both are "default" to this guard: the Focused shell serves them.
+ *
+ * @return list<string>
+ */
+function presentationCustomerCapabilities(): array
+{
+    return [...PermissionCatalogue::userDefaults(), ...PermissionCatalogue::RETIRED_USER_DEFAULTS];
+}
+
 /** @return array<string, string> every catalogue permission mapped to default|operational|neutral */
 function presentationClasses(): array
 {
     $classes = [];
 
-    foreach (PermissionCatalogue::userDefaults() as $capability) {
+    foreach (presentationCustomerCapabilities() as $capability) {
         $classes[$capability] = 'default';
     }
 
@@ -208,7 +219,7 @@ function presentationActor(?string $capability = null): User
 // ── R1 ────────────────────────────────────────────────────────────────────
 
 it('R1: partitions the catalogue into customer defaults, operational and presentation-neutral', function () {
-    $defaults = PermissionCatalogue::userDefaults();
+    $defaults = presentationCustomerCapabilities();
     $operational = ShellPresentationResolver::OPERATIONAL;
     $neutral = array_keys(ShellPresentationResolver::PRESENTATION_NEUTRAL);
     $all = PermissionCatalogue::all();
@@ -226,7 +237,8 @@ it('R1: partitions the catalogue into customer defaults, operational and present
 it('R1: records the approved sizes and a reason for every neutral capability', function () {
     expect(ShellPresentationResolver::OPERATIONAL)->toHaveCount(11)
         ->and(ShellPresentationResolver::PRESENTATION_NEUTRAL)->toHaveCount(20) // 19 + portal.operator (R0.9-CS1)
-        ->and(PermissionCatalogue::userDefaults())->toHaveCount(12);
+        ->and(PermissionCatalogue::userDefaults())->toHaveCount(4) // R1-1: the customer minimum
+        ->and(presentationCustomerCapabilities())->toHaveCount(12); // 4 + the 8 explicitly grantable (the 0.9 defaults)
 
     foreach (ShellPresentationResolver::PRESENTATION_NEUTRAL as $capability => $reason) {
         expect(trim($reason))->not->toBe('', "{$capability} has no reason");

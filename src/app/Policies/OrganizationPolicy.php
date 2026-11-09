@@ -15,10 +15,10 @@ use App\Shared\Permissions\PermissionCatalogue;
  *    eligibility is a customer;
  *  - `crm.manage`: the Directory capability the organization screens already require.
  *
- * Both are capability checks, never the `operator` role name that the tenant scopes still test, so a custom role that
- * carries the two is a legitimate operator here. Because those scopes still hide organizations from such an account, the
- * relationship operations resolve organizations by id with deliberate, unscoped queries AFTER this check passes, and never
- * through route-model binding. The ability takes no organization: who may manage relationships does not depend on which.
+ * Both are capability checks, never the `operator` role name. The tenant scopes key on `portal.operator` too (R1-1), so a
+ * custom role that carries the two is a legitimate operator here and is not filtered by them. The relationship operations
+ * nevertheless resolve organizations by id with deliberate, unscoped queries AFTER this check passes, and never through
+ * route-model binding, so an integrity decision never rests on a scoped lookup. The ability takes no organization: who may manage relationships does not depend on which.
  *
  * Holding the relationship grants nothing: this policy answers who may EDIT it, and no policy elsewhere reads it.
  */

@@ -6,6 +6,8 @@ use App\Services\InvoiceService;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries billing.view; this suite models a customer explicitly granted it.
+    $this->grantUserRole('billing.view');
 });
 
 // ── Guests ───────────────────────────────────────────────────────────────────

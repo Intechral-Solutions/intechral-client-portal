@@ -49,7 +49,7 @@ function ticketTimeEntryPayload(array $context = []): array
 // ── New ticket time: refused for every non-operator, the owner included ────
 
 it('refuses a ticket timer to its own requester, writing nothing', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $before = ticketTimeSnapshot();
 
@@ -63,7 +63,7 @@ it('refuses a ticket timer to its own requester, writing nothing', function () {
 });
 
 it('refuses a manual ticket entry to its own requester, writing nothing', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $before = ticketTimeSnapshot();
 
@@ -75,9 +75,9 @@ it('refuses a manual ticket entry to its own requester, writing nothing', functi
 });
 
 it('refuses a customer the ticket context for every other ticket too', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
-    $stranger = ticketUser();
+    $stranger = ticketTimeUser();
 
     $this->actingAs($stranger)
         ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
@@ -88,7 +88,7 @@ it('refuses a customer the ticket context for every other ticket too', function 
 });
 
 it('allows ticket time to an operator who can view the ticket, by capability and not by role', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $agent = ticketAgent();
 
@@ -105,7 +105,7 @@ it('allows ticket time to an operator who can view the ticket, by capability and
 });
 
 it('answers the rule from the capability alone: the owner is refused until they hold tickets.assign', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
 
     expect(AccessibleTimeContext::allows($owner, 'ticket', $ticket->id))->toBeFalse();
@@ -117,9 +117,9 @@ it('answers the rule from the capability alone: the owner is refused until they 
 });
 
 it('offers no ticket in the context selector to a customer, even one recorded as the assignee', function () {
-    $customer = ticketUser();
+    $customer = ticketTimeUser();
     // A legacy row: assignment eligibility (EPIC-010D H5) prevents this today, the selector must not rely on it.
-    ticketFor(ticketUser(), ['assignee_id' => $customer->id, 'status' => 'open']);
+    ticketFor(ticketTimeUser(), ['assignee_id' => $customer->id, 'status' => 'open']);
     $ownTicket = ticketFor($customer, ['assignee_id' => $customer->id]);
 
     $this->actingAs($customer)
@@ -139,7 +139,7 @@ it('offers no ticket in the context selector to a customer, even one recorded as
 // ── Existing ticket-linked entries: editing records ticket time ────────────
 
 it('refuses a customer edit that KEEPS an entry on its ticket, whether or not ticket_id is resubmitted', function (bool $resubmit) {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $entry = TimeEntry::factory()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id, 'duration_minutes' => 30, 'date' => today()->toDateString()]);
     $before = ticketTimeSnapshot();
@@ -161,7 +161,7 @@ it('refuses a customer edit that KEEPS an entry on its ticket, whether or not ti
 ]);
 
 it('refuses a customer moving an existing entry INTO a ticket context', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $entry = TimeEntry::factory()->create(['user_id' => $owner->id, 'date' => today()->toDateString()]);
     $before = ticketTimeSnapshot();
@@ -174,7 +174,7 @@ it('refuses a customer moving an existing entry INTO a ticket context', function
 });
 
 it('PRESERVED: a customer may move an existing entry OUT of ticket context, which records no ticket time', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $entry = TimeEntry::factory()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id, 'date' => today()->toDateString()]);
 
@@ -187,7 +187,7 @@ it('PRESERVED: a customer may move an existing entry OUT of ticket context, whic
 
 it('lets an operator edit their own ticket entry and keep it on the ticket', function () {
     $agent = ticketAgent();
-    $ticket = ticketFor(ticketUser());
+    $ticket = ticketFor(ticketTimeUser());
     $entry = TimeEntry::factory()->create(['user_id' => $agent->id, 'ticket_id' => $ticket->id, 'duration_minutes' => 30, 'date' => today()->toDateString()]);
 
     $this->actingAs($agent)
@@ -203,7 +203,7 @@ it('lets an operator edit their own ticket entry and keep it on the ticket', fun
 // paths checks `tickets.assign` or ticket visibility; each is bounded by ownership and the billing lock.
 
 it('PRESERVED: a customer can still stop a ticket timer that was already running, so it never runs forever', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $running = TimeEntry::factory()->running()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id]);
 
@@ -214,12 +214,14 @@ it('PRESERVED: a customer can still stop a ticket timer that was already running
 
 it('PRESERVED: stopping stores the accumulated duration on the same ticket, even after tickets.assign was revoked', function () {
     $operator = ticketAgent();
-    $ticket = ticketFor(ticketUser());
+    $ticket = ticketFor(ticketTimeUser());
     $running = TimeEntry::factory()->running()->create([
         'user_id' => $operator->id, 'ticket_id' => $ticket->id, 'billable' => false, 'timer_started_at' => now()->subHours(3),
     ]);
 
     $operator->syncRoles(['user']);
+    // The `user` role no longer carries time.log (R1-1); grant it so the route admits the stop and the rule under test decides.
+    $operator->givePermissionTo('time.log');
     $revoked = User::findOrFail($operator->id);
     expect(AccessibleTimeContext::allows($revoked, 'ticket', $ticket->id))->toBeFalse();
 
@@ -234,9 +236,9 @@ it('PRESERVED: stopping stores the accumulated duration on the same ticket, even
 });
 
 it('keeps the ownership and billing-lock protections on the existing-entry paths', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
-    $stranger = ticketUser();
+    $stranger = ticketTimeUser();
     $running = TimeEntry::factory()->running()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id]);
     // The model refuses to save a billed running timer, so lock one with a raw update: the service's own
     // guard must hold even for data that arrived some other way.
@@ -261,7 +263,7 @@ it('keeps the ownership and billing-lock protections on the existing-entry paths
 });
 
 it('PRESERVED: a customer can still edit the description of a ticket timer that was already running, and nothing else', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $running = TimeEntry::factory()->running()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id, 'billable' => false]);
     $startedAt = $running->fresh()->timer_started_at;
@@ -277,7 +279,7 @@ it('PRESERVED: a customer can still edit the description of a ticket timer that 
 });
 
 it('refuses the description endpoint for an entry whose timer is not running, so it cannot edit stopped ticket time', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $entry = TimeEntry::factory()->create(['user_id' => $owner->id, 'ticket_id' => ticketFor($owner)->id, 'description' => 'Original']);
 
     $this->actingAs($owner)
@@ -288,7 +290,7 @@ it('refuses the description endpoint for an entry whose timer is not running, so
 });
 
 it('PRESERVED: a customer can still delete their own ticket-linked entry', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = ticketFor($owner);
     $entry = TimeEntry::factory()->create(['user_id' => $owner->id, 'ticket_id' => $ticket->id]);
 
@@ -300,7 +302,7 @@ it('PRESERVED: a customer can still delete their own ticket-linked entry', funct
 // ── General Time is unchanged ──────────────────────────────────────────────
 
 it('PRESERVED: the same customer still logs project time on a project they belong to', function () {
-    $customer = ticketUser();
+    $customer = ticketTimeUser();
     $project = app(ProjectService::class)->create(ticketUser('operator'), ['name' => 'Customer project']);
     $project->members()->attach($customer->id, ['role' => 'member']);
 

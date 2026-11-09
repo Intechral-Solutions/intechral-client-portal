@@ -42,6 +42,8 @@ function projectTasksTitles(array $props): array
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
     $this->owner = makeUser('operator', ['name' => 'Owner Olive', 'email' => 'olive@example.test']);
     $this->project = makeProject($this->owner, 'Apollo');
     [$this->todo, $this->doing, , , $this->done] = $this->project->columns->all();

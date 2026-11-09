@@ -7,6 +7,8 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -42,6 +44,18 @@ abstract class TestCase extends BaseTestCase
         // change on either path). Session GC is framework behaviour no test here depends on, so it is
         // off for every test; the session read and write queries still count, equally, in both shapes.
         config(['session.lottery' => [0, 100]]);
+    }
+
+    /**
+     * Model an authorized operator granting the built-in `user` role's audience extra permissions, for a suite whose
+     * subject is a feature a customer reaches only by such a grant (R1-1: `time.log`, `billing.view` and the other retired
+     * defaults are no longer built in). Call it after seedRolesAndPermissions(); it changes the test database's `user`
+     * role only, never the code's definition.
+     */
+    protected function grantUserRole(string ...$permissions): void
+    {
+        Role::findByName('user', 'web')->givePermissionTo($permissions);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**
