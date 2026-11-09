@@ -9,7 +9,7 @@ import { applyTheme } from './support/theme';
  * Release 1.0 (HD-C1) — the operator Helpdesk composer in real Chromium: the Visible/Hidden toggle and the inline due-date control.
  *
  * jsdom has no native picker, no layout and no focus ring, so what only a browser can show is held here: pointer and keyboard use
- * of the toggle and its tooltip, the editor panel anchored beneath the button (and moving nothing), Enter / Escape / blur, the native
+ * of the toggle and its tooltip, the editor panel laid over the button (and moving nothing), Enter / Escape / blur, the native
  * picker not collapsing the editor, the pending and undo states, urgency colours (computed values against the theme tokens, in both themes), the live clock, and the layout at
  * phone width. The arithmetic and the inference of the server fields are unit-tested in
  * `resources/js/shell/blade-ticket-composer.test.ts`; the server contract in `OperatorComposerControlsTest.php` and
@@ -197,7 +197,7 @@ test.describe('the Visible / Hidden toggle', () => {
 });
 
 test.describe('the inline due-date control', () => {
-    test('opens an anchored panel under the button and moves nothing; Enter finishes the edit without posting; Escape cancels', async ({
+    test('opens a panel over the button, its field where the button was, and moves nothing; Enter finishes the edit without posting; Escape cancels', async ({
         page,
         contextFor,
     }) => {
@@ -226,7 +226,7 @@ test.describe('the inline due-date control', () => {
             ]);
             const scrollBefore = await operator.evaluate(() => window.scrollY);
 
-            // Open: the panel appears beneath the button and holds focus in its field. The joined controls, and everything else on the
+            // Open: the panel appears over the button and holds focus in its field. The joined controls, and everything else on the
             // page, stay exactly where they were.
             await trigger(operator).click();
             await expect(panel).toBeVisible();
@@ -244,17 +244,22 @@ test.describe('the inline due-date control', () => {
             expect(after).toEqual(before);
             expect(await operator.evaluate(() => window.scrollY)).toBe(scrollBefore);
 
+            // The field takes the place of the button: it is centred on it, and the panel starts at the button's left edge.
             const triggerBox = before[1]!;
             const panelBox = (await panel.boundingBox())!;
-            expect(panelBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height);
-            expect(panelBox.y - (triggerBox.y + triggerBox.height)).toBeLessThan(16);
+            const fieldBox = (await dueInput(operator).boundingBox())!;
+            expect(
+                Math.abs(fieldBox.y + fieldBox.height / 2 - (triggerBox.y + triggerBox.height / 2)),
+            ).toBeLessThan(3);
+            expect(panelBox.y).toBeLessThan(triggerBox.y);
             expect(Math.abs(panelBox.x - triggerBox.x)).toBeLessThan(2); // aligned to the button when there is room
 
-            // Pressing the button again closes the panel (it is the toggle), keeping what the field held.
-            await trigger(operator).click();
+            // Enter with the field untouched closes the panel and gives focus back to the button.
+            await operator.keyboard.press('Enter');
             await expect(panel).toBeHidden();
             await expect(trigger(operator)).toHaveAttribute('aria-expanded', 'false');
             await expect(trigger(operator)).toBeFocused();
+            await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
 
             // Escape cancels the edit: the original stands, nothing pending, focus returns to the button.
             await trigger(operator).click();

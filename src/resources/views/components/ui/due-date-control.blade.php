@@ -1,8 +1,8 @@
 {{--
     Release 1.0 (HD-C1): the operator composer's due-date control. It replaces the "Change due date (optional)" disclosure and
     its keep/set/restore dropdown with ONE compact button showing the effective due date. Clicking it opens a small editor
-    PANEL anchored beneath the button (a popover with a native `datetime-local` field); the joined controls above it never
-    change size or position while it is open.
+    PANEL laid over the button (a popover with a native `datetime-local` field that takes the place of the button's own field); the
+    joined controls under it never change size or position while it is open.
 
     <x-ui.due-date-control :ticket="$ticket" :zone="$dueZone" :min="$dueMin" :max="$dueMax" :days="$dueDays" />
 
@@ -15,9 +15,11 @@
     - The editor input is DETACHED from the form (`form` names no form): it is never submitted, and the browser never runs its
       own min/max validation on it, so a plain reply is never blocked by a half-typed or stale date. The script validates it
       against the live clock before it counts, and the server re-validates whatever is posted.
-    - The panel is `absolute` under the button, so opening it moves nothing. The script only sets two custom properties on it
-      (`--due-editor-x`, `--due-editor-max`) so it stays inside the viewport on a narrow screen, and `data-placement="top"` to
-      open it upward when there is no room beneath the button; the look is all static classes.
+    - The panel is `absolute`, so opening it moves nothing. Its top edge sits 50px above the button (`-top-12.5`) because the
+      field starts 48px into the panel (16px padding + the 20px heading line + 12px gap): the field therefore lands over the
+      button (2px above its top, as the field is 40px tall to the button's 36px), as if the button had turned into the field.
+      The script only sets three custom properties on it (`--due-editor-x`, `--due-editor-y`, `--due-editor-max`) to nudge it back
+      inside the viewport on a narrow or short screen; the look is all static classes.
       Inside: a heading and the zone, the one field (dominant), a muted relative-time line (the touch-screen twin of the
       tooltip), and a footer with the two distinct, subdued actions: "Restore SLA" (only while an override exists and a restore
       is not already pending) and "Undo change" (only while something is pending).
@@ -117,7 +119,7 @@
     </button>
 
     <div id="due-date-editor" data-due-editor hidden role="group" aria-labelledby="due-date-editor-title"
-         class="absolute top-full left-(--due-editor-x) z-20 mt-2 w-80 max-w-(--due-editor-max) data-[placement=top]:top-auto data-[placement=top]:bottom-full data-[placement=top]:mt-0 data-[placement=top]:mb-2 rounded-overlay bg-surface p-4 text-text shadow-overlay">
+         class="absolute -top-12.5 left-(--due-editor-x) z-20 w-80 max-w-(--due-editor-max) translate-y-(--due-editor-y) rounded-overlay bg-surface p-4 text-text shadow-overlay">
         <div class="flex items-baseline justify-between gap-3">
             <p id="due-date-editor-title" class="text-sm font-semibold">Change due date</p>
             <span id="due-date-editor-zone" class="text-xs font-medium text-text-muted">{{ $zone }}</span>

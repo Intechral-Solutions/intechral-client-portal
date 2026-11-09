@@ -35,8 +35,8 @@ new endpoint, no auto-save and no due-date-only submit. The submit button reads 
 - **Visibility.** A pressed-state button, "Visible" (eye) or "Hidden" (eye-off), posting `is_internal` = `0` / `1`. Pressed means Hidden, an
   internal note. It is rendered only for an actor who passes `TicketPolicy::viewInternal`; the reply controller still demotes the flag for
   any actor who does not, so the control can grant nothing.
-- **Due date.** One button showing the effective date and zone (or "No due date"). Clicking it opens a small **editor panel anchored
-  beneath the button** (a popover, "Change due date", with the zone, one native `datetime-local` field and a muted relative-time line);
+- **Due date.** One button showing the effective date and zone (or "No due date"). Clicking it opens a small **editor panel laid
+  over the button** (its field lands where the button was; a popover, "Change due date", with the zone, one native `datetime-local` field and a muted relative-time line);
   the joined controls never change size or position while it is open. The script infers the existing fields: untouched → `keep` (no
   `due_at`); a different date → `set` + that wall-clock text; the explicit "Restore SLA" button (offered only while an override exists and
   a restore is not already pending) → `restore` (no `due_at`). Returning to the original date clears the change. The change stays pending,
@@ -44,10 +44,10 @@ new endpoint, no auto-save and no due-date-only submit. The submit button reads 
   text action in the panel, shown only while something is pending) drops the pending change; it is distinct from Restore SLA, which is a
   pending change in its own right.
 - **Editor.** Enter finishes the local edit (it never submits the form); Escape cancels it and returns focus to the button; focus leaving
-  it, or pressing the button again, commits it. It is detached from the form (`form` names no form), so it is never posted and the browser
+  it commits it. It is detached from the form (`form` names no form), so it is never posted and the browser
   never blocks a plain reply on it. An unfinished or refused value (half-typed, past, beyond the horizon) keeps the panel open with the
   reason beside the field, and a post made while it is open finishes or stops. The panel is `absolute`, so opening it moves nothing; the
-  script only keeps it inside the viewport (two custom properties, and it opens upward when there is no room below).
+  script only keeps it inside the viewport (custom properties that shift it sideways and nudge it up, so a composer near the bottom of the screen does not scroll the page).
 - **Zone.** A typed date is read in `app.timezone` (an IANA name sent as `data-timezone`) by `lib/due-deadline.ts`, which mirrors
   `DueDateInput::parse`: the browser's zone is never consulted. "Now" is the browser clock corrected by the server's clock at page load.
 - **Urgency** of the effective or pending deadline: **green** more than 4 h left; **yellow** from 4 h before through 1 h after the deadline,

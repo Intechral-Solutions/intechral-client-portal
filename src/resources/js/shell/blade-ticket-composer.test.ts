@@ -242,7 +242,7 @@ describe('the due-date control — inference of the server fields', () => {
         expect(error.hidden).toBe(false);
     });
 
-    it('keeps the panel inside a narrow viewport by shifting and capping it with two custom properties', () => {
+    it('keeps the panel inside a narrow viewport by shifting and capping it with custom properties', () => {
         const { trigger, editor } = mount();
         Object.defineProperty(document.documentElement, 'clientWidth', {
             value: 360,
@@ -257,56 +257,50 @@ describe('the due-date control — inference of the server fields', () => {
         expect(editor.style.getPropertyValue('--due-editor-x')).toBe('-148px');
     });
 
-    it('opens upward instead of scrolling the page when there is room above the button but not below', () => {
+    it('nudges the panel up by its overhang instead of scrolling the page when the composer is near the bottom of the screen', () => {
         const { trigger, editor } = mount();
-        const control = trigger.closest<HTMLElement>('[data-due-control]')!;
         const scroll = vi.fn();
         editor.scrollIntoView = scroll;
         Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
-        control.getBoundingClientRect = () =>
-            ({ left: 100, right: 300, top: 600, bottom: 636, width: 200, height: 36 }) as DOMRect;
-        // Beneath the button it would run to 844; above it, it sits at 392-592.
+        Object.defineProperty(document.documentElement, 'clientWidth', {
+            value: 1200,
+            configurable: true,
+        });
+        // Laid over the button it would run to 820, 28px past the bottom edge less the 8px margin.
+        const lifted = () => Number.parseFloat(editor.style.getPropertyValue('--due-editor-y'));
         editor.getBoundingClientRect = () =>
-            (editor.dataset.placement === 'top'
-                ? { left: 100, right: 420, top: 392, bottom: 592, width: 320, height: 200 }
-                : {
-                      left: 100,
-                      right: 420,
-                      top: 644,
-                      bottom: 844,
-                      width: 320,
-                      height: 200,
-                  }) as DOMRect;
+            ({
+                left: 100,
+                right: 420,
+                top: 620 + lifted(),
+                bottom: 820 + lifted(),
+                width: 320,
+                height: 200,
+            }) as DOMRect;
 
         trigger.click();
 
-        expect(editor.dataset.placement).toBe('top');
+        expect(editor.style.getPropertyValue('--due-editor-y')).toBe('-28px');
         expect(scroll).not.toHaveBeenCalled();
     });
 
-    it('stays beneath the button when it fits there, and scrolls only when it fits nowhere', () => {
+    it('leaves the panel where it lies over the button when it fits, and scrolls only when it fits nowhere', () => {
         const { trigger, editor } = mount();
-        const control = trigger.closest<HTMLElement>('[data-due-control]')!;
         const scroll = vi.fn();
         editor.scrollIntoView = scroll;
         Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
         editor.getBoundingClientRect = () =>
             ({ left: 100, right: 420, top: 300, bottom: 500, width: 320, height: 200 }) as DOMRect;
-        control.getBoundingClientRect = () =>
-            ({ left: 100, right: 300, top: 100, bottom: 136, width: 200, height: 36 }) as DOMRect;
 
         trigger.click();
-        expect(editor.dataset.placement).toBeUndefined();
+        expect(editor.style.getPropertyValue('--due-editor-y')).toBe('0px');
         expect(scroll).not.toHaveBeenCalled();
 
         key(editor, 'Escape');
-        control.getBoundingClientRect = () =>
-            ({ left: 100, right: 300, top: 60, bottom: 96, width: 200, height: 36 }) as DOMRect;
-        editor.getBoundingClientRect = () =>
-            ({ left: 100, right: 420, top: 104, bottom: 304, width: 320, height: 200 }) as DOMRect;
-        Object.defineProperty(window, 'innerHeight', { value: 250, configurable: true });
+        // Taller than the room: it is pushed as far as the top margin allows and the browser scrolls the rest into view.
+        Object.defineProperty(window, 'innerHeight', { value: 150, configurable: true });
         trigger.click();
-        expect(editor.dataset.placement).toBeUndefined();
+        expect(editor.style.getPropertyValue('--due-editor-y')).toBe('-292px');
         expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
     });
 

@@ -8,7 +8,7 @@
  * - turns what the operator did with the due-date control into the EXISTING `due_action` / `due_at` fields:
  *   nothing → `keep` (and no `due_at`); a different date → `set` + that wall-clock text; the explicit button → `restore`;
  * - draws the effective or pending date with its urgency, and keeps the urgency current while the page stays open;
- * - opens the editor as a small panel anchored beneath the date button (it never resizes or moves the joined controls) and
+ * - opens the editor as a small panel laid over the date button, its field where the button was (it never resizes or moves the joined controls) and
  *   keeps that panel inside the viewport.
  *
  * Nothing is saved here: no fetch, no endpoint. A change stays pending in the two hidden inputs until the operator posts the
@@ -274,19 +274,18 @@ function initDueDate(root: ParentNode): void {
     }
 
     /**
-     * Keep the panel inside the viewport. It is `absolute` under the button, so on a wide screen it simply sits there; on a narrow one
-     * it is shifted left by exactly as much as it overhangs, and capped to the viewport's width. Only two custom properties are set:
-     * the look is static classes. If there is no room beneath the button but there is above it, the panel opens upward instead of
-     * making the page scroll (`data-placement="top"`).
+     * Keep the panel inside the viewport. It is `absolute` and laid over the button (its field lands where the button is), so on a
+     * roomy screen it simply sits there; on a narrow one it is shifted left by exactly as much as it overhangs and capped to the
+     * viewport's width, and on a short one (the composer near the bottom of the screen) it is nudged up by the overhang so the page
+     * does not have to scroll. Only three custom properties are set: the look is static classes.
      */
     function place(): void {
         const margin = 8;
         const viewport = document.documentElement.clientWidth;
 
-        delete editor!.dataset.placement;
-
         editor!.style.setProperty('--due-editor-max', `${Math.max(viewport - 2 * margin, 0)}px`);
         editor!.style.setProperty('--due-editor-x', '0px');
+        editor!.style.setProperty('--due-editor-y', '0px');
 
         const box = editor!.getBoundingClientRect();
         let shift = 0;
@@ -301,15 +300,17 @@ function initDueDate(root: ParentNode): void {
 
         editor!.style.setProperty('--due-editor-x', `${shift}px`);
 
-        const anchor = control!.getBoundingClientRect();
-        const room = {
-            below: window.innerHeight - anchor.bottom - margin,
-            above: anchor.top - margin,
-        };
+        let lift = 0;
 
-        if (box.height > room.below && room.above >= box.height) {
-            editor!.dataset.placement = 'top';
+        if (box.bottom > window.innerHeight - margin) {
+            lift = window.innerHeight - margin - box.bottom;
         }
+
+        if (box.top + lift < margin) {
+            lift = margin - box.top;
+        }
+
+        editor!.style.setProperty('--due-editor-y', `${lift}px`);
     }
 
     function openEditor(): void {
@@ -323,8 +324,8 @@ function initDueDate(root: ParentNode): void {
         setError(null);
         describeEditorValue();
         place();
-        // The panel is anchored, not in the flow: focusing must not scroll the page unless the panel still runs off the screen
-        // (neither below nor above the button had room for it).
+        // The panel is out of the flow: focusing must not scroll the page unless the panel still runs off the screen even after
+        // being nudged (it is taller than the room).
         input!.focus({ preventScroll: true });
 
         const box = editor!.getBoundingClientRect();

@@ -158,21 +158,21 @@ it('has no keep/set dropdown and no accordion', function () {
     expect(composerPage($this->ticket, $this->operator)->query('//select[@name="due_action"] | //details')->length)->toBe(0);
 });
 
-it('anchors a small labelled editor panel beneath the button instead of widening the joined control', function () {
+it('lays a small labelled editor panel over the button instead of widening the joined control', function () {
     $page = composerPage($this->ticket, $this->operator);
     $control = uiOne($page, '//*[@data-due-control]');
     $panel = uiOne($page, '//*[@data-due-editor]');
     $classes = ' '.preg_replace('/\s+/', ' ', $panel->getAttribute('class')).' ';
 
-    // Inside the control, after the button (so it can be positioned under it), closed until the script opens it.
+    // Inside the control, after the button (so it can be positioned over it), closed until the script opens it.
     expect($page->query('.//*[@data-due-editor]', $control)->length)->toBe(1)
         ->and($panel->hasAttribute('hidden'))->toBeTrue()
         ->and($panel->getAttribute('role'))->toBe('group')
         ->and($panel->getAttribute('aria-labelledby'))->toBe('due-date-editor-title')
         ->and(trim(uiOne($page, '//*[@id="due-date-editor-title"]')->textContent))->toBe('Change due date')
         ->and(trim(uiOne($page, '//*[@id="due-date-editor-zone"]')->textContent))->toBe('UTC')
-        // Out of the flow (nothing around it moves), under the button, on the overlay surface and within the viewport.
-        ->and($classes)->toContain(' absolute ', ' top-full ', ' rounded-overlay ', ' bg-surface ', ' shadow-overlay ', ' max-w-(--due-editor-max) ')
+        // Out of the flow (nothing around it moves), its field over the button, on the overlay surface and nudged into the viewport.
+        ->and($classes)->toContain(' absolute ', ' -top-12.5 ', ' translate-y-(--due-editor-y) ', ' rounded-overlay ', ' bg-surface ', ' shadow-overlay ', ' max-w-(--due-editor-max) ')
         // The toggle and the date button keep the controls' own button classes, not the panel's.
         ->and($page->query('.//*[@data-due-trigger]', $control)->length)->toBe(1)
         ->and($page->query('//*[@data-due-trigger][@hidden]')->length)->toBe(0);
