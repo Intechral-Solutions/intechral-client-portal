@@ -172,7 +172,7 @@ it('lays a small labelled editor panel over the button instead of widening the j
         ->and(trim(uiOne($page, '//*[@id="due-date-editor-title"]')->textContent))->toBe('Change due date')
         ->and(trim(uiOne($page, '//*[@id="due-date-editor-zone"]')->textContent))->toBe('UTC')
         // Out of the flow (nothing around it moves), its field over the button, on the overlay surface and nudged into the viewport.
-        ->and($classes)->toContain(' absolute ', ' -top-12.5 ', ' translate-y-(--due-editor-y) ', ' rounded-overlay ', ' bg-surface ', ' shadow-overlay ', ' max-w-(--due-editor-max) ')
+        ->and($classes)->toContain(' absolute ', ' -top-14 ', ' translate-y-(--due-editor-y) ', ' rounded-overlay ', ' bg-surface ', ' shadow-overlay ', ' max-w-(--due-editor-max) ')
         // The toggle and the date button keep the controls' own button classes, not the panel's.
         ->and($page->query('.//*[@data-due-trigger]', $control)->length)->toBe(1)
         ->and($page->query('//*[@data-due-trigger][@hidden]')->length)->toBe(0);

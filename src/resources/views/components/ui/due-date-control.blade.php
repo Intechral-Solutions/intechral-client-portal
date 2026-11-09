@@ -15,9 +15,9 @@
     - The editor input is DETACHED from the form (`form` names no form): it is never submitted, and the browser never runs its
       own min/max validation on it, so a plain reply is never blocked by a half-typed or stale date. The script validates it
       against the live clock before it counts, and the server re-validates whatever is posted.
-    - The panel is `absolute`, so opening it moves nothing. Its top edge sits 50px above the button (`-top-12.5`) because the
-      field starts 48px into the panel (16px padding + the 20px heading line + 12px gap): the field therefore lands over the
-      button (2px above its top, as the field is 40px tall to the button's 36px), as if the button had turned into the field.
+    - The panel is `absolute`, so opening it moves nothing. Its top edge sits 56px above the button (`-top-14`) and the field
+      starts 48px into the panel (16px padding + the 20px heading line + 12px gap), so the field lands over the button, 8px above
+      its top (the field is 40px tall to the button's 36px), as if the button had turned into the field with the heading above it.
       The script only sets three custom properties on it (`--due-editor-x`, `--due-editor-y`, `--due-editor-max`) to nudge it back
       inside the viewport on a narrow or short screen; the look is all static classes.
       Inside: a heading and the zone, the one field (dominant), a muted relative-time line (the touch-screen twin of the
@@ -119,7 +119,7 @@
     </button>
 
     <div id="due-date-editor" data-due-editor hidden role="group" aria-labelledby="due-date-editor-title"
-         class="absolute -top-12.5 left-(--due-editor-x) z-20 w-80 max-w-(--due-editor-max) translate-y-(--due-editor-y) rounded-overlay bg-surface p-4 text-text shadow-overlay">
+         class="absolute -top-14 left-(--due-editor-x) z-20 w-80 max-w-(--due-editor-max) translate-y-(--due-editor-y) rounded-overlay bg-surface p-4 text-text shadow-overlay">
         <div class="flex items-baseline justify-between gap-3">
             <p id="due-date-editor-title" class="text-sm font-semibold">Change due date</p>
             <span id="due-date-editor-zone" class="text-xs font-medium text-text-muted">{{ $zone }}</span>

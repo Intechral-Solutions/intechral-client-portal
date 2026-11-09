@@ -244,13 +244,14 @@ test.describe('the inline due-date control', () => {
             expect(after).toEqual(before);
             expect(await operator.evaluate(() => window.scrollY)).toBe(scrollBefore);
 
-            // The field takes the place of the button: it is centred on it, and the panel starts at the button's left edge.
+            // The field takes the place of the button: it starts a little above it (the heading sits over the button's top edge) and
+            // still overlaps it, and the panel starts at the button's left edge.
             const triggerBox = before[1]!;
             const panelBox = (await panel.boundingBox())!;
             const fieldBox = (await dueInput(operator).boundingBox())!;
-            expect(
-                Math.abs(fieldBox.y + fieldBox.height / 2 - (triggerBox.y + triggerBox.height / 2)),
-            ).toBeLessThan(3);
+            expect(fieldBox.y).toBeLessThan(triggerBox.y);
+            expect(triggerBox.y - fieldBox.y).toBeLessThanOrEqual(12);
+            expect(fieldBox.y + fieldBox.height).toBeGreaterThan(triggerBox.y + 16);
             expect(panelBox.y).toBeLessThan(triggerBox.y);
             expect(Math.abs(panelBox.x - triggerBox.x)).toBeLessThan(2); // aligned to the button when there is room
 
