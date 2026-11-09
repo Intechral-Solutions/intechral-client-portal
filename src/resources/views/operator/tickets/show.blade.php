@@ -117,7 +117,6 @@
                         @endif
                     </div>
                     @if ($canAdjustDue)
-                    <p id="due-date-editor-message" role="alert" hidden class="text-sm text-danger"></p>
                     <x-ui.field-error for="due_action" />
                     <x-ui.field-error for="due_at" />
                     @endif

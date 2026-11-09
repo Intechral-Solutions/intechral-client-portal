@@ -7,7 +7,9 @@
  * - flips the visibility toggle and the hidden `is_internal` input it stands for (pressed = Hidden = `1`);
  * - turns what the operator did with the due-date control into the EXISTING `due_action` / `due_at` fields:
  *   nothing → `keep` (and no `due_at`); a different date → `set` + that wall-clock text; the explicit button → `restore`;
- * - draws the effective or pending date with its urgency, and keeps the urgency current while the page stays open.
+ * - draws the effective or pending date with its urgency, and keeps the urgency current while the page stays open;
+ * - opens the editor as a small panel anchored beneath the date button (it never resizes or moves the joined controls) and
+ *   keeps that panel inside the viewport.
  *
  * Nothing is saved here: no fetch, no endpoint. A change stays pending in the two hidden inputs until the operator posts the
  * update, and a refused post is refilled from `old()` by the Blade view, which this file reads back on load.
@@ -125,6 +127,7 @@ function initDueDate(root: ParentNode): void {
     const relative = control.querySelector<HTMLElement>('[data-due-relative]');
     const restore = control.querySelector<HTMLButtonElement>('[data-due-restore]');
     const discard = control.querySelector<HTMLButtonElement>('[data-due-discard]');
+    const actions = control.querySelector<HTMLElement>('[data-due-actions]');
 
     if (!trigger || !editor || !input || !actionField || !atField || !text || !tip) {
         return;
@@ -250,6 +253,11 @@ function initDueDate(root: ParentNode): void {
             discard.hidden = pending === null;
         }
 
+        if (actions) {
+            // The footer is only there while it has something to offer.
+            actions.hidden = (restore?.hidden ?? true) && (discard?.hidden ?? true);
+        }
+
         syncFields();
     }
 
@@ -262,7 +270,46 @@ function initDueDate(root: ParentNode): void {
         const wall = input!.value;
         const epoch = wall === '' ? null : wallToEpoch(wall, timeZone);
 
-        relative.textContent = epoch === null ? '' : `· ${relativeLabel(epoch - now())}`;
+        relative.textContent = epoch === null ? '' : relativeLabel(epoch - now());
+    }
+
+    /**
+     * Keep the panel inside the viewport. It is `absolute` under the button, so on a wide screen it simply sits there; on a narrow one
+     * it is shifted left by exactly as much as it overhangs, and capped to the viewport's width. Only two custom properties are set:
+     * the look is static classes. If there is no room beneath the button but there is above it, the panel opens upward instead of
+     * making the page scroll (`data-placement="top"`).
+     */
+    function place(): void {
+        const margin = 8;
+        const viewport = document.documentElement.clientWidth;
+
+        delete editor!.dataset.placement;
+
+        editor!.style.setProperty('--due-editor-max', `${Math.max(viewport - 2 * margin, 0)}px`);
+        editor!.style.setProperty('--due-editor-x', '0px');
+
+        const box = editor!.getBoundingClientRect();
+        let shift = 0;
+
+        if (box.right > viewport - margin) {
+            shift = viewport - margin - box.right;
+        }
+
+        if (box.left + shift < margin) {
+            shift = margin - box.left;
+        }
+
+        editor!.style.setProperty('--due-editor-x', `${shift}px`);
+
+        const anchor = control!.getBoundingClientRect();
+        const room = {
+            below: window.innerHeight - anchor.bottom - margin,
+            above: anchor.top - margin,
+        };
+
+        if (box.height > room.below && room.above >= box.height) {
+            editor!.dataset.placement = 'top';
+        }
     }
 
     function openEditor(): void {
@@ -270,13 +317,21 @@ function initDueDate(root: ParentNode): void {
         before = pending;
         control!.setAttribute('data-editing', '');
         delete control!.dataset.dismissed;
-        trigger!.hidden = true;
         trigger!.setAttribute('aria-expanded', 'true');
         editor!.hidden = false;
         input!.value = shown()?.wall ?? '';
         setError(null);
         describeEditorValue();
-        input!.focus();
+        place();
+        // The panel is anchored, not in the flow: focusing must not scroll the page unless the panel still runs off the screen
+        // (neither below nor above the button had room for it).
+        input!.focus({ preventScroll: true });
+
+        const box = editor!.getBoundingClientRect();
+
+        if (box.bottom > window.innerHeight || box.top < 0) {
+            editor!.scrollIntoView({ block: 'nearest' });
+        }
     }
 
     function closeEditor(returnFocus: boolean): void {
@@ -284,7 +339,6 @@ function initDueDate(root: ParentNode): void {
         closeAfterPress = false;
         control!.removeAttribute('data-editing');
         editor!.hidden = true;
-        trigger!.hidden = false;
         trigger!.setAttribute('aria-expanded', 'false');
         setError(null);
         render();
@@ -360,7 +414,33 @@ function initDueDate(root: ParentNode): void {
         return true;
     }
 
-    trigger.addEventListener('click', openEditor);
+    // The button stays in place while the panel is open and works as its toggle: a click takes what the field holds (or, if that
+    // cannot be taken, leaves the panel open with the reason) and closes it.
+    trigger.addEventListener('click', () => {
+        if (!editing) {
+            openEditor();
+
+            return;
+        }
+
+        if (commit()) {
+            closeEditor(true);
+        }
+    });
+
+    // Pressing the button while the panel is open must not pull focus out of the field first (which would commit and collapse the
+    // panel before the click arrives, only for the click to reopen it).
+    trigger.addEventListener('mousedown', (event) => {
+        if (editing) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (editing) {
+            place();
+        }
+    });
 
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {

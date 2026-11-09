@@ -68,14 +68,16 @@ function mount(options: Options = {}) {
                     </button>
                     <div id="due-date-editor" data-due-editor hidden>
                         <input type="datetime-local" data-due-input form="due-date-editor-detached">
-                        <span data-due-relative></span>
-                        ${hasOverride ? '<button type="button" data-due-restore>Restore SLA</button>' : ''}
-                        <button type="button" data-due-discard hidden>Undo change</button>
+                        <p data-due-relative></p>
+                        <p id="due-date-editor-message" role="alert" hidden></p>
+                        <div data-due-actions${action === 'keep' && !hasOverride ? ' hidden' : ''}>
+                            ${hasOverride ? '<button type="button" data-due-restore>Restore SLA</button>' : ''}
+                            <button type="button" data-due-discard hidden>Undo change</button>
+                        </div>
                     </div>
                     <span id="due-date-tip" role="tooltip" data-due-tip></span>
                 </div>
             </div>
-            <p id="due-date-editor-message" role="alert" hidden></p>
             <div data-composer-announcer role="status"></div>
             <button type="submit">Post Update</button>
         </form>`;
@@ -100,6 +102,7 @@ function mount(options: Options = {}) {
         announcer: q<HTMLElement>('[data-composer-announcer]'),
         restore: document.querySelector<HTMLButtonElement>('[data-due-restore]'),
         discard: q<HTMLButtonElement>('[data-due-discard]'),
+        actions: q<HTMLElement>('[data-due-actions]'),
     };
 }
 
@@ -190,16 +193,135 @@ describe('the due-date control — inference of the server fields', () => {
         expect(trigger.dataset.pending).toBeUndefined();
     });
 
-    it('opens the editor in place of the button and puts focus in the field', () => {
+    it('opens the editor panel beneath the button, which stays put, and puts focus in the field', () => {
         const { trigger, editor, input } = mount();
 
         trigger.click();
 
-        expect(trigger.hidden).toBe(true);
+        expect(trigger.hidden).toBe(false);
         expect(editor.hidden).toBe(false);
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
+        expect(trigger.closest('[data-due-control]')!.hasAttribute('data-editing')).toBe(true);
         expect(document.activeElement).toBe(input);
         expect(input.value).toBe('2026-11-05T10:00');
+    });
+
+    it('closes again, handing focus back to the button, when the button is pressed while the panel is open', () => {
+        const { trigger, editor, input, action } = mount();
+
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        trigger.click();
+
+        expect(editor.hidden).toBe(true);
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(action.value).toBe('set');
+        expect(document.activeElement).toBe(trigger);
+    });
+
+    it('does not let a press on the button pull focus out of the field while the panel is open', () => {
+        const { trigger } = mount();
+        const closed = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+        trigger.dispatchEvent(closed);
+        expect(closed.defaultPrevented).toBe(false);
+
+        trigger.click();
+        const open = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+        trigger.dispatchEvent(open);
+        expect(open.defaultPrevented).toBe(true);
+    });
+
+    it('leaves the panel open, with the reason, when the button is pressed over a value that cannot be taken', () => {
+        const { trigger, editor, input, error } = mount();
+
+        trigger.click();
+        type(input, '2026-11-03T10:00');
+        trigger.click();
+
+        expect(editor.hidden).toBe(false);
+        expect(error.hidden).toBe(false);
+    });
+
+    it('keeps the panel inside a narrow viewport by shifting and capping it with two custom properties', () => {
+        const { trigger, editor } = mount();
+        Object.defineProperty(document.documentElement, 'clientWidth', {
+            value: 360,
+            configurable: true,
+        });
+        editor.getBoundingClientRect = () =>
+            ({ left: 180, right: 500, top: 0, bottom: 100, width: 320, height: 100 }) as DOMRect;
+
+        trigger.click();
+
+        expect(editor.style.getPropertyValue('--due-editor-max')).toBe('344px');
+        expect(editor.style.getPropertyValue('--due-editor-x')).toBe('-148px');
+    });
+
+    it('opens upward instead of scrolling the page when there is room above the button but not below', () => {
+        const { trigger, editor } = mount();
+        const control = trigger.closest<HTMLElement>('[data-due-control]')!;
+        const scroll = vi.fn();
+        editor.scrollIntoView = scroll;
+        Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+        control.getBoundingClientRect = () =>
+            ({ left: 100, right: 300, top: 600, bottom: 636, width: 200, height: 36 }) as DOMRect;
+        // Beneath the button it would run to 844; above it, it sits at 392-592.
+        editor.getBoundingClientRect = () =>
+            (editor.dataset.placement === 'top'
+                ? { left: 100, right: 420, top: 392, bottom: 592, width: 320, height: 200 }
+                : {
+                      left: 100,
+                      right: 420,
+                      top: 644,
+                      bottom: 844,
+                      width: 320,
+                      height: 200,
+                  }) as DOMRect;
+
+        trigger.click();
+
+        expect(editor.dataset.placement).toBe('top');
+        expect(scroll).not.toHaveBeenCalled();
+    });
+
+    it('stays beneath the button when it fits there, and scrolls only when it fits nowhere', () => {
+        const { trigger, editor } = mount();
+        const control = trigger.closest<HTMLElement>('[data-due-control]')!;
+        const scroll = vi.fn();
+        editor.scrollIntoView = scroll;
+        Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+        editor.getBoundingClientRect = () =>
+            ({ left: 100, right: 420, top: 300, bottom: 500, width: 320, height: 200 }) as DOMRect;
+        control.getBoundingClientRect = () =>
+            ({ left: 100, right: 300, top: 100, bottom: 136, width: 200, height: 36 }) as DOMRect;
+
+        trigger.click();
+        expect(editor.dataset.placement).toBeUndefined();
+        expect(scroll).not.toHaveBeenCalled();
+
+        key(editor, 'Escape');
+        control.getBoundingClientRect = () =>
+            ({ left: 100, right: 300, top: 60, bottom: 96, width: 200, height: 36 }) as DOMRect;
+        editor.getBoundingClientRect = () =>
+            ({ left: 100, right: 420, top: 104, bottom: 304, width: 320, height: 200 }) as DOMRect;
+        Object.defineProperty(window, 'innerHeight', { value: 250, configurable: true });
+        trigger.click();
+        expect(editor.dataset.placement).toBeUndefined();
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+    });
+
+    it('does not move the panel when it already fits', () => {
+        const { trigger, editor } = mount();
+        Object.defineProperty(document.documentElement, 'clientWidth', {
+            value: 1200,
+            configurable: true,
+        });
+        editor.getBoundingClientRect = () =>
+            ({ left: 300, right: 620, top: 0, bottom: 100, width: 320, height: 100 }) as DOMRect;
+
+        trigger.click();
+
+        expect(editor.style.getPropertyValue('--due-editor-x')).toBe('0px');
     });
 
     it('keeps when the date is left unchanged', () => {
@@ -365,17 +487,64 @@ describe('the due-date control — inference of the server fields', () => {
     });
 
     it('lets the operator undo a pending change', () => {
-        const { trigger, input, action, discard, at } = mount();
+        const { trigger, input, action, discard, at, actions, editor } = mount();
 
+        expect(actions.hidden).toBe(true);
         trigger.click();
         type(input, '2026-11-08T16:45');
         key(input, 'Enter');
         trigger.click();
         expect(discard.hidden).toBe(false);
+        expect(actions.hidden).toBe(false);
         discard.click();
 
         expect(action.value).toBe('keep');
         expect(at.value).toBe('');
+        expect(editor.hidden).toBe(true);
+        expect(actions.hidden).toBe(true);
+        expect(document.activeElement).toBe(trigger);
+    });
+
+    it('offers Restore SLA while an override exists and Undo change only while something is pending: two distinct actions', () => {
+        const { trigger, input, restore, discard, actions } = mount({
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+        });
+
+        expect(actions.hidden).toBe(false);
+        expect(restore!.hidden).toBe(false);
+        expect(discard.hidden).toBe(true);
+
+        trigger.click();
+        restore!.click();
+        trigger.click();
+        // A pending restore: nothing left to restore, but the pending change can be undone.
+        expect(restore!.hidden).toBe(true);
+        expect(discard.hidden).toBe(false);
+        expect(actions.hidden).toBe(false);
+
+        discard.click();
+        expect(restore!.hidden).toBe(false);
+        expect(discard.hidden).toBe(true);
+        expect(input.value).not.toBe('');
+    });
+
+    it('undoing a pending date and restoring the SLA end in different states', () => {
+        const { trigger, input, action, discard, restore } = mount({
+            hasOverride: true,
+            original: '2026-11-06T09:00',
+        });
+
+        trigger.click();
+        type(input, '2026-11-08T16:45');
+        key(input, 'Enter');
+        trigger.click();
+        discard.click();
+        expect(action.value).toBe('keep');
+
+        trigger.click();
+        restore!.click();
+        expect(action.value).toBe('restore');
     });
 
     it('refills a refused post: a pending set stays pending', () => {
@@ -565,13 +734,13 @@ describe('the due-date control — review hardening', () => {
         const relative = document.querySelector<HTMLElement>('[data-due-relative]')!;
 
         trigger.click();
-        expect(relative.textContent).toBe('· Due in 1 day');
+        expect(relative.textContent).toBe('Due in 1 day');
 
         type(input, '2026-11-04T12:00');
-        expect(relative.textContent).toBe('· Due in 2 hours');
+        expect(relative.textContent).toBe('Due in 2 hours');
 
         type(input, '2026-11-04T09:30');
-        expect(relative.textContent).toBe('· Overdue by 30 minutes');
+        expect(relative.textContent).toBe('Overdue by 30 minutes');
 
         type(input, '');
         expect(relative.textContent).toBe('');

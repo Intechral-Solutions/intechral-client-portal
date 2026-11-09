@@ -207,6 +207,18 @@ test('restoring the SLA deadline is a recorded, reasoned change', async ({ page,
         await expect(trigger(operator)).toHaveAttribute('data-pending', 'restore');
         await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
         await expect(operator.locator('[data-due-at]')).toHaveValue('');
+
+        // Restore and Undo are different things: with a restore pending there is nothing left to restore, but it can be undone,
+        // which puts the override back as the effective date.
+        await trigger(operator).click();
+        await expect(operator.locator('[data-due-restore]')).toBeHidden();
+        await operator.locator('[data-due-discard]').click();
+        await expect(trigger(operator)).not.toHaveAttribute('data-pending', /.*/);
+        await expect(operator.locator('[data-due-action]')).toHaveValue('keep');
+        await trigger(operator).click();
+        await expect(operator.locator('[data-due-restore]')).toBeVisible();
+        await operator.locator('[data-due-restore]').click();
+        await expect(operator.locator('[data-due-action]')).toHaveValue('restore');
         await operator.getByRole('button', { name: 'Post Update' }).click();
         await expect(operator.getByText('Reply added and due date updated.')).toBeVisible();
 

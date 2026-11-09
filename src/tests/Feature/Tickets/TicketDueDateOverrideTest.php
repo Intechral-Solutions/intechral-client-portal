@@ -156,7 +156,7 @@ it('also refuses at the service when a customer author is handed an adjustment',
 it('offers the due-date control to an operator and never to the requester page', function () {
     $this->actingAs($this->operator)->get(route('operator.tickets.show', $this->ticket))
         ->assertOk()->assertSee('data-due-control', false)->assertSee('data-due-trigger', false)
-        ->assertDontSee('Change due date')->assertDontSee('data-due-date-adjust', false);
+        ->assertSee('Change due date')->assertDontSee('data-due-date-adjust', false);
 
     $page = $this->actingAs($this->owner)->get(route('tickets.show', $this->ticket))->assertOk()->getContent();
     expect($page)->not->toContain('due_action')->and($page)->not->toContain('Change due date')->and($page)->not->toContain('due_at')

@@ -152,10 +152,66 @@ it('renders the effective date as a button, with the zone, the instant and the b
 
 it('has no keep/set dropdown and no accordion', function () {
     $this->actingAs($this->operator)->get($this->show)->assertOk()
-        ->assertDontSee('Change due date')->assertDontSee('Keep the current due date')->assertDontSee('Set a new due date')
+        ->assertDontSee('Keep the current due date')->assertDontSee('Set a new due date')
         ->assertDontSee('data-due-date-adjust', false);
 
     expect(composerPage($this->ticket, $this->operator)->query('//select[@name="due_action"] | //details')->length)->toBe(0);
+});
+
+it('anchors a small labelled editor panel beneath the button instead of widening the joined control', function () {
+    $page = composerPage($this->ticket, $this->operator);
+    $control = uiOne($page, '//*[@data-due-control]');
+    $panel = uiOne($page, '//*[@data-due-editor]');
+    $classes = ' '.preg_replace('/\s+/', ' ', $panel->getAttribute('class')).' ';
+
+    // Inside the control, after the button (so it can be positioned under it), closed until the script opens it.
+    expect($page->query('.//*[@data-due-editor]', $control)->length)->toBe(1)
+        ->and($panel->hasAttribute('hidden'))->toBeTrue()
+        ->and($panel->getAttribute('role'))->toBe('group')
+        ->and($panel->getAttribute('aria-labelledby'))->toBe('due-date-editor-title')
+        ->and(trim(uiOne($page, '//*[@id="due-date-editor-title"]')->textContent))->toBe('Change due date')
+        ->and(trim(uiOne($page, '//*[@id="due-date-editor-zone"]')->textContent))->toBe('UTC')
+        // Out of the flow (nothing around it moves), under the button, on the overlay surface and within the viewport.
+        ->and($classes)->toContain(' absolute ', ' top-full ', ' rounded-overlay ', ' bg-surface ', ' shadow-overlay ', ' max-w-(--due-editor-max) ')
+        // The toggle and the date button keep the controls' own button classes, not the panel's.
+        ->and($page->query('.//*[@data-due-trigger]', $control)->length)->toBe(1)
+        ->and($page->query('//*[@data-due-trigger][@hidden]')->length)->toBe(0);
+
+    // The field is the panel's one input, full width; the relative-time line and the error line belong to the panel and are described by it.
+    $input = uiOne($page, '//input[@type="datetime-local"]');
+    expect($page->query('.//input[@type="datetime-local"]', $panel)->length)->toBe(1)
+        ->and(' '.$input->getAttribute('class').' ')->toContain(' w-full ')
+        ->and($page->query('.//*[@id="due-date-editor-help"][@data-due-relative]', $panel)->length)->toBe(1)
+        ->and($page->query('.//*[@id="due-date-editor-message"][@role="alert"][@hidden]', $panel)->length)->toBe(1);
+});
+
+it('offers no footer actions on a plain ticket, only Restore SLA with an override, and Undo change only as a hidden hook', function () {
+    $plain = composerPage($this->ticket, $this->operator);
+
+    expect(uiOne($plain, '//*[@data-due-actions]')->hasAttribute('hidden'))->toBeTrue()
+        ->and($plain->query('//*[@data-due-restore]')->length)->toBe(0)
+        ->and(uiOne($plain, '//*[@data-due-discard]')->hasAttribute('hidden'))->toBeTrue()
+        ->and(trim(uiOne($plain, '//*[@data-due-discard]')->textContent))->toBe('Undo change');
+
+    $this->ticket->forceFill(['due_override_at' => Carbon::parse('2026-11-09 14:30:00')])->saveQuietly();
+    $overridden = composerPage($this->ticket, $this->operator);
+
+    expect(uiOne($overridden, '//*[@data-due-actions]')->hasAttribute('hidden'))->toBeFalse()
+        ->and(uiOne($overridden, '//*[@data-due-restore]')->hasAttribute('hidden'))->toBeFalse()
+        ->and(uiOne($overridden, '//*[@data-due-restore]')->getAttribute('title'))->toContain('05 Nov 2026 10:00')
+        ->and(uiOne($overridden, '//*[@data-due-discard]')->hasAttribute('hidden'))->toBeTrue();
+});
+
+it('shows Undo change from the first paint when a refused post left a pending date', function () {
+    $this->actingAs($this->operator)->from($this->show)
+        ->post(route('operator.tickets.replies.store', $this->ticket), ['body' => '', 'due_action' => 'set', 'due_at' => '2026-11-10T14:30'])
+        ->assertRedirect($this->show)->assertSessionHasErrors();
+
+    $page = composerPage($this->ticket, $this->operator);
+
+    expect(uiOne($page, '//*[@data-due-actions]')->hasAttribute('hidden'))->toBeFalse()
+        ->and(uiOne($page, '//*[@data-due-discard]')->hasAttribute('hidden'))->toBeFalse()
+        ->and(uiOne($page, '//*[@data-due-trigger]')->getAttribute('data-pending'))->toBe('set');
 });
 
 it('carries no pending change by default: keep, and no date', function () {
