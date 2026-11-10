@@ -137,12 +137,18 @@ The capability names in the table above are the closest existing permissions, us
 - **Target:** one requester's request/conversation, linked to a Person (requester) and, where relevant, an Organization; optionally linked to an Incident, Knowledge, Tasks, and Time.
 - **Open:** requester as Person (non-User requesters, e.g. email-originated); organization-level ticket visibility for customers; category/priority/SLA model.
 
+### Service Request
+
+- **Current:** no persisted ticket-type discriminator or subtype model. Existing Tickets already support customers asking for help and work.
+- **Target:** the first intended **classification of Ticket** for customer-facing requests and support conversations, potentially reflected in user-facing terminology when useful. It does not imply a separate database entity or inheritance hierarchy.
+- **Open:** when a formal type field or type-specific behavior earns its keep; how existing tickets are classified if more ticket types are introduced. No Release 1.0 schema or workflow dependency is created.
+
 ### Incident
 
 - **Current:** none.
-- **Target:** a service-affecting event linking many Tickets, People, and Organizations; managed centrally by operators while each requester keeps their own Ticket.
-- **Open:** Incident lifecycle; whether customers see Incident status (e.g. a status notice on linked Tickets).
-- **Direction (2026-11-09):** [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md) treats Service Request and Incident as conceptual specializations of Ticket. An Incident may publish updates to associated Service Requests only through explicit visibility choices, with tenant isolation and no implicit status cascade. Storage, association cardinality and any Outage type remain undecided.
+- **Target:** a **separate operational entity**, not a Ticket subtype, for investigating and responding to a failure, degradation, disruption, or service-affecting event. An Incident has its own identity, lifecycle, and affected scope. Several customer Tickets may relate to one Incident, and an Incident can exist without any Ticket.
+- **Open:** Incident lifecycle, authorized audience and update publication, ticket association cardinality/storage, and integration with monitoring evidence. Outage may eventually be an Incident classification or impact condition; neither is decided.
+- **Direction (2026-11-09):** revised [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md) establishes a distinct operational Incident entity. Internal Incident information does not become customer-visible through a Ticket association; any selected updates require explicit publication, authorization and tenant isolation. No implicit Ticket-status cascade.
 
 ### Knowledge
 
@@ -199,7 +205,7 @@ Conceptual map. The **Current** column states what exists in the database today;
 | Task ↔ Ticket | Work derived from a request | `tasks.ticket_id` (no creation path) |
 | Ticket ↔ Person/Organization | Requester (Person) and affected Organization | `tickets.user_id` (User), `tickets.company_id` (CRM company) |
 | Ticket ↔ Time | Support effort | `time_entries.ticket_id` |
-| Ticket ↔ Incident | Many Tickets to one Incident (product intent; cardinality and storage open, [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md)) | None |
+| Ticket ↔ Incident | Optional relationship between distinct entities; many Tickets may report one Incident, exact cardinality and storage open ([ADR-009](../architecture/adr/ADR-009-ticket-specialization.md)) | None |
 | Ticket ↔ Knowledge | Articles used in or drafted from a resolution | None |
 | Incident ↔ Knowledge | Articles describing the event/workaround | None |
 | Incident ↔ Organization | Affected organizations | None |
@@ -221,7 +227,7 @@ Conceptual map. The **Current** column states what exists in the database today;
 | Customer / client (implicit; `client_id`; `user` role) | Relationship classification "customer" | Directory → Relationships / customer view | Not an entity type |
 | Partner | Relationship classification "partner" | Directory → Relationships | New |
 | Client (as invoice recipient) | Billing / Commercial Account (Future) | Finance | "Customer" ≠ "entity we invoice" |
-| Tickets / Ticket Queue | Helpdesk → Tickets | **Helpdesk** | Customer-facing label may be "Help" or "Support" (Provisional) |
+| Tickets / Ticket Queue | Helpdesk → Tickets (Service Request as first intended classification) | **Helpdesk** | Customer-facing labels may use "Requests", "Help" or "Support" as appropriate; classification is not an implemented field |
 | Billing | Finance → Billing / Invoices | **Finance** | Locked |
 | Pages (viewer) / CMS Pages (operator) | CMS Page; some content may become Knowledge | System → Pages (management); viewer placement Open | |
 | Manage (nav group) | Split into System and workspace-level operator surfaces | — | Retired as a concept |

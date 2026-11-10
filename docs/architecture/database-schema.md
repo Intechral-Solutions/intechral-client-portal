@@ -91,7 +91,7 @@ Pivot: `user_id` + `organization_id` + `role` (`admin` or `member`). The pair is
 
 ### Tickets Module
 
-> **Direction (2026-11-09):** the `tickets` model is expected to be reassessed as ticket specializations (Service Request, Incident, later types) become concrete. No field moves now and no mechanism is chosen; see [ADR-009](./adr/ADR-009-ticket-specialization.md).
+> **Direction (2026-11-09):** `Ticket` remains the existing support-record model. Service Request is its first intended classification, without requiring a type column today. Incident is a future, **separate operational entity**, not a Ticket subtype. No schema change or speculative relationship is required for Release 1.0; see revised [ADR-009](./adr/ADR-009-ticket-specialization.md).
 
 - `tickets` — id, user_id, company_id nullable, ticket_number (the unique public reference `TK-XXXXX-XXXXX`, random and immutable, [ADR-008](./adr/ADR-008-ticket-public-reference.md); the numeric id stays internal), title, description, category, priority, status, assignee_id
 - `ticket_replies` — ticket_id, user_id, body, is_internal
