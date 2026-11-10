@@ -5,10 +5,13 @@ use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Shared\Permissions\PermissionCatalogue;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: these suites model a customer explicitly granted what the built-in `user` role no longer carries.
+    $this->grantUserRole(...PermissionCatalogue::RETIRED_USER_DEFAULTS);
 });
 
 /**

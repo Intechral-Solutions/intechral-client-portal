@@ -66,10 +66,10 @@ it('TARGET H5: an ineligible assignee is a validation error; nothing changes and
         ->and(Activity::forSubject($ticket)->count())->toBe(0);
 })->with(['customer (user role)', 'custom role without tickets.assign', 'role-less account']);
 
-it('TARGET H5: a tickets.assign holder is accepted whatever their role name (custom role, direct grant)', function (string $kind) {
+it('TARGET H5: an operator holding tickets.assign is accepted whatever their role name (custom role, direct grants)', function (string $kind) {
     $eligible = match ($kind) {
         'custom role' => ticketAgent(),
-        'direct grant on the user role' => tap(ticketUser())->givePermissionTo('tickets.assign'),
+        'direct grant on the user role' => tap(ticketUser())->givePermissionTo(['tickets.assign', 'portal.operator']),
     };
     $ticket = ticketFor(ticketUser());
 

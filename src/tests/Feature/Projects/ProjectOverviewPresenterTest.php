@@ -58,6 +58,8 @@ function overviewOf(Project $project, User $viewer): array
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
     Carbon::setTestNow('2026-06-15 12:00:00');
     $this->owner = makeUser('operator', ['name' => 'Owner Olive', 'email' => 'olive@example.test']);
     $this->project = makeProject($this->owner, 'Alpha');

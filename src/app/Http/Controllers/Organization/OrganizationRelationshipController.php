@@ -15,8 +15,8 @@ use Illuminate\Validation\Rule;
  *
  * Authorization is the FIRST statement of every action: OrganizationPolicy::manageRelationships needs `portal.operator`
  * AND `crm.manage`. The organizations are then resolved by id, deliberately unscoped, and never through route-model binding:
- * the tenant scope still keys on the `operator` role name and would answer 404 for a custom-role operator, and, worse, would
- * let a scoped lookup stand in for an integrity decision. The service re-checks the policy and every rule under lock.
+ * the tenant scope (which keys on `portal.operator`, R1-1) would still answer 404 for an actor that is not eligible, and, worse,
+ * would let a scoped lookup stand in for an integrity decision. The service re-checks the policy and every rule under lock.
  */
 class OrganizationRelationshipController extends Controller
 {
@@ -103,8 +103,9 @@ class OrganizationRelationshipController extends Controller
 
     /**
      * Back to the organization's page when THIS actor can open it, otherwise to the organizations index. The check is
-     * deliberately scoped: organizations.show still binds through the tenant scope, which keys on the `operator` role name, so a
-     * custom-role operator who is not a member would be answered 404 for a change that just succeeded. The scopes are not widened.
+     * deliberately scoped: organizations.show binds through the tenant scope, which keys on `portal.operator` (R1-1): an operator-eligible actor,
+     * built-in or custom-role, opens every organization; an actor who is not eligible and not a member would be answered 404 for a change
+     * that just succeeded, so they go to the index instead.
      */
     private function back(Organization $organization, string $message): RedirectResponse
     {

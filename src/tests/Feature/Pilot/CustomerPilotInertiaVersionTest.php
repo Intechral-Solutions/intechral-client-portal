@@ -49,6 +49,15 @@ function versionHeaders(array $headers): array
     return array_map(fn ($value) => $value === '__CURRENT__' ? versionCurrent() : $value, $headers);
 }
 
+/**
+ * The redirect/location URL with the project id taken out of its `/projects/{id}` path segment, and nothing else: the scheme, host,
+ * port and query are left as they are, so an id that happens to occur in the port (42 in 4242) cannot change what is compared.
+ */
+function versionLocation(?string $location, int $id): ?string
+{
+    return $location === null ? null : preg_replace('#/projects/'.preg_quote((string) $id, '#').'(?![0-9])#', '/projects/{id}', $location);
+}
+
 /** A response reduced to what a client can compare; only the redirect/location URL (which echoes the request) has the id taken out. */
 function versionShape(TestResponse $response, int $id): array
 {
@@ -56,12 +65,27 @@ function versionShape(TestResponse $response, int $id): array
 
     return [
         'status' => $response->getStatusCode(),
-        'location' => $location === null ? null : str_replace((string) $id, '{id}', $location),
+        'location' => versionLocation($location, $id),
         // Not normalized: a body that mentions an id is itself the leak, so equal bodies mean no id appears in one.
         'body' => $response->getContent(),
         'vary' => $response->headers->get('Vary'),
     ];
 }
+
+it('normalizes only the project id in the URL path, never the same digits in the port or elsewhere', function () {
+    // An id of 42 against a port of 4242: the blanket string replace this helper once used turned the port into "{id}{id}".
+    expect(versionLocation('http://localhost:4242/projects/42', 42))->toBe('http://localhost:4242/projects/{id}')
+        ->and(versionLocation('http://localhost:4242/projects/4242', 4242))->toBe('http://localhost:4242/projects/{id}')
+        ->and(versionLocation('https://example.test:42/projects/42?ref=42#top', 42))->toBe('https://example.test:42/projects/{id}?ref=42#top')
+        ->and(versionLocation('http://localhost:4242/projects/421', 42))->toBe('http://localhost:4242/projects/421', 'another id that merely starts with the digits')
+        ->and(versionLocation('http://localhost/login', 42))->toBe('http://localhost/login')
+        ->and(versionLocation(null, 42))->toBeNull();
+
+    // Through the helper itself, on a real response object: the port survives, so two equivalent redirects still compare equal.
+    $redirect = fn (int $id) => new TestResponse(response('', 302, ['Location' => "http://localhost:4242/projects/{$id}"]));
+    expect(versionShape($redirect(42), 42))->toBe(versionShape($redirect(4242), 4242))
+        ->and(versionShape($redirect(42), 42)['location'])->toBe('http://localhost:4242/projects/{id}');
+});
 
 it('answers an unauthorized existing project and a nonexistent one identically, in every request form', function (string $form, array $headers) {
     $customer = pilotCustomer();

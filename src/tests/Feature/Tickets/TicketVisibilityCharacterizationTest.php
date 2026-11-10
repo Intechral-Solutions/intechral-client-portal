@@ -42,7 +42,8 @@ function ticketCompanyFixture(): array
 {
     $operator = ticketUser('operator');
     $owner = ticketUser();
-    $peer = ticketUser();
+    // tickets.view_org is no longer a built-in default (R1-1); it is granted explicitly so the test still proves it is inert.
+    $peer = tap(ticketUser())->givePermissionTo('tickets.view_org');
     $outsider = ticketUser();
 
     $organization = Organization::factory()->create(['owner_id' => $operator->id]);
@@ -130,8 +131,9 @@ it('BASELINE F-1 (D3: no write-path fix in EPIC-010D): ticket creation never per
 /** Ticket owned by a customer, assigned to the capability-only agent, with public and internal attachments. */
 function ticketRoleFixture(): array
 {
-    $owner = ticketUser();
-    $customer = ticketUser();
+    // Customers that hold time.log explicitly (R1-1: not a built-in default) so the O1 rule, not the route, refuses them.
+    $owner = ticketTimeUser();
+    $customer = ticketTimeUser();
     $operator = ticketUser('operator');
     $agent = ticketAgent(['name' => 'Capability Agent']);
     $ticket = ticketFor($owner, ['assignee_id' => $agent->id, 'status' => 'open', 'title' => 'Agent assigned ticket']);

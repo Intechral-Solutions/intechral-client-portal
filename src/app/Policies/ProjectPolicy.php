@@ -59,10 +59,13 @@ class ProjectPolicy
      * Who may add or remove project members, change member roles, or supply extra initial
      * members (EPIC-011E D7-B). Deliberately narrower than manage(): only projects.admin, and
      * independent of projects.manage. Called with a Project for an existing project and with
-     * the class name when a project is being created.
+     * the class name when a project is being created. A restricted customer is never admitted
+     * (R1-1): membership administration is operator work, and holding `projects.admin` without
+     * `portal.operator` must not let a customer add or remove people, which would otherwise be
+     * the one `administers()` rule this method did not share.
      */
     public function manageMembers(User $user, Project|string|null $project = null): bool
     {
-        return $user->can('projects.admin');
+        return $this->administers($user);
     }
 }

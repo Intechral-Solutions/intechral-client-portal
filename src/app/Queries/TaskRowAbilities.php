@@ -4,6 +4,7 @@ namespace App\Queries;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -46,7 +47,10 @@ final class TaskRowAbilities
             ->pluck('role', 'project_id')
             ->all();
 
-        return new self($actor, $roles, $actor->can('projects.admin'), $actor->can('projects.manage'));
+        // Restated from ProjectPolicy::administers(): `projects.admin` does not widen a restricted customer (R1-1).
+        $admin = $actor->can('projects.admin') && ! CustomerPilotGate::restricts($actor);
+
+        return new self($actor, $roles, $admin, $actor->can('projects.manage'));
     }
 
     /** ProjectPolicy::view for a project on this page. */

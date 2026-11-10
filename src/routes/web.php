@@ -201,7 +201,9 @@ Route::middleware(['auth', 'can:billing.manage'])->prefix('billing')->name('bill
     Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('destroy');
 });
 
-// Billing — client invoice views (any authenticated user can see their own invoices)
+// Billing — client invoice views: own invoices only (ownership), and only with an explicit `billing.view` (R1-1; not a built-in `user`
+// default). The list is authorized by InvoicePolicy::viewOwn and the page by InvoicePolicy::view. In pilot and closed mode the customer
+// surface gate still answers 404 for these routes whatever has been granted.
 Route::middleware('auth')->prefix('my')->name('billing.client.invoices.')->group(function () {
     Route::get('/invoices', [ClientInvoiceController::class, 'index'])->name('index');
     Route::get('/invoices/{invoice}', [ClientInvoiceController::class, 'show'])->name('show');

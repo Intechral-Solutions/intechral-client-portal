@@ -45,6 +45,8 @@ function projectTimeProps($response): array
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: the built-in `user` role no longer carries time.log; this suite models a customer explicitly granted it.
+    $this->grantUserRole('time.log');
     $this->owner = makeUser('operator', ['name' => 'Owner Olive', 'email' => 'olive@example.test']);
     $this->projectA = makeProject($this->owner, 'Apollo');
     $this->projectB = makeProject($this->owner, 'Borealis');

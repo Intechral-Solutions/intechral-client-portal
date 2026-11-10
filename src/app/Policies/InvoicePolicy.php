@@ -52,9 +52,19 @@ class InvoicePolicy
         return $user->can('billing.admin') && $invoice->status === 'draft';
     }
 
-    /** Client can pay their own payable invoice */
+    /**
+     * A client can pay their own payable invoice, and only with an explicit `billing.view` (R1-1): ownership and the
+     * payable state are necessary but no longer sufficient, so a customer holding no billing capability (the built-in
+     * `user` role carries none) cannot start a payment for an invoice that happens to name them.
+     */
     public function pay(User $user, Invoice $invoice): bool
     {
-        return $invoice->client_id === $user->id && $invoice->isPayable();
+        return $user->can('billing.view') && $invoice->client_id === $user->id && $invoice->isPayable();
+    }
+
+    /** A client may list their own invoices only with an explicit `billing.view` (R1-1); the list itself is scoped to the caller. */
+    public function viewOwn(User $user): bool
+    {
+        return $user->can('billing.view');
     }
 }

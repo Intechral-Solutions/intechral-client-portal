@@ -26,7 +26,7 @@ beforeEach(function () {
 it('shows the operator the ticket time, the recent entries and an in-context Start Timer on the operator page', function () {
     $agent = ticketAgent();
     $other = User::factory()->create(['name' => 'Ticket Coworker'])->assignRole('operator');
-    $ticket = Ticket::factory()->create(['user_id' => ticketUser()->id, 'status' => 'open']);
+    $ticket = Ticket::factory()->create(['user_id' => ticketTimeUser()->id, 'status' => 'open']);
     TimeEntry::factory()->create(['user_id' => $other->id, 'ticket_id' => $ticket->id, 'duration_minutes' => 60, 'date' => today()]);
 
     $html = $this->actingAs($agent)->get(route('operator.tickets.show', $ticket))->assertOk()
@@ -42,7 +42,7 @@ it('shows the operator the ticket time, the recent entries and an in-context Sta
 
 it('shows a running timer of the operator as Stop, and not as Start', function () {
     $agent = ticketAgent();
-    $ticket = Ticket::factory()->create(['user_id' => ticketUser()->id, 'status' => 'open']);
+    $ticket = Ticket::factory()->create(['user_id' => ticketTimeUser()->id, 'status' => 'open']);
     $running = TimeEntry::factory()->running()->create(['user_id' => $agent->id, 'ticket_id' => $ticket->id]);
 
     $html = $this->actingAs($agent)->get(route('operator.tickets.show', $ticket))->assertOk()
@@ -54,7 +54,7 @@ it('shows a running timer of the operator as Stop, and not as Start', function (
 
 it('starts and stops the ticket timer through the existing endpoints the embed uses, without new authorization', function () {
     $agent = ticketAgent();
-    $ticket = Ticket::factory()->create(['user_id' => ticketUser()->id, 'status' => 'open']);
+    $ticket = Ticket::factory()->create(['user_id' => ticketTimeUser()->id, 'status' => 'open']);
 
     $entryId = $this->actingAs($agent)->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()->assertJsonPath('context.id', $ticket->id)->json('id');
@@ -64,7 +64,7 @@ it('starts and stops the ticket timer through the existing endpoints the embed u
 });
 
 it('does not give the tracker to the requester: their page has no tracker, and starting a timer is refused (G1)', function () {
-    $owner = ticketUser();
+    $owner = ticketTimeUser();
     $ticket = Ticket::factory()->create(['user_id' => $owner->id, 'status' => 'open']);
     TimeEntry::factory()->create(['user_id' => User::factory()->create(['name' => 'Ticket Coworker'])->id, 'ticket_id' => $ticket->id, 'duration_minutes' => 60, 'date' => today()]);
 

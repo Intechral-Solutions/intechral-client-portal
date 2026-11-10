@@ -92,7 +92,8 @@ it('keeps operator Helpdesk work, including internal attachments, in pilot mode'
 // ── Dashboard, shared props, navigation ───────────────────────────────────────
 
 it('sends the customer Home without the invoices section, and without invoice wording', function () {
-    $customer = pilotCustomer();
+    // billing.view is an explicit grant (R1-1); even held, pilot mode shows no invoices.
+    $customer = pilotCustomer()->givePermissionTo('billing.view');
     pilotInvoiceFor($customer);
     pilotMode('pilot');
 
@@ -110,7 +111,8 @@ it('sends the customer Home without the invoices section, and without invoice wo
 });
 
 it('offers a customer Home, Support and Projects only, in the Focused shell', function () {
-    $customer = pilotCustomer();
+    // billing.view is an explicit grant (R1-1); even held, pilot mode offers no Invoices.
+    $customer = pilotCustomer()->givePermissionTo('billing.view');
     pilotMode('pilot');
 
     $this->actingAs($customer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
@@ -148,6 +150,29 @@ it('tells the browser only the capabilities the pilot surface uses', function ()
     // An operator is told everything, as before.
     $this->actingAs(pilotOperator())->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
         ->where('auth.permissions', fn ($permissions) => count($permissions) === count(PermissionCatalogue::all())));
+});
+
+// R1-1: the defaults no longer hold time.log or billing.view, so the test above proves nothing about suppressing them. A customer that
+// an operator granted both explicitly is told neither in pilot or closed mode: the browser's own capability list never advertises a
+// module the surface has not opened (their routes still answer 404; see CustomerPilotRouteBoundaryTest).
+it('never tells a pilot or closed customer about time.log or billing.view, even when both are explicitly granted', function () {
+    $customer = pilotCustomer()->givePermissionTo(['billing.view', 'time.log', 'time.view_own', 'tickets.view_org']);
+    expect($customer->can('billing.view'))->toBeTrue()->and($customer->can('time.log'))->toBeTrue();
+
+    pilotMode('pilot');
+    foreach (['dashboard', 'projects.index', 'tickets.index'] as $route) {
+        $this->actingAs($customer)->get(route($route))->assertInertia(fn (Assert $page) => $page
+            ->where('auth.permissions', ['projects.view', 'tickets.create', 'tickets.view']));
+    }
+
+    pilotMode('closed');
+    $this->actingAs($customer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('auth.permissions', []));
+
+    // Legacy is the pre-pilot surface: the same grants are told to the browser.
+    pilotMode('legacy');
+    $this->actingAs($customer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('auth.permissions', fn ($permissions) => collect($permissions)->contains('time.log') && collect($permissions)->contains('billing.view')));
 });
 
 it('renders the Blade error page for a refused module without a link into any excluded module', function () {

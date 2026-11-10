@@ -320,7 +320,7 @@ class TicketService
 
     /**
      * The one assignment-eligibility rule (EPIC-010D H5): a Ticket may be assigned only to a user
-     * who currently holds `tickets.assign` and whose account is active (Release 0.9, H3). Unassigning
+     * who currently holds `tickets.assign`, is an operator ({@see isAssignable()}, R1-1) and whose account is active (Release 0.9, H3). Unassigning
      * (null) is always allowed. There is no exemption for the current assignee, so a stale assignee
      * who lost the capability, or was suspended, cannot be re-selected. Bulk callers run this before
      * touching any Ticket.
@@ -335,11 +335,24 @@ class TicketService
 
         $assignee = User::find($assigneeId);
 
-        if ($assignee === null || $assignee->isSuspended() || ! $assignee->can('tickets.assign')) {
+        if ($assignee === null || ! self::isAssignable($assignee)) {
             throw ValidationException::withMessages([
                 'assignee_id' => 'The selected assignee cannot be assigned tickets.',
             ]);
         }
+    }
+
+    /**
+     * Whether a user may be a ticket assignee: active, holding `tickets.assign`, AND operator-eligible (`portal.operator`,
+     * {@see CustomerPilotGate::isOperator()}). The capability alone is not enough (R1-1): a customer who was granted
+     * `tickets.assign` is still a customer, and TicketPolicy already refuses them the tickets, so assigning one would only
+     * create a ticket nobody who owns it can work. Every assignee list and {@see assertAssignable()} use this one rule.
+     */
+    public static function isAssignable(User $user): bool
+    {
+        return ! $user->isSuspended()
+            && $user->can('tickets.assign')
+            && CustomerPilotGate::isOperator($user);
     }
 
     // ── Private helpers ──────────────────────────────────────

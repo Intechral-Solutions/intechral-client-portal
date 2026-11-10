@@ -106,7 +106,11 @@ it('shows the same customer the Helpdesk and projects in pilot mode, and everyth
     $this->actingAs($customer)->get('/tickets')->assertOk();
     $this->actingAs($customer)->get("/projects/{$fx['project']->id}")->assertOk();
 
+    // Legacy is the pre-pilot surface. R1-1: invoices need an explicit billing.view (not a default), so the proof grants it, and
+    // the same customer without the grant is refused there (the 403 is the capability, not the pilot gate's 404).
     pilotMode('legacy');
+    $this->actingAs($customer)->get('/my/invoices')->assertForbidden();
+    $customer->givePermissionTo('billing.view');
     $this->actingAs($customer)->get('/my/invoices')->assertOk();
 
     pilotMode('closed');

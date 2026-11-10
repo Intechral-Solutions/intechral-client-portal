@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Gate;
  *   Reopen it. That arm grants nothing else, in particular not `move`.
  * - **Standalone** tasks are personal (Q4): their creator or current assignee, nobody else.
  *   `tasks.view_all` does not reach them (Q3), and no organization ownership exists to consult.
- * - **Ticket** tasks may be viewed per `TicketPolicy`, for internal consistency only; every
- *   mutation is denied (Q6). Seeing one here never means a Tasks-workspace surface lists it.
+ * - **Ticket** tasks may be viewed by the ticket's requester or an operator working tickets
+ *   (`TicketPolicy::viewAsRequesterOrOperator`, deliberately not `view`, so a wider ticket
+ *   viewer never sees them; R1-1), for internal consistency only; every mutation is denied (Q6). Seeing one here never means a Tasks-workspace surface lists it.
  * - A malformed row linked to both a project and a ticket (INV-13) is refused everything: it is
  *   not treated as whichever kind `Task::kind()` happens to prefer.
  *
@@ -45,7 +46,7 @@ class TaskPolicy
         return match ($this->kindOf($task)) {
             Task::KIND_BOARD => $this->project($user, 'view', $task),
             Task::KIND_STANDALONE => $this->ownsStandalone($user, $task),
-            Task::KIND_TICKET => $task->ticket !== null && Gate::forUser($user)->allows('view', $task->ticket),
+            Task::KIND_TICKET => $task->ticket !== null && Gate::forUser($user)->allows('viewAsRequesterOrOperator', $task->ticket),
             default => false,
         };
     }

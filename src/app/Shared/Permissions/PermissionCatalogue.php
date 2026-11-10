@@ -164,11 +164,29 @@ final class PermissionCatalogue
     }
 
     /**
-     * Permissions granted to the built-in 'user' (platform user) role.
+     * What the built-in 'user' role carried through Release 0.9 and no longer does (R1-1). They stay in the catalogue: an
+     * authorized operator may still grant `billing.view` or `time.log` to a direct customer explicitly, so they remain
+     * customer-safe capabilities (the pilot surface gate still refuses the pages behind them). The `*.view_org` ones are read
+     * by no code path.
+     */
+    public const RETIRED_USER_DEFAULTS = [
+        self::TICKETS_VIEW_ORG,
+        self::PROJECTS_VIEW_ORG,
+        self::TASKS_VIEW_ORG,
+        self::BILLING_VIEW,
+        self::BILLING_VIEW_ORG,
+        self::TIME_LOG,
+        self::TIME_VIEW_OWN,
+        self::TIME_VIEW_ORG,
+    ];
+
+    /**
+     * The 'user' role exactly as Release 0.9 defined it, for the migration rehearsal baseline, which models a 0.9 database
+     * and must not drift with the current defaults.
      *
      * @return string[]
      */
-    public static function userDefaults(): array
+    public static function release09UserDefaults(): array
     {
         return [
             self::TICKETS_VIEW,
@@ -182,6 +200,26 @@ final class PermissionCatalogue
             self::TIME_LOG,
             self::TIME_VIEW_OWN,
             self::TIME_VIEW_ORG,
+            self::CMS_VIEW,
+        ];
+    }
+
+    /**
+     * Permissions granted to the built-in 'user' (platform user) role: the Release 1.0 customer minimum, own tickets and
+     * member projects only (R1-1). It deliberately carries no billing, time or organization-wide permission, so a
+     * managed customer organization never inherits one. A direct customer that should see its own invoices or log time is
+     * granted `billing.view` / `time.log` through a custom role by an authorized operator; the existing functionality
+     * behind those capabilities is unchanged. The `*.view_org` permissions stay in the catalogue as recorded debt (no
+     * code path reads them) but are no longer defaults.
+     *
+     * @return string[]
+     */
+    public static function userDefaults(): array
+    {
+        return [
+            self::TICKETS_VIEW,
+            self::TICKETS_CREATE,
+            self::PROJECTS_VIEW,
             self::CMS_VIEW,
         ];
     }

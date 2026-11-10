@@ -39,10 +39,17 @@ the remaining H5 to H10 decisions, administrator recovery and operator MFA.
 There is no `is_operator` column and no user type. Identity is capabilities (Spatie permissions, through roles):
 
 - The built-in `user` role (`PermissionCatalogue::userDefaults()`) is what every invitation assigns
-  (`InvitationService::acceptWithPassword` and `acceptWithSocialAccount`). It holds `tickets.view`, `tickets.create`,
-  `tickets.view_org`, `projects.view`, `projects.view_org`, `tasks.view_org`, `billing.view`, `billing.view_org`,
-  `time.log`, `time.view_own`, `time.view_org`, `cms.view`.
+  (`InvitationService::acceptWithPassword` and `acceptWithSocialAccount`). Since R1-1 it holds the customer minimum only:
+  `tickets.view`, `tickets.create`, `projects.view`, `cms.view`. It no longer carries `tickets.view_org`, `projects.view_org`,
+  `tasks.view_org`, `billing.view`, `billing.view_org`, `time.log`, `time.view_own` or `time.view_org` (the `*.view_org` ones
+  are read by no code path), so a managed customer organization inherits no billing, time or organization-wide access. A direct
+  customer that should see its own invoices or log time is granted `billing.view` or `time.log` explicitly, through a custom
+  role or a direct grant, by an authorized operator; the pages behind them stay closed in pilot mode.
 - The built-in `operator` role carries the whole catalogue.
+- The three organization scopes (`OrganizationScope`, `OrganizationMembershipScope`, `OrganizationThroughCompanyScope`) bypass
+  tenant filtering for `portal.operator` (`CustomerPilotGate::isOperator`), not for the role name (R1-1), so a custom-role
+  operator and the built-in one see the same records, and an account with other operational capabilities but no eligibility
+  sees only its memberships.
 - Custom roles may carry any mix, so the role name proves nothing, and neither does any single operational capability:
   `settings.view` gates no route at all, `tasks.view_all` and `time.view_all` only widen a list. The first design called an
   account an operator when it held any of 11 such capabilities (the shell's Operational classification); the independent
@@ -51,15 +58,17 @@ There is no `is_operator` column and no user type. Identity is capabilities (Spa
 
 Consequence: the built-in `user` role alone does not define "customer", and no operational permission defines "operator".
 
-### 2.2 Routes a customer can reach today (before this package)
+### 2.2 Routes a customer could reach before this package (the legacy-mode surface)
 
-Every authenticated customer holding the `user` defaults can reach all of the following. None of it is approved.
+The legacy-mode surface, as the R0.9-CS1 audit found it: an authenticated customer could reach the following when it held the
+capability named in the last column (the Release 0.9 `user` role held `billing.view` and `time.log`; since R1-1 the built-in role
+holds neither, so only an explicit grant reaches those two rows). None of it is approved for the pilot.
 
 | Area | Routes (names) | Why reachable |
 |---|---|---|
-| Finance, invoices | `billing.client.invoices.index/show` (`/my/invoices*`) | `auth` only; `InvoicePolicy::view` lets `billing.view` see own invoices |
-| Customer payment | `billing.invoices.pay`, `billing.invoices.pay.intent` | `auth` only; `InvoicePolicy::pay`; creates a Stripe PaymentIntent |
-| Time tracking | `time.*` (`/time*`): list, store, timers, allocation, context options, update, delete | `can:time.log` is a `user` default |
+| Finance, invoices | `billing.client.invoices.index/show` (`/my/invoices*`) | `auth`; since R1-1 the list (`InvoicePolicy::viewOwn`) and the page (`InvoicePolicy::view`) both need an explicit `billing.view`, plus ownership for the page; the list is scoped to the caller |
+| Customer payment | `billing.invoices.pay`, `billing.invoices.pay.intent` | `auth`; `InvoicePolicy::pay` needs an explicit `billing.view` (R1-1), ownership and a payable state; creates a Stripe PaymentIntent |
+| Time tracking | `time.*` (`/time*`): list, store, timers, allocation, context options, update, delete | `can:time.log` (not a `user` default since R1-1; an explicit grant only) |
 | Standalone tasks | `tasks.*` (`/tasks*`): list, store, bulk, show, update, delete, complete, reopen, assignee | `auth` only; TaskPolicy decides rows |
 | Project board | `projects.board` | `auth`; `ProjectPolicy::view` (member) |
 | Project tasks | `projects.tasks.*` incl. comments and checklist mutations | `auth`; membership |
@@ -84,8 +93,8 @@ Removing a component does not remove props already sent. The Inertia props that 
 - `projects/show` (Overview): `description`, `health`, `tasks` counts, `milestones` (descriptions, task counts, completer
   `{id,name}`), and for a user with `time.log` a project `time` total.
 - `projects/milestones/index`: milestone descriptions, completer names, task counts.
-- Shared `auth.permissions` lists every capability (including `time.log`, `billing.view`); the React timer provider keys
-  off `time.log` and polls `/time/timers/active`.
+- Shared `auth.permissions` lists every capability the account holds (including `time.log` and `billing.view` when explicitly
+  granted); the React timer provider keys off `time.log` and polls `/time/timers/active`.
 - Shared `navigation`: Focused entries "Invoices" and "Resources".
 
 ### 2.4 Other entry points
@@ -381,3 +390,31 @@ R-2 (low): a stale Inertia version distinguished an existing unauthorized projec
 
 Final closure review (Opus 5.5): **SAFE TO COMMIT**. R-1, R-2 and R-3 are closed. Two documentation items were recorded afterwards:
 I-b, the inherited foreign-ticket 403 versus 404 (section 8, item 7), and I-c, deployment versus onboarding preflight (section 10).
+
+## R1-1 authorization baseline
+
+Hardening ahead of authorized support staff and managed customers (no new surface):
+
+- **Assignees.** `TicketService::isAssignable()` (used by `assertAssignable` and both assignee choice lists) requires an active
+  account holding `tickets.assign` **and** `portal.operator`. A customer granted `tickets.assign` is not an assignee.
+- **Projects.** `ProjectPolicy::manageMembers()` shares `administers()`: `projects.admin` widens nothing for a restricted
+  customer. `TaskRowAbilities` restates the same rule so row abilities never exceed `TaskPolicy`. Membership semantics
+  (member visibility, `projects.manage` + manager role) are unchanged.
+- **Reuse of ticket visibility.** Ticket-linked task visibility (`TaskPolicy`) and ticket time attribution
+  (`AccessibleTimeContext`) ask `TicketPolicy::viewAsRequesterOrOperator`, not `view`. A later widening of `view` for partner
+  support personnel must not change that ability; ticket time additionally requires `viewInternal` (operator work).
+- **Invoices.** Ownership and a payable state were never enough on their own. `ClientInvoiceController::index` (via
+  `InvoicePolicy::viewOwn`) and `InvoicePolicy::pay` now require an explicit `billing.view`, as `InvoicePolicy::view` already did, so
+  a customer with no billing capability (the built-in `user` role, and so every managed customer) can neither list invoices nor
+  start a payment for one that names them. Operators (who hold the capability), the invoice-ownership rule and the payable-state
+  rule are unchanged, and no billing route is enabled in pilot or closed mode.
+- **Route restriction versus capability.** In pilot and closed mode `EnforceCustomerPilotSurface` answers 404 for every route the
+  mode does not name, before any capability is read, and `CustomerPilotGate::exposedPermissions` hides every other capability from
+  the browser's shared `auth.permissions`. That is a surface control, not an authorization rule: a capability a customer
+  was granted (`billing.view`, `time.log`) is still held, still answers `can()`, and still decides in legacy mode (and in any
+  future mode that names the route). Each control is therefore tested on its own: the gate by pilot-mode 404 tests, the
+  capability by legacy-mode 403 tests and policy checks. A pilot-mode 404 alone is never taken as proof of authorization.
+- **Project management (deferred decision).** `ProjectPolicy::manage()` keeps its project-manager membership rule, and
+  `ProjectPolicy::create` still allows `projects.manage`/`projects.admin`. Pilot routes prevent a customer from reaching project
+  creation or manager-level mutations today. Exposing any such route to customers, or to partner support personnel, needs an
+  explicit authorization decision first; R1-1 records it and builds none of it.

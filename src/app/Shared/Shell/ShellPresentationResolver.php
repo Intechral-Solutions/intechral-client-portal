@@ -24,7 +24,8 @@ use Illuminate\Http\Request;
  * instance can never serve another request's answer.
  *
  * **Drift.** `ShellPresentationDriftGuardTest` proves every capability is in exactly one of three
- * sets: the customer defaults, `OPERATIONAL`, or `PRESENTATION_NEUTRAL`. A capability that gates an
+ * sets: the customer capabilities (the built-in `user` defaults plus the explicitly grantable
+ * `PermissionCatalogue::RETIRED_USER_DEFAULTS`, R1-1), `OPERATIONAL`, or `PRESENTATION_NEUTRAL`. A capability that gates an
  * operator, admin, CRM or System surface and is in neither of the last two fails that test until a
  * human classifies it.
  */

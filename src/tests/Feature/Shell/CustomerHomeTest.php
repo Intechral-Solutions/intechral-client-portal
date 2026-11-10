@@ -23,6 +23,8 @@ use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: these suites model a customer explicitly granted what the built-in `user` role no longer carries.
+    $this->grantUserRole(...PermissionCatalogue::RETIRED_USER_DEFAULTS);
 });
 
 /** A customer; `$without` takes some customer defaults away through a custom role. */
@@ -34,7 +36,7 @@ function customerHomeUser(array $without = []): User
         $user->assignRole('user');
     } else {
         $role = Role::firstOrCreate(['name' => 'customer-home-'.md5(implode(',', $without)), 'guard_name' => 'web']);
-        $role->syncPermissions(array_values(array_diff(PermissionCatalogue::userDefaults(), $without)));
+        $role->syncPermissions(array_values(array_diff(PermissionCatalogue::release09UserDefaults(), $without)));
         $user->assignRole($role);
     }
 

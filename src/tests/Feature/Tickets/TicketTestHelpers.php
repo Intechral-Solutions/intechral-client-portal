@@ -39,10 +39,23 @@ function ticketCustomRoleUser(string $roleName, array $permissions, array $attri
     return User::factory()->create($attributes)->assignRole($role);
 }
 
-/** The H9 actor: operator capabilities without the literal `operator` role. */
+/**
+ * The H9 actor: an operator without the literal `operator` role. R1-1: a custom-role operator carries the explicit
+ * `portal.operator` eligibility; `tickets.assign` alone is a customer.
+ */
 function ticketAgent(array $attributes = []): User
 {
-    return ticketCustomRoleUser('support_agent', ['tickets.view', 'tickets.assign', 'time.log'], $attributes);
+    return ticketCustomRoleUser('support_agent', ['tickets.view', 'tickets.assign', 'time.log', 'portal.operator'], $attributes);
+}
+
+/**
+ * A customer that was explicitly granted `time.log`. The built-in `user` role no longer carries it (R1-1), so the time
+ * suites that prove a rule against a requester or a customer grant it here: the rule under test, not the route's
+ * `can:time.log` middleware, must be what refuses them.
+ */
+function ticketTimeUser(string $role = 'user', array $attributes = []): User
+{
+    return tap(ticketUser($role, $attributes))->givePermissionTo('time.log');
 }
 
 function ticketFor(User $owner, array $attributes = []): Ticket

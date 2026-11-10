@@ -127,11 +127,14 @@ it('refuses to remove a partner designation while it still has customers, howeve
     $service->assignCustomer($a, $unisa, $this->operator);
     $service->assignCustomer($b, $unisa, $this->operator);
 
-    // The actor is a custom-role operator who is a member of nothing: the membership scope shows them no organization at all,
-    // so a scoped count would say "no customers". The unscoped count must still refuse.
+    // The session is filtered by the tenant scope: the authenticated account is a customer that is a member of nothing (and not
+    // operator-eligible, which the membership scope now keys on, R1-1), so a scoped count would say "no customers". The service actor
+    // is an eligible custom-role operator, as it must be to pass the policy, and the service reads unscoped, so it must still refuse.
+    // (An eligible operator in the session is no longer filtered; that contract is pinned in AuthorizationBaselineHardeningTest.)
     $lead = customRoleOperator();
-    $this->actingAs($lead);   // the scopes only apply to an authenticated actor
-    expect(Organization::count())->toBe(0, 'the scope hides every organization from this account (the premise of the test)');
+    $this->actingAs(User::factory()->create()->assignRole('user'));   // the scopes only apply to an authenticated account
+    expect(Organization::count())->toBe(0, 'the scope hides every organization from this session (the premise of the test)')
+        ->and(Organization::withoutGlobalScopes()->count())->toBeGreaterThanOrEqual(3);
 
     $refusal = relationshipRefusal(fn () => $service->removePartner($unisa, $lead));
 
@@ -310,26 +313,26 @@ it('lets a custom-role operator holding both capabilities use the operations, wi
     $unisa = pairedOrganization('UNISA');
     $customer = pairedOrganization('Customer A');
 
-    // Not a member, so the scoped organization page is a 404 for them: the success lands on the index instead.
+    // Not a member, but eligible (R1-1): the organization page resolves for them, so the success lands on it.
     $this->actingAs($lead)->put(route('organizations.partner.designate', $unisa->id))
-        ->assertRedirect(route('organizations.index'));
+        ->assertRedirect(route('organizations.show', $unisa->id));
     $this->actingAs($lead)->post(route('organizations.customers.link', $unisa->id), ['customer_id' => $customer->id])
-        ->assertRedirect(route('organizations.index'))
+        ->assertRedirect(route('organizations.show', $unisa->id))
         ->assertSessionHas('success', '"Customer A" is now managed by "UNISA".');
 
     expect(relationshipRow($customer)->managed_by_organization_id)->toBe($unisa->id)
         ->and(Activity::where('causer_id', $lead->id)->count())->toBe(2);
 
-    $this->actingAs($lead)->delete(route('organizations.manager.unlink', $customer->id))->assertRedirect(route('organizations.index'));
-    $this->actingAs($lead)->delete(route('organizations.partner.remove', $unisa->id))->assertRedirect(route('organizations.index'));
+    $this->actingAs($lead)->delete(route('organizations.manager.unlink', $customer->id))->assertRedirect(route('organizations.show', $customer->id));
+    $this->actingAs($lead)->delete(route('organizations.partner.remove', $unisa->id))->assertRedirect(route('organizations.show', $unisa->id));
 
     expect(relationshipRow($customer)->managed_by_organization_id)->toBeNull()
         ->and((bool) relationshipRow($unisa)->can_manage_customers)->toBeFalse();
 });
 
 it('lands each actor on a page they can open, with the success message, after a successful change', function () {
-    // The change is made, then the actor is sent somewhere. organizations.show binds through the tenant scope, so a custom-role
-    // operator who is not a member would get a 404 there: they go to the index. Nobody gains access to any page.
+    // The change is made, then the actor is sent somewhere. organizations.show binds through the tenant scope, which (R1-1) keys on
+    // portal.operator: an eligible custom-role operator who is not a member opens the page like the built-in operator.
     $visit = function (User $actor, Organization $organization, string $expectedUrl, string $message) {
         $response = $this->actingAs($actor)->put(route('organizations.partner.designate', $organization->id));
         $response->assertRedirect($expectedUrl)->assertSessionHas('success', $message);
@@ -340,7 +343,8 @@ it('lands each actor on a page they can open, with the success message, after a 
     };
 
     $nonMember = customRoleOperator();
-    $visit($nonMember, pairedOrganization('Alpha'), route('organizations.index'), '"Alpha" is now a partner.');
+    $alpha = pairedOrganization('Alpha');
+    $visit($nonMember, $alpha, route('organizations.show', $alpha->id), '"Alpha" is now a partner.');
 
     $member = customRoleOperator();
     $beta = pairedOrganization('Beta');
@@ -350,8 +354,9 @@ it('lands each actor on a page they can open, with the success message, after a 
     $gamma = pairedOrganization('Gamma');
     $visit($this->operator, $gamma, route('organizations.show', $gamma->id), '"Gamma" is now a partner.');
 
-    // A custom-role operator is still not given the page they are not a member of.
-    $this->actingAs($nonMember)->get(route('organizations.show', $gamma->id))->assertNotFound();
+    // R1-1: nor is a custom-role operator refused a page they are not a member of; a customer that is not a member still is.
+    $this->actingAs($nonMember)->get(route('organizations.show', $gamma->id))->assertOk();
+    $this->actingAs(User::factory()->create()->assignRole('user'))->get(route('organizations.show', $gamma->id))->assertNotFound();
 });
 
 it('is not reachable by a customer in pilot mode, even one holding crm.manage', function () {

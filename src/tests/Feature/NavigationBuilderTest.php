@@ -10,6 +10,8 @@ use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
+    // R1-1: these suites model a customer explicitly granted what the built-in `user` role no longer carries.
+    $this->grantUserRole(...PermissionCatalogue::RETIRED_USER_DEFAULTS);
 });
 
 /**
@@ -146,7 +148,7 @@ function actorWithPermissions(array $permissions): User
 /** The built-in `user` role's capabilities, minus the named ones. */
 function userDefaultsWithout(string ...$permissions): User
 {
-    return actorWithPermissions(array_values(array_diff(PermissionCatalogue::userDefaults(), $permissions)));
+    return actorWithPermissions(array_values(array_diff(PermissionCatalogue::release09UserDefaults(), $permissions)));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -675,7 +677,7 @@ it('applies the G3 rule for every A1.6 actor profile', function (
         ->and(in_array(route('operator.cms.index'), $hrefs, true))->toBe($systemPages);
 })->with([
     // cms.view AND NOT cms.edit — the rule's whole purpose: customers keep published content.
-    'user (role defaults)' => [PermissionCatalogue::userDefaults(), true, false],
+    'user (role defaults)' => [PermissionCatalogue::release09UserDefaults(), true, false],
     'helpdesk agent' => [['cms.view', 'tickets.view', 'tickets.assign'], true, false],
     'billing operator' => [['cms.view', 'billing.manage'], true, false],
     'crm manager' => [['cms.view', 'crm.manage'], true, false],

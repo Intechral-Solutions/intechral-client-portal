@@ -15,9 +15,9 @@ class TicketController extends Controller
     public function index(Request $request)
     {
         // The assignee FILTER lists every holder, suspended ones included, because it searches existing assignments;
-        // the bulk "Assign to" choices are active holders only (Release 0.9, H3).
+        // the bulk "Assign to" choices are active, operator-eligible holders only (Release 0.9, H3; R1-1).
         $operators = User::permission('tickets.assign')->orderBy('name')->get();
-        $assignableOperators = $operators->reject(fn (User $operator) => $operator->isSuspended())->values();
+        $assignableOperators = $operators->filter(fn (User $operator) => TicketService::isAssignable($operator))->values();
         $includeInternal = $request->user()->can('viewInternal', Ticket::class);
 
         $tickets = Ticket::with(['user', 'assignee'])
@@ -53,7 +53,8 @@ class TicketController extends Controller
             'replies.dueDateChange',
         ]);
 
-        $operators = User::permission('tickets.assign')->active()->orderBy('name')->get();
+        $operators = User::permission('tickets.assign')->active()->orderBy('name')->get()
+            ->filter(fn (User $operator) => TicketService::isAssignable($operator))->values();
         $categories = UserTicketController::CATEGORIES;
 
         // Release 1.0: the due-date form states its zone and bounds itself (the browser's zone is never consulted).

@@ -244,7 +244,9 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
 
 function pilotExcludedFixture(): array
 {
-    $customer = pilotCustomer();
+    // Explicit grants of what the built-in `user` role no longer carries (R1-1): the gate, not an absent permission,
+    // must be what refuses these pages in pilot mode.
+    $customer = pilotCustomer()->givePermissionTo(['billing.view', 'time.log']);
     $fx = pilotProjectFor($customer);
     $invoice = pilotInvoiceFor($customer);
     $page = CmsPage::factory()->create(['title' => 'PILOT-SECRET page', 'slug' => 'pilot-secret-page', 'status' => 'published', 'published_at' => now()]);

@@ -17,7 +17,8 @@ use Illuminate\Validation\Rule;
  * permission, by any customer account holding it who was a member of the organization.
  *
  * The organization still comes from route-model binding, so the tenant scope still decides which organizations this page can
- * open (a custom-role operator, the capabilities without the `operator` role, reaches only the organizations the scope shows them and is answered 404 for the rest, a known limit that is deliberately not widened).
+ * open. The scope keys on `portal.operator` (R1-1), so an operator-eligible account, built-in or custom-role, opens every organization;
+ * an account that is not eligible reaches only the organizations it is a member of and is answered 404 for the rest.
  */
 class OrganizationMemberController extends Controller
 {
