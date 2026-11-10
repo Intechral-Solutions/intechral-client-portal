@@ -3,6 +3,7 @@
 **Status:** implemented on `feature/r1-0-mo-1a-managed-organizations`; independent implementation review (Opus 5.5 High) completed, and
 its closure review returned **SAFE TO COMMIT**. Submitted as a pull request; **not merged, not deployed**. Release 0.9 staging is
 unchanged. This record covers MO-1A only; MO-2, MO-3 and MO-4 are not started. The Release 1.0 deployment gates below remain open.
+*Annotation 2026-11-10: the rollback and data-preservation gates in this record were retired by the 2026-11-09 owner ruling (see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)); they are kept as history.*
 
 ## Decision
 
@@ -102,6 +103,8 @@ Both migrations are forward-only, and a repeat of either is harmless. Their cont
 | `2026_11_06_120000_add_organization_management_relationship` | additive | Appended columns; no row rewritten, no backfill. Release 0.9 code ignores them and never writes them. |
 | `2026_11_06_120100_unique_company_organization_link` | **tightening** | **Refuses to run, changing nothing, and names the duplicates** if two companies point at one organization. Never merges, repairs or deletes. Release 0.9 code cannot violate it (its only writer always creates a new organization). |
 
+*Retired 2026-11-09: no rollback to the Release 0.9 build is supported, and the incompatibility described below is accepted by design (see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)).*
+
 **Rollback to the Release 0.9 build is NOT fully verified through the existing release procedure.**
 
 - The Release 0.9 *application* should keep serving against the expanded schema: it ignores the new columns, never writes them, and the
@@ -115,7 +118,7 @@ Both migrations are forward-only, and a repeat of either is harmless. Their cont
 - Relationship-derived behaviour grants no access, so a rollback closes, never opens, anything. Recovery from backup discards
   relationship edits made after the backup; they are operator-entered and re-enterable.
 
-**Open Release 1.0 release-engineering gate:** decide how the 1.0 rollback handles the 0.9 verifier and preflight (for example a
+**Release 1.0 release-engineering gate (closed by retirement, 2026-11-09):** decide how the 1.0 rollback handles the 0.9 verifier and preflight (for example a
 rollback-specific manifest or an explicit, reviewed acknowledgement of the known extra keys) **before the first 1.0 upgrade of any
 authoritative environment**. Not solved here: no rollback framework is added and no Release 0.9 code is changed.
 
@@ -124,7 +127,7 @@ authoritative environment**. Not solved here: no rollback framework is added and
 `php artisan organizations:preflight [--json]` is read-only (tables only: no permission cache, no scope). It reports duplicate
 company-to-organization links (**failure**: blocks the unique migration), organizations without a company, companies without an
 organization, organization **admin** memberships and the **operator-held** ones, users in several organizations, tickets that already
-carry a company, and (after migration) any relationship that breaks a rule. Run it against a copy of production data before migrating.
+carry a company, and (after migration) any relationship that breaks a rule. Run it against any non-empty database (staging, or a future production) before migrating.
 
 Why admin memberships matter: `Organization::isAdmin()` has **no callers**, so `role = admin` grants nothing today. MO-2 would turn those
 inert rows into authority; they need an owner review first.
@@ -164,12 +167,12 @@ either migration and recompute its pin in `candidates.php`.
 - The preflight prints user emails: keep its output out of committed evidence.
 - Existing organization `admin` memberships are inert today; MO-2 would activate them and needs an owner review first.
 
-### Release 1.0 deployment gates (open; not solved by this change)
+### Release 1.0 deployment gates (historical; superseded by the gates in the release notes)
 
-1. Run `php artisan organizations:preflight` on real data, or a controlled copy, before the unique migration reaches any real environment.
+1. If the target database is non-empty, run `php artisan organizations:preflight` before the unique migration reaches it.
 2. The owner reviews its findings before that migration is applied.
-3. Resolve the rollback-verification incompatibility with the Release 0.9 schema verifier (see Migration and rollback).
-4. Preserve the migration-rehearsal evidence.
+3. Resolve the rollback-verification incompatibility with the Release 0.9 schema verifier (see Migration and rollback). *Retired 2026-11-09.*
+4. Preserve the migration-rehearsal evidence. *Retired 2026-11-09.*
 
 ## Remaining work packages (not started)
 
@@ -179,7 +182,7 @@ either migration and recompute its pin in `candidates.php`.
 | MO-3 | Partner admins create and manage customer organizations (new atomic service, not `promoteToOrganization`) | Opus review |
 | MO-4A | Tickets carry a visible, explicit organization; guarded company delete | design gate |
 | MO-4B | Partner support staff read and reply on the public thread (separate ability and routes; `TicketPolicy::view` unchanged) | Opus design gate first |
-| Next release | `tickets.company_id` to `RESTRICT` once the guard has shipped | rehearsal |
+| Next release | `tickets.company_id` to `RESTRICT` once the guard has shipped | fresh-migration verification and `database:verify` (foreign-key manifest update) |
 
 ## Deferred decisions
 

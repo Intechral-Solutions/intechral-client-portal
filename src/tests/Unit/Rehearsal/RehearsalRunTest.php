@@ -197,7 +197,7 @@ it('refuses to run or clean while another database session holds the rehearsal l
     expect(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline);
 });
 
-it('refuses, with exit 2 and no change, a migration file that is neither pinned nor an approved candidate', function () {
+it('does not rehearse, and does not refuse, a migration file that is neither pinned nor an approved candidate', function () {
     $baseline = IntegritySnapshot::hash(RehearsalSandbox::baseline());
     $path = RehearsalSandbox::databasePath();
     file_put_contents($path.'/migrations/2026_12_31_000009_surprise_migration.php', '<?php return null;');
@@ -205,8 +205,8 @@ it('refuses, with exit 2 and no change, a migration file that is neither pinned 
 
     [$exit, , $output] = rehearse(['--no-restore' => true]);
 
-    expect($exit)->toBe(2)
-        ->and($output)->toContain('undeclared migration file "2026_12_31_000009_surprise_migration"', 'Nothing was changed')
+    expect($exit)->toBe(0)
+        ->and($output)->not->toContain('undeclared migration file')
         ->and(IntegritySnapshot::hash(IntegritySnapshot::capture(RehearsalTarget::primary())))->toBe($baseline);
 });
 

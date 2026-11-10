@@ -48,7 +48,7 @@ use InvalidArgumentException;
  *
  * AN APPROVAL IS ONE RECORD OF TWO COLUMNS. Only a COMPLETE record (time AND approver) is an approval; a half-written one counts
  * for nothing, approve() refuses to treat it as approved, and revokeApproval() clears it ({@see OrganizationAuthority::approvalRecord()}).
- * The previous release can write neither column, so a half-written record is damage to investigate, not a rollback effect.
+ * The application never writes one column without the other, so a half-written record is damage to investigate.
  */
 final class OrganizationMembership
 {

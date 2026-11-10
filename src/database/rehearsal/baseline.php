@@ -2,16 +2,15 @@
 
 /*
 |--------------------------------------------------------------------------
-| Release 0.9 migration rehearsal: the pinned baseline
+| Migration rehearsal: the pinned baseline
 |--------------------------------------------------------------------------
 | The rehearsal harness (App\Support\Rehearsal) builds its baseline from EXACTLY these migrations, in this
 | order, and nothing else: it migrates them, seeds the deterministic fixtures, snapshots, and only then applies
 | the approved candidates named in candidates.php. Each entry is the SHA-256 of the migration file as it
 | shipped, so a baseline file that is edited or missing is reported as drift.
 |
-| Every file in database/migrations must be named either here or in candidates.php. A migration that is in
-| neither is refused before anything is changed: it must not silently join the baseline (it would then be
-| installed on an empty schema and never exercised against populated data).
+| A migration that is named neither here nor in candidates.php is not part of the rehearsal (R1-0): it is never
+| added to the baseline and never run by the harness.
 |
 | This list is history. It changes in only two situations, both reviewed:
 |   - a candidate has shipped and a LATER package needs its columns in the fixtures: move the entry from

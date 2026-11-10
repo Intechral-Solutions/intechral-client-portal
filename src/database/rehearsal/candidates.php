@@ -2,18 +2,19 @@
 
 /*
 |--------------------------------------------------------------------------
-| Release 0.9 migration rehearsal: the reviewed candidate migrations
+| Migration rehearsal: the reviewed candidate migrations
 |--------------------------------------------------------------------------
 | The rehearsal harness (App\Support\Rehearsal, `php artisan rehearsal:run`) builds its baseline from the
 | migrations pinned in baseline.php, seeds records, snapshots them, applies the candidates the operator selects
 | with --candidate=<name>, snapshots again, and reports any difference it was not told to expect. It runs ONLY
 | migrations that are listed here, are present in database/migrations, and whose file still has the recorded
 | SHA-256, so what is rehearsed is exactly what was reviewed. Nothing else (no path, no other PHP file) is ever
-| executed by it. A migration file named in neither baseline.php nor this file is refused before anything is
-| changed; it can never silently join the baseline.
+| executed by it. A migration file named in neither baseline.php nor this file is simply not rehearsed (it can
+| never silently join the baseline).
 |
-| An entry is added in the same change that adds the migration, and must sort after every baseline migration.
-| Shape:
+| An entry is OPTIONAL (R1-0): a migration does not need one to ship. Add one when you want a migration proven on
+| populated fixtures with `./dev rehearse --candidate=<name>`; it must then sort after every baseline migration.
+| Entries that exist stay SHA-256 pinned, so the migration file they name is never edited. Shape:
 |
 |   '2026_10_12_000001_example_migration' => [
 |       'summary' => 'One sentence a reviewer can check the change against.',
@@ -31,9 +32,10 @@
 | index-:t(a,b) . fk+:t.c->p.c:DELETE/UPDATE . fk-:t.c->p.c:DELETE/UPDATE . fk~:t.c->p.c:OLD>NEW (ON DELETE rule) .
 | fku~:t.c->p.c:OLD>NEW (ON UPDATE rule).
 |
-| R0.9-1B: the three Release 0.9 schema-protection migrations (H1, H2 and the schema portion of H3). Once a
-| candidate has shipped and a later package needs its columns in the fixtures, move its entry to the END of
-| baseline.php as `name => sha256` in the same change that updates the fixtures.
+| R0.9-1B: the three Release 0.9 schema-protection migrations (H1, H2 and the schema portion of H3) shipped in
+| Release 0.9 and are kept as populated-data regression cases (PreservationRehearsalTest); the four after them are
+| unreleased Release 1.0 migrations. Moving an entry into baseline.php is not required and would change the
+| fixtures, the snapshot hash and the pins that depend on them.
 */
 
 return [

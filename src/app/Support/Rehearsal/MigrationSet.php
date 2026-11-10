@@ -7,19 +7,19 @@ use InvalidArgumentException;
 /**
  * Which migrations form the rehearsal baseline and which may be applied as candidates.
  *
- * Two reviewed manifests decide it, and the migrations directory must match them exactly:
+ * Two reviewed manifests decide it:
  *
  *  - the BASELINE (`database/rehearsal/baseline.php`): every migration the rehearsal builds its starting schema
  *    from, in order, each pinned to the SHA-256 of the file as it shipped;
- *  - the CANDIDATES (`database/rehearsal/candidates.php`): the migrations under review, each pinned the same way
- *    and chosen by name.
+ *  - the CANDIDATES (`database/rehearsal/candidates.php`): the migrations an owner chose to prove on populated
+ *    data, each pinned the same way and chosen by name.
  *
- * Every `.php` file in the directory must be named by one of the two. A file named by neither is refused with
- * its name ("undeclared"), because the old behaviour (baseline = everything not a candidate) let a new
- * migration run before the fixtures existed and so be rehearsed against an empty schema instead of populated
- * data. A baseline file that is missing or no longer hashes to its pin is drift. A candidate must sort after
- * every baseline migration, so rehearsing "baseline, fixtures, then candidates" is the order a real upgrade
- * applies them in. Nothing a caller supplies (a path, a wildcard, a PHP file) is ever loaded.
+ * Only what the two manifests name is ever applied. A `.php` file in the directory that neither names is not a
+ * rehearsal subject: it is not refused, and it is never added to the baseline or run (R1-0: proving a migration on
+ * populated data is optional, so a migration need not be listed to ship). A listed file that is missing, or that no
+ * longer hashes to its pin, is drift and is refused. A candidate must sort after every baseline migration, so
+ * rehearsing "baseline, fixtures, then candidates" is the order a real upgrade applies them in. Nothing a caller
+ * supplies (a path, a wildcard, a PHP file) is ever loaded.
  *
  * The directory and manifests are constructor arguments only so tests can exercise the rules against a
  * throw-away directory; the command always uses {@see repository()}.
@@ -73,8 +73,9 @@ final class MigrationSet
     }
 
     /**
-     * Everything wrong with the pinned sets or with the directory against them. Empty means the directory is
-     * exactly the baseline plus the approved candidates, with no file edited or missing.
+     * Everything wrong with the pinned sets or with the directory against them. Empty means every listed
+     * baseline and candidate migration is present and well formed, and no pinned baseline file is edited or missing.
+     * A file that no manifest lists is not a violation.
      *
      * @return list<string>
      */
@@ -149,19 +150,14 @@ final class MigrationSet
     }
 
     /**
-     * The directory against the pinned sets: undeclared files, missing baseline files, edited baseline files.
+     * The directory against the pinned sets: missing baseline files and edited baseline files. A file the manifests
+     * do not name is not drift (see the class comment).
      *
      * @return list<string>
      */
     private function driftViolations(): array
     {
         $violations = [];
-        $present = $this->names();
-
-        foreach (array_diff($present, $this->baselineNames(), $this->candidateNames()) as $name) {
-            $violations[] = "undeclared migration file \"{$name}\": it is in neither database/rehearsal/baseline.php nor database/rehearsal/candidates.php. "
-                .'Add it to candidates.php with a reviewed entry (summary, sha256, declared schema changes) so it is rehearsed against populated data; it is never silently added to the baseline';
-        }
 
         foreach ($this->baseline as $name => $pinned) {
             $path = $this->path((string) $name);

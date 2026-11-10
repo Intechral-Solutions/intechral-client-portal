@@ -194,7 +194,7 @@ final class OrganizationPreflight
         ];
 
         if ($report['incompleteApprovals'] !== []) {
-            $failures[] = count($report['incompleteApprovals']).' membership(s) have an approval time without an approver, or the reverse. They count as no approval. The previous release cannot write either column, so this is not a rollback effect: investigate, then revoke each one before relying on approvals.';
+            $failures[] = count($report['incompleteApprovals']).' membership(s) have an approval time without an approver, or the reverse. They count as no approval. The application never writes one column without the other, so investigate how it happened, then revoke each one before relying on approvals.';
         }
 
         if ($report['approvedButNotAdministrator'] !== []) {
