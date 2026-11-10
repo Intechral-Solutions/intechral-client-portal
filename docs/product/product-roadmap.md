@@ -373,7 +373,7 @@ The epic absorbs EPIC-016's deferred Helpdesk items:
 - the customer label "Waiting on you";
 - the hourglass glyph through the shared `Status` vocabulary.
 
-**Company-level visibility stays owner-only (EPIC-010D D1, locked).** Organization-level ticket visibility is Post-v1 and depends on Directory. Incidents are conditional (default Post-v1; conceptual direction in [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md), with a compatibility checkpoint before R1-2 and a data-model review before the first additional ticket type; Release 1.0 scope unchanged). Knowledge is Post-v1; SLA, routing and automation remain Future.
+**Company-level visibility stays owner-only (EPIC-010D D1, locked).** Organization-level ticket visibility is Post-v1 and depends on Directory. Incidents are conditional (default Post-v1) and are a **separate operational domain**, not a Ticket subtype (revised [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md)). Service Request is the first intended Ticket classification, not a Release 1.0 schema requirement. The original R1-2 subtype-compatibility checkpoint is withdrawn; future Ticket-type and Incident designs are reviewed separately when real requirements justify them. Release 1.0 scope is unchanged. Knowledge is Post-v1; SLA, routing and automation remain Future.
 
 **Is Helpdesk still the best next major product epic? Yes**, on the evidence above. Under owner ruling D1 it also delivers the customer shell, as its first package.
 
