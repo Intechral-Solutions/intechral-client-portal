@@ -68,4 +68,4 @@ new endpoint, no auto-save and no due-date-only submit. The submit button reads 
 ## Compatibility
 
 Additive migration (`2026_11_04_120000_add_ticket_due_date_override`), no backfill. The Release 0.9 build ignores the new column and
-table. Rehearsed on populated data: see [migration rehearsal](../testing/migration-rehearsal.md).
+table. Rehearsed on populated data: see [migration rehearsal](../testing/migration-rehearsal.md). *(Historical: the compatibility with the Release 0.9 build and the populated-data rehearsal are no longer required, see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0).)*

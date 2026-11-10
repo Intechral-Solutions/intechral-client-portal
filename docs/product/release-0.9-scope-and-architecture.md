@@ -5,7 +5,7 @@
 **Reconciled (2026-10-11)** with the EPIC-017 WP2 closure ([Amendment 2](../epics/EPIC-017-helpdesk-mvp-customer-shell.md#amendment-2-wp2-customer-helpdesk-in-react-pr-2)); see [§2.1](#21-epic-017-sequencing-dispositions-owner-directed-2026-10-11).
 **Class:** Release scope and data architecture. It is a planning record, not an epic.
 **Inputs:** the Release 0.9 readiness assessment, the R0.9-0 scope and architecture gate, and the independent data architecture review of 2026-10-10 (Opus 5.5).
-**Governs:** the Release 0.9 production data and its migrations. It supersedes the pre-release disposable-data assumptions in the [Product Roadmap](./product-roadmap.md) for that database (see [§12](#12-supersession-record)).
+**Governs:** the Release 0.9 production data and its migrations. It supersedes the pre-release disposable-data assumptions in the [Product Roadmap](./product-roadmap.md) for that database (see [§12](#12-supersession-record)). The 2026-11-09 owner re-scope in that section retires the durable-data and rollback obligations for it.
 **Companions:** [Product Roadmap](./product-roadmap.md) · [EPIC-017](../epics/EPIC-017-helpdesk-mvp-customer-shell.md) · [Database Schema](../architecture/database-schema.md)
 
 ## Contents
@@ -323,6 +323,13 @@ C6 (a previously communicated ticket number is never reissued after disaster rec
 - Unchanged: a restore requires an identified, consistent, verified backup set (sections 7.1 and 8). Recovery adds stale-identity safeguards (references-only ticket routes, nested attachment URLs, session invalidation, queue review, attachment isolation) and verifies canonical format, uniqueness and id-to-reference identity instead of sequential numbers.
 - Existing data: the intended production install is fresh and separate from the existing production portal; no real customer-facing `TKT-` reference from this portal is known. Before deployment this is verified (`tickets:rereference --check`, empty production ticket table, sandbox-only mail history). Staging's disposable tickets are re-referenced by `tickets:rereference`.
 - Obsolete by this addendum: any statement in this document or in EPIC-010D that ticket numbers are derived from the id, never reissued, or checked against a high-water mark. They remain as history.
+
+### Addendum 2026-11-09: owner re-scope (R1-0)
+
+The owner ruled on 2026-11-09, recorded in the repository on 2026-11-10 ([R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)), that no authoritative production or customer data exists and that Release 0.9 staging is disposable. Release 1.0 is a fresh install, not an upgrade of authoritative data.
+
+- **Retired:** the Release 0.9 N-1 compatibility, ordinary-rollback and "previous release does not exist yet" items (3, 4 and 8) of [section 6](#6-migration-and-rollback-contract), as applied to rollback of Release 1.0 to the Release 0.9 build (item 9, that schema compatibility is not security compatibility, remains a general caution), and the requirement in [section 8](#8-migration-rehearsal-contract) that migrations preserve a populated Release 0.9 data set. Sections 4, 6 and 8 are not edited and stay as the historical record. The supersession in the first bullet above, that Release 1 is an upgrade of authoritative data, is withdrawn.
+- **Unchanged:** the H1 to H4 decisions and the foreign-key, account-suspension and role-governance changes that already shipped, the backup and restore requirements of [section 7](#7-backup-consistency-app_key-and-ticket-number-continuity), and the requirement that a verified backup and a tested restore exist before real customer production onboarding.
 
 ## 13. Evidence basis
 

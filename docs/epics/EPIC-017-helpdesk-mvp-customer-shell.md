@@ -29,7 +29,7 @@ No implementation has started, and no implementation branch exists.
 - **WP5 retains the essential early-access notification, security and accessibility work** (owner-confirmed 2026-10-11, [A2.14](#a214-deferred-work-not-cancelled)). It is neither cancelled nor deferred with WP3/WP4. Which items form that essential slice is not yet specified or ratified.
 - The keyboard-only and 390/768 customer Helpdesk checks ([A2.10](#a210-g3-b-review-follow-ups), follow-up 1) are in the Release 0.9 customer-readiness scope, associated with WP5 and exit criterion §33.1 (owner-confirmed 2026-10-11).
 - The work packages, requirements, owner rulings and exit criteria of this epic are otherwise unchanged, and [Amendment 2](#amendment-2-wp2-customer-helpdesk-in-react-pr-2) stands as the WP2 ledger.
-- The row in §3 stating that development tickets are disposable describes development data. Release 0.9 production data, ticket numbers included, is authoritative from its first record.
+- The row in §3 stating that development tickets are disposable describes development data. Release 0.9 production data, ticket numbers included, is authoritative from its first record. *Superseded 2026-11-09: no authoritative production data exists; see the [R1-0 ruling](../product/release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0).*
 
 ---
 

@@ -5,8 +5,8 @@ use Tests\Support\RehearsalSandbox;
 
 /*
  * R0.9-1A/1B: which migrations form the rehearsal baseline and which may be applied as candidates. The baseline
- * is a PINNED list (database/rehearsal/baseline.php); the migrations directory must be exactly that list plus
- * the approved candidates. Pure file rules: no database is touched.
+ * is a PINNED list (database/rehearsal/baseline.php) and candidates are listed and pinned too. A migration file
+ * that neither names is not rehearsed and not refused (R1-0). Pure file rules: no database is touched.
  */
 
 const CANDIDATE = '2026_12_31_000001_rehearsal_probe';
@@ -39,12 +39,14 @@ function refusalFor(callable $arrange, array $names = []): string
 }
 
 describe('the committed sets', function () {
-    it('pin every committed migration: nothing is undeclared and nothing has drifted', function () {
+    it('pin every listed migration: each exists and none has drifted', function () {
         $set = MigrationSet::repository();
 
         expect($set->manifestViolations())->toBe([])
             ->and($set->select([]))->toBe([])
-            ->and($set->names())->toBe([...$set->baselineNames(), ...$set->candidateNames()]);
+            ->and(array_diff([...$set->baselineNames(), ...$set->candidateNames()], $set->names()))->toBe([])
+            // select() hashes only what is selected: select every candidate so each committed pin is checked against its file.
+            ->and($set->select($set->candidateNames()))->toHaveCount(count($set->candidateNames()));
     });
 
     it('keeps the baseline in migration order and every candidate after it', function () {
@@ -87,20 +89,17 @@ describe('baseline pinning', function () {
             ->and($set->candidateNames())->toBe([CANDIDATE]);
     });
 
-    it('refuses an undeclared migration file, naming it, instead of adding it to the baseline', function () {
-        $message = refusalFor(fn (string $path) => file_put_contents($path.'/migrations/2026_12_31_000009_surprise_migration.php', '<?php return null;'));
-
-        expect($message)->toContain('Migration set refused', 'undeclared migration file "2026_12_31_000009_surprise_migration"', 'candidates.php');
-    });
-
-    it('refuses an undeclared migration even when no candidate is selected, and never lists it in the baseline', function () {
+    it('does not refuse a migration file that no manifest names, and never adds it to the baseline or runs it', function () {
         $path = RehearsalSandbox::databasePath();
         file_put_contents($path.'/migrations/2026_12_31_000009_surprise_migration.php', '<?php return null;');
         $set = new MigrationSet($path.'/migrations', [], require $path.'/rehearsal/baseline.php');
 
-        expect(fn () => $set->select([]))->toThrow(InvalidArgumentException::class, 'undeclared migration file')
-            ->and(fn () => $set->baselinePaths())->toThrow(InvalidArgumentException::class, 'undeclared migration file')
-            ->and($set->baselineNames())->not->toContain('2026_12_31_000009_surprise_migration');
+        expect($set->manifestViolations())->toBe([])
+            ->and($set->select([]))->toBe([])
+            ->and($set->names())->toContain('2026_12_31_000009_surprise_migration')
+            ->and($set->baselineNames())->not->toContain('2026_12_31_000009_surprise_migration')
+            ->and(implode("\n", $set->baselinePaths()))->not->toContain('surprise_migration')
+            ->and(fn () => $set->select(['2026_12_31_000009_surprise_migration']))->toThrow(InvalidArgumentException::class, 'not an approved candidate');
     });
 
     it('reports a missing baseline file by name', function () {
@@ -160,13 +159,17 @@ describe('baseline pinning', function () {
     });
 
     it('reports every piece of drift in one refusal', function () {
-        $name = array_key_first(RehearsalSandbox::pinnedBaseline());
-        $message = refusalFor(function (string $path, array $baseline, array $candidates) use ($name) {
-            file_put_contents($path.'/migrations/2026_12_31_000009_surprise_migration.php', '<?php return null;');
-            unlink($path.'/migrations/'.$name.'.php');
+        [$missing, $edited] = array_slice(array_keys(RehearsalSandbox::pinnedBaseline()), 0, 2);
+        // The sandbox baseline files are SYMLINKS to the real migrations: never write through them. Unlink one, and change the
+        // other's PIN instead of its content.
+        $message = refusalFor(function (string $path, array $baseline, array $candidates) use ($missing, $edited) {
+            unlink($path.'/migrations/'.$missing.'.php');
+            $baseline[$edited] = str_repeat('0', 64);
+
+            return [$baseline, $candidates];
         });
 
-        expect($message)->toContain('undeclared migration file', 'pinned but missing');
+        expect($message)->toContain('pinned but missing', 'has changed since it was pinned');
     });
 });
 

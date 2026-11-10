@@ -13,7 +13,7 @@ There is no version framework. A release is identified by what already identifie
 | **Git tag** | **None yet** (owner ruling, 2026-11-06: no release tags are created). Proposed for later: `v1.0.0` on the release commit. |
 | **Build identity** (authoritative) | the `RELEASE` file at the root of the build archive: `release=<UTC yyyymmddHHMMSS>-<7-character commit>` and the full 40-character `commit=` ([Release build](../operations/release-build.md#release-identity)). A rebuild of one commit is a new id. |
 | **Where it is visible at runtime** | the release directory name under `releases/`; the cron wrapper's `START release=<id>` lines; the A2 `--verify` release row; `backup:create` manifests (which read `RELEASE`) |
-| **Baseline it was built from** | Release 0.9, commit `32ec62f5c034b6394950203941e170d830b4669c` (untagged; a tag `v0.9.0` is proposed for later). Gate G3 confirms the commit against the deployed release's `RELEASE`, and the rollback assessment re-checks the retained directory. |
+| **Baseline it was built from** | Release 0.9, commit `32ec62f5c034b6394950203941e170d830b4669c` (untagged; a tag `v0.9.0` is proposed for later). |
 
 An `app:version` command was considered and not added: the identity already travels in `RELEASE`, and a command would only re-read the file the build stamps.
 
@@ -25,6 +25,27 @@ Filled at build time:
 | Commit | _(from `RELEASE`)_ |
 | Archive SHA-256 | _(from `<archive>.sha256`)_ |
 | Tag | _(none yet)_ |
+
+## Data, deployment and recovery ruling (R1-0)
+
+**Owner ruling of 2026-11-09, made authoritative in this repository by R1-0 (2026-11-10).** It supersedes every earlier statement in the repository that treats Release 0.9
+data as authoritative or requires a way back to the Release 0.9 build; those statements are kept as history and annotated, not rewritten.
+
+- **No authoritative production or customer data exists.** The new portal has never been in production. Release 0.9 staging is **disposable** and is rebuilt only when the owner
+  explicitly authorizes it; the shared hosting account's other sites and the legacy portal are *not* disposable, so every host operation still needs exact-target verification and explicit approval.
+- **Release 1.0 is fresh-install and rebuild-first.** A migration may therefore refuse a populated table instead of transforming it (the refuse-and-list pattern of
+  `2026_11_06_120100_unique_company_organization_link`), and it is never a rule that a new migration must keep an older build running.
+- **Retired:** the mandatory code rollback from Release 1.0 to the Release 0.9 build (the `rollback-1.0-to-0.9` procedure, `database:rollback-assessment`, the `database/profile/rollback/0.9.json`
+  declaration and its pinned `releases/0.9` manifest, Mode 1/Mode 2 and the gates G1 to G4 of that procedure), the "N-1" rule applied to the 0.9 build, and the requirement that every migration
+  pass a populated Release 0.9 data-preservation rehearsal. Nothing was rehearsed against real data, so no evidence is lost: the history is in git.
+- **Still required, and unchanged:** the database profile and `database:verify` with `database/profile/foreign-keys.json` (a migration that adds or changes a foreign key updates that manifest);
+  fresh-migration verification; runtime preflight (`runtime:preflight`, A2); release identity (the `RELEASE` file); hosted CI and the browser suites as evidence; the security, tenant-isolation and
+  integrity tests; and the unrelated deployment and hosting assets.
+- **Backup and recovery remain required.** [Backup and recovery](../operations/backup-and-recovery.md) is the one recovery procedure (restoring a verified backup discards every later write).
+  A **verified backup and a tested restore of the Release 1.0 database must exist before any real customer is onboarded to production**; that drill on the real host is an open requirement, not something this ruling waives.
+- **The migration-rehearsal harness is kept as an optional tool** ([migration rehearsal](../testing/migration-rehearsal.md)) for proving a data-touching migration on populated fixtures; it is also the shared
+  infrastructure of `backup:drill` and `database:verify`. A migration need **not** be listed in `database/rehearsal/candidates.php` to ship. Migrations already listed stay SHA-256 pinned: editing a pinned migration file,
+  even a comment, invalidates its pin.
 
 ## What changed since Release 0.9
 
@@ -47,32 +68,22 @@ Merged on `main` up to `fec5c81`:
 | Fact | Detail |
 |---|---|
 | Migrations (4) | `2026_11_04_120000_add_ticket_due_date_override` (additive), `2026_11_06_120000_add_organization_management_relationship` (additive), `2026_11_06_120100_unique_company_organization_link` (**tightening**: refuses to run, changing nothing, if an organization has two companies), `2026_11_07_090000_add_organization_admin_approval` (additive: two nullable columns on `organization_members` and one foreign key; no backfill, no approval is ever created by it) |
-| Before the unique-link migration | run `art organizations:preflight` on the real data and have the owner review any `failure` ([MO-1A record](./release-1.0-managed-organizations-mo-1a.md#existing-data-preflight)). After the approval migration the same command also inventories administrator approvals ([MO-2A1 record](./release-1.0-managed-organizations-mo-2a1.md)); a historical administrator is unapproved until an operator approves that exact membership |
-| New commands | `organizations:preflight`, `database:rollback-assessment` |
+| Before the unique-link migration | on any non-empty database (a rebuilt staging that was seeded, or a future production), run `art organizations:preflight` and have the owner review any `failure` ([MO-1A record](./release-1.0-managed-organizations-mo-1a.md#existing-data-preflight)); a fresh install has nothing to report. After the approval migration the same command also inventories administrator approvals ([MO-2A1 record](./release-1.0-managed-organizations-mo-2a1.md)); a historical administrator is unapproved until an operator approves that exact membership |
+| New commands | `organizations:preflight` |
 | Configuration | no new keys |
-| Queue | no new queued class; the six Release 0.9 classes only (pinned by a test). Restart workers after the swap as usual |
-| Rehearsal | the four migrations are pinned candidates and were rehearsed alone and together; re-run `./dev rehearse` after any edit to one |
-| Rollback record | `database/profile/rollback/0.9.json` and the pinned `database/profile/releases/0.9/foreign-keys.json` ship in the archive; any package that adds a foreign key, column, CHECK, queued class or migration updates them in the same change |
+| Queue | no new queued class; the six Release 0.9 classes only. Restart workers after the swap as usual |
+| Rehearsal | optional. The four migrations are pinned candidates in `database/rehearsal/candidates.php` and were rehearsed; their SHA-256 pins mean none of those files may be edited. A new migration need not be added there |
 
-## Rolling back
+## Recovery
 
-Rolling the code back to Release 0.9 is **not** an ordinary rollback: the unmodified 0.9 build reports five `unexpected foreign key` lines in `database:verify` and `runtime:preflight`, and its
-`--issue` refuses to issue an A2 challenge (a real A2 is still possible by issuing the challenge through `RuntimeChallenges::issue()`). There are two supported ways back:
+There is no supported way back to the Release 0.9 build (see the ruling above). Recovery for Release 1.0 is **restoring a verified backup** with
+[Backup and recovery](../operations/backup-and-recovery.md), or **rebuilding** a disposable environment when the owner authorizes it. A same-commit code swap-back of a retained
+release directory remains an ordinary release operation, with its own conditions, in the [first-install runbook](../operations/staging-first-install.md).
 
-- **Mode 1, code-only** (data kept): an exceptional, reviewed operation: assess on Release 1.0 after the producers are stopped and the queue is drained, pre-check the old verifier's exact output, swap, then a real A2 whose accepted violations are exactly the five lines. The old verifier **exits non-zero** and the procedure never says otherwise.
-- **Mode 2, restore the verified pre-upgrade backup**: the old gates pass unchanged, and **every write since that backup is discarded**. A backup taken just before the rollback is *not* a Mode 2 source.
+## Gates before Release 1.0 is deployed to a customer-facing environment
 
-Mode 1 starts only after a written **step 0**: a verified pre-upgrade backup (identifier and digest), the completed rehearsal record, the owner's confirmation that delegation was never enabled, the approved target, an owner-defined maximum window and a **company-deletion freeze** (the 0.9 build cannot enforce it; it is a procedure with an operator inventory, acknowledgements and read-only monitoring). When managed relationships exist, an extra verified backup of the 1.0 state is mandatory.
-Mode 1 is prohibited once MO-2B delegation has been enabled (a persistent database marker, to be built with MO-2B, will make the assessment refuse). **Before** a code-only rollback through older membership code, all administrator approvals must be revoked explicitly (audited, idempotent, by an authorized operator, one membership at a time on the organization page): `database:rollback-assessment` **refuses while either approval column holds any value**, complete or half-written, so a code-only rollback is prohibited until none remains. After any rollback, `organizations:preflight` must pass before the re-upgrade (repairs go through the application's relationship service, never SQL), and administrators need renewed review and explicit approval before delegation is enabled. The reviewed procedure,
-its evidence, the re-upgrade and the integration requirements for later packages are in [Rolling the Release 1.0 code back to Release 0.9](../operations/rollback-1.0-to-0.9.md).
-
-## Gates that must be closed before Release 1.0 upgrades an authoritative environment
-
-1. **G1, verified pre-upgrade backup.** A verified, restorable backup set of the Release 0.9 database, taken immediately before the first 1.0 migration, with its identifiers recorded. Without it there is no Mode 2.
-2. `organizations:preflight` is run on real data, and the owner reviews its findings before the unique-link migration.
-3. **G2, rollback rehearsal.** The rollback and re-upgrade procedure is rehearsed once on a **disposable host-copy** (never the authoritative environment).
-4. **G3, release identity.** The retained Release 0.9 directory's `RELEASE` records the commit named in the rollback declaration (`32ec62f5c034b6394950203941e170d830b4669c`).
-5. The migration-rehearsal evidence is preserved, and re-run after any migration edit.
-6. Hosted CI, including the full Pest suite and the browser suites, is green on the release commit.
-
-Owner rulings on rollback (2026-11-06) are recorded in the [rollback document](../operations/rollback-1.0-to-0.9.md#4-owner-rulings-and-the-two-supported-ways-back).
+1. A **fresh install** migrates cleanly: `php artisan migrate --force` then `php artisan database:verify` exits 0 with nothing pending.
+2. `php artisan runtime:preflight` passes, and the release identity (`RELEASE`) is recorded for the build.
+3. Hosted CI, including the full Pest suite and the browser suites, is green on the release commit.
+4. On any non-empty database, `organizations:preflight` has been run and the owner has reviewed its findings.
+5. **Before any real customer is onboarded to production:** a verified backup and a **tested restore** of the Release 1.0 database exist ([Backup and recovery](../operations/backup-and-recovery.md)).

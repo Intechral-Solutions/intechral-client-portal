@@ -11,13 +11,13 @@ use Illuminate\Console\Command;
 use InvalidArgumentException;
 
 /**
- * Runs the Release 0.9 migration rehearsal (R0.9-1A): baseline, fixtures, snapshot, optional approved
+ * Runs the migration rehearsal (R0.9-1A; an optional tool since R1-0, not a release gate): baseline, fixtures, snapshot, optional approved
  * candidate migrations, comparison, and a backup/restore round trip, all inside two dedicated rehearsal
  * databases and one rehearsal file area. It never touches the development, testing or E2E database.
  *
  * Exit codes: 0 every invariant held; 1 the rehearsal ran and found a difference or a broken invariant, failed
  * part-way (the report names the step; the rehearsal databases and files may be partly changed), or could not
- * remove its own temporary backup; 2 it refused to start (an unapproved, undeclared or drifted migration, an
+ * remove its own temporary backup; 2 it refused to start (an unapproved candidate or a drifted pinned migration, an
  * unsafe target, or another rehearsal running). Only a refusal promises that nothing was changed.
  *
  * Temporary artifacts: the run's backup set is removed when the run passes, and kept (private) when it

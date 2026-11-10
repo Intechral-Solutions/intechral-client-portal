@@ -180,6 +180,7 @@ accounts are onboarded. The release gate records them in
    `SELECT COUNT(*) FROM users WHERE disabled_at IS NOT NULL`; if it is not zero, fix forward instead, or follow a
    recovery procedure that keeps those accounts locked out. **That procedure is not yet established, and must be
    before customer onboarding.** N-1 schema compatibility does not by itself guarantee security compatibility.
+   *Retired as a Release 0.9 obligation (2026-11-09, [R1-0 ruling](../product/release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)): no Release 0.9 build is rolled back to. The principle still applies to any future code rollback.*
 
 ## Independent review findings (R0.9-1C)
 

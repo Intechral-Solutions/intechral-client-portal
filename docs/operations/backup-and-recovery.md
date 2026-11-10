@@ -7,6 +7,10 @@
 
 > **Status.** Implemented and tested in the repository only. **No backup or restore has been run on staging or production**, no cron entry exists for it, no key
 > has been created, and nothing is uploaded anywhere. Every host step below needs the owner's go-ahead.
+>
+> **Recovery path (R1-0, 2026-11-10).** This document is the one recovery procedure ([owner ruling R1-0](../product/release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)): there is
+> no separate rollback to the Release 0.9 build. Restoring a set discards every write made after it. No authoritative production data exists yet, but **a verified backup and a tested restore on the
+> real host must exist before any real customer is onboarded to production**; that drill has not been run and is an open requirement.
 
 This is the smallest recovery capability Release 0.9 needs: one command makes an encrypted, self-describing backup set on the host; the owner pulls it off the host
 by hand; a drill on the owner's machine proves it restores; and one guarded command restores it into an empty installation when that is ever needed.
@@ -188,7 +192,8 @@ These apply to the first staging backup and drill, and to every rehearsal after 
    the rehearsal.
 3. **The legacy-reference restore path is proven before the C6-R conversion.** Staging still holds the two legacy `TKT-` references, so the set taken at ADR-008
    step 1 must pass `backup:drill … --expect-legacy-references=2` (the drill refuses any other count) **before** `tickets:rereference --apply` runs. That drill is
-   what makes the step-1 set the rollback point the conversion relies on. (`BackupRoundTripTest` proves this path on fixtures: a real dump of a database holding
+   what makes the step-1 set the rollback point the conversion relies on. *(R1-0 note, 2026-11-10: staging is now disposable and is rebuilt only when the owner authorizes it, so this safeguard may be moot for
+   staging. It is kept until the owner confirms whether to retire it; it is not a Release 0.9 code-rollback obligation.)* (`BackupRoundTripTest` proves this path on fixtures: a real dump of a database holding
    `TKT-` references verifies, fails the drill unless exactly that count is expected, and passes when it is.)
 4. **The disposable restore database uses narrowly scoped privileges wherever practical.** The drill's target is fixed (the rehearsal restore database), but on
    the development machine it connects with the shared `portal` account, which also holds the development and testing databases; the dump checks and the digest
@@ -292,6 +297,8 @@ Each safeguard was also disabled in turn (mutation probes) to confirm its test t
 - **The first staging backup needs this code on the host.** The running staging release predates it. Because C6-R makes legacy ticket URLs 404 as soon as it is
   selected, the backup that gates the C6-R deployment (ADR-008 step 1) must be taken **before** the new release is selected: unpack the new release, link `.env` and
   `storage` as usual, and run `backup:create` from that unselected directory (it only reads). That is a host step for the owner to approve.
+- **Set and build.** `backup:verify` and the restore check that the dump, the manifest and the files agree with each other, including a summary of the migrations recorded in the set (count, last name, SHA-256).
+  The restore does not compare that summary with the migrations of the build that runs it, so restore a set into a build whose migration set matches it, and run `php artisan database:verify` after any restore.
 - The client tools differ by host: `mariadb-dump` 11.4 on Namecheap, 11.8 in the development image, 10.11 on hosted CI runners. The dump reader accepts the
   statement forms these write and refuses anything else, so a future client format change fails closed (no set) rather than producing an unchecked one.
 - File-time resolution leaves the same-second window in section 2, point 5.

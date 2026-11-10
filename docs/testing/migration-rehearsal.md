@@ -1,6 +1,10 @@
 # Migration rehearsal harness (R0.9-1A, extended in R0.9-1B)
 
-The Release 0.9 data contract ([§8 of the scope document](../product/release-0.9-scope-and-architecture.md#8-migration-rehearsal-contract)) says a risky migration is proven on populated data in a disposable database before it is trusted. This harness is that proof. It builds a known populated baseline, snapshots it, applies an **approved candidate migration**, snapshots again, reports any difference nobody announced, and proves a backup of the result restores to an identical snapshot.
+> **Status (R1-0, 2026-11-10).** The Release 0.9 data-preservation and rollback obligation is retired: no authoritative data exists ([owner ruling](../product/release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)).
+> This harness is now an **optional tool** for proving a data-touching migration on populated fixtures, and the shared infrastructure of `backup:drill` and `database:verify`. It is **not a release gate**. The sections
+> below that speak of the Release 0.9 data contract describe the history of how it was built.
+
+The Release 0.9 data contract ([§8 of the scope document](../product/release-0.9-scope-and-architecture.md#8-migration-rehearsal-contract)) said a risky migration is proven on populated data in a disposable database before it is trusted; this harness was built as that proof, and it remains available for that purpose. It builds a known populated baseline, snapshots it, applies an **approved candidate migration**, snapshots again, reports any difference nobody announced, and proves a backup of the result restores to an identical snapshot.
 
 It is a **rehearsal tool**. It is not a production backup, restore or deployment tool (see [Not production tooling](#not-production-tooling)).
 
@@ -46,7 +50,7 @@ The shared `portal` account **also** holds `ALL` on `portal` and the Pest testin
 
 Checked immediately **before every destructive step** (reset, clean, restore, migrate), not once at start-up. Failures are classified by *when* they happen, because the two promise different things:
 
-- **A refusal, before anything is changed** (an unapproved, undeclared or drifted migration, an unsafe target, another rehearsal holding the lock): exit **2**, and the command prints "Nothing was changed". For `rehearse:clean` every target is checked before the first one is touched, so a refusal there changes nothing either.
+- **A refusal, before anything is changed** (an unapproved candidate, a drifted pinned migration, an unsafe target, another rehearsal holding the lock): exit **2**, and the command prints "Nothing was changed". For `rehearse:clean` every target is checked before the first one is touched, so a refusal there changes nothing either.
 - **A failure after the rehearsal began** (a candidate that throws, a guard failing on a later capture, a failed restore): exit **1**. The report names the step ("Rehearsal stopped during ...") and says the rehearsal databases and files **may be partly changed**; it never says nothing changed. They hold fixtures only and only the rehearsal resources are ever touched, so `./dev rehearse:clean` or the next `./dev rehearse` resets them. A `rehearse:clean` that stops part-way exits 1 and names the step that failed and what was already cleaned.
 
 1. **Environment.** The runtime environment *and* the configured `app.env` must each be `local` or `testing` (`--env` changes only the first). `production` and anything unrecognised is refused.
@@ -60,13 +64,14 @@ Checked immediately **before every destructive step** (reset, clean, restore, mi
 
 ## Baseline and fixtures
 
-The baseline is **pinned**: `database/rehearsal/baseline.php` lists, in migration order, every migration the rehearsal builds its starting schema from, each with the SHA-256 of the file as it shipped. `database/migrations` must be exactly that list plus the approved candidates in `candidates.php`, and anything else is refused with exit 2 before the database is touched, naming the precise problem:
+The baseline is **pinned**: `database/rehearsal/baseline.php` lists, in migration order, every migration the rehearsal builds its starting schema from, each with the SHA-256 of the file as it shipped. A baseline or candidate file that is missing or no longer matches its pin is refused with exit 2 before the database is touched, naming the precise problem:
 
-- an **undeclared migration file** (in neither list): it does not silently join the baseline, where it would be installed on an empty schema and never tested against populated data;
 - a **missing** or **edited** baseline file (drift);
 - a baseline out of order, a name in both lists, or a **candidate that sorts before the last baseline migration** (it must run after the fixtures, as a real upgrade would).
 
-The run then applies only the pinned baseline, checks the `migrations` table records exactly those names, seeds the fixtures, and only afterwards applies the selected candidates; it fails if the fixtures wrote no rows or a candidate was already applied. The report says `applied_after_fixtures` and how many rows existed first. A run with no candidate lists the approved candidates it did *not* exercise. When a candidate has shipped and a later package needs its columns in the fixtures, its entry moves from `candidates.php` to the end of `baseline.php` in the same reviewed change. Fixtures (`BaselineFixtures`) are deterministic: fixed ids, timestamps and values, inserted directly (no events, mail, queue or activity-log side effects), written against the schema that exists **before** a candidate (C5: `users.disabled_at` is never seeded before its migration). Nothing in them is a real person or credential (`.test` addresses, inert password hashes).
+A migration file in `database/migrations` that is in **neither** list is **not rehearsed and not refused**: it is never added to the baseline and never applied by the harness, and a migration does not need to be listed to ship.
+
+The run then applies only the pinned baseline, checks the `migrations` table records exactly those names, seeds the fixtures, and only afterwards applies the selected candidates; it fails if the fixtures wrote no rows or a candidate was already applied. The report says `applied_after_fixtures` and how many rows existed first. A run with no candidate lists the approved candidates it did *not* exercise. If a candidate has shipped and a later package wants its columns in the fixtures, its entry may move from `candidates.php` to the end of `baseline.php` in the same reviewed change (this changes the fixtures and the snapshot hash, so it is a deliberate choice, not a requirement). Fixtures (`BaselineFixtures`) are deterministic: fixed ids, timestamps and values, inserted directly (no events, mail, queue or activity-log side effects), written against the schema that exists **before** a candidate (C5: `users.disabled_at` is never seeded before its migration). Nothing in them is a real person or credential (`.test` addresses, inert password hashes).
 
 Coverage today: 205 rows in 33 tables and 4 real attachment files: users (operators, customers, an SSO-only user with no password, a custom role), invitations in each state, tickets in every status with replies, internal notes, status history and attachments, projects with customer members, task kinds, comments, checklists, dependencies, milestones, time entries (running, stopped, billed-locked) with blocks, retained invoices with items and payments, organizations and CRM metadata, and activity-log rows.
 
@@ -85,9 +90,9 @@ Coverage today: 205 rows in 33 tables and 4 real attachment files: users (operat
 
 ## Candidate migrations
 
-A candidate is selected **by name** (`--candidate=2026_10_12_000001_example`), never by path, wildcard or `all`. It must be in `database/rehearsal/candidates.php` (the review record: summary, SHA-256, declared `schema` changes in the manifest notation, declared `data` tables), present in `database/migrations`, sort after the pinned baseline, and its file must still hash to the recorded SHA-256. Duplicates, stale manifest entries and anything else are refused with exit 2 before the database is touched.
+A candidate is selected **by name** (`--candidate=2026_10_12_000001_example`), never by path, wildcard or `all`. To be rehearsed it must be in `database/rehearsal/candidates.php` (an **optional** review record, kept for migrations an owner chose to prove on populated data: summary, SHA-256, declared `schema` changes in the manifest notation, declared `data` tables), present in `database/migrations`, sort after the pinned baseline, and its file must still hash to the recorded SHA-256. Duplicates, stale manifest entries and anything else are refused with exit 2 before the database is touched.
 
-The manifest holds the three **R0.9-1B** candidates (see [Release 0.9 preservation migrations](#release-09-preservation-migrations-r09-1b)) and the **Release 1.0** ticket due-date candidate `2026_11_04_120000_add_ticket_due_date_override` (additive: one nullable column, one audit table, one unique index; rehearsed with `./dev rehearse --candidate=2026_11_04_120000_add_ticket_due_date_override`, no record changed, backup round trip identical). The **Release 1.0 managed-organization** candidates `2026_11_06_120000_add_organization_management_relationship` (additive: two columns, one self foreign key, one CHECK) and `2026_11_06_120100_unique_company_organization_link` (tightening: UNIQUE on `crm_companies.organization_id`; refuses to run on duplicate links) are rehearsed separately and together; see [the MO-1A record](../product/release-1.0-managed-organizations-mo-1a.md). The snapshot gains `organizations:*` checks once the columns exist; it does not read CHECK constraints, so their survival of the dump and restore is verified by a direct `information_schema` query. `./dev rehearse` with no `--candidate` exercises none of them and says so.
+The manifest holds the three **R0.9-1B** candidates (see [Historical: R0.9-1B tightening migrations](#historical-r09-1b-tightening-migrations-shipped-in-release-09)) and the **Release 1.0** ticket due-date candidate `2026_11_04_120000_add_ticket_due_date_override` (additive: one nullable column, one audit table, one unique index; rehearsed with `./dev rehearse --candidate=2026_11_04_120000_add_ticket_due_date_override`, no record changed, backup round trip identical). The **Release 1.0 managed-organization** candidates `2026_11_06_120000_add_organization_management_relationship` (additive: two columns, one self foreign key, one CHECK) and `2026_11_06_120100_unique_company_organization_link` (tightening: UNIQUE on `crm_companies.organization_id`; refuses to run on duplicate links) are rehearsed separately and together; see [the MO-1A record](../product/release-1.0-managed-organizations-mo-1a.md). The snapshot gains `organizations:*` checks once the columns exist; it does not read CHECK constraints, so their survival of the dump and restore is verified by a direct `information_schema` query. `./dev rehearse` with no `--candidate` exercises none of them and says so.
 
 Schema notation: `table+`/`table-`, `column+`/`column-`/`column~` (type, nullability), `collation~:t.c`, `tablecollation~:t`, `primary~`, `unique+`/`unique-`, `index+:t(a,b)`/`index-:t(a,b)`, `fk+`/`fk-:t.c->p.c:DELETE/UPDATE` (an added or removed key states both rules), `fk~:t.c->p.c:OLD>NEW` (ON DELETE) and `fku~:t.c->p.c:OLD>NEW` (ON UPDATE). A rename of an index is not a change.
 
@@ -139,12 +144,12 @@ The independent review (Opus 5.5) of R0.9-1A concluded **SAFE TO COMMIT**, with 
 
 | Id | Status | What changed |
 |----|--------|--------------|
-| J-1 | **Done in R0.9-1B** | The baseline is pinned (`baseline.php`, SHA-256 per file, ordered). An undeclared, missing or edited migration file, a misordered baseline, and a candidate that sorts before the baseline are refused with exit 2 and the precise drift. Candidates run only after the fixtures, with evidence in the report. |
+| J-1 | **Done in R0.9-1B** | The baseline is pinned (`baseline.php`, SHA-256 per file, ordered). A missing or edited baseline file (R0.9-1B also refused an undeclared migration file; R1-0 relaxed that to "not rehearsed"), a misordered baseline, and a candidate that sorts before the baseline are refused with exit 2 and the precise drift. Candidates run only after the fixtures, with evidence in the report. |
 | J-2 | **Done in R0.9-1B** | The snapshot includes foreign-key `ON UPDATE` rules, non-unique indexes and column and table collations, each with its own declarable token, alongside the existing `ON DELETE` detection. |
 | J-3 | **Done in R0.9-1B** | A refusal before anything changes (exit 2, "Nothing was changed") is distinguished from a failure after the rehearsal began (exit 1, the step named, resources "may be partly changed"). A cleanup that stops part-way names the step and what was already cleaned. |
 | J-4 | **Done in R0.9-1B** | One database-server lock shared by `./dev rehearse`, `rehearse:clean` and the Pest tests, released by the server when the holder dies. |
 
-Still open:
+Still open (optional improvements since R1-0, not obligations):
 
 | When | Id | Obligation |
 |------|----|------------|
@@ -163,9 +168,11 @@ Informational findings, accepted and not expanding this package:
 
 **Hosted CI obligations.** The rehearsal Pest tests (`tests/Unit/Rehearsal/*`, several minutes) and the new `tests/Feature/Database/*` are expected to run in the existing hosted Pest job once pushed, because the Compose `db` service mounts `init-rehearsal.sql`. The first hosted run confirmed that the two rehearsal databases are provisioned and the tests pass, including `GET_LOCK`. The rehearsal lock makes a hosted run that overlapped another rehearsal fail loudly instead of corrupting it. The populated, production-like rehearsal (`./dev rehearse:*`) is a local and later-package tool and has not run on hosted CI.
 
-## Release 0.9 preservation migrations (R0.9-1B)
+<a id="release-09-preservation-migrations-r09-1b"></a>
 
-Three candidate migrations implement the schema decisions of the [Release 0.9 gate](../product/release-0.9-scope-and-architecture.md): H1 and H2 in full, and the schema portion of H3. Each is in `candidates.php` with its SHA-256 and the exact structural change it declares.
+## Historical: R0.9-1B tightening migrations (shipped in Release 0.9)
+
+*This section is a historical record.* Three candidate migrations implemented the schema decisions of the [Release 0.9 gate](../product/release-0.9-scope-and-architecture.md): H1 and H2 in full, and the schema portion of H3. Each is in `candidates.php` with its SHA-256 and the exact structural change it declares.
 
 | Migration | Decision | Change |
 |-----------|----------|--------|
@@ -175,7 +182,7 @@ Three candidate migrations implement the schema decisions of the [Release 0.9 ga
 
 **Method.** MariaDB DDL is not transactional, and a foreign key cannot be dropped and re-added under the same name in one statement (error 121, verified on 10.11). So each key is replaced in two single-statement `ALTER`s, each atomic (a failing `ALTER` leaves the old constraint in place): first the `CASCADE` key is dropped and a `RESTRICT` key added under a temporary name, then that is swapped back to the original name. The column has exactly one foreign key at every moment, constraint names are preserved (including the two tables renamed after their constraints were created: `project_tasks_created_by_foreign`, `project_task_comments_user_id_foreign`), and a run interrupted between the steps leaves a correct `RESTRICT` key that a re-run finishes. Foreign-key checks are never disabled. Before any change the migration checks every key against the approved inventory (live name, parent, rule, `ON UPDATE RESTRICT`, `NOT NULL`) and every child column for orphans, and stops with a list and changes nothing if anything differs. `ON UPDATE` is left unspecified, which preserves the existing `RESTRICT`.
 
-**Class: tightening.** No row is read, moved or rewritten, and none can become invalid; `RESTRICT` only refuses a *later* parent delete. The previous release's code has no path that deletes a user, so it cannot violate the new rule. Per R0.9-0 section 6, run them under maintenance mode after a verified backup, and rehearse first: `./dev rehearse --candidate=<name>` for each, or all three together.
+**Class: tightening.** No row is read, moved or rewritten, and none can become invalid; `RESTRICT` only refuses a *later* parent delete. The previous release's code has no path that deletes a user, so it cannot violate the new rule. At the time, R0.9-0 section 6 asked for maintenance mode, a verified backup and a rehearsal first (`./dev rehearse --candidate=<name>` for each, or all three together); that requirement is retired (R1-0).
 
 **Consequences for the application, left deliberately to later packages:**
 
@@ -185,4 +192,4 @@ Three candidate migrations implement the schema decisions of the [Release 0.9 ga
 
 ## How a later package uses it
 
-A new migration is added to `candidates.php` in the same change: summary, SHA-256 and the exact `schema` tokens it should produce (for example `fk~:tickets.user_id->users.id:CASCADE>RESTRICT`). `./dev rehearse --candidate=<name>` must pass with no undeclared difference before the migration is accepted. Fixtures stay on the pre-migration schema; once a candidate has shipped, its entry moves to the end of `baseline.php` and fixtures for the *next* candidate may use its columns, and the baseline snapshot hash changes in the same commit.
+To prove a migration on populated data, optionally add a candidate entry to `candidates.php` in the same change: summary, SHA-256 and the exact `schema` tokens it should produce (for example `fk~:tickets.user_id->users.id:CASCADE>RESTRICT`), then run `./dev rehearse --candidate=<name>`; it should pass with no undeclared difference. A migration need **not** be listed to ship, and a passing rehearsal is evidence, not a release gate. Fixtures stay on the pre-migration schema; if a candidate has shipped and a later one needs its columns, the entry may move to the end of `baseline.php` and the baseline snapshot hash changes in the same commit.

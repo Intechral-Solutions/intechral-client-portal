@@ -1,7 +1,7 @@
 # Release 1.0: Managed Organizations, MO-2A1 (membership security and administrator approval)
 
 **Status:** implemented on `feature/r1-0-mo-2a1-membership-approval`; the independent review (2026-11-07) was **SAFE AFTER TARGETED REMEDIATION**; the remediation below is done and the branch is **integrated with `main` at `8cbda05`** (RE-C1 and HD-P1). The independent differential closure review (2026-11-08) was **SAFE TO SUBMIT PR**; three documentation corrections from it are applied. **Approved for PR submission; not merged, not deployed.** Hosted CI is the merge gate.
-Release 0.9 staging is unchanged. This record covers MO-2A1 only. **It is operator-only: no customer-facing delegation, no
+Release 0.9 staging is unchanged. This record covers MO-2A1 only. *Annotation 2026-11-10: the Release 0.9 rollback obligations in this record (the rollback refusal, the `0.9.json` declaration, N-1 compatibility) were retired by the 2026-11-09 owner ruling, see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0); they are kept below as history.* **It is operator-only: no customer-facing delegation, no
 invitation change and no new access of any kind is introduced.** MO-2A2 (invitations), MO-2B (customer-facing delegation), MO-3 and
 MO-4 are not started. It follows the MO-2 design review (SAFE AFTER TARGETED DESIGN REVISIONS) and the owner's two clarifications,
 recorded under "Operator-only revocation" and "Rollback", and the owner's rulings of 2026-11-08 on the review (see "Remediation after the independent review").
@@ -86,7 +86,7 @@ and new role and approval. Approval provenance (who, when) is also on the member
 and completed independently (an interrupted run is finished by the next), an existing piece must have the shape the migration would
 create or it stops, and existing data is never rewritten. **No CHECK** requires approval to imply `role = admin`: the Release 0.9 code
 writes roles without knowing these columns, so during a rollback window it could violate one. Release 0.9 code uses the existing
-columns unchanged and cannot write the new ones. The candidate is registered and pinned in `database/rehearsal/candidates.php`; the
+columns unchanged and cannot write the new ones. (Retired 2026-11-09: the rollback window no longer exists, so a CHECK or trigger becomes possible later. It must be a **new** migration; this migration file is SHA-256 pinned and must not be edited.) The candidate is registered and pinned in `database/rehearsal/candidates.php`; the
 foreign-key manifest has one new entry; the integrity snapshot gained two conditional checks (approval on a non-administrator,
 and a half-written approval).
 
@@ -101,16 +101,16 @@ unapproved rows, and let an operator approve exactly the reviewed memberships on
 
 ## Rollback: no approval may remain
 
-Release 0.9 code (and any older code) can change a membership's role **without clearing an approval**. A demote followed by a re-promote by older code leaves a row that is `admin` with its old approval intact, indistinguishable from a genuine one, and no application trace. Owner ruling (2026-11-08): **a code-only rollback to Release 0.9 is prohibited while either approval column holds a value.** It is enforced, not merely documented:
+*Retired in part, 2026-11-09 (see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)): a code-only rollback to the Release 0.9 build is no longer a supported path, so the rollback-assessment refusal, the `0.9.json` declaration and the renewed approval after a rollback described in the earlier text of this section no longer apply. The earlier text is kept in git history. What stays is below.*
 
-- `database:rollback-assessment` (RE-C1) **refuses** while any `organization_members.admin_approved_at` or `admin_approved_by` is non-null: a complete record, a half-written one, or one on a non-administrator row. It names the organization and user ids (never an email) and the counts, and `--expected` exits 1 and prints no lines to compare for a refused assessment.
+Older code can change a membership's role **without clearing an approval**: a demote followed by a re-promote leaves a row that is `admin` with its old approval intact, indistinguishable from a genuine one, and no application trace. The integrity checks and the way out of an unwanted approval therefore remain:
+
 - The way out is the explicit, audited **per-membership revocation** on the organization page (`OrganizationMembership::revokeApproval`), available whenever *either* column is populated. The owner ruled this sufficient for MO-2A1; **no bulk command exists**, so many approvals mean many revocations, each with its own audit entry.
-- The rollback declaration (`database/profile/rollback/0.9.json`) now lists this migration, its two nullable columns and its foreign key, and the old verifier's output has five lines, captured from the real Release 0.9 archive (see the [rollback document](../operations/rollback-1.0-to-0.9.md)).
-- After any rollback, the re-upgrade preflight fails on the damage older code can leave (approval on a non-administrator, half-written record, membership changed after approval), and every administrator needs renewed operator review and an explicit new approval before delegation is ever enabled. Nothing is silently grandfathered or reactivated, and no generic rollback-compatibility framework is built for this.
+- The preflight (`organizations:preflight`) fails on a damaged approval: approval on a non-administrator, a half-written record, or a membership changed after approval. These are integrity checks independent of any rollback, and nothing is silently grandfathered or reactivated.
 
 ## Remediation after the independent review
 
-The review (Opus, 2026-11-07) accepted the membership and approval architecture, the lock ordering, the transaction handling and the last-approved-administrator protection, and found three rollback or security gaps and several consistency issues. Owner rulings of 2026-11-08: per-membership revocation is sufficient (no bulk command); every membership-management action needs an explicit, active, authorized operator; incomplete approval records fail closed; code-only rollback is prohibited while either approval column holds a value; operator-role or capability changes must not silently restore delegated authority once MO-2B exists (recorded below, not built); Release 0.9 staging is untouched.
+The review (Opus, 2026-11-07) accepted the membership and approval architecture, the lock ordering, the transaction handling and the last-approved-administrator protection, and found three rollback or security gaps and several consistency issues. Owner rulings of 2026-11-08: per-membership revocation is sufficient (no bulk command); every membership-management action needs an explicit, active, authorized operator; incomplete approval records fail closed; code-only rollback is prohibited while either approval column holds a value (superseded 2026-11-09: that rollback is retired, see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)); operator-role or capability changes must not silently restore delegated authority once MO-2B exists (recorded below, not built); Release 0.9 staging is untouched.
 
 | Finding | Remediation |
 |---|---|
@@ -124,7 +124,7 @@ The review (Opus, 2026-11-07) accepted the membership and approval architecture,
 
 ## Mandatory MO-2B security requirement (recorded, not built)
 
-A change to an account's **operator eligibility or capabilities** (granting or removing `portal.operator`, the `operator` role, or a role carrying either) must never silently restore, create or preserve delegated authority. Today an approved membership is inert while its account is an operator, and removing the eligibility makes the same approval count again with no audit entry; that is harmless only because an approval grants nothing in this release. **MO-2B must close this before it honours any approval**, for example by clearing or invalidating the account's approvals, with an audit entry, in the same transaction as the eligibility change, or by requiring renewed approval, and it needs a test that grant-then-remove does not restore authority. MO-2A1 builds no role-governance framework for it. The other MO-2B requirements (the persistent activation marker, default-off delegation, renewed approval after a rollback) are R3 and R4 in the [rollback document](../operations/rollback-1.0-to-0.9.md#r-requirements).
+A change to an account's **operator eligibility or capabilities** (granting or removing `portal.operator`, the `operator` role, or a role carrying either) must never silently restore, create or preserve delegated authority. Today an approved membership is inert while its account is an operator, and removing the eligibility makes the same approval count again with no audit entry; that is harmless only because an approval grants nothing in this release. **MO-2B must close this before it honours any approval**, for example by clearing or invalidating the account's approvals, with an audit entry, in the same transaction as the eligibility change, or by requiring renewed approval, and it needs a test that grant-then-remove does not restore authority. MO-2A1 builds no role-governance framework for it. MO-2B also keeps delegation default-off.
 
 ## Validation evidence
 
