@@ -176,6 +176,8 @@ Tasks become a **first-class workspace**, not a by-product of project boards. Th
 
 **Before any Helpdesk product work:** the known Ticket authorization and integrity defects were fixed as a separate, small hardening package, [EPIC-010D](../epics/EPIC-010D-helpdesk-security-hardening.md) (Verified 2026-09-24; see [Product Roadmap → Critical Helpdesk hardening](./product-roadmap.md#critical-helpdesk-hardening)). Organization-level visibility, Incidents, Knowledge and the redesign below remain future work.
 
+**Ticket specialization (2026-11-09).** `Ticket` stays the foundational entity; Service Request and Incident are conceptual specializations, and more may follow. The conceptual direction is recorded in [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md); implementation, storage and any Outage or monitoring integration are deferred, and Incidents stay post-1.0 by default.
+
 **ITIL posture.** The long-term direction may evolve toward fuller ITIL-inspired capability, but the starting point is deliberately small. **Future** concepts, introduced only when operational need appears: Problem, Change, SLA, service catalog, escalation, routing, automation, service ownership.
 
 **Operator vs customer.** Operators get a queue, triage, assignment, internal notes, time, and linkage to Incidents/Knowledge. Customers get their own requests, clear status, a simple reply experience, and relevant Knowledge, never internal notes or internal attachments.
