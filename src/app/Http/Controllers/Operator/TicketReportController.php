@@ -60,7 +60,7 @@ class TicketReportController extends Controller
         $from = $request->date('date_from', 'Y-m-d') ?? now()->subDays(30)->startOfDay();
         $to = $request->date('date_to', 'Y-m-d') ?? now()->endOfDay();
 
-        $tickets = Ticket::with('user', 'assignee')
+        $tickets = Ticket::with('user', 'assignee', 'submittedBy', 'organization')
             ->whereBetween('created_at', [$from, $to])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -73,9 +73,11 @@ class TicketReportController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
+        // R1-2B: Organization and Submitted by are APPENDED, so every existing column keeps its position for anyone who reads this file by
+        // index. The column that was called "Submitter" is the REQUESTER (tickets.user_id), and is now labelled so.
         $callback = function () use ($tickets) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Submitter', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due'], escape: '');
+            fputcsv($out, ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'], escape: '');
 
             foreach ($tickets as $t) {
                 // Free-text and user-controlled cells are formula-neutralized (EPIC-010D H7);
@@ -92,6 +94,8 @@ class TicketReportController extends Controller
                     $t->resolved_at?->toDateTimeString() ?? '',
                     $t->sla_due_at?->toDateTimeString() ?? '',
                     $t->effectiveDueAt()?->toDateTimeString() ?? '',
+                    CsvText::safe($t->organization?->name),
+                    CsvText::safe($t->submittedBy?->name),
                 ], escape: '');
             }
             fclose($out);

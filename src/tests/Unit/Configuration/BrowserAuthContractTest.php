@@ -169,6 +169,8 @@ function reusablePersonaEmails(): array
         'user@intechral.test',
         'e2e-customer@intechral.test',
         'e2e-customer-other@intechral.test',
+        'e2e-customer-multi@intechral.test',
+        'e2e-customer-no-org@intechral.test',
         'e2e-operational-member@intechral.test',
     ];
 }

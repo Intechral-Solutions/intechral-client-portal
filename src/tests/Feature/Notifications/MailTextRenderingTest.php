@@ -10,6 +10,7 @@ use App\Notifications\TicketStatusNotification;
 use App\Support\Mail\MailText;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 
@@ -239,9 +240,11 @@ describe('NewTicketAlertNotification', function () {
         mtrAssertLiteral(function (string $text) {
             [, $ticket] = mtrTicket($text, $text, ['name' => $text]);
             $ticket->forceFill(['category' => mb_substr($text, 0, 64)])->save();
+            // R1-2B: the alert names the ticket's organization, so its name is one more user-authored field (an operator typed it).
+            DB::table('organizations')->where('id', $ticket->organization_id)->update(['name' => mb_substr($text, 0, 255)]);
 
             return [new NewTicketAlertNotification($ticket->fresh()), fn ($n) => Notification::route('mail', 'helpdesk@desk.invalid')->notifyNow($n)];
-        }, $payload, [url('/operator/tickets/')], [MailText::plain(mb_substr($payload, 0, 64))]);
+        }, $payload, [url('/operator/tickets/')], [MailText::plain(mb_substr($payload, 0, 64)), MailText::plain(mb_substr($payload, 0, 255))]);
     })->with(mtrPayloadSets());
 });
 

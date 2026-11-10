@@ -48,10 +48,12 @@ spec files need that persona or how many cores the machine has. `playwright.conf
 | `e2e-signout@intechral.test` | operator (all permissions) | `shell.spec.ts` (sign-out test) | Sessions are database-backed, so signing out destroys the session row presented; the test's assertion (no admin item leaks into a fully-permissioned account's menu) holds for any fully-permissioned account, not specifically the shared one |
 | `e2e-customer@intechral.test` | user (minimal) | `customer-shell.spec.ts`, `customer-helpdesk.spec.ts`; `persona: 'customer'` | The customer-shell journeys (Focused frame in both renderers, the sheet, the account menu, `/time` Start → Stop) and the Helpdesk journeys 3–8 (below). Owns its own session and its own active-timer set, so it never races a shared persona. Owns the seeded `TK-E2E00-00002` request that is waiting on it, and **every** disposable `E2E-…` ticket the Helpdesk spec raises, which is what makes those tickets eligible for the suite-level cleanup |
 | `e2e-customer-other@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 8); `contextFor('customerOther')` | A second, unrelated customer, used only to prove isolation: it is refused `e2e-customer`'s ticket and attachments and never lists them. It creates no ticket |
+| `e2e-customer-multi@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 10), `customer-pilot.spec.ts`; `contextFor('customerMulti')` | R1-2B: a customer in **two** organizations (`E2E Multi Org A` and `B`), so the create page offers an explicit required choice. Its disposable `E2E-…` requests are removed by the suite cleanup like every other (it is in the cleanup command's owner allowlist) |
+| `e2e-customer-no-org@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 11), `customer-pilot.spec.ts`; `contextFor('customerNoOrg')` | R1-2B: a customer in **no** organization: the create page explains instead of offering a form, and a request posted by hand is refused. It creates no ticket |
 | `e2e-operational-member@intechral.test` | user + `projects.manage` (direct) | `shell.spec.ts`, `blade-shell.spec.ts`, `time-migration.spec.ts`, `tasks-migration.spec.ts`; `persona: 'operationalMember'` | A customer-scoped actor that still gets the **Operational** shell (`projects.manage` is an operator-surface capability), for specs whose subject is the rail, drawer, breadcrumb or timer pill and tray, which a plain customer no longer sees. It is the single owner of the member active-timer set that `time-migration.spec.ts` documents |
 | dynamically created manager (`e2e-wp3-manager-<timestamp>@intechral.test`) | user + `projects.manage` | `projects-migration.spec.ts` (membership test) | Created by the test itself to prove a *specific* non-admin manager's read-only membership view; a fresh, explicitly anonymous context (`contextFor('anonymous')`) is required so it doesn't inherit the project's authenticated `storageState` |
 
-The six `e2e-*` fixtures are seeded by `database/seeders/DevSeeder.php`, guarded (like the
+The eight `e2e-*` fixtures are seeded by `database/seeders/DevSeeder.php`, guarded (like the
 operator/user accounts) to `local`/`testing` environments only, and never a production bootstrap
 requirement. Re-seed the development database after pulling a change that adds one
 (`docker compose exec app php artisan db:seed --class=DevSeeder` is idempotent: every account is
@@ -75,6 +77,7 @@ Fortify's limiter key is email + IP, 5 requests/minute. With `workers: 3`:
 | `e2e-signout@intechral.test` | 1 | One test, one login |
 | `e2e-customer@intechral.test` | ≤ 3 | A worker mints it at most once, however many spec files (`customer-shell`, `customer-helpdesk`) it runs |
 | `e2e-customer-other@intechral.test` | ≤ 3 | A worker mints it at most once, the first time one of its tests calls `contextFor('customerOther')` |
+| `e2e-customer-multi@intechral.test`, `e2e-customer-no-org@intechral.test` | ≤ 3 each | Minted at most once per worker, the first time a test calls `contextFor('customerMulti')` / `contextFor('customerNoOrg')` |
 | `e2e-operational-member@intechral.test` | ≤ 3 | A worker mints it at most once; at most 3 workers exist |
 | dynamically created manager | 1 per run, unique email every time | Never shares a bucket with any other run or test |
 

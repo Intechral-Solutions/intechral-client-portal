@@ -77,6 +77,25 @@ final class ServiceRequestAccess
         return new TicketAttribution((int) $organization->id, (int) $actor->getKey());
     }
 
+    /**
+     * The organizations this actor could file for RIGHT NOW, for the create page to offer: id and name, ordered by name. A convenience for
+     * display only (an ordinary read, no lock): what the actor chose is decided again by {@see attributionFor()} inside the creation
+     * transaction, so a stale page can only produce a refusal. It reads the actor's own membership rows and nothing else (no scope, no
+     * relationship, no role), so it discloses no organization the actor does not belong to.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    public function eligibleOrganizations(User $actor): array
+    {
+        return DB::table('organization_members')
+            ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')
+            ->where('organization_members.user_id', $actor->getKey())
+            ->orderBy('organizations.name')->orderBy('organizations.id')
+            ->get(['organizations.id', 'organizations.name'])
+            ->map(fn (object $row) => ['id' => (int) $row->id, 'name' => (string) $row->name])
+            ->all();
+    }
+
     /** The account is active NOW (read from the table, not the loaded model) and holds the creation capability. */
     private function authorizeActor(User $actor): void
     {

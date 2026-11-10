@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\TicketService;
 use App\Support\Helpdesk\DueDateInput;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TicketController extends Controller
 {
@@ -20,12 +21,18 @@ class TicketController extends Controller
         $assignableOperators = $operators->filter(fn (User $operator) => TicketService::isAssignable($operator))->values();
         $includeInternal = $request->user()->can('viewInternal', Ticket::class);
 
-        $tickets = Ticket::with(['user', 'assignee'])
+        // R1-2B: an exact organization, by id. Only a whole positive number filters; anything else (text, a list, zero, a negative) is ignored,
+        // never looked up, and never echoed: the view is handed this validated value, not the raw query.
+        $organization = $request->query('organization');
+        $organizationFilter = is_string($organization) && ctype_digit($organization) && (int) $organization > 0 ? (int) $organization : null;
+
+        $tickets = Ticket::with(['user', 'assignee', 'organization:id,name'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->search, $includeInternal))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('priority'), fn ($q) => $q->where('priority', $request->priority))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->category))
             ->when($request->filled('assignee'), fn ($q) => $q->where('assignee_id', $request->assignee))
+            ->when($organizationFilter !== null, fn ($q) => $q->where('organization_id', $organizationFilter))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('created_at', '>=', $request->date_from))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('created_at', '<=', $request->date_to))
             ->orderByRaw("CASE status WHEN 'open' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'pending_user' THEN 3 WHEN 'resolved' THEN 4 ELSE 5 END")
@@ -36,7 +43,13 @@ class TicketController extends Controller
 
         $categories = UserTicketController::CATEGORIES;
 
-        return view('operator.tickets.index', compact('tickets', 'operators', 'assignableOperators', 'categories'));
+        // The organizations that have at least one ticket, for the filter: an operator works every ticket, so every ticket's organization is
+        // already theirs to see. Read from the tables, not through the membership scope (an operator holds no membership in most of them).
+        $organizations = DB::table('organizations')
+            ->whereExists(fn ($query) => $query->selectRaw('1')->from('tickets')->whereColumn('tickets.organization_id', 'organizations.id'))
+            ->orderBy('name')->orderBy('id')->get(['id', 'name']);
+
+        return view('operator.tickets.index', compact('tickets', 'operators', 'assignableOperators', 'categories', 'organizations', 'organizationFilter'));
     }
 
     public function show(Ticket $ticket, TicketService $service)
@@ -45,6 +58,8 @@ class TicketController extends Controller
 
         $ticket->load([
             'user',
+            'submittedBy',
+            'organization',
             'assignee',
             'attachments',
             'statusHistories.user',

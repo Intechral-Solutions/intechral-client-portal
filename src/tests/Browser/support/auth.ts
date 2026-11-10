@@ -48,7 +48,14 @@ import { signIn } from './sign-in';
  * **Extra contexts.** A bare `browser.newContext()` inherits the test's own `storageState`, i.e. it is
  * *already signed in*. Open extra contexts with `contextFor(...)`, which states who the context is.
  */
-export type Persona = 'operator' | 'member' | 'customer' | 'customerOther' | 'operationalMember';
+export type Persona =
+    | 'operator'
+    | 'member'
+    | 'customer'
+    | 'customerOther'
+    | 'customerMulti'
+    | 'customerNoOrg'
+    | 'operationalMember';
 export type Who = Persona | 'anonymous';
 
 export const personas: Record<Persona, { email: string }> = {
@@ -56,6 +63,9 @@ export const personas: Record<Persona, { email: string }> = {
     member: { email: 'user@intechral.test' },
     customer: { email: 'e2e-customer@intechral.test' },
     customerOther: { email: 'e2e-customer-other@intechral.test' },
+    // R1-2B: a customer in TWO organizations (a request must name one) and one in NONE (the create page explains instead).
+    customerMulti: { email: 'e2e-customer-multi@intechral.test' },
+    customerNoOrg: { email: 'e2e-customer-no-org@intechral.test' },
     operationalMember: { email: 'e2e-operational-member@intechral.test' },
 };
 

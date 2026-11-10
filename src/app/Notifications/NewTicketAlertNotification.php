@@ -17,7 +17,7 @@ use Illuminate\Queue\Attributes\Tries;
  *
  * It goes to ONE configured destination, `HELPDESK_NOTIFY_ADDRESS`, as an on-demand (address) notification: never to the
  * requester, never to the `tickets.assign` holders, and never to an account, so the suspended-recipient listener has nothing to
- * decide here. What it says is deliberately small: the number, the title, the category and priority, who raised it, a short
+ * decide here. What it says is deliberately small: the number, the title, the category and priority, who raised it and for which organization (R1-2B), a short
  * preview of the description and a link to the operator page. No attachment names, no reply, no internal note, no requester address.
  * Every piece of user-authored text is escaped for the Markdown template (F-3, {@see MailText}).
  *
@@ -50,6 +50,7 @@ class NewTicketAlertNotification extends Notification implements ShouldQueue
             ->subject("[{$ticket->ticket_number}] New request: ".MailText::plain($ticket->title, 150))
             ->greeting('New support request')
             ->line(MailText::line("**{$ticket->ticket_number}** was raised by ", $requester, '.'))
+            ->line(MailText::line('**Organization:** ', MailText::escape($ticket->organization?->name ?: 'unknown', 255)))
             ->line(MailText::line('**Subject:** ', MailText::escape($ticket->title, 255)))
             ->line(MailText::line('**Category:** ', MailText::escape($ticket->category, 100)))
             ->line(MailText::line('**Priority:** ', MailText::escape(ucfirst((string) $ticket->priority), 40)))

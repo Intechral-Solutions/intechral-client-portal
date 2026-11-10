@@ -70,6 +70,9 @@ function RequestRow({ ticket }: { ticket: RequesterTicketRow }) {
                 <p className="mt-1 text-sm text-text-secondary">
                     <span className="font-mono">{ticket.number}</span>
                     <span aria-hidden="true"> · </span>
+                    <span className="sr-only">Organization: </span>
+                    {ticket.organization}
+                    <span aria-hidden="true"> · </span>
                     <span className="sr-only">Opened </span>
                     <time dateTime={ticket.createdAt}>{ticket.createdAtHuman}</time>
                 </p>

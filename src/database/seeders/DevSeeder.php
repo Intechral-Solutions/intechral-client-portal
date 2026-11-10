@@ -132,6 +132,29 @@ class DevSeeder extends Seeder
         // timer pill and tray need time.log and the legacy invoice specs need billing.view.
         $operationalMember->givePermissionTo(['projects.manage', 'billing.view', 'time.log']);
 
+        // R1-2B: the two customers the organization-selection journeys need. `customerMulti` belongs to TWO organizations (a request must
+        // name one) and `customerNoOrg` to none (the create page explains instead of offering a form). Both are plain customers: the
+        // `user` role and nothing else, so what they can do is exactly what an invited customer can do.
+        $customerMulti = User::firstOrCreate(
+            ['email' => 'e2e-customer-multi@intechral.test'],
+            [
+                'name' => 'E2E Customer Multi',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
+        $customerMulti->assignRole('user');
+
+        $customerNoOrg = User::firstOrCreate(
+            ['email' => 'e2e-customer-no-org@intechral.test'],
+            [
+                'name' => 'E2E Customer No Org',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
+        $customerNoOrg->assignRole('user');
+
         // R1-2: a Ticket belongs to an organization, and a person may raise one only as a CURRENT MEMBER of it (operators included).
         // Each persona that files requests (through the form in the browser specs, or as the owner of a fixture below) gets
         // its own fixed organization, so re-seeding is idempotent and the isolation journeys still have two unrelated customers.
@@ -139,6 +162,9 @@ class DevSeeder extends Seeder
         $customerOrg = $this->organization('e2e-customer-org', 'E2E Customer Org', $customer, [$customer]);
         $this->organization('e2e-other-org', 'E2E Other Org', $customerOther, [$customerOther]);
         $operatorOrg = $this->organization('e2e-operator-org', 'E2E Operator Org', $operator, [$operator]);
+        $this->organization('e2e-multi-org-a', 'E2E Multi Org A', $customerMulti, [$customerMulti]);
+        $this->organization('e2e-multi-org-b', 'E2E Multi Org B', $customerMulti, [$customerMulti]);
+        // $customerNoOrg is deliberately in none.
 
         // A fixed, idempotent fixture ticket (EPIC-011E WP7, §21): the task page's move to
         // React leaves the embedded Blade `x-time-tracker` with no remaining project/task host
@@ -184,6 +210,8 @@ class DevSeeder extends Seeder
         $this->command->line('  e2e-customer@intechral.test / password         (user, Focused shell, E2E fixture)');
         $this->command->line('  e2e-customer-other@intechral.test / password   (user, Focused shell, E2E fixture)');
         $this->command->line('  e2e-operational-member@intechral.test / password (user + projects.manage, Operational shell, E2E fixture)');
+        $this->command->line('  e2e-customer-multi@intechral.test / password   (user, two organizations, E2E fixture)');
+        $this->command->line('  e2e-customer-no-org@intechral.test / password  (user, no organization, E2E fixture)');
     }
 
     /**

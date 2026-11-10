@@ -1,3 +1,7 @@
+import { randomBytes } from 'node:crypto';
+
+import type { Page } from '@playwright/test';
+
 import { expect, test } from './support/e2e-fixtures';
 import { signedIn } from './support/auth';
 import { decidePilotRun, pilotRequired } from './support/pilot-probe';
@@ -34,6 +38,9 @@ test('a pilot customer sees only the approved surface, and an operator sees ever
     contextFor,
     cleanup,
 }) => {
+    // R1-2B added the organization creation matrix (three more customer sessions) to this one test; the default 30 s leaves too little on a
+    // slow runner. The hosted job still requires exactly "1 passed".
+    test.setTimeout(120_000);
     const probe = await contextFor('member');
     const status = async (path: string) =>
         (await probe.request.get(path, { maxRedirects: 0, failOnStatusCode: false })).status();
@@ -151,6 +158,89 @@ test('a pilot customer sees only the approved surface, and an operator sees ever
         expect(create?.status()).toBe(200);
     } finally {
         await customerContext.close();
+    }
+
+    // R1-2B: the Helpdesk creation matrix, in pilot mode, through real customer sessions. Kept inside this one test so the hosted job's
+    // "1 passed" check still means the whole spec. The operator (this `page`) reads the organization ids the customers must not be able to
+    // borrow; the three customers are the seeded fixtures: one organization, two, and none.
+    await page.goto('/operator/tickets');
+    const foreignId = (await page
+        .getByRole('combobox', { name: 'Organization' })
+        .locator('option', { hasText: 'E2E Customer Org' })
+        .getAttribute('value'))!;
+    expect(foreignId).toMatch(/^\d+$/);
+
+    const detailOrganization = (customer: Page) =>
+        customer.locator('dt', { hasText: 'Organization' }).locator('xpath=following-sibling::dd[1]');
+
+    // One organization: stated, not chosen, and the request carries it.
+    const single = await contextFor('customer');
+    try {
+        const customer = await single.newPage();
+        await customer.goto('/tickets/create');
+        await expect(customer.getByText('Requesting for E2E Customer Org')).toBeVisible();
+        await expect(customer.getByRole('combobox', { name: /Organization/ })).toHaveCount(0);
+        await customer.getByLabel(/^Subject/).fill(`E2E-${randomBytes(8).toString('hex')} pilot single organization`);
+        await customer.getByLabel(/^Description/).fill('Pilot mode, one organization.');
+        await customer.getByRole('button', { name: 'Submit request' }).click();
+        await expect(customer).toHaveURL(/\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
+        await expect(detailOrganization(customer)).toHaveText('E2E Customer Org');
+    } finally {
+        await single.close();
+    }
+
+    // Two organizations: an explicit choice; a forged id is refused and shown; the honest one is carried.
+    const multi = await contextFor('customerMulti');
+    try {
+        const customer = await multi.newPage();
+        await customer.goto('/tickets/create');
+        const select = customer.getByRole('combobox', { name: /Organization/ });
+        await expect(select).toHaveValue('');
+        await expect(select.locator('option')).toHaveText(['Choose an organization', 'E2E Multi Org A', 'E2E Multi Org B']);
+        await customer.getByLabel(/^Subject/).fill(`E2E-${randomBytes(8).toString('hex')} pilot two organizations`);
+        await customer.getByLabel(/^Description/).fill('Pilot mode, two organizations.');
+
+        await select.selectOption({ label: 'E2E Multi Org A' });
+        // The form submits React state, not the DOM: rewrite the chosen option's value AND tell React (a `change` event), so the forged id is
+        // what the form really sends.
+        await select.evaluate((element, id) => {
+            (element as HTMLSelectElement).selectedOptions[0]!.value = id;
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }, foreignId);
+        await expect(select).toHaveValue(foreignId);
+        await customer.getByRole('button', { name: 'Submit request' }).click();
+        await expect(customer.getByText('That organization is not available for this request.')).toBeVisible();
+        await expect(customer.getByText(/E2E Customer Org/)).toHaveCount(0);
+
+        await select.selectOption({ label: 'E2E Multi Org B' });
+        await customer.getByRole('button', { name: 'Submit request' }).click();
+        await expect(customer).toHaveURL(/\/tickets\/TK-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
+        await expect(detailOrganization(customer)).toHaveText('E2E Multi Org B');
+    } finally {
+        await multi.close();
+    }
+
+    // No organization: explained, no form, and the server refuses the same request made by hand.
+    const none = await contextFor('customerNoOrg');
+    try {
+        const customer = await none.newPage();
+        const created = await customer.goto('/tickets/create');
+        expect(created?.status()).toBe(200);
+        await expect(customer.getByText("Your account isn't linked to an organization yet.")).toBeVisible();
+        await expect(customer.getByLabel(/^Subject/)).toHaveCount(0);
+        const refused = await customer.evaluate(async (id) => {
+            const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
+            const response = await fetch('/tickets', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ title: 'E2E-pilot-no-org', description: 'x', category: 'General', priority: 'low', organization_id: id }),
+            });
+
+            return response.status;
+        }, foreignId);
+        expect(refused).toBe(422);
+    } finally {
+        await none.close();
     }
 
     // The operator is unaffected, and still sees the full internal project.

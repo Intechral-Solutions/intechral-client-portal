@@ -21,6 +21,10 @@ use App\Services\TicketService;
  * entries or totals or a running timer, status-history actors, the assignee's id or email, the
  * requester's or submitter's id, `organization_id` or `submitted_by_id`, or assignee candidates. Dropping a key from the output is the
  * guarantee; hiding it in the page is not.
+ *
+ * R1-2B (owner decision E4): the ticket's ORGANIZATION NAME is sent, as `organization`, on a row and on the detail: the name of the
+ * organization the request was raised for, to the requester whom TicketPolicy already lets read that ticket. Never an id, and never a
+ * list of organizations (the create page gets only the actor's own memberships, from ServiceRequestAccess).
  */
 final class RequesterTicketPresenter
 {
@@ -60,13 +64,15 @@ final class RequesterTicketPresenter
     /**
      * One list row. Category, assignee and SLA are deliberately not here (§19.1).
      *
-     * @return array{number: string, title: string, status: string, statusLabel: string, priority: string, createdAt: string, createdAtHuman: string, href: string}
+     * @return array{number: string, title: string, organization: string, status: string, statusLabel: string, priority: string, createdAt: string, createdAtHuman: string, href: string}
      */
     public static function row(Ticket $ticket): array
     {
         return [
             'number' => $ticket->ticket_number,
             'title' => $ticket->title,
+            // The list query selects the name as `organization_name` (one query for the page); a ticket loaded any other way has the relation.
+            'organization' => $ticket->getAttribute('organization_name') ?? $ticket->organization?->name ?? '',
             'status' => $ticket->status,
             'statusLabel' => self::statusLabel($ticket->status),
             'priority' => $ticket->priority,
@@ -113,6 +119,7 @@ final class RequesterTicketPresenter
             'ticket' => [
                 'number' => $ticket->ticket_number,
                 'title' => $ticket->title,
+                'organization' => $ticket->organization?->name ?? '',
                 'status' => $ticket->status,
                 'statusLabel' => self::statusLabel($ticket->status),
                 'priority' => $ticket->priority,

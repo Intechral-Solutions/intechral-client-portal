@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
@@ -315,6 +316,20 @@ describe('what the alert says', function () {
             ->and($html)->toContain($ticket->ticket_number)->toContain('Printer is broken')->toContain('Technical')->toContain('High')
             ->toContain('Dana Customer')->toContain('It prints blank pages.')
             ->and($html)->toContain('href="'.route('operator.tickets.show', $ticket).'"');
+    });
+
+    it('names the organization the request was raised for, escaped like every other user-authored line (R1-2B)', function () {
+        Notification::fake();
+        $user = ticketUser();
+        ticketJoin($user, Organization::factory()->create(['name' => 'Acme *Bold* [x](https://evil.invalid) Ltd']));
+        $ticket = app(TicketService::class)->create($user, ntaForm());
+        $message = (new NewTicketAlertNotification($ticket))->toMail(new AnonymousNotifiable);
+        $html = (string) $message->render();
+
+        // The name is data: its Markdown punctuation is escaped, so it renders as text and cannot become a link or emphasis.
+        expect($html)->toContain('Organization:')->toContain('Acme')->not->toContain('href="https://evil.invalid"')->not->toContain('<strong>Bold</strong>');
+        // Only THIS ticket's organization; the alert is a one-line fact about one request.
+        expect(substr_count($html, 'Organization:'))->toBe(1);
     });
 
     it('shows only a short preview of the description', function () {

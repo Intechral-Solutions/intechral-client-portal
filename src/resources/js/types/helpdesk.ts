@@ -4,16 +4,24 @@ import type { Paginated } from '@/types/pagination';
  * The requester Helpdesk page props (EPIC-017 §19). Each shape mirrors, key for key, what
  * `App\Http\Presenters\RequesterTicketPresenter` writes out and `RequesterTicketPropsTest` pins. A key
  * that is not here is never sent to a requester: there is no time data, internal note, SLA, history
- * actor or company in these types because there is none on the wire.
+ * actor, company, or organization id in these types (the organization NAME is here, owner decision E4) because there is none on the wire.
  */
 export type TicketStatusValue = 'open' | 'in_progress' | 'pending_user' | 'resolved' | 'closed';
 
 export type TicketPriorityValue = 'low' | 'medium' | 'high' | 'critical';
 
+/**
+ * One organization the signed-in user could raise a request for right now: their OWN current membership, id and name, nothing else
+ * (R1-2B). The server decides again when the request arrives; this only fills the page.
+ */
+export type OrganizationOption = { id: number; name: string };
+
 export type RequesterTicketRow = {
     /** The public reference (`TK-XXXXX-XXXXX`): the ticket's only public identity. The numeric key is never sent. */
     number: string;
     title: string;
+    /** The name of the organization the request was raised for (R1-2B); never its id. */
+    organization: string;
     status: TicketStatusValue;
     /** The customer vocabulary, chosen by the server (EPIC-017 §13). */
     statusLabel: string;
@@ -61,6 +69,8 @@ export type RequesterTicketDetail = {
     /** The public reference (`TK-XXXXX-XXXXX`): the ticket's only public identity. The numeric key is never sent. */
     number: string;
     title: string;
+    /** The name of the organization the request was raised for (R1-2B); never its id. */
+    organization: string;
     status: TicketStatusValue;
     statusLabel: string;
     priority: TicketPriorityValue;

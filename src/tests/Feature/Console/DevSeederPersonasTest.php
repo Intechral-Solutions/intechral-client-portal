@@ -77,13 +77,19 @@ it('R1-2: gives each persona that files requests one organization of its own, at
 
     $memberships = fn (string $email) => DB::table('organization_members')->where('user_id', seededPersona($email)->id)
         ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')->pluck('organizations.slug', 'organization_members.role')->all();
+    $slugs = fn (string $email) => DB::table('organization_members')->where('user_id', seededPersona($email)->id)
+        ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')->orderBy('organizations.slug')->pluck('organizations.slug')->all();
 
     // One organization each, a plain member: no administrator role or approval, so no persona holds more than eligibility.
     expect($memberships('e2e-customer@intechral.test'))->toBe(['member' => 'e2e-customer-org'])
         ->and($memberships('e2e-customer-other@intechral.test'))->toBe(['member' => 'e2e-other-org'])
         ->and($memberships('operator@intechral.test'))->toBe(['member' => 'e2e-operator-org'])
-        ->and(DB::table('organizations')->count())->toBe(3)
-        ->and(DB::table('organization_members')->count())->toBe(3);
+        // R1-2B: the organization-selection personas: two organizations, and none.
+        ->and($slugs('e2e-customer-multi@intechral.test'))->toBe(['e2e-multi-org-a', 'e2e-multi-org-b'])
+        ->and($slugs('e2e-customer-no-org@intechral.test'))->toBe([])
+        ->and(DB::table('organizations')->count())->toBe(5)
+        ->and(DB::table('organization_members')->count())->toBe(5)
+        ->and(DB::table('organization_members')->where('role', '<>', 'member')->count())->toBe(0);
 
     $customerTicket = Ticket::where('ticket_number', 'TK-E2E00-00002')->sole();
     $operatorTicket = Ticket::where('ticket_number', 'TK-E2E00-00001')->sole();

@@ -45,6 +45,7 @@ function props(
         ticket: {
             number: 'TK-00012-ABCDE',
             title: 'Printer offline',
+            organization: 'Acme Ltd',
             status,
             statusLabel:
                 status === 'pending_user'
@@ -429,4 +430,12 @@ it('renders a hostile reply and attachment name as text', () => {
 
     expect(container.querySelector('img')).not.toBeInTheDocument();
     expect(screen.getAllByText(hostile).length).toBeGreaterThan(0);
+});
+
+it('shows the organization the request was raised for under Details', () => {
+    render(<TicketsShowPage {...props()} />);
+
+    const term = screen.getByText('Organization', { selector: 'dt' });
+
+    expect(term.nextElementSibling).toHaveTextContent('Acme Ltd');
 });

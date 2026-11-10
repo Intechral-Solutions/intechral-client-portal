@@ -8,6 +8,7 @@ use App\Models\TicketAttachment;
 use App\Models\User;
 use App\Queries\RequesterTicketQuery;
 use App\Rules\AllowedTicketAttachment;
+use App\Services\ServiceRequestAccess;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -44,9 +45,12 @@ class TicketController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request, ServiceRequestAccess $access): Response
     {
         return Inertia::render('tickets/create', [
+            // R1-2B: the actor's OWN current memberships (id and name), nothing else. The page shows a read-only line for one, a required
+            // choice for several and an explanation for none; the server still decides what was chosen, inside the creation transaction.
+            'organizations' => $access->eligibleOrganizations($request->user()),
             'categories' => self::CATEGORIES,
             'priorities' => RequesterTicketPresenter::priorityOptions(),
             'defaultPriority' => 'medium',
@@ -97,6 +101,7 @@ class TicketController extends Controller
         $ticket->load([
             'user:id,name',
             'assignee:id,name',
+            'organization:id,name',
             'attachments',
             'statusHistories' => fn ($query) => $query->orderBy('id'),
             // Public replies only, for every viewer, an operator who is the requester included.

@@ -68,6 +68,8 @@ class CleanupE2eTickets extends Command
     public const OWNER_EMAILS = [
         'e2e-customer@intechral.test',
         'e2e-customer-other@intechral.test',
+        // R1-2B: the customer in two organizations raises disposable requests too (the organization-selection journey).
+        'e2e-customer-multi@intechral.test',
     ];
 
     private const DISK = 'local';
