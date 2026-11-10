@@ -114,7 +114,7 @@ final class IntegritySnapshot
         $schema = $this->schema();
 
         $this->referentialChecks($schema);
-        $this->ticketChecks();
+        $this->ticketChecks($schema);
         $this->taskChecks();
         $this->timeChecks();
         $this->invoiceChecks();
@@ -132,7 +132,7 @@ final class IntegritySnapshot
             'rows' => $digests['counts'],
             'digests' => $digests['rows'],
             'checks' => $this->checks,
-            'facts' => $this->facts(),
+            'facts' => $this->facts($schema),
             'files' => $files,
         ];
 
@@ -358,7 +358,8 @@ final class IntegritySnapshot
         $this->check('organization_members:approval_incomplete', 'select count(*) as n from organization_members where (admin_approved_at is null) <> (admin_approved_by is null)');
     }
 
-    private function ticketChecks(): void
+    /** @param  array<string, mixed>  $schema */
+    private function ticketChecks(array $schema): void
     {
         // Release 0.9 C6-R (ADR-008): the public reference is random, so the old id-derived checks (number equals the padded id, number above
         // the highest id) are meaningless. What a recovered or upgraded database must show instead: every reference is canonical (a legacy
@@ -372,6 +373,19 @@ final class IntegritySnapshot
             'select count(*) as n from ticket_attachments a join ticket_replies r on r.id = a.reply_id where r.ticket_id <> a.ticket_id');
         $this->check('attachment_path_outside_its_ticket_directory',
             "select count(*) as n from ticket_attachments where path not like concat('tickets/', ticket_id, '/%') or path like '%..%' or path like '/%'");
+
+        // Release 1.0 (R1-2): every ticket has a customer organization and a submitter that exist. Run only once the attribution columns
+        // exist, so a rehearsal that stops before that migration (the 0.9-shaped baseline) has no such checks. These REPLACE the legacy
+        // "tickets carrying a company_id" figure, which the migration retires with the column. The foreign keys make a missing or dangling
+        // value impossible while they are enforced; this counts them anyway, because a dump is loaded with checks off.
+        $columns = $schema['columns']['tickets'] ?? [];
+
+        if (isset($columns['organization_id'], $columns['submitted_by_id'])) {
+            $this->check('tickets:without_existing_organization',
+                'select count(*) as n from tickets t where not exists (select 1 from organizations o where o.id = t.organization_id)');
+            $this->check('tickets:without_existing_submitter',
+                'select count(*) as n from tickets t where not exists (select 1 from users u where u.id = t.submitted_by_id)');
+        }
     }
 
     private function taskChecks(): void
@@ -494,8 +508,11 @@ final class IntegritySnapshot
 
     // ── facts ─────────────────────────────────────────────────────────────────────────────────
 
-    /** @return array<string, mixed> */
-    private function facts(): array
+    /**
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private function facts(array $schema): array
     {
         $one = fn (string $sql, array $bind = []) => (int) $this->db->selectOne($sql, $bind)->n;
         $user = self::USER;
@@ -503,7 +520,11 @@ final class IntegritySnapshot
         $facts = [
             // EPIC-010D A1.10 preflight, informational figures.
             'epic_010d_p0_tickets' => $one('select count(*) as n from tickets'),
-            'epic_010d_p1_company_linked_tickets' => $one('select count(*) as n from tickets where company_id is not null'),
+            // The legacy company link exists only on a database that has not had the R1-2 attribution migration (nothing ever wrote it);
+            // the migration retires it with the column, and ticketChecks() holds the replacement checks.
+            ...(isset($schema['columns']['tickets']['company_id'])
+                ? ['epic_010d_p1_company_linked_tickets' => $one('select count(*) as n from tickets where company_id is not null')]
+                : []),
             'epic_010d_p2_assignees_without_tickets_assign' => $one(
                 "select count(*) as n from tickets t where t.assignee_id is not null
                  and not exists (select 1 from model_has_permissions mhp join permissions p on p.id = mhp.permission_id

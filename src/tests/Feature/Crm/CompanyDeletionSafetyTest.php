@@ -3,6 +3,7 @@
 use App\Exceptions\CompanyHasProjectsException;
 use App\Models\CrmCompany;
 use App\Models\CrmContact;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\User;
@@ -21,14 +22,19 @@ beforeEach(function () {
     $this->operator = User::factory()->create()->assignRole('operator');
 });
 
-/** A company linked to $projects projects, with a contact and a ticket that refer to it. */
+/**
+ * A company linked to $projects projects, with a contact that refers to it, and a ticket attributed to the company's ORGANIZATION. R1-2: a
+ * ticket no longer references the company at all (the `company_id` column is gone), so deleting a company can only ever leave a ticket's
+ * attribution where it was; these tests hold that, and every MO-1A refusal, unchanged.
+ */
 function linkedCompany(int $projects = 1): array
 {
-    $company = CrmCompany::factory()->create(['name' => 'Linked Co']);
+    $organization = Organization::factory()->create();
+    $company = CrmCompany::factory()->create(['name' => 'Linked Co', 'organization_id' => $organization->id]);
     $linked = Project::factory()->count($projects)->create();
     $company->projects()->attach($linked->pluck('id')->all());
     $contact = CrmContact::factory()->create(['crm_company_id' => $company->id]);
-    $ticket = Ticket::factory()->create(['company_id' => $company->id]);
+    $ticket = Ticket::factory()->inOrganization($organization)->create();
 
     return [$company, $linked, $contact, $ticket];
 }
@@ -40,7 +46,8 @@ function companyWorld(CrmCompany $company): array
         (array) DB::table('crm_companies')->where('id', $company->id)->first(),
         DB::table('project_company')->where('crm_company_id', $company->id)->orderBy('project_id')->get()->map(fn ($row) => (array) $row)->all(),
         DB::table('crm_contacts')->where('crm_company_id', $company->id)->pluck('id')->all(),
-        DB::table('tickets')->where('company_id', $company->id)->pluck('id')->all(),
+        DB::table('tickets')->where('organization_id', $company->organization_id)->get()->map(fn ($row) => (array) $row)->all(),
+        DB::table('organizations')->where('id', $company->organization_id)->count(),
         DB::table('projects')->count(),
     ];
 }
@@ -90,7 +97,7 @@ it('has no side effect before it refuses: contacts and tickets keep their compan
     $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company));
 
     expect($contact->fresh()->crm_company_id)->toBe($company->id)
-        ->and($ticket->fresh()->company_id)->toBe($company->id)
+        ->and($ticket->fresh()->organization_id)->toBe($company->organization_id)
         ->and(DB::table('activity_log')->count())->toBe($activities);
 });
 
@@ -108,10 +115,12 @@ it('lets the deletion through once the last project is unlinked', function () {
         ->and(Project::count())->toBe(2, 'the projects themselves are never touched');
 });
 
-it('keeps the existing contract for an unlinked company: it is deleted, its contacts and tickets keep their rows with the company cleared', function () {
-    $company = CrmCompany::factory()->create();
+it('keeps the existing contract for an unlinked company: it is deleted, its contacts keep their rows with the company cleared, and a ticket keeps its organization attribution', function () {
+    $organization = Organization::factory()->create();
+    $company = CrmCompany::factory()->create(['organization_id' => $organization->id]);
     $contact = CrmContact::factory()->create(['crm_company_id' => $company->id]);
-    $ticket = Ticket::factory()->create(['company_id' => $company->id]);
+    $ticket = Ticket::factory()->inOrganization($organization)->create();
+    $attribution = [$ticket->organization_id, $ticket->submitted_by_id, $ticket->user_id];
 
     $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
         ->assertRedirect(route('crm.companies.index'))
@@ -119,7 +128,8 @@ it('keeps the existing contract for an unlinked company: it is deleted, its cont
 
     expect(CrmCompany::find($company->id))->toBeNull()
         ->and($contact->fresh()->crm_company_id)->toBeNull()
-        ->and($ticket->fresh()->company_id)->toBeNull();
+        ->and([$ticket->fresh()->organization_id, $ticket->fresh()->submitted_by_id, $ticket->fresh()->user_id])->toBe($attribution)
+        ->and(Organization::withoutGlobalScopes()->find($organization->id))->not->toBeNull('deleting a company never deletes its organization');
 });
 
 it('keeps the authorization: guests and users without crm.manage are refused before anything is checked', function () {

@@ -32,6 +32,7 @@ it('keeps the customer Helpdesk working end to end in pilot mode', function () {
     Notification::fake();
     Storage::fake('local');
     $customer = pilotCustomer();
+    ticketJoin($customer);
     pilotMode('pilot');
 
     $this->actingAs($customer)->get(route('tickets.index'))->assertOk();

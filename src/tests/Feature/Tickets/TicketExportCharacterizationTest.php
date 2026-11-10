@@ -83,7 +83,7 @@ it('TARGET H7: text that merely contains or ends with a formula character is lef
     expect(ticketExportRows($csv)[$ticket->ticket_number][1])->toBe($title);
 })->with(['Total = 5', 'a+b', 'user@example.com', 'Costs -5', '100%']);
 it('TARGET H7: a formula title planted through the ordinary create form reaches the operator export neutralized', function () {
-    $customer = ticketUser();
+    $customer = ticketRequester();
 
     $this->actingAs($customer)->post(route('tickets.store'), [
         'title' => '=HYPERLINK("https://evil.example","Open")',

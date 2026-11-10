@@ -172,6 +172,13 @@ export function TicketsCreatePage({
                         errors={errors}
                     />
 
+                    {/* R1-2A: the server decides which organization a request is for. Until the organization selector and blocked state
+                        arrive (R1-2B), a refusal (no organization, or several to choose from) must at least be visible, not silent. */}
+                    <FormFieldError
+                        id="create-organization-error"
+                        message={errors.organization_id}
+                    />
+
                     <div className="flex flex-wrap justify-end gap-3 border-t border-rule pt-6">
                         <Link
                             href={index.url()}

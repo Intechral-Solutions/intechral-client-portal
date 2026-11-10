@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
  * `failures` are conditions that block the work or mean the data is already inconsistent (a duplicate company-to-organization
  * link stops the UNIQUE migration; a relationship that breaks a rule). `warnings` are facts a person must decide about
  * (existing organization admin rows, which MO-2 would turn from inert into authority; operator-held rows; users in several
- * organizations; tickets that already carry a company).
+ * organizations; tickets and their organization attribution).
  */
 final class OrganizationPreflight
 {
@@ -75,14 +75,7 @@ final class OrganizationPreflight
             $warnings[] = count($multiOrganization).' user(s) belong to more than one organization.';
         }
 
-        $attributed = [
-            'tickets' => DB::table('tickets')->whereNotNull('company_id')->count(),
-            'companies' => DB::table('tickets')->whereNotNull('company_id')->distinct()->count('company_id'),
-        ];
-
-        if ($attributed['tickets'] > 0) {
-            $warnings[] = $attributed['tickets'].' ticket(s) already carry a company attribution.';
-        }
+        $attributed = $this->ticketAttribution($warnings);
 
         $relationships = $this->relationships($failures);
         $adminApproval = $this->adminApproval($failures, $warnings, $operators);
@@ -96,11 +89,52 @@ final class OrganizationPreflight
             'adminMemberships' => $admins,
             'operatorAdminMemberships' => $operatorHeld,
             'multiOrganizationUsers' => $multiOrganization,
-            'attributedTickets' => $attributed,
+            'ticketAttribution' => $attributed,
             'relationships' => $relationships,
             'adminApproval' => $adminApproval,
             'failures' => $failures,
             'warnings' => $warnings,
+        ];
+    }
+
+    /**
+     * Tickets and their organization (Release 1.0, R1-2). Reads whichever shape the database has, so it can be run before the attribution
+     * migration (the legacy `company_id` link, which nothing ever wrote) and after it (the durable organization, and how many requesters
+     * have since left it; information only, because a requester keeps access to their own tickets).
+     *
+     * @param  list<string>  $warnings
+     * @return array<string, mixed>
+     */
+    private function ticketAttribution(array &$warnings): array
+    {
+        if (! Schema::hasColumn('tickets', 'organization_id')) {
+            $companyLinked = Schema::hasColumn('tickets', 'company_id') ? DB::table('tickets')->whereNotNull('company_id')->count() : 0;
+            $total = DB::table('tickets')->count();
+
+            if ($total > 0) {
+                $warnings[] = "{$total} ticket(s) exist and none can be attributed to an organization: the attribution migration will refuse until they are removed or the database is rebuilt.";
+            }
+
+            return ['attributed' => false, 'tickets' => $total, 'companyLinked' => $companyLinked];
+        }
+
+        $perOrganization = DB::table('tickets')->select('organization_id', DB::raw('count(*) as n'))->groupBy('organization_id')->orderBy('organization_id')
+            ->get()->map(fn ($row) => ['organization_id' => (int) $row->organization_id, 'tickets' => (int) $row->n])->all();
+
+        $requesterLeft = (int) DB::table('tickets')->whereNotExists(
+            fn ($query) => $query->selectRaw('1')->from('organization_members')
+                ->whereColumn('organization_members.organization_id', 'tickets.organization_id')->whereColumn('organization_members.user_id', 'tickets.user_id')
+        )->count();
+
+        if ($requesterLeft > 0) {
+            $warnings[] = "{$requesterLeft} ticket(s) have a requester who is no longer a member of the ticket's organization. They keep access to their own tickets until suspended.";
+        }
+
+        return [
+            'attributed' => true,
+            'tickets' => (int) DB::table('tickets')->count(),
+            'perOrganization' => $perOrganization,
+            'requesterNoLongerMember' => $requesterLeft,
         ];
     }
 

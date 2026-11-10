@@ -51,8 +51,10 @@ it('reports what the later packages will meet: admin rows, operator-held rows, m
     $acme->members()->attach($suspended, ['role' => 'admin']);
     $globex->members()->attach($customer, ['role' => 'member']);
     $globex->members()->attach($lead, ['role' => 'admin']);
-    Ticket::factory()->create(['user_id' => $customer->id, 'company_id' => $acmeCompany->id]);
-    Ticket::factory()->create(['user_id' => $customer->id, 'company_id' => null]);
+    // Two tickets in Acme (the customer is a member), one in Globex whose requester has since left it.
+    Ticket::factory()->create(['user_id' => $customer->id, 'organization_id' => $acme->id]);
+    Ticket::factory()->create(['user_id' => $customer->id, 'organization_id' => $acme->id]);
+    Ticket::factory()->create(['user_id' => $lead->id, 'organization_id' => $orphan->id]);
 
     // Read straight from the tables: it must not warm the permission cache as a side effect.
     app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -67,9 +69,14 @@ it('reports what the later packages will meet: admin rows, operator-held rows, m
         ->and(collect($report['operatorAdminMemberships'])->pluck('email')->sort()->values()->all())->toBe(['lead@example.test', 'op@example.test'], 'the role-name operator and the capability-only operator both count')
         ->and(collect($report['adminMemberships'])->firstWhere('email', 'gone@example.test')['active'])->toBeFalse()
         ->and($report['multiOrganizationUsers'])->toBe([['user_id' => $customer->id, 'email' => 'cust@example.test', 'organizations' => 2]])
-        ->and($report['attributedTickets'])->toBe(['tickets' => 1, 'companies' => 1])
+        ->and($report['ticketAttribution'])->toBe([
+            'attributed' => true,
+            'tickets' => 3,
+            'perOrganization' => [['organization_id' => $acme->id, 'tickets' => 2], ['organization_id' => $orphan->id, 'tickets' => 1]],
+            'requesterNoLongerMember' => 1,
+        ])
         ->and($report['failures'])->toBe([])
-        ->and(count($report['warnings']))->toBe(5);   // MO-2A1 added the "administrators are not approved" warning
+        ->and(count($report['warnings']))->toBe(5);   // MO-2A1 added the "administrators are not approved" warning; R1-2 replaced "tickets carry a company" with "requester no longer a member"
 
     expect([DB::table('organizations')->count(), DB::table('activity_log')->count(), DB::table('organization_members')->count()])->toBe($writes);
 

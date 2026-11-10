@@ -129,7 +129,7 @@ it('ignores the browser-supplied MIME: a spoofed application/pdf with HTML bytes
 // ── The same rule on create and on both reply routes ───────────────────────
 
 it('refuses a renamed HTML file on ticket creation, writing nothing', function () {
-    $this->actingAs(ticketUser())
+    $this->actingAs(ticketRequester())
         ->post(route('tickets.store'), attachmentCreatePayload([ticketUpload('notes.txt', 'html')]))
         ->assertSessionHasErrors('attachments.0');
 
@@ -137,7 +137,7 @@ it('refuses a renamed HTML file on ticket creation, writing nothing', function (
 });
 
 it('refuses a renamed HTML file on the customer reply route, writing nothing', function () {
-    $owner = ticketUser();
+    $owner = ticketRequester();
     $ticket = ticketFor($owner);
 
     $this->actingAs($owner)
@@ -148,7 +148,7 @@ it('refuses a renamed HTML file on the customer reply route, writing nothing', f
 });
 
 it('refuses a renamed HTML file on the operator reply route, writing nothing', function () {
-    $ticket = ticketFor(ticketUser());
+    $ticket = ticketFor(ticketRequester());
 
     $this->actingAs(ticketAgent())
         ->post(route('operator.tickets.replies.store', $ticket), ['body' => 'See file', 'attachments' => [ticketUpload('notes.txt', 'html')]])
@@ -158,7 +158,7 @@ it('refuses a renamed HTML file on the operator reply route, writing nothing', f
 });
 
 it('stores an allowed file on create and both reply routes, recording the DETECTED type', function () {
-    $owner = ticketUser();
+    $owner = ticketRequester();
     $agent = ticketAgent();
 
     $this->actingAs($owner)->post(route('tickets.store'), attachmentCreatePayload([ticketUpload('a.pdf')]))->assertSessionHasNoErrors();
@@ -173,7 +173,7 @@ it('stores an allowed file on create and both reply routes, recording the DETECT
 });
 
 it('keeps the count limit on every route', function () {
-    $owner = ticketUser();
+    $owner = ticketRequester();
     $files = array_map(fn (int $i) => ticketUpload("f{$i}.pdf"), range(1, 11));
 
     $this->actingAs($owner)->post(route('tickets.store'), attachmentCreatePayload($files))->assertSessionHasErrors('attachments');
@@ -191,7 +191,7 @@ it('rolls back a create whose second attachment row fails, deleting the file alr
         }
     });
 
-    expect(fn () => app(TicketService::class)->create(ticketUser(), attachmentServicePayload(), [ticketUpload('a.pdf'), ticketUpload('b.pdf')]))
+    expect(fn () => app(TicketService::class)->create(ticketRequester(), attachmentServicePayload(), [ticketUpload('a.pdf'), ticketUpload('b.pdf')]))
         ->toThrow(RuntimeException::class, 'simulated attachment row failure');
 
     TicketAttachment::flushEventListeners();
@@ -207,14 +207,14 @@ it('rolls back a create whose file cannot be stored, deleting every file written
         }
     };
 
-    expect(fn () => app(TicketService::class)->create(ticketUser(), attachmentServicePayload(), [ticketUpload('ok.pdf'), $unstorable]))
+    expect(fn () => app(TicketService::class)->create(ticketRequester(), attachmentServicePayload(), [ticketUpload('ok.pdf'), $unstorable]))
         ->toThrow(RuntimeException::class, 'could not be stored');
 
     attachmentExpectNoWrites();
 });
 
 it('rolls back a reply whose third attachment row fails: no reply, no file, no status change, no mail', function () {
-    $owner = ticketUser();
+    $owner = ticketRequester();
     $ticket = ticketFor($owner, ['status' => 'pending_user', 'assignee_id' => ticketAgent()->id]);
     $calls = 0;
     TicketAttachment::creating(function () use (&$calls) {
@@ -233,7 +233,7 @@ it('rolls back a reply whose third attachment row fails: no reply, no file, no s
 
 it('hands the creation mail to the dispatcher only after the create transaction has finished', function () {
     $fake = ticketRecordNotificationLevels();
-    $user = ticketUser();
+    $user = ticketRequester();
     $baseline = ticketTransactionLevel();
 
     $ticket = app(TicketService::class)->create($user, attachmentServicePayload(), [ticketUpload('a.pdf'), ticketUpload('b.pdf')]);
@@ -251,7 +251,7 @@ it('hands over no creation mail when the create transaction rolls back', functio
         throw new RuntimeException('simulated attachment row failure');
     });
 
-    expect(fn () => app(TicketService::class)->create(ticketUser(), attachmentServicePayload(), [ticketUpload('a.pdf')]))
+    expect(fn () => app(TicketService::class)->create(ticketRequester(), attachmentServicePayload(), [ticketUpload('a.pdf')]))
         ->toThrow(RuntimeException::class);
 
     TicketAttachment::flushEventListeners();
@@ -260,9 +260,9 @@ it('hands over no creation mail when the create transaction rolls back', functio
 });
 
 it('writes no file for a customer reply on someone else\'s ticket, however valid the file', function () {
-    $ticket = ticketFor(ticketUser());
+    $ticket = ticketFor(ticketRequester());
 
-    $this->actingAs(ticketUser())
+    $this->actingAs(ticketRequester())
         ->post(route('tickets.replies.store', $ticket), ['body' => 'Not mine', 'attachments' => [ticketUpload('a.pdf')]])
         ->assertForbidden();
 

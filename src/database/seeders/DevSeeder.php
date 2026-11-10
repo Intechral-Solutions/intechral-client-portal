@@ -2,9 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -129,6 +132,14 @@ class DevSeeder extends Seeder
         // timer pill and tray need time.log and the legacy invoice specs need billing.view.
         $operationalMember->givePermissionTo(['projects.manage', 'billing.view', 'time.log']);
 
+        // R1-2: a Ticket belongs to an organization, and a person may raise one only as a CURRENT MEMBER of it (operators included).
+        // Each persona that files requests (through the form in the browser specs, or as the owner of a fixture below) gets
+        // its own fixed organization, so re-seeding is idempotent and the isolation journeys still have two unrelated customers.
+        // Memberships are plain `member` rows: the role and approval grant nothing.
+        $customerOrg = $this->organization('e2e-customer-org', 'E2E Customer Org', $customer, [$customer]);
+        $this->organization('e2e-other-org', 'E2E Other Org', $customerOther, [$customerOther]);
+        $operatorOrg = $this->organization('e2e-operator-org', 'E2E Operator Org', $operator, [$operator]);
+
         // A fixed, idempotent fixture ticket (EPIC-011E WP7, §21): the task page's move to
         // React leaves the embedded Blade `x-time-tracker` with no remaining project/task host
         // to browser-test against, but tickets have no delete route and this seeder creates
@@ -138,6 +149,8 @@ class DevSeeder extends Seeder
         // up, never the ticket itself.
         $this->fixtureTicket('TKT-E2E1', 'TK-E2E00-00001', [
             'user_id' => $operator->id,
+            'organization_id' => $operatorOrg->id,
+            'submitted_by_id' => $operator->id,
             'title' => 'E2E fixture: embedded time tracker',
             'description' => 'Seeded fixture for the Blade-embedded time tracker browser test.',
             'category' => 'General',
@@ -152,6 +165,8 @@ class DevSeeder extends Seeder
         // package's cleanup command removes. This one is owned by the seeder and never removed.
         $this->fixtureTicket('TKT-E2E2', 'TK-E2E00-00002', [
             'user_id' => $customer->id,
+            'organization_id' => $customerOrg->id,
+            'submitted_by_id' => $customer->id,
             'title' => 'E2E fixture: waiting on the customer',
             'description' => 'Seeded fixture so the customer Home has a request waiting on its owner.',
             'category' => 'General',
@@ -192,6 +207,33 @@ class DevSeeder extends Seeder
             return;
         }
 
-        Ticket::create(['ticket_number' => $reference, ...$attributes]);
+        // Fixture provenance is written explicitly: the two attribution columns are not mass-assignable.
+        $ticket = new Ticket(['ticket_number' => $reference, ...Arr::except($attributes, ['organization_id', 'submitted_by_id'])]);
+        $ticket->organization_id = $attributes['organization_id'];
+        $ticket->submitted_by_id = $attributes['submitted_by_id'];
+        $ticket->save();
+    }
+
+    /**
+     * A fixed organization (by slug) whose members are exactly the given users, idempotently. Memberships are written straight to the
+     * table, as plain members: this is fixture data, not an operator act, and the role and approval grant nothing.
+     *
+     * @param  list<User>  $members
+     */
+    private function organization(string $slug, string $name, User $owner, array $members): Organization
+    {
+        $organization = Organization::withoutGlobalScopes()->firstOrCreate(['slug' => $slug], ['name' => $name, 'owner_id' => $owner->id]);
+
+        foreach ($members as $member) {
+            DB::table('organization_members')->insertOrIgnore([
+                'organization_id' => $organization->id,
+                'user_id' => $member->id,
+                'role' => 'member',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $organization;
     }
 }

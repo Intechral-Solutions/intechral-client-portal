@@ -18,7 +18,6 @@ class Ticket extends Model
     protected $fillable = [
         'ticket_number',
         'user_id',
-        'company_id',
         'assignee_id',
         'title',
         'description',
@@ -31,6 +30,8 @@ class Ticket extends Model
     ];
 
     // `due_override_at` is deliberately NOT fillable: it changes only through TicketService::addReply(), with its history row.
+    // `organization_id` and `submitted_by_id` (Release 1.0, R1-2) are deliberately NOT fillable either: they are provenance, set once by
+    // TicketService::create() from ServiceRequestAccess's decision, and never request input. Factories and seeders set them explicitly.
     protected $casts = [
         'sla_due_at' => 'datetime',
         'due_override_at' => 'datetime',
@@ -50,9 +51,25 @@ class Ticket extends Model
             if (! TicketReference::isCanonical($ticket->ticket_number)) {
                 throw new InvalidArgumentException('A ticket is created with a canonical TK-XXXXX-XXXXX reference.');
             }
+
+            // R1-2: a ticket is born with its customer organization and its submitter. The columns are NOT NULL with foreign keys; this
+            // turns a missing value into a clear error before the database's, and refuses the placeholder 0 a lax SQL mode could store.
+            foreach (['organization_id', 'submitted_by_id'] as $column) {
+                $value = $ticket->getAttribute($column);
+
+                if (! is_numeric($value) || (int) $value < 1) {
+                    throw new InvalidArgumentException('A ticket is created with its customer organization and its submitter.');
+                }
+            }
         });
 
         static::updating(function (Ticket $ticket) {
+            // R1-2: where a ticket belongs and who submitted it are provenance. They never change, and there is deliberately no
+            // correction path (a future one is a dedicated, audited operator action). Authorization never reads them.
+            if ($ticket->isDirty('organization_id') || $ticket->isDirty('submitted_by_id')) {
+                throw new LogicException('A ticket\'s organization and submitter are immutable once set.');
+            }
+
             // Release 1.0: the original SLA deadline is fixed at creation. An operator's working due date is `due_override_at`.
             if ($ticket->isDirty('sla_due_at')) {
                 throw new LogicException('The SLA deadline is immutable once set; adjust the due date override instead.');
@@ -110,9 +127,20 @@ class Ticket extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function company(): BelongsTo
+    /** The submitter: the authenticated actor who created the row. Equal to the requester until partner-originated requests exist (R1-5). */
+    public function submittedBy(): BelongsTo
     {
-        return $this->belongsTo(CrmCompany::class, 'company_id');
+        return $this->belongsTo(User::class, 'submitted_by_id');
+    }
+
+    /**
+     * The customer organization the request belongs to. Read WITHOUT the organization membership scope on purpose: that scope is a read
+     * filter for the Organizations screens and would silently return null for a requester who has since left the organization, whose own
+     * ticket is still attributed. Attribution is not authorization: whether a viewer may see the name is the presenter's decision.
+     */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'organization_id')->withoutGlobalScopes();
     }
 
     public function assignee(): BelongsTo

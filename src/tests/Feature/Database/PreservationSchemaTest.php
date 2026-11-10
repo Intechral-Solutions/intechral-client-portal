@@ -54,6 +54,8 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'time_entry_blocks.user_id -> users' => 'CASCADE/RESTRICT (time_entry_blocks_user_id_foreign)',
         // Release 1.0 (MO-2A1): added later by its own migration, RESTRICT from the start (the approving operator is provenance).
         'organization_members.admin_approved_by -> users' => 'RESTRICT/RESTRICT (organization_members_admin_approved_by_foreign)',
+        // Release 1.0 (R1-2A): the submitter of a ticket is provenance, RESTRICT from the start (the requester, tickets.user_id, is the H1 key above).
+        'tickets.submitted_by_id -> users' => 'RESTRICT/RESTRICT (tickets_submitted_by_id_foreign)',
         // Nullable pointers: the record stays and the pointer is cleared.
         'cms_pages.updated_by -> users' => 'SET NULL/RESTRICT (cms_pages_updated_by_foreign)',
         'invitations.invited_by -> users' => 'SET NULL/RESTRICT (invitations_invited_by_foreign)',
@@ -65,7 +67,7 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'users.invited_by -> users' => 'SET NULL/RESTRICT (users_invited_by_foreign)',
         // The other company references.
         'crm_contacts.crm_company_id -> crm_companies' => 'SET NULL/RESTRICT (crm_contacts_crm_company_id_foreign)',
-        'tickets.company_id -> crm_companies' => 'SET NULL/RESTRICT (tickets_company_id_foreign)',
+        // `tickets.company_id` is gone (R1-2A, migration 2026_11_10_120000): a ticket is attributed to an organization, not a CRM company.
     ];
 
     $expected = $restricted + $unchanged;

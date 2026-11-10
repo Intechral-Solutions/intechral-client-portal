@@ -7,7 +7,6 @@ use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
 use App\Queries\RequesterTicketQuery;
-use App\Rules\AccessibleCrmCompany;
 use App\Rules\AllowedTicketAttachment;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
@@ -57,15 +56,16 @@ class TicketController extends Controller
 
     public function store(Request $request, TicketService $service)
     {
-        // The form no longer offers a company and nothing auto-fills one (EPIC-017 F-1, section 20: nothing
-        // ever persisted it, and Directory owns the organization link). The rule stays, unchanged, so a
-        // forged cross-tenant `company_id` is still refused (EPIC-010B); it is validated, never stored.
+        // R1-2: `organization_id` is a REQUEST: an integer, never `exists:` (that rule would tell a caller which organizations exist).
+        // Whether the actor may file for it, and which organization is used when none is named, is decided inside the creation
+        // transaction by ServiceRequestAccess. The submitter and requester are the authenticated user and nothing in the payload. The
+        // old `company_id` input is gone: nothing ever persisted it, and the column is dropped.
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'category' => ['required', 'string', 'in:'.implode(',', self::CATEGORIES)],
             'priority' => ['required', 'in:low,medium,high,critical'],
-            'company_id' => ['nullable', new AccessibleCrmCompany],
+            'organization_id' => ['nullable', 'integer', 'min:1'],
             ...AllowedTicketAttachment::rules(),
         ]);
 
@@ -73,6 +73,7 @@ class TicketController extends Controller
             $request->user(),
             $validated,
             $request->file('attachments', []),
+            isset($validated['organization_id']) ? (int) $validated['organization_id'] : null,
         );
 
         return redirect()->route('tickets.show', $ticket)

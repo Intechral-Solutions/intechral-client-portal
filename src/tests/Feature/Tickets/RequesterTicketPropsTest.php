@@ -74,13 +74,11 @@ function propsFixture(?User $owner = null): array
     $assignee = ticketAgent(['name' => 'Handler Hana', 'email' => 'assignee-sentinel@example.test']);
     $operator = ticketAgent(['name' => 'operator-history-sentinel']);
     $coworker = ticketUser('operator', ['name' => 'Coworker-Time-SENTINEL']);
-    $company = CrmCompany::factory()->create([
-        'name' => 'Acme-Company-SENTINEL',
-        'created_by' => $operator->id,
-        'organization_id' => Organization::factory()->create(['owner_id' => $operator->id])->id,
-    ]);
+    // R1-2A: the ticket is attributed to an organization carrying the sentinel name. Until R1-2B deliberately adds the organization's name
+    // to the requester props (owner decision E4), it must not appear anywhere a customer is sent.
+    $organization = Organization::factory()->create(['name' => 'Acme-Company-SENTINEL', 'owner_id' => $operator->id]);
     $ticket = ticketFor($owner, [
-        'status' => 'pending_user', 'assignee_id' => $assignee->id, 'company_id' => $company->id,
+        'status' => 'pending_user', 'assignee_id' => $assignee->id, 'organization_id' => $organization->id,
         'title' => 'Printer offline', 'description' => 'It prints nothing.', 'priority' => 'high',
     ]);
 
@@ -357,8 +355,9 @@ it('sends the create page its exact props, with no company selector data even fo
         ->and(json_encode($own))->not->toContain('compan');
 });
 
-it('confirms a new request with the approved flash, and never links a company', function () {
+it('confirms a new request with the approved flash, and attributes it to the member\'s organization', function () {
     $member = ticketUser();
+    $organization = ticketJoin($member);
 
     $response = $this->actingAs($member)->post(route('tickets.store'), [
         'title' => 'Cannot log in', 'description' => 'Details', 'category' => 'Account', 'priority' => 'medium',
@@ -366,7 +365,7 @@ it('confirms a new request with the approved flash, and never links a company', 
 
     $ticket = Ticket::sole();
     $response->assertRedirect(route('tickets.show', $ticket))->assertSessionHas('status', "Request {$ticket->ticket_number} received.");
-    expect($ticket->company_id)->toBeNull();
+    expect($ticket->organization_id)->toBe($organization->id)->and($ticket->submitted_by_id)->toBe($member->id);
 });
 
 // ── Empty states and malformed queries ─────────────────────────────────────

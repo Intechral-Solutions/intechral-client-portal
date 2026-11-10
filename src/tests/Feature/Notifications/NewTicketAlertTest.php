@@ -47,7 +47,7 @@ describe('who is told', function () {
     beforeEach(fn () => Notification::fake());
 
     it('sends exactly one alert, to the configured address and to nobody else', function () {
-        $customer = ticketUser();
+        $customer = ticketRequester();
         $operator = ticketUser('operator');
         $agent = ticketAgent();
 
@@ -65,7 +65,7 @@ describe('who is told', function () {
     });
 
     it('sends nothing for a reply, an assignment or a status change', function () {
-        $customer = ticketUser();
+        $customer = ticketRequester();
         $agent = ticketAgent();
         $ticket = ticketFor($customer);
 
@@ -78,7 +78,7 @@ describe('who is told', function () {
     });
 
     it('sends one alert per ticket created', function () {
-        $customer = ticketUser();
+        $customer = ticketRequester();
 
         $this->actingAs($customer)->post(route('tickets.store'), ntaForm(['title' => 'One']))->assertRedirect();
         $this->actingAs($customer)->post(route('tickets.store'), ntaForm(['title' => 'Two']))->assertRedirect();
@@ -89,7 +89,7 @@ describe('who is told', function () {
     it('trims the configured address', function () {
         config(['helpdesk.notify_address' => '  '.NTA_ADDRESS."  \n"]);
 
-        app(TicketService::class)->create(ticketUser(), ntaForm());
+        app(TicketService::class)->create(ticketRequester(), ntaForm());
 
         Notification::assertSentOnDemand(NewTicketAlertNotification::class, fn ($n, $c, AnonymousNotifiable $notifiable) => $notifiable->routes['mail'] === NTA_ADDRESS);
     });
@@ -102,7 +102,7 @@ describe('absent or unusable configuration', function () {
         config(['helpdesk.notify_address' => $value]);
         Log::spy();
 
-        $this->actingAs($customer = ticketUser())->post(route('tickets.store'), ntaForm())->assertRedirect();
+        $this->actingAs($customer = ticketRequester())->post(route('tickets.store'), ntaForm())->assertRedirect();
 
         ntaAlerts(0);
         Notification::assertSentTo($customer, TicketCreatedNotification::class);
@@ -127,7 +127,7 @@ describe('absent or unusable configuration', function () {
         $this->app['env'] = 'production';
         Log::spy();
 
-        app(TicketService::class)->create(ticketUser(), ntaForm());
+        app(TicketService::class)->create(ticketRequester(), ntaForm());
 
         Log::shouldHaveReceived('log')->once()->withArgs(fn (string $level) => $level === 'error');
         ntaAlerts(0);
@@ -147,7 +147,7 @@ describe('absent or unusable configuration', function () {
             }
         });
 
-        $customer = ticketUser();
+        $customer = ticketRequester();
         $this->actingAs($customer)->post(route('tickets.store'), ntaForm())->assertRedirect();
 
         expect(Ticket::count())->toBe(1);
@@ -161,7 +161,7 @@ describe('after commit, never on rollback', function () {
         $fake = ticketRecordNotificationLevels();
         $baseline = ticketTransactionLevel();
 
-        app(TicketService::class)->create(ticketUser(), ntaForm(), [ticketUpload('a.pdf')]);
+        app(TicketService::class)->create(ticketRequester(), ntaForm(), [ticketUpload('a.pdf')]);
 
         // Two hand-overs (the requester's confirmation, the operator alert), both at the caller's own level.
         expect($fake->levels)->toBe([$baseline, $baseline]);
@@ -174,7 +174,7 @@ describe('after commit, never on rollback', function () {
             throw new RuntimeException('simulated attachment failure');
         });
 
-        expect(fn () => app(TicketService::class)->create(ticketUser(), ntaForm(), [ticketUpload('a.pdf')]))->toThrow(RuntimeException::class, 'simulated attachment failure');
+        expect(fn () => app(TicketService::class)->create(ticketRequester(), ntaForm(), [ticketUpload('a.pdf')]))->toThrow(RuntimeException::class, 'simulated attachment failure');
 
         TicketAttachment::flushEventListeners();
         expect(Ticket::count())->toBe(0);
@@ -187,14 +187,14 @@ describe('after commit, never on rollback', function () {
         $service = app(TicketService::class);
 
         DB::transaction(function () use ($service) {
-            $service->create(ticketUser(), ntaForm());
+            $service->create(ticketRequester(), ntaForm());
             ntaAlerts(0);
         });
         ntaAlerts(1);
 
         Notification::fake();
         expect(fn () => DB::transaction(function () use ($service) {
-            $service->create(ticketUser(), ntaForm(['title' => 'Rolled back']));
+            $service->create(ticketRequester(), ntaForm(['title' => 'Rolled back']));
             throw new RuntimeException('caller failed after creating');
         }))->toThrow(RuntimeException::class);
 
@@ -208,7 +208,7 @@ describe('ticket creation notifications are independent and never make a committ
         Exceptions::fake();
         $fake = ticketFailHandOff(TicketCreatedNotification::class);
 
-        $this->actingAs($customer = ticketUser())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($customer = ticketRequester())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
 
         expect(Ticket::count())->toBe(1);
         $fake->assertNotSentTo($customer, TicketCreatedNotification::class);
@@ -221,7 +221,7 @@ describe('ticket creation notifications are independent and never make a committ
         Exceptions::fake();
         $fake = ticketFailHandOff(NewTicketAlertNotification::class);
 
-        $this->actingAs($customer = ticketUser())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($customer = ticketRequester())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
 
         expect(Ticket::count())->toBe(1);
         $fake->assertSentTo($customer, TicketCreatedNotification::class);
@@ -240,7 +240,7 @@ describe('ticket creation notifications are independent and never make a committ
         };
         Notification::swap($fake);
 
-        $this->actingAs(ticketUser())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs(ticketRequester())->post(route('tickets.store'), ntaForm())->assertRedirect()->assertSessionHasNoErrors();
 
         expect(Ticket::count())->toBe(1);
         Exceptions::assertReportedCount(2);
@@ -250,7 +250,7 @@ describe('ticket creation notifications are independent and never make a committ
         Exceptions::fake();
         ticketFailHandOff(TicketCreatedNotification::class);
 
-        $ticket = app(TicketService::class)->create(ticketUser(), ntaForm());
+        $ticket = app(TicketService::class)->create(ticketRequester(), ntaForm());
 
         expect($ticket->exists)->toBeTrue()->and(Ticket::find($ticket->id))->not->toBeNull();
     });
@@ -262,7 +262,7 @@ describe('ticket creation notifications are independent and never make a committ
             throw new RuntimeException('simulated attachment failure');
         });
 
-        expect(fn () => app(TicketService::class)->create(ticketUser(), ntaForm(), [ticketUpload('a.pdf')]))->toThrow(RuntimeException::class, 'simulated attachment failure');
+        expect(fn () => app(TicketService::class)->create(ticketRequester(), ntaForm(), [ticketUpload('a.pdf')]))->toThrow(RuntimeException::class, 'simulated attachment failure');
 
         TicketAttachment::flushEventListeners();
         expect(Ticket::count())->toBe(0);
@@ -275,7 +275,7 @@ describe('ticket creation notifications are independent and never make a committ
         $fake = ticketFailHandOff(TicketCreatedNotification::class);
 
         expect(fn () => DB::transaction(function () {
-            app(TicketService::class)->create(ticketUser(), ntaForm(['title' => 'Rolled back']));
+            app(TicketService::class)->create(ticketRequester(), ntaForm(['title' => 'Rolled back']));
             throw new RuntimeException('caller failed after creating');
         }))->toThrow(RuntimeException::class, 'caller failed');
 
@@ -289,7 +289,7 @@ describe('ticket creation notifications are independent and never make a committ
         $baseline = ticketTransactionLevel();
 
         DB::transaction(function () use ($fake) {
-            app(TicketService::class)->create(ticketUser(), ntaForm());
+            app(TicketService::class)->create(ticketRequester(), ntaForm());
             expect($fake->levels)->toBe([]);
         });
 
@@ -300,7 +300,7 @@ describe('ticket creation notifications are independent and never make a committ
 describe('what the alert says', function () {
     function ntaAlertFor(array $form, array $owner = []): array
     {
-        $user = ticketUser('user', $owner);
+        $user = ticketRequester('user', $owner);
         $ticket = app(TicketService::class)->create($user, ntaForm($form));
         $message = (new NewTicketAlertNotification($ticket))->toMail(new AnonymousNotifiable);
 
@@ -326,7 +326,7 @@ describe('what the alert says', function () {
 
     it('leaves out the requester address, attachment names, replies and internal notes', function () {
         Notification::fake();
-        $user = ticketUser('user', ['name' => 'Dana Customer', 'email' => 'dana.private@customer.invalid']);
+        $user = ticketRequester('user', ['name' => 'Dana Customer', 'email' => 'dana.private@customer.invalid']);
         $ticket = app(TicketService::class)->create($user, ntaForm(), [ticketUpload('secret-plan.pdf')]);
         ticketReply($ticket, ticketUser('operator'), true, 'INTERNALNOTEMARKER');
         ticketReply($ticket, ticketUser('operator'), false, 'PUBLICREPLYMARKER');
@@ -363,7 +363,7 @@ describe('through the real queue', function () {
     }
 
     it('delivers one mail to the helpdesk address and one to the requester, each addressed to that one recipient', function () {
-        $customer = ticketUser('user', ['email' => 'dana@customer.invalid']);
+        $customer = ticketRequester('user', ['email' => 'dana@customer.invalid']);
 
         app(TicketService::class)->create($customer, ntaForm(['title' => 'Real queue']));
         ntaWorkerRuns(2);
@@ -377,7 +377,7 @@ describe('through the real queue', function () {
     });
 
     it('discards, rather than fails, an alert for a ticket that no longer exists', function () {
-        $ticket = app(TicketService::class)->create(ticketUser(), ntaForm());
+        $ticket = app(TicketService::class)->create(ticketRequester(), ntaForm());
         Ticket::query()->whereKey($ticket->id)->delete();
 
         ntaWorkerRuns(2);
@@ -386,7 +386,7 @@ describe('through the real queue', function () {
     });
 
     it('is not blocked by the suspended-recipient safeguard, which concerns accounts and the alert is an address', function () {
-        $customer = ticketUser();
+        $customer = ticketRequester();
         app(TicketService::class)->create($customer, ntaForm());
         User::query()->whereKey($customer->id)->update(['disabled_at' => now()]);
 

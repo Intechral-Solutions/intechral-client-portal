@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\TicketStatusHistory;
@@ -32,7 +33,7 @@ afterEach(function () {
 function rereferenceLegacy(User $owner, string $number, array $extra = []): Ticket
 {
     $id = DB::table('tickets')->insertGetId([
-        'ticket_number' => $number, 'user_id' => $owner->id, 'title' => "Legacy {$number}", 'description' => 'x', 'category' => 'General',
+        'ticket_number' => $number, 'user_id' => $owner->id, 'organization_id' => Organization::factory()->create()->id, 'submitted_by_id' => $owner->id, 'title' => "Legacy {$number}", 'description' => 'x', 'category' => 'General',
         'priority' => 'low', 'status' => 'open', 'created_at' => '2026-01-01 10:00:00', 'updated_at' => '2026-01-02 10:00:00', ...$extra,
     ]);
 

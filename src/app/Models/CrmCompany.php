@@ -53,11 +53,6 @@ class CrmCompany extends Model
             ->withTimestamps();
     }
 
-    public function tickets(): HasMany
-    {
-        return $this->hasMany(Ticket::class, 'company_id');
-    }
-
     // ── Helpers ────────────────────────────────────────────
 
     public function isPromoted(): bool

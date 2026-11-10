@@ -170,8 +170,8 @@ it('lists no row for a project the viewer cannot open, even one still assigned t
 it('lists no ticket-kind task, whether or not TicketPolicy would open the ticket (Q6)', function () {
     // Until WP3 both rows were listed through the org tab, only the openable ticket linked.
     $this->orgUser->givePermissionTo('tasks.view_all');
-    $foreignTicket = Ticket::factory()->create(['user_id' => $this->owner->id, 'company_id' => $this->company->id, 'ticket_number' => 'TK-T7001-AAAAA']);
-    $ownTicket = Ticket::factory()->create(['user_id' => $this->orgUser->id, 'company_id' => $this->company->id, 'ticket_number' => 'TK-T7002-AAAAA']);
+    $foreignTicket = Ticket::factory()->create(['user_id' => $this->owner->id, 'organization_id' => $this->org->id, 'ticket_number' => 'TK-T7001-AAAAA']);
+    $ownTicket = Ticket::factory()->create(['user_id' => $this->orgUser->id, 'organization_id' => $this->org->id, 'ticket_number' => 'TK-T7002-AAAAA']);
     Task::factory()->standalone()->create(['ticket_id' => $foreignTicket->id, 'title' => 'On foreign ticket', 'assignee_id' => $this->orgUser->id]);
     Task::factory()->standalone()->create(['ticket_id' => $ownTicket->id, 'title' => 'On own ticket', 'assignee_id' => $this->orgUser->id, 'created_by' => $this->orgUser->id]);
 

@@ -16,6 +16,7 @@ use App\Rules\AllowedTicketAttachment;
 use App\Shared\Pilot\CustomerPilotGate;
 use App\Support\Helpdesk\DueDateAdjustment;
 use App\Support\Helpdesk\HelpdeskNotifyAddress;
+use App\Support\Helpdesk\TicketAttribution;
 use App\Support\Helpdesk\TicketReference;
 use App\Support\Helpdesk\TicketReferenceExhausted;
 use App\Support\Helpdesk\TicketReferenceGenerator;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -46,6 +48,15 @@ class TicketService
     /** Hours a ticket stays `resolved` before `tickets:auto-close` may close it; the Resolved mail tells the customer the same number. */
     public const AUTO_CLOSE_HOURS = 72;
 
+    /**
+     * Attempts at a creation that is the OUTERMOST transaction when InnoDB picks it as a deadlock victim (error 1213; a lock wait timeout,
+     * 1205, is never retried). R1-2: the creation transaction now holds shared locks on an organization and a membership row before its
+     * INSERT, which lengthens it enough that a forced reference collision can deadlock two inserts. Each attempt starts from nothing: the
+     * lost attempt's files are deleted, attribution is decided again from current state and a new reference is drawn. See
+     * {@see retryingDeadlock()}. Inside a caller's transaction there is no retry and the error propagates as before.
+     */
+    public const CREATE_ATTEMPTS = 3;
+
     /** References drawn per creation: at most this many before it fails closed (C6-R). */
     public const REFERENCE_ATTEMPTS = 5;
 
@@ -54,7 +65,19 @@ class TicketService
     /** Release 1.0: the furthest ahead an operator may set a due date, in days from now. */
     public const DUE_OVERRIDE_MAX_DAYS = 365;
 
-    public function create(User $user, array $data, array $files = []): Ticket
+    public function __construct(private readonly ServiceRequestAccess $access) {}
+
+    /**
+     * The one way a Ticket is created. The authenticated `$user` becomes the requester and the submitter, and the customer organization is
+     * decided HERE, inside the creation transaction, by {@see ServiceRequestAccess} from the actor's current membership (a refusal throws
+     * before anything is written, so a caller cannot reach the INSERT without it). `$organizationId` is what the actor asked for, or null
+     * to let the server choose the only organization they belong to; it is a request, never an authority, and nothing in `$data` can
+     * name an organization, a submitter or a requester.
+     *
+     * @throws AuthorizationException when the account may not raise a request at all
+     * @throws ValidationException on `organization_id` when no organization is eligible, or one must be chosen
+     */
+    public function create(User $user, array $data, array $files = [], ?int $organizationId = null): Ticket
     {
         $priority = $data['priority'];
         $hours = Ticket::SLA_HOURS[$priority];
@@ -63,8 +86,12 @@ class TicketService
         // only inside that transaction; storeAttachments() deletes every written file when it
         // rolls back (F-7). The public reference is random and issued with the row (C6-R, ADR-008);
         // the row's numeric id stays internal, and private files are stored under it.
-        $ticket = $this->storeAttachments(function (array &$stored) use ($user, $data, $priority, $hours, $files) {
-            $ticket = $this->createWithReference([
+        $work = function (array &$stored) use ($user, $data, $priority, $hours, $files, $organizationId) {
+            // Before any write, and once: the collision-retry loop below can never re-decide it. A refusal rolls the transaction back,
+            // so no ticket, reply, attachment row, file, mail or job exists afterwards.
+            $attribution = $this->access->attributionFor($user, $organizationId);
+
+            $ticket = $this->createWithReference($attribution, [
                 'user_id' => $user->id,
                 'title' => $data['title'],
                 'description' => $data['description'],
@@ -79,7 +106,9 @@ class TicketService
             }
 
             return $ticket;
-        });
+        };
+
+        $ticket = $this->retryingDeadlock(fn () => $this->storeAttachments($work));
 
         // After commit only: a mail must never describe a ticket that rolled back, and a mail that cannot be queued must never make a
         // ticket that DID commit look as if it failed. Each hand-over is its own after-commit callback, so one failing (reported, not thrown)
@@ -416,19 +445,74 @@ class TicketService
     }
 
     /**
+     * Runs a creation again, from nothing, when the database chose it as a deadlock victim (InnoDB error 1213), and ONLY then: a lock wait
+     * TIMEOUT (1205) means the lock holder is slow, not that this transaction is the cheaper half of a cycle, and retrying it would only
+     * wait again, so it propagates like any other error.
+     *
+     * Only when it was the OUTERMOST transaction. The victim's transaction is already rolled back and storeAttachments() has already deleted
+     * the files it wrote (the one rollback path), so the next attempt writes its own, decides the attribution again from current state and
+     * issues a new reference. Inside a caller's transaction the level is not 0, a retry would act on a transaction that no longer holds what
+     * it thinks, and the error propagates as before.
+     *
+     * Classification reads the exception CHAIN, because Laravel changes the type on the way out: an error inside a nested transaction (the
+     * savepoint around the reference INSERT) is rethrown as `Illuminate\Database\DeadlockException`, a PDOException whose code is 0 for a
+     * string SQLSTATE and whose `previous` is the driver's QueryException, and Laravel treats a 1205 timeout the same way, so neither the
+     * wrapper's class nor its message can tell the two apart. The driver's error number can: `errorInfo[1]` of a PDOException in the chain.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $attempt
+     * @return T
+     */
+    private function retryingDeadlock(callable $attempt): mixed
+    {
+        for ($try = 1; ; $try++) {
+            try {
+                return $attempt();
+            } catch (Throwable $e) {
+                if (! self::isInnoDbDeadlock($e) || DB::transactionLevel() > 0 || $try >= self::CREATE_ATTEMPTS) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    /** InnoDB error 1213 ("Deadlock found when trying to get lock") anywhere in the exception chain; never a 1205 lock wait timeout. */
+    private static function isInnoDbDeadlock(Throwable $e): bool
+    {
+        for ($cause = $e; $cause !== null; $cause = $cause->getPrevious()) {
+            if ($cause instanceof PDOException && (int) ($cause->errorInfo[1] ?? 0) === 1213) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Inserts the ticket under a fresh random reference. Each attempt is its own savepoint inside the caller's transaction, and ONLY
      * a duplicate of the `ticket_number` unique index draws again; any other error propagates after one attempt. When every attempt
      * collides it throws, and the caller's transaction rolls back whole (no row, file, mail or job).
      *
+     * Private (R1-2): the only caller is {@see create()}, so the only way a Ticket row is written by the application is behind
+     * {@see ServiceRequestAccess}. The attribution is assigned explicitly: those two columns are not mass-assignable.
+     *
      * @param  array<string, mixed>  $attributes
      */
-    public function createWithReference(array $attributes): Ticket
+    private function createWithReference(TicketAttribution $attribution, array $attributes): Ticket
     {
         $generator = app(TicketReferenceGenerator::class);
 
         for ($attempt = 1; $attempt <= self::REFERENCE_ATTEMPTS; $attempt++) {
             try {
-                return DB::transaction(fn () => Ticket::create([...$attributes, 'ticket_number' => $generator->next()]));
+                return DB::transaction(function () use ($attribution, $attributes, $generator) {
+                    $ticket = new Ticket([...$attributes, 'ticket_number' => $generator->next()]);
+                    $ticket->organization_id = $attribution->organizationId;
+                    $ticket->submitted_by_id = $attribution->submittedById;
+                    $ticket->save();
+
+                    return $ticket;
+                });
             } catch (QueryException $e) {
                 if (! TicketReference::isCollision($e)) {
                     throw $e;

@@ -48,6 +48,7 @@ final class CommittedUsers
             ['tasks', 'created_by'],          // checklists, dependencies and comments cascade
             ['ticket_attachments', 'user_id'],
             ['ticket_replies', 'user_id'],
+            ['tickets', 'submitted_by_id'],   // tickets.submitted_by_id (R1-2, RESTRICT); replies, attachments and status history cascade
             ['tickets', 'user_id'],           // replies, attachments and status history cascade
             ['projects', 'created_by'],       // columns, members, milestones, remaining tasks and company links cascade
             ['crm_contacts', 'created_by'],

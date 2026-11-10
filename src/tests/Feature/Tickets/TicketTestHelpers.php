@@ -1,10 +1,12 @@
 <?php
 
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketReply;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Testing\Fakes\NotificationFake;
@@ -56,6 +58,31 @@ function ticketAgent(array $attributes = []): User
 function ticketTimeUser(string $role = 'user', array $attributes = []): User
 {
     return tap(ticketUser($role, $attributes))->givePermissionTo('time.log');
+}
+
+/**
+ * R1-2: make `$user` a CURRENT member of an organization (a new one unless given), written straight to the table as an operator act would,
+ * and return it. Creating a ticket requires exactly this; a factory-built ticket does not (attribution is provenance, not authorization).
+ */
+function ticketJoin(User $user, ?Organization $organization = null, string $role = 'member'): Organization
+{
+    $organization ??= Organization::factory()->create();
+
+    DB::table('organization_members')->insertOrIgnore([
+        'organization_id' => $organization->id,
+        'user_id' => $user->id,
+        'role' => $role,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $organization;
+}
+
+/** A customer (or any role) who may raise a request: `ticketUser()` plus membership of one fresh organization. */
+function ticketRequester(string $role = 'user', array $attributes = []): User
+{
+    return tap(ticketUser($role, $attributes), fn (User $user) => ticketJoin($user));
 }
 
 function ticketFor(User $owner, array $attributes = []): Ticket

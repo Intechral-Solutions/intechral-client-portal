@@ -19,7 +19,7 @@ use App\Services\TicketService;
  *
  * Never serialized, for any viewer: internal replies and their attachments, SLA and overdue, time
  * entries or totals or a running timer, status-history actors, the assignee's id or email, the
- * requester's id, `company_id`, or assignee candidates. Dropping a key from the output is the
+ * requester's or submitter's id, `organization_id` or `submitted_by_id`, or assignee candidates. Dropping a key from the output is the
  * guarantee; hiding it in the page is not.
  */
 final class RequesterTicketPresenter

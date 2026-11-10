@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Support\Helpdesk\TicketReferenceGenerator;
@@ -22,6 +23,11 @@ class TicketFactory extends Factory
             // 'TK-E2E00-0000n'. Tests that need a specific value pass one.
             'ticket_number' => app(TicketReferenceGenerator::class)->next(),
             'user_id' => User::factory(),
+            // R1-2: every ticket belongs to an organization and has a submitter (NOT NULL). A factory ticket is its requester's own
+            // submission in a fresh organization. It writes NO membership: attribution is provenance, and the tests that exercise who may
+            // CREATE a ticket go through TicketService (see `ticketMemberOf()`); `->for($org, 'organization')` / `->state([...])` override.
+            'organization_id' => Organization::factory(),
+            'submitted_by_id' => fn (array $attributes) => $attributes['user_id'],
             'assignee_id' => null,
             'title' => $this->faker->sentence(6),
             'description' => $this->faker->paragraphs(2, true),
@@ -52,6 +58,11 @@ class TicketFactory extends Factory
     public function overdue(): static
     {
         return $this->state(['status' => 'open', 'sla_due_at' => now()->subHour()]);
+    }
+
+    public function inOrganization(Organization $organization): static
+    {
+        return $this->state(['organization_id' => $organization->id]);
     }
 
     public function assignedTo(User $user): static
