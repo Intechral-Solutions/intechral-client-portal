@@ -142,6 +142,7 @@ The capability names in the table above are the closest existing permissions, us
 - **Current:** none.
 - **Target:** a service-affecting event linking many Tickets, People, and Organizations; managed centrally by operators while each requester keeps their own Ticket.
 - **Open:** Incident lifecycle; whether customers see Incident status (e.g. a status notice on linked Tickets).
+- **Direction (2026-11-09):** [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md) treats Service Request and Incident as conceptual specializations of Ticket. An Incident may publish updates to associated Service Requests only through explicit visibility choices, with tenant isolation and no implicit status cascade. Storage, association cardinality and any Outage type remain undecided.
 
 ### Knowledge
 
@@ -198,7 +199,7 @@ Conceptual map. The **Current** column states what exists in the database today;
 | Task ↔ Ticket | Work derived from a request | `tasks.ticket_id` (no creation path) |
 | Ticket ↔ Person/Organization | Requester (Person) and affected Organization | `tickets.user_id` (User), `tickets.company_id` (CRM company) |
 | Ticket ↔ Time | Support effort | `time_entries.ticket_id` |
-| Ticket ↔ Incident | Many Tickets to one Incident | None |
+| Ticket ↔ Incident | Many Tickets to one Incident (product intent; cardinality and storage open, [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md)) | None |
 | Ticket ↔ Knowledge | Articles used in or drafted from a resolution | None |
 | Incident ↔ Knowledge | Articles describing the event/workaround | None |
 | Incident ↔ Organization | Affected organizations | None |

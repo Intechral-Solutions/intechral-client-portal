@@ -1083,6 +1083,7 @@ Both are seeded by `DevSeeder` (local/testing only), and each is minted at most 
 - **No day-one need.** No code, data, document or owner ruling shows an operational need for Incidents in Release 1. The Release 1 class stays **B, default Post-v1**.
 - **No seam is reserved.** Linking tickets to a future Incident needs only a nullable foreign key added at that time. Status vocabulary and navigation registration already accept new entries. Reserving a column or UI slot now would be speculative (roadmap principle 6).
 - **Promotion.** If the owner promotes Incidents before WP3, they become a separately planned package after WP4. They are not folded into the MVP.
+- **Update (2026-11-09), guidance only.** [ADR-009](../architecture/adr/ADR-009-ticket-specialization.md) records the owner-approved conceptual direction for ticket specialization (Service Request, Incident, later types). It treats the "nullable foreign key" above as **one possible implementation, not an architectural commitment**; the association, cardinality and storage model are decided at ADR-009's pre-first-additional-type checkpoint. The Release 1 conclusion (Class B, default Post-v1, no seam reserved) is unchanged.
 
 ## 30. Knowledge / CMS
 
