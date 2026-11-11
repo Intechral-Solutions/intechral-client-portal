@@ -58,7 +58,7 @@ class UserController extends Controller
         $newRoles = $validated['roles'] ?? [];
 
         // Release 0.9 (H3): refused if it would demote the last active account administrator.
-        $this->grants->syncUserRoles($user, $newRoles);
+        $this->grants->syncUserRoles($user, $newRoles, $request->user());
 
         // Invalidate permission cache for this user
         app(PermissionRegistrar::class)->forgetCachedPermissions();

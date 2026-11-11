@@ -166,7 +166,7 @@ final class BuiltInRoleSynchronizer
             }
 
             return $plan;
-        });
+        }, OrganizationInvitations::SOURCE_ROLES_SYNC);
     }
 
     private function execute(RoleSyncPlan $plan): void

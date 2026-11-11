@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Policies\OrganizationPolicy;
 use App\Shared\Permissions\BuiltInRoles;
 use App\Shared\Permissions\PermissionCatalogue;
+use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -129,5 +131,76 @@ final class OrganizationAuthority
     public static function isOperator(int $userId): bool
     {
         return in_array($userId, self::operatorIds(), true);
+    }
+
+    /**
+     * Whether the account is, RIGHT NOW and from the TABLES ALONE, someone the policy {@see OrganizationPolicy::manageMembership}
+     * would admit: ACTIVE (`users.disabled_at` null) and holding BOTH `portal.operator` and `crm.manage`, each directly or through any
+     * role (Release 1.0, R1-3A). The invitation flow asks this wherever it decides inside a locked transaction or a queue job: acceptance,
+     * the membership seam, the revocation hooks and the notification's send-time check.
+     *
+     * WHY NOT THE GATE. `can()` goes through the permission cache, and a cache MISS inside an organization-locked transaction writes the
+     * cache row on that connection; ServiceRequestAccess runs `can('tickets.create')` inside the ticket transaction BEFORE it takes its own
+     * organization lock, so a cache write held under the organization lock here could deadlock against it. A table read takes no lock and
+     * writes nothing. It is also never stale: a Gate answer can be old for the cache's lifetime.
+     *
+     * Deliberately NOT {@see isOperator()}: the policy tests capabilities, never the `operator` role NAME, so this does too. The two are kept
+     * equal by a parameterized drift test (OrganizationInvitationAuthorityTest); a change to either side that is not made to both fails it.
+     */
+    public static function isMembershipManager(int $userId): bool
+    {
+        return in_array($userId, self::membershipManagerIds([$userId]), true);
+    }
+
+    /**
+     * The subset of the given accounts for which {@see isMembershipManager()} is true, ascending: one table query, the set version of
+     * the predicate (the revocation hooks compare it before and after a mutation).
+     *
+     * @param  list<int>  $userIds
+     * @return list<int>
+     */
+    public static function membershipManagerIds(array $userIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $userIds)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('users.id', $ids)
+            ->whereNull('users.disabled_at')
+            ->where(self::holds(PermissionCatalogue::PORTAL_OPERATOR))
+            ->where(self::holds(PermissionCatalogue::CRM_MANAGE))
+            ->orderBy('users.id')
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** The account holds the permission directly or through one of its roles (the same reading as AccountAdministrators::holds). */
+    private static function holds(string $permission): Closure
+    {
+        $tables = config('permission.table_names');
+        $modelKey = config('permission.column_names.model_morph_key');
+        $morphClass = (new User)->getMorphClass();
+        $guard = (string) config('auth.defaults.guard');
+
+        return fn (Builder $query) => $query
+            ->whereExists(fn (Builder $direct) => $direct->selectRaw('1')
+                ->from($tables['model_has_permissions'].' as mhp')
+                ->join($tables['permissions'].' as p', 'p.id', '=', 'mhp.permission_id')
+                ->whereColumn("mhp.{$modelKey}", 'users.id')
+                ->where('mhp.model_type', $morphClass)
+                ->where('p.name', $permission)
+                ->where('p.guard_name', $guard))
+            ->orWhereExists(fn (Builder $viaRole) => $viaRole->selectRaw('1')
+                ->from($tables['model_has_roles'].' as mhr')
+                ->join($tables['role_has_permissions'].' as rhp', 'rhp.role_id', '=', 'mhr.role_id')
+                ->join($tables['permissions'].' as p', 'p.id', '=', 'rhp.permission_id')
+                ->whereColumn("mhr.{$modelKey}", 'users.id')
+                ->where('mhr.model_type', $morphClass)
+                ->where('p.name', $permission)
+                ->where('p.guard_name', $guard));
     }
 }

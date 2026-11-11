@@ -28,16 +28,25 @@ use Spatie\Permission\PermissionRegistrar;
  */
 final class AccessGrants
 {
-    public function __construct(private readonly AccountAdministrators $administrators) {}
+    public function __construct(
+        private readonly AccountAdministrators $administrators,
+        private readonly OrganizationInvitations $invitations,
+    ) {}
 
     /**
      * @param  list<string>  $roles  role names
+     * @param  User|null  $actor  who made the change, recorded on the invitations it revokes (R1-3A)
      *
      * @throws LastAccountAdministratorException
      */
-    public function syncUserRoles(User $user, array $roles): void
+    public function syncUserRoles(User $user, array $roles, ?User $actor = null): void
     {
-        $this->administrators->guard(fn () => $user->syncRoles($roles));
+        $this->administrators->guard(fn () => $this->invitations->reconcileIssuers(
+            [(int) $user->getKey()],
+            fn () => $user->syncRoles($roles),
+            OrganizationInvitations::SOURCE_USER_ROLES,
+            $actor,
+        ));
     }
 
     /**
@@ -46,11 +55,21 @@ final class AccessGrants
      * @throws BuiltInRoleException
      * @throws LastAccountAdministratorException
      */
-    public function syncRolePermissions(Role $role, array $permissions): void
+    public function syncRolePermissions(Role $role, array $permissions, ?User $actor = null): void
     {
         $this->assertCustom($role);
 
-        $this->administrators->guard(fn () => $role->syncPermissions($permissions));
+        // A role edit changes every holder of the role and the holders are not enumerated, so every issuer of an open invitation is a
+        // candidate (R1-3A): the before/after comparison of their authority decides who loses (or regains) it. The invitations are locked
+        // BEFORE the role is touched, and this mutation reads the permission mapping, so the cache epoch is replaced before those locks
+        // (reconcileIssuers() documents the sequence).
+        $this->administrators->guard(fn () => $this->invitations->reconcileIssuers(
+            null,
+            fn () => $role->syncPermissions($permissions),
+            OrganizationInvitations::SOURCE_ROLE_PERMISSIONS,
+            $actor,
+            fenceCache: true,
+        ));
 
         $this->forgetCachedPermissionsAfterCommit();
     }
@@ -107,6 +126,9 @@ final class AccessGrants
      * rolled back (finding M-1). The clear is registered at the start of the guarded transaction too, so a refusal
      * or failure inside it, which rolls back, also clears whatever the work reloaded from its own uncommitted rows.
      *
+     * Like the methods above it also revokes, permanently, the open organization invitations of any issuer whose membership-management
+     * authority the mutation changed (R1-3A, {@see OrganizationInvitations::reconcileIssuers()}); `$source` names the caller in the audit.
+     *
      * @template T
      *
      * @param  Closure(): T  $mutation
@@ -114,12 +136,12 @@ final class AccessGrants
      *
      * @throws LastAccountAdministratorException
      */
-    public function guardedGrantChange(Closure $mutation): mixed
+    public function guardedGrantChange(Closure $mutation, string $source, ?User $actor = null): mixed
     {
-        $result = $this->administrators->guard(function () use ($mutation) {
+        $result = $this->administrators->guard(function () use ($mutation, $source, $actor) {
             $this->forgetCachedPermissionsAfterCommit();
 
-            return $mutation();
+            return $this->invitations->reconcileIssuers(null, $mutation, $source, $actor, fenceCache: true);
         });
 
         // Again, now that guard() has returned: when it was nested, an outer rollback does not run callbacks that a
