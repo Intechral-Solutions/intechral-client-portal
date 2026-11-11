@@ -1,8 +1,8 @@
 # Release 1.0: R1-2 Ticket organization attribution (D0 design record)
 
-**Status:** design only (R1-2-D0, 2026-11-10), written against `origin/main` at `e88b1a8`. **Owner rulings of 2026-11-10 are incorporated (section E, "Ruling" lines):
-E1, E2, E3, E6 approved, E4 default accepted, E5 accepted with the explicit risk record in section I.** Nothing is implemented, migrated or deployed; Release 0.9
-staging is untouched. **R1-0 has since landed (PR #60, `79340a9`, 2026-11-10) and R1-2A is in implementation on `feature/r1-2-ticket-attribution`** (see "Implementation notes (R1-2A)" at the end). Sections A to H are the approved design as written against `e88b1a8`; where R1-0 or the build changed a fact, the implementation notes say so and this record is not rewritten.
+**Status:** **implemented in one PR, packages A, B and C (2026-11-10), awaiting merge**; this record began as the D0 design (R1-2-D0, 2026-11-10), written against `origin/main` at `e88b1a8`. **Owner rulings of 2026-11-10 are incorporated (section E, "Ruling" lines):
+E1, E2, E3, E6 approved, E4 default accepted, E5 accepted with the explicit risk record in section I.** Nothing was implemented, migrated or deployed when it was written; Release 0.9
+staging was untouched, and still is. **R1-0 has since landed (PR #60, `79340a9`, 2026-11-10) and R1-2 was built on `feature/r1-2-ticket-attribution`** (see the implementation notes, sections J to L, at the end). Sections A to H are the approved design as written against `e88b1a8`; where R1-0 or the build changed a fact, the implementation notes say so and this record is not rewritten.
 
 R1-2 gives a Ticket (the Service Request) a durable **customer organization** and a durable **submitter**, and makes the server, not the browser,
 the authority for both. It grants no new access to anyone. It is the foundation MO-4A asked for; it is not a competing implementation (section D).
@@ -328,3 +328,39 @@ R1-2B makes the attribution of section B usable. It changes **no authorization**
 - **Browser evidence** was produced on an isolated stack (a throwaway MariaDB database, `migrate:fresh --seed`, the application served from the worktree by PHP's built-in server), never the shared development database or staging. Legacy mode: **63 passed** across the customer Helpdesk (including journeys 9-11), customer shell, operator due-date, operator composer, Helpdesk default, Home and E2E-cleanup specs (the one marked failed is that spec's deliberate fail-then-clean-up case). Pilot mode: the pilot spec, **1 passed**, against a server verified to be in pilot mode (its own probe refuses a legacy one), after which the suite cleanup removed the requests it had raised (the multi-organization persona included). Hosted CI has not run. The full Pest suite on an isolated MariaDB 11.4 container: **4912 passed, 20 skipped, 0 failed** (4421 s); Pint and the frontend gate (typecheck, lint with no suppression growth, prettier, vitest, build) are clean. Two earlier runs failed for reasons in the new specs themselves (an unmeasured assertion and a forged choice that did not notify React) and were corrected before these results.
 
 **Review.** An independent read-only review of this delta found no production-code issue and four test weaknesses, all fixed: a forged-choice step that did not notify React, an operator-row assertion satisfied by the filter's option list, an unposted foreign organization in the page-versus-server test, and a requester probe that proved nothing beyond the existing scope. Carry-forward for R1-4: partner support personnel must stay off every `tickets.assign` route, or the queue filter becomes a cross-tenant name list.
+
+## L. Closure (R1-2C, 2026-11-10)
+
+R1-2C reconciles the documentation with what A and B built, applies the five non-blocking test-strength items of the independent differential review of R1-2B (verdict SAFE TO COMMIT, no production-code finding), and validates the whole branch. It changes no production code and no behaviour.
+
+**Documentation.** Current Release 1.0 behaviour is stated in the documents that describe the system *now*, and each older document keeps its historical text with a dated amendment that says what is superseded:
+
+| Document | Treatment |
+|---|---|
+| [ADR-005](../architecture/adr/ADR-005-organization-multitenancy.md) | **Amendment 2**: Ticket scoping is policy-based with a direct attribution column and no `OrganizationScope`; attribution is not access; consequences (creation-time membership under locks, E5, no backfill). The 2024 decision and the 2026-06-30 amendment are kept. |
+| [`database-schema.md`](../architecture/database-schema.md) | Current: the `tickets` row, the data-scoping note and the RESTRICT list now name `organization_id` and `submitted_by_id`; `company_id` is gone. |
+| [`rbac-design.md`](../architecture/rbac-design.md) | Current: the scoping paragraph is corrected and a new section states creation authorization, provenance, unchanged viewing, presentation and the **R1-4 obligation**. |
+| [EPIC-010B](../epics/EPIC-010B-tenant-scoping.md) | Matrix cell marked superseded and a dated amendment (the 10B boundary did not change). |
+| [EPIC-010D](../epics/EPIC-010D-helpdesk-security-hardening.md) | Dated amendment under **D3** (answered); **D1 is not reopened**; header pointer. |
+| [EPIC-017](../epics/EPIC-017-helpdesk-mvp-customer-shell.md) | **Amendment 3**, a top-of-document update, and inline "superseded" notes on the "wait for Directory" rows and on "this epic needs no migration". |
+| [Roadmap](./product-roadmap.md) | Forward note (R1-2 implemented, fulfils MO-4A, attribution is not visibility, the R1-4 obligation) and a pointer on the "company-level visibility" line. |
+| [`information-architecture.md`](./information-architecture.md) | Current: the Ticket entity and the Ticket ↔ Organization relation. |
+| [MO-1A](./release-1.0-managed-organizations-mo-1a.md), [Release 0.9 scope](./release-0.9-scope-and-architecture.md), [README](./README.md) | One-line supersession notes and the index row. |
+
+**Review items O-1 to O-5 (all test-only).**
+- **O-1** The suspended-account scenario now asserts the real answer (HTTP 403, nothing created, nothing mailed) instead of "not a 500".
+- **O-2** A test fails if `matrixScenarioNames()` (the dataset, declared before the application boots) and `matrixScenarios()` (the fixtures) ever stop naming the same set, or a name repeats.
+- **O-3** Journey 11 no longer posts a hard-coded `1`: it posts a **real** organization's id (read from the operator queue filter, like journey 10) and an id that does not exist, and requires the same refusal for both. A small `organizationId()` helper serves both journeys.
+- **O-4** Journey 10 also asserts the control's own `validity.valueMissing` after the blocked submit, so it is the browser's constraint and not only a `required` attribute on the markup.
+- **O-5** `CleanupE2eTicketsTest` covers the multi-organization persona (its `E2E-` requests in either organization are removed; a request without the prefix and its memberships are not) and that the no-organization persona is not an owner.
+- None needed restructuring, so none is deferred.
+
+**Accepted limitations and obligations carried forward.**
+- **R1-4:** partner-support users must **not** inherit operator-wide `tickets.assign` to view or manage supported customer Tickets. That ability opens the whole queue, the organization filter (a list of every organization with a Ticket), CSV and bulk actions (no per-ticket `authorize`). It needs its own customer-specific grant and design review; it must not be met by widening `TicketPolicy::view` or by handing out `tickets.assign`.
+- **Attribution is not access.** Nothing here makes any Ticket visible to a new person. Organization-level visibility remains Post-v1 (EPIC-010D D1).
+- **E5:** a former member keeps access to, and sees the organization name on, their own Tickets. A removed requester's Tickets stay attributed to the organization.
+- **No backfill.** A database that holds Tickets must be rebuilt (`migrate:fresh`) before the migration runs; it refuses and lists counts only. The shared development database is not rebuilt by this work.
+- **R1-5** (partner-originated requests with a named contact) will be the first time `submitted_by_id` differs from `user_id`; the column exists, so no data migration will be needed.
+- Not in R1-2: partner support access, on-behalf-of submission, Incident functionality, Ticket subtypes.
+
+**Validation (isolated stack; the shared development database, staging and production were never touched).** `./dev check` binds to the running development containers (which mount the original checkout), so its steps were run individually against this worktree on a throwaway MariaDB 11.4.13: CLI self-tests (391 assertions), `git diff --check`, Pint (559 files), `npm run check` (typecheck, lint with no suppression growth, prettier, 115 vitest files / 1,988 tests, build), and the **full Pest suite: 4915 passed, 20 skipped, 0 failed**. Browser: the whole `tests/Browser` tree in legacy mode, **220 passed**, 1 skipped, and the pilot spec in a server verified to be in pilot mode, **`1 passed`**, with the single-test reporting contract of the hosted pilot job intact (the matrix is inside that one test; a spec that cannot detect pilot mode fails, it does not skip). Two specs failed in that legacy run, neither touched by R1-2: `projects-drawer.spec.ts:428` (a drawer-layout frame check) fails identically on a clean `origin/main` (`79340a9`) in the same container, and a `customer-shell.spec.ts` keyboard test is intermittent (it passed in the earlier runs, and the same account-menu keyboard tests fail under repetition on clean `origin/main` too); `time-migration.spec.ts:350` (a 3 px timer-pill shift) failed in two runs, also fails on clean `origin/main` and passed in the last, so it is font-metric dependent in the container. These are container rendering effects, not regressions; hosted CI is the arbiter. Hosted CI had not run when this was written.

@@ -745,6 +745,28 @@ test('a reply composed before the ticket was closed is refused visibly, keeps th
 test.describe('R1-2B organization attribution (journeys 9–11)', () => {
     const ORGANIZATION_REFUSAL = 'That organization is not available for this request.';
 
+    /** A real organization's id, as an operator can read it from the queue filter (the fixture ticket TK-E2E00-00002 belongs to 'E2E Customer Org'). */
+    async function organizationId(
+        contextFor: (who: 'operator', options?: BrowserContextOptions) => Promise<BrowserContext>,
+        name: string,
+    ): Promise<string> {
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await signedIn(operator, '/operator/tickets');
+            const id = await operator
+                .getByRole('combobox', { name: 'Organization' })
+                .locator('option', { hasText: name })
+                .getAttribute('value');
+            expect(id).toMatch(/^\d+$/);
+
+            return id!;
+        } finally {
+            await context.close();
+        }
+    }
+
     async function operatorShows(
         contextFor: (who: 'operator', options?: BrowserContextOptions) => Promise<BrowserContext>,
         ticket: Created,
@@ -799,21 +821,8 @@ test.describe('R1-2B organization attribution (journeys 9–11)', () => {
     }) => {
         const title = ticketTitle('two organizations');
 
-        // The foreign organization's id, as an operator can read it from the queue filter (the fixture ticket TK-E2E00-00002 belongs to it).
-        const operatorContext = await contextFor('operator', { viewport: DESKTOP });
-        let foreignId: string;
-
-        try {
-            const operator = await operatorContext.newPage();
-            await signedIn(operator, '/operator/tickets');
-            foreignId = (await operator
-                .getByRole('combobox', { name: 'Organization' })
-                .locator('option', { hasText: 'E2E Customer Org' })
-                .getAttribute('value'))!;
-            expect(foreignId).toMatch(/^\d+$/);
-        } finally {
-            await operatorContext.close();
-        }
+        // An organization this customer is NOT in.
+        const foreignId = await organizationId(contextFor, 'E2E Customer Org');
 
         const context = await contextFor('customerMulti', { viewport: DESKTOP });
 
@@ -837,6 +846,8 @@ test.describe('R1-2B organization attribution (journeys 9–11)', () => {
             // Left unchosen, the browser refuses to send it at all.
             await page.getByRole('button', { name: 'Submit request' }).click();
             await expect(page).toHaveURL(/\/tickets\/create$/);
+            // ...because the control itself is invalid (the browser's own constraint, not only a `required` attribute on the markup).
+            expect(await select.evaluate((element) => (element as HTMLSelectElement).validity.valueMissing)).toBe(true);
 
             // Forged: the offered option's value is rewritten to an organization this customer is NOT in, then submitted through the real form.
             await select.selectOption({ label: 'E2E Multi Org A' });
@@ -871,6 +882,8 @@ test.describe('R1-2B organization attribution (journeys 9–11)', () => {
     test('11. a customer in no organization is told why, is offered no form, and cannot raise a request by posting one', async ({
         contextFor,
     }) => {
+        // A REAL organization (it has a ticket, and another persona is a member), not a made-up id: the refusal must hold for one that exists.
+        const realId = await organizationId(contextFor, 'E2E Customer Org');
         const context = await contextFor('customerNoOrg', { viewport: DESKTOP });
 
         try {
@@ -885,7 +898,7 @@ test.describe('R1-2B organization attribution (journeys 9–11)', () => {
             await expect(page.getByText(/E2E (Customer|Other|Operator|Multi)/)).toHaveCount(0);
 
             // The server refuses the same request made by hand, with the same answer whatever organization is named.
-            const statuses = await page.evaluate(async () => {
+            const statuses = await page.evaluate(async (existing) => {
                 const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
                 const send = async (organization: string | null) => {
                     const body = new URLSearchParams({ title: 'E2E-no-org', description: 'x', category: 'General', priority: 'low' });
@@ -899,8 +912,8 @@ test.describe('R1-2B organization attribution (journeys 9–11)', () => {
                     return { status: response.status, body: await response.json() };
                 };
 
-                return [await send(null), await send('1'), await send('999999')];
-            });
+                return [await send(null), await send(existing), await send('999999')];
+            }, realId);
 
             for (const attempt of statuses) {
                 expect(attempt.status).toBe(422);

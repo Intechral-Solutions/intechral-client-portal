@@ -7,6 +7,7 @@
 - the E2E cleanup command is locked ([§25.3](#253-playwright)).
 
 No implementation has started, and no implementation branch exists.
+**Update (2026-11-10, R1-2):** the "wait for Directory" decisions for `tickets.company_id` and organization display ([§3](#3-owner-rulings-and-locked-contracts), [§20](#20-data-model-boundary)) are **superseded for current behaviour**: Release 1.0 attributes every new Ticket to a customer organization and shows the organization name to the requester and to operators. See [Amendment 3](#amendment-3-r1-2-ticket-organization-attribution-2026-11-10). The text below is the historical design and is otherwise unchanged.
 **Update (2026-10-08):** WP1 (the customer shell foundation) is implemented on `feature/epic-017-helpdesk-mvp-customer-shell`, uncommitted and awaiting independent review ([Amendment 1](#amendment-1-wp1-customer-shell-foundation-pr-1)). The status stays **Planned** until PR 1 merges; nothing has been pushed and hosted CI has not run. The sentence above describes the design-gate baseline.
 **Update (2026-10-11):** WP1 and WP2 are implemented and committed **locally** on `feature/epic-017-helpdesk-mvp-customer-shell`, in five commits on top of `main` (`6058dc1` WP1, `67d1f9d` G1, `1ff93f4` G2, `8220deb` G3-A, `56cad95` G3-B). [Amendment 2](#amendment-2-wp2-customer-helpdesk-in-react-pr-2) is the WP2 evidence ledger and closes WP2 locally. **Nothing has been pushed, no PR exists, and hosted CI has not run for any of it.** The status stays **Planned**: WP3 (operator ticket workspace), WP4 (operator queue, bulk and reports) and WP5 (notification hardening and closeout) are not started, and the "uncommitted, awaiting independent review" wording in the 2026-10-08 update above is historical.
 **Class:** Product functionality + UX foundation (Product Roadmap [Release 1 → Helpdesk](../product/product-roadmap.md#helpdesk-release-1) and [Customer product and customer shell](../product/product-roadmap.md#customer-product-and-customer-shell); Release 1 Phase 2)
@@ -140,7 +141,7 @@ Every ruling below was recovered from the current repository text and **still st
 | Roadmap Helpdesk absorption list | The MVP absorbs EPIC-016's Helpdesk deferrals: `confirm()` replaced by dialogs, the page frame and `DataTable` density, "All Statuss" / "All Prioritys", bulk-bar error placement, the customer label "Waiting on you", and the hourglass glyph in the shared `Status` vocabulary. | [§28](#28-existing-technical-debt) |
 | **EPIC-010D D1** | A customer sees **their own** Tickets. Company/organization membership grants **no** visibility. `tickets.view_org` is reserved and unused. | Authorization matrix ([§7.3](#73-authorization-matrix)) |
 | EPIC-010D D2 | Only a user who currently holds `tickets.assign` may be assigned. | Kept unchanged. |
-| EPIC-010D D3 | `company_id` is not inferred or backfilled. Whether new Tickets persist organization context belongs to Helpdesk/Directory design. | Decided: **wait for Directory** ([§20](#20-data-model-boundary)). |
+| EPIC-010D D3 | `company_id` is not inferred or backfilled. Whether new Tickets persist organization context belongs to Helpdesk/Directory design. | Decided: **wait for Directory** ([§20](#20-data-model-boundary)). *Superseded 2026-11-10 (R1-2): new Tickets persist `organization_id`; see [Amendment 3](#amendment-3-r1-2-ticket-organization-attribution-2026-11-10).* |
 | EPIC-010D D4 | Replies are plain text: no Markdown, rich text or sanitizer dependency. | Kept unchanged. |
 | EPIC-010D D5 | Ticket-derived tasks stay dormant. | Kept unchanged. |
 | EPIC-013 §23 | Presentation is not authorization. `shell.presentation` is server-resolved. `AppShell` is the only branch point. Pages are chrome-agnostic. | The shell architecture ([§8](#8-routing-and-layout-boundary)) |
@@ -824,7 +825,7 @@ These requirements are measured per surface. **No product-wide WCAG conformance 
 | Atomic uploads (F-7) | **NEEDS CHANGE, no schema** | Files written during a failed create or reply are deleted. A row is never left without its file. Implemented in `TicketService`. |
 | Ticket "last activity" timestamp | **NOT NEEDED** | The list sorts by created. "Waiting on you" covers the customer's call to action. |
 
-**This epic needs no migration.** If implementation discovers a real blocker, the WP stops and amends this section, with the reason, the migration risk, and whether Directory supersedes it.
+**This epic needs no migration.** *(Superseded 2026-11-10, R1-2: one migration added `tickets.organization_id` and `tickets.submitted_by_id` and dropped `company_id`; see [Amendment 3](#amendment-3-r1-2-ticket-organization-attribution-2026-11-10).)* If implementation discovers a real blocker, the WP stops and amends this section, with the reason, the migration risk, and whether Directory supersedes it.
 
 ### 20.1 Attachment type policy
 
@@ -1929,3 +1930,16 @@ Verified in G3-C. **No WP3–WP5 code is in the tree:** there is no React operat
 ### A2.16 Lifecycle and disposition
 
 **WP2 is complete and closed locally**, with the limitations above, and with hosted CI and the different-UID cleanup still to come (A2.13). The owner accepted the local closure on 2026-10-11. EPIC-017 is **not** complete and stays **Planned**; WP3 and WP4 are deferred from the Release 0.9 critical path, not cancelled, and WP5 keeps its essential early-access notification, security and accessibility work (A2.14). G3-C changes documentation only and is committed locally. Nothing is pushed; no PR exists.
+
+## Amendment 3: R1-2 Ticket organization attribution (2026-11-10)
+
+**Status:** current Release 1.0 behaviour. The sections above are the design as planned and are kept as history; where they disagree with this amendment, this amendment governs.
+
+**What changed.**
+- **§20 "needs no migration" is superseded.** R1-2 added `tickets.organization_id` and `tickets.submitted_by_id` (both NOT NULL, RESTRICT foreign keys) and dropped `tickets.company_id`, in one migration that refuses a populated `tickets` table (no backfill; disposable environments are rebuilt). The row "`tickets.company_id`: SHOULD WAIT FOR DIRECTORY" is answered: the column never held data, organizations are canonical (Directory keeps `organizations.id` as the surviving key), so nothing here must later be transformed.
+- **EPIC-010D D3 is answered; D1 is not reopened.** A customer still sees only their **own** Tickets. Attribution is not access: organization membership grants no visibility and `tickets.view_org` stays reserved and unused.
+- **Create page.** The page receives only the actor's own memberships. One organization is shown as a read-only "Requesting for <name>" line, several as a required select with no default, none as an explanation with no form (the "dead company selector" removal in §20 stands; this is a new, organization selector backed by a server decision). The server re-decides inside the creation transaction under shared locks; an unknown and a foreign organization return the same 422, shown beside the field.
+- **Display.** The requester list and detail carry `organization`, the **name** only (never an id, never another organization's name). This is a deliberate, reviewed addition to the exact-key prop allowlists (`RequesterTicketPropsTest`); every other prop rule there is unchanged. A former member keeps the name on their own tickets (owner decision E5).
+- **Operators.** The queue and ticket show the organization; the queue gains a validated organization filter; the CSV appends `Organization` and `Submitted by` (and relabels the old `Submitter` column `Requester`); the new-ticket alert carries an escaped `Organization` line.
+
+**Accepted limitations and later obligations.** No partner-support access, no on-behalf-of submission and no Incident or Ticket-subtype machinery (R1-4, R1-5 and later). **R1-4:** partner-support users must not inherit operator-wide `tickets.assign` merely to view or manage supported customer Tickets, because that ability opens the whole queue, the organization filter (a cross-tenant list of names), CSV and bulk actions. Design record: [R1-2](../product/release-1.0-r1-2-ticket-attribution.md).

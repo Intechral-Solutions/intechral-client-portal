@@ -208,7 +208,7 @@ Ticket numbers are `TKT-` plus the auto-increment identifier zero-padded to at l
 Neither rewrite is designed or ratified here. These are the constraints Release 0.9 must keep so that both remain possible as forward migrations on authoritative data. The roadmap's "reseed rather than transform" plan no longer applies to the production database.
 
 **Current facts these seams rely on (verified in the repository):**
-- `tickets.company_id` is nullable provenance and is never written by ticket creation.
+- `tickets.company_id` is nullable provenance and is never written by ticket creation. *(Release 0.9 as shipped; superseded for Release 1.0 on 2026-11-10: R1-2 drops the column and attributes every new Ticket to an organization, see [R1-2](./release-1.0-r1-2-ticket-attribution.md).)*
 - `projects.client_id` has no foreign key and is not used.
 - `project_company` is visibility metadata, not access control.
 - Business tables reference users by `users.id`; SSO accounts link by provider id, not by email.

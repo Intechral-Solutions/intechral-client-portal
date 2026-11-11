@@ -167,8 +167,9 @@ it('gives every actor and organization case the outcome the server owes it, in l
             Notification::assertNothingSent();
         })(),
         'blocked' => (function () use ($response) {
-            // The account never reaches the controller; whatever the gate answers, nothing was created.
-            expect($response->status())->not->toBe(500)->and(Ticket::count())->toBe(0);
+            // A suspended account is refused outright (the gate answers 403), never reaches the controller, and creates nothing.
+            $response->assertForbidden();
+            expect(Ticket::count())->toBe(0);
             Notification::assertNothingSent();
         })(),
         'guest' => (function () use ($response) {
@@ -204,6 +205,12 @@ it('shows the actor on the create page exactly the organizations the server woul
     $response = $this->actingAs($none)->get(route('tickets.create'))->assertOk();
     expect(ticketOwnProps($response)['organizations'])->toBe([])->and($response->getContent())->not->toContain('Foreign-SENTINEL');
 })->with(['legacy', 'pilot']);
+
+it('keeps the dataset names and the scenarios the same set, so a scenario can neither be forgotten nor left unrun', function () {
+    // The dataset is declared before the application boots, so it cannot read the scenarios; this is the check that they agree.
+    expect(array_keys(matrixScenarios()))->toEqualCanonicalizing(matrixScenarioNames())
+        ->and(matrixScenarioNames())->toHaveCount(count(array_unique(matrixScenarioNames())));
+});
 
 /** The scenario names, without building any fixture: the dataset is declared before the application boots. */
 function matrixScenarioNames(): array
