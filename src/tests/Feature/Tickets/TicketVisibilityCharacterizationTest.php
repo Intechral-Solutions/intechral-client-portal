@@ -7,6 +7,7 @@ use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -35,8 +36,8 @@ afterEach(function () {
 // ── H4 — list/detail mismatch ───────────────────────────────────────────────
 
 /**
- * Owner and peer in one organization whose CRM company is linked to the owner's ticket. The
- * company link is written directly: no application path sets tickets.company_id (F-1).
+ * Owner and peer in one organization, with the owner's ticket ATTRIBUTED to that organization (R1-2: the ticket names the organization, no
+ * longer a CRM company). The proof stays the same: the peer, though in the same organization and holding `tickets.view_org`, sees nothing.
  */
 function ticketCompanyFixture(): array
 {
@@ -51,7 +52,7 @@ function ticketCompanyFixture(): array
     $organization->members()->attach($peer, ['role' => 'member']);
     $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
 
-    $ticket = ticketFor($owner, ['title' => 'Company linked ticket', 'company_id' => $company->id]);
+    $ticket = ticketFor($owner, ['title' => 'Company linked ticket', 'organization_id' => $organization->id]);
 
     return compact('operator', 'owner', 'peer', 'outsider', 'organization', 'company', 'ticket');
 }
@@ -85,7 +86,7 @@ it('BASELINE H4: the owner lists and opens their ticket; an unrelated customer d
 
 it('TARGET H4: every row on a customer list is a ticket the customer may open (no dead links)', function () {
     $f = ticketCompanyFixture();
-    ticketFor($f['peer'], ['title' => 'Peer own ticket', 'company_id' => $f['company']->id]);
+    ticketFor($f['peer'], ['title' => 'Peer own ticket', 'organization_id' => $f['organization']->id]);
     ticketFor($f['peer'], ['title' => 'Peer unlinked ticket']);
 
     $listed = ticketOwnProps($this->actingAs($f['peer'])->get(route('tickets.index'))->assertOk())['tickets']['data'];
@@ -105,9 +106,9 @@ it('BASELINE H4: /tickets is an operator\'s own-requests list, while the operato
     $this->actingAs($f['operator'])->get(route('operator.tickets.show', $f['ticket']))->assertOk();
 });
 
-// ── F-1 — company_id is validated but never persisted ───────────────────────
+// ── F-1 — R1-2: a ticket is attributed to an ORGANIZATION; company_id is no longer an input ──────────────────
 
-it('BASELINE F-1 (D3: no write-path fix in EPIC-010D): ticket creation never persists company_id, chosen or auto-selected', function () {
+it('F-1 (R1-2, replaces the EPIC-010D baseline): creation attributes the ticket to the member\'s organization and ignores a company_id it is sent', function () {
     $operator = ticketUser('operator');
     $member = ticketUser();
     $organization = Organization::factory()->create(['owner_id' => $operator->id]);
@@ -115,15 +116,15 @@ it('BASELINE F-1 (D3: no write-path fix in EPIC-010D): ticket creation never per
     $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
     $payload = ['description' => 'x', 'category' => 'General', 'priority' => 'low'];
 
-    // Explicitly chosen (passes AccessibleCrmCompany validation)...
-    $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Chosen company', 'company_id' => $company->id])
-        ->assertRedirect();
-    // ...and (EPIC-017 WP2) no longer auto-selected for a single-organization member: the form and the
-    // auto-fill are gone, nothing persisted a company before either.
-    $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Auto company'])
-        ->assertRedirect();
+    // A company id is neither validated nor stored any more (the column is gone); the organization is the member's own.
+    $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Sent a company', 'company_id' => $company->id])->assertRedirect();
+    $this->actingAs($member)->post(route('tickets.store'), [...$payload, 'title' => 'Sent nothing'])->assertRedirect();
 
-    expect(Ticket::whereIn('title', ['Chosen company', 'Auto company'])->pluck('company_id')->all())->toBe([null, null]);
+    $tickets = Ticket::whereIn('title', ['Sent a company', 'Sent nothing'])->get();
+    expect($tickets)->toHaveCount(2)
+        ->and($tickets->pluck('organization_id')->unique()->all())->toBe([$organization->id])
+        ->and($tickets->pluck('submitted_by_id')->unique()->all())->toBe([$member->id])
+        ->and(Schema::hasColumn('tickets', 'company_id'))->toBeFalse();
 });
 
 // ── H9 — literal operator role vs tickets.assign ────────────────────────────

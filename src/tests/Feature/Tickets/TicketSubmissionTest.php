@@ -50,6 +50,7 @@ it('allows a user with tickets.create to view the create form', function () {
 it('creates a ticket with a TK-XXXXX-XXXXX reference', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    ticketJoin($user);
 
     $this->actingAs($user)->post(route('tickets.store'), [
         'title' => 'My first ticket',
@@ -68,6 +69,7 @@ it('creates a ticket with a TK-XXXXX-XXXXX reference', function () {
 it('sets SLA due date based on priority', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    ticketJoin($user);
 
     $this->actingAs($user)->post(route('tickets.store'), [
         'title' => 'Critical issue',
@@ -85,6 +87,7 @@ it('sets SLA due date based on priority', function () {
 it('sends a confirmation email after ticket creation', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    ticketJoin($user);
 
     $this->actingAs($user)->post(route('tickets.store'), [
         'title' => 'Notify me',
@@ -99,6 +102,7 @@ it('sends a confirmation email after ticket creation', function () {
 it('accepts file attachments on ticket submission', function () {
     $user = User::factory()->create();
     $user->assignRole('user');
+    ticketJoin($user);
 
     // EPIC-017 WP2: the attachment rule reads the type from the bytes (§20.1), so the fixture is a
     // real PDF; a zero-filled fake()->create('*.pdf') is, correctly, not one.

@@ -138,6 +138,10 @@ export function TicketsShowPage({
                 <Section title="Details">
                     <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                         <div>
+                            <dt className="text-xs text-text-secondary">Organization</dt>
+                            <dd className="text-text">{ticket.organization}</dd>
+                        </div>
+                        <div>
                             <dt className="text-xs text-text-secondary">Category</dt>
                             <dd className="text-text">{ticket.category}</dd>
                         </div>

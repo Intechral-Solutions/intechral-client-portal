@@ -23,6 +23,7 @@ function row(id: number, overrides: Partial<RequesterTicketRow> = {}): Requester
     return {
         number: ref(id),
         title: `Request ${id}`,
+        organization: 'Acme Ltd',
         status: 'open',
         statusLabel: 'Open',
         priority: 'medium',
@@ -253,4 +254,15 @@ it('renders a hostile title as text', () => {
 
     expect(container.querySelector('img')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: hostile })).toBeInTheDocument();
+});
+
+it('shows the organization each request was raised for, in the row and to a screen reader', () => {
+    render(<TicketsIndexPage {...props({}, [row(2, { organization: 'Globex Corp' }), row(1)])} />);
+
+    const rows = screen
+        .getAllByRole('listitem')
+        .filter((item) => item.textContent?.includes('TK-'));
+
+    expect(rows[0]).toHaveTextContent('Organization: Globex Corp');
+    expect(rows[1]).toHaveTextContent('Organization: Acme Ltd');
 });

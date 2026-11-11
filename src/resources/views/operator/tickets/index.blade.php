@@ -49,10 +49,16 @@
             <option value="{{ $op->id }}" {{ request('assignee') == $op->id ? 'selected' : '' }}>{{ $op->name }}</option>
             @endforeach
         </x-ui.select>
+        <x-ui.select name="organization" aria-label="Organization">
+            <option value="">All organizations</option>
+            @foreach ($organizations as $org)
+            <option value="{{ $org->id }}" {{ $organizationFilter === (int) $org->id ? 'selected' : '' }}>{{ $org->name }}</option>
+            @endforeach
+        </x-ui.select>
         <x-ui.input type="date" name="date_from" :value="request('date_from')" aria-label="Submitted from" />
         <x-ui.input type="date" name="date_to" :value="request('date_to')" aria-label="Submitted to" />
         <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
-        @if (request()->hasAny(['search', 'status', 'priority', 'category', 'assignee', 'date_from', 'date_to']))
+        @if (request()->hasAny(['search', 'status', 'priority', 'category', 'assignee', 'organization', 'date_from', 'date_to']))
         <x-ui.button :href="route('operator.tickets.index')" variant="secondary">Clear</x-ui.button>
         @endif
     </form>
@@ -88,6 +94,7 @@
                     <td class="px-4 py-3">
                         <p class="font-medium text-sm text-text">{{ $ticket->title }}</p>
                         <p class="text-xs mt-0.5 text-text-secondary">{{ $ticket->ticket_number }} &middot; {{ $ticket->category }} &middot; {{ $ticket->user->name }}</p>
+                        <p class="text-xs mt-0.5 text-text-secondary"><span class="sr-only">Organization: </span>{{ $ticket->organization?->name ?? '—' }}</p>
                     </td>
                     <td class="px-4 py-3">@include('tickets._priority_badge', ['priority' => $ticket->priority])</td>
                     <td class="px-4 py-3">@include('tickets._status_badge', ['status' => $ticket->status])</td>

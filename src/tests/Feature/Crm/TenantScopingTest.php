@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\ServiceRequestAccess;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -218,13 +219,15 @@ it('rejects cross-tenant company identifiers during contact ticket and project w
 
     $this->actingAs($member)
         ->post(route('tickets.store'), [
-            'company_id' => $companyB->id,
+            // R1-2: the organization is decided from the member's CURRENT membership; naming another tenant's is refused (the same answer as
+            // for an organization that does not exist). A company id is no longer an input at all.
+            'organization_id' => $orgB->id,
             'title' => 'Cross-tenant ticket',
             'description' => 'Must not attach to another tenant.',
             'category' => 'General',
             'priority' => 'medium',
         ])
-        ->assertSessionHasErrors('company_id');
+        ->assertSessionHasErrors(['organization_id' => ServiceRequestAccess::NOT_AVAILABLE]);
 
     $this->actingAs($member)
         ->put(route('projects.companies.sync', $project), [

@@ -8,7 +8,11 @@ vi.mock('@inertiajs/react', async () => (await import('@/test/inertia')).inertia
 
 afterEach(resetInertiaMock);
 
+const acme = { id: 7, name: 'Acme Ltd' };
+const globex = { id: 12, name: 'Globex Corp' };
+
 const props: TicketsCreateProps = {
+    organizations: [acme],
     categories: ['General', 'Technical', 'Billing', 'Account', 'Other'],
     priorities: [
         { value: 'low', label: 'Low' },
@@ -81,6 +85,7 @@ it('submits multipart to the store route with the fields and the chosen files', 
         url: '/tickets',
         options: { forceFormData: true },
         data: {
+            organization_id: '7',
             title: 'Cannot log in',
             category: 'Account',
             priority: 'high',
@@ -92,6 +97,7 @@ it('submits multipart to the store route with the fields and the chosen files', 
         'attachments',
         'category',
         'description',
+        'organization_id',
         'priority',
         'title',
     ]);
@@ -186,4 +192,105 @@ it('links Cancel back to the list', () => {
     render(<TicketsCreatePage {...props} />);
 
     expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/tickets');
+});
+
+// ── R1-2B: the organization a request is raised for ───────────────────────────────────────────────
+
+it('states the only organization, read-only, and sends it explicitly', async () => {
+    const user = userEvent.setup();
+    render(<TicketsCreatePage {...props} />);
+
+    expect(screen.getByText(/Requesting for/)).toHaveTextContent('Requesting for Acme Ltd');
+    expect(screen.queryByLabelText(/Organization/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Organization/ })).not.toBeInTheDocument();
+
+    fill();
+    await user.click(screen.getByRole('button', { name: 'Submit request' }));
+
+    expect(submitted()[0]!.data).toMatchObject({ organization_id: '7' });
+});
+
+it('makes several organizations an explicit required choice, with no default and only the offered ones', async () => {
+    const user = userEvent.setup();
+    render(<TicketsCreatePage {...props} organizations={[acme, globex]} />);
+
+    const select = screen.getByLabelText(/Organization/);
+
+    expect(select).toBeRequired();
+    expect(select).toHaveValue('');
+    expect(screen.queryByText(/Requesting for/)).not.toBeInTheDocument();
+    expect(
+        screen.getAllByRole('option').filter((option) => option.closest('#create-organization_id')),
+    ).toHaveLength(3);
+    expect(screen.getByRole('option', { name: 'Choose an organization' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Acme Ltd' })).toHaveValue('7');
+    expect(screen.getByRole('option', { name: 'Globex Corp' })).toHaveValue('12');
+
+    // Nothing is sent until one is chosen (the browser refuses a required select left empty).
+    fill();
+    await user.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(submitted()).toHaveLength(0);
+
+    await user.selectOptions(select, 'Globex Corp');
+    await user.click(screen.getByRole('button', { name: 'Submit request' }));
+
+    expect(submitted()).toHaveLength(1);
+    expect(submitted()[0]!.data).toMatchObject({ organization_id: '12' });
+});
+
+it('explains instead of offering a form when the account is linked to no organization', () => {
+    render(<TicketsCreatePage {...props} organizations={[]} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'New request' })).toBeInTheDocument();
+    expect(
+        screen.getByText("Your account isn't linked to an organization yet."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Contact Intechral/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to your requests' })).toHaveAttribute(
+        'href',
+        '/tickets',
+    );
+    expect(screen.queryByLabelText(/Subject/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit request' })).not.toBeInTheDocument();
+    // It names no organization, because there is none the account may see.
+    expect(document.body).not.toHaveTextContent(/Acme|Globex/);
+});
+
+it("shows the server's refusal of the organization beside the field and focuses it", async () => {
+    const user = userEvent.setup();
+    setFormErrors({ organization_id: 'That organization is not available for this request.' });
+    render(<TicketsCreatePage {...props} organizations={[acme, globex]} />);
+
+    const select = screen.getByLabelText(/Organization/);
+
+    expect(select).toHaveAttribute('aria-invalid', 'true');
+    expect(select).toHaveAttribute('aria-describedby', 'create-organization_id-error');
+    expect(
+        screen.getByText('That organization is not available for this request.'),
+    ).toHaveAttribute('id', 'create-organization_id-error');
+
+    await user.selectOptions(select, 'Acme Ltd');
+    fill();
+    await user.click(screen.getByRole('button', { name: 'Submit request' }));
+    submitted()[0]!.options.onError!({
+        organization_id: 'That organization is not available for this request.',
+    });
+
+    expect(select).toHaveFocus();
+});
+
+it('shows a refusal under the read-only line when the single organization is no longer available', async () => {
+    const user = userEvent.setup();
+    setFormErrors({ organization_id: 'That organization is not available for this request.' });
+    render(<TicketsCreatePage {...props} />);
+
+    expect(
+        screen.getByText('That organization is not available for this request.'),
+    ).toHaveAttribute('id', 'create-organization_id-error');
+
+    fill();
+    await user.click(screen.getByRole('button', { name: 'Submit request' }));
+    submitted()[0]!.options.onError!({ organization_id: 'x' });
+
+    expect(document.getElementById('create-organization_id')).toHaveFocus();
 });

@@ -182,7 +182,7 @@ either migration and recompute its pin in `candidates.php`.
 | MO-3 | Partner admins create and manage customer organizations (new atomic service, not `promoteToOrganization`) | Opus review |
 | MO-4A | Tickets carry a visible, explicit organization; guarded company delete | design gate |
 | MO-4B | Partner support staff read and reply on the public thread (separate ability and routes; `TicketPolicy::view` unchanged) | Opus design gate first |
-| Next release | `tickets.company_id` to `RESTRICT` once the guard has shipped | fresh-migration verification and `database:verify` (foreign-key manifest update) |
+| Next release | `tickets.company_id` to `RESTRICT` once the guard has shipped *(superseded 2026-11-10 by R1-2: the column is dropped and `tickets.organization_id` is RESTRICT; see [R1-2](./release-1.0-r1-2-ticket-attribution.md))* | fresh-migration verification and `database:verify` (foreign-key manifest update) |
 
 ## Deferred decisions
 

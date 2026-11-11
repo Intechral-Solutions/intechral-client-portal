@@ -521,10 +521,12 @@ it('exports the original SLA unchanged and appends the effective due date', func
     $rows = collect(ticketParseCsv($csv));
     $header = $rows->shift();
 
-    expect(array_slice($header, -2))->toBe(['SLA Due', 'Effective Due']);
+    // By position, which is the contract: columns 9 and 10. (R1-2B appended Organization and Submitted by after them, so they are no longer the
+    // last two, and every column before them kept its place.)
+    expect(array_slice($header, 9, 2))->toBe(['SLA Due', 'Effective Due']);
     $byNumber = $rows->keyBy(0);
-    expect(array_slice($byNumber[$plain->ticket_number], -2))->toBe(['2026-11-05 10:00:00', '2026-11-05 10:00:00'])
-        ->and(array_slice($byNumber[$moved->ticket_number], -2))->toBe(['2026-11-05 10:00:00', '2026-11-10 14:30:00']);
+    expect(array_slice($byNumber[$plain->ticket_number], 9, 2))->toBe(['2026-11-05 10:00:00', '2026-11-05 10:00:00'])
+        ->and(array_slice($byNumber[$moved->ticket_number], 9, 2))->toBe(['2026-11-05 10:00:00', '2026-11-10 14:30:00']);
 });
 
 // ── Time zone ────────────────────────────────────────────────────────────────────────────────────

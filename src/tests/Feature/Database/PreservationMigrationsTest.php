@@ -231,7 +231,7 @@ describe('M3: project_company.crm_company_id', function () {
 
     it('does not touch the other side of the association or the other company references', function () {
         $migration = preservationMigration(M3);
-        $others = [['project_company', 'project_id'], ['crm_contacts', 'crm_company_id'], ['tickets', 'company_id']];
+        $others = [['project_company', 'project_id'], ['crm_contacts', 'crm_company_id'], ['tickets', 'organization_id']];
         $before = governedKeyRules($others);
 
         try {

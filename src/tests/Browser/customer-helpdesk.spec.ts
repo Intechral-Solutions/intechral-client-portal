@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import type { Page } from '@playwright/test';
+import type { BrowserContext, BrowserContextOptions, Page } from '@playwright/test';
 
 import { expect, signedIn, test } from './support/auth';
 
@@ -733,4 +733,198 @@ test('a reply composed before the ticket was closed is refused visibly, keeps th
     } finally {
         await operatorAgain.close();
     }
+});
+
+/*
+ * R1-2B — the organization a request is raised for, in real Chromium. Three customers, three states of the create page: `customer` belongs
+ * to ONE organization (stated, read-only), `customerMulti` to TWO (an explicit required choice), `customerNoOrg` to none (an explanation, no
+ * form). The operator sees the organization on the Blade queue and ticket. The browser only reflects what the server decided: a forged
+ * choice is refused by the server and shown beside the field. Tickets are disposable `E2E-` ones, owned by the seeded customers and removed
+ * by the suite-level cleanup like every other; the two new personas are DevSeeder fixtures.
+ */
+test.describe('R1-2B organization attribution (journeys 9–11)', () => {
+    const ORGANIZATION_REFUSAL = 'That organization is not available for this request.';
+
+    /** A real organization's id, as an operator can read it from the queue filter (the fixture ticket TK-E2E00-00002 belongs to 'E2E Customer Org'). */
+    async function organizationId(
+        contextFor: (who: 'operator', options?: BrowserContextOptions) => Promise<BrowserContext>,
+        name: string,
+    ): Promise<string> {
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await signedIn(operator, '/operator/tickets');
+            const id = await operator
+                .getByRole('combobox', { name: 'Organization' })
+                .locator('option', { hasText: name })
+                .getAttribute('value');
+            expect(id).toMatch(/^\d+$/);
+
+            return id!;
+        } finally {
+            await context.close();
+        }
+    }
+
+    async function operatorShows(
+        contextFor: (who: 'operator', options?: BrowserContextOptions) => Promise<BrowserContext>,
+        ticket: Created,
+        organization: string,
+    ) {
+        const context = await contextFor('operator', { viewport: DESKTOP });
+
+        try {
+            const operator = await context.newPage();
+            await openOperatorTicket(operator, ticket);
+            await expect(operator.locator('p', { hasText: 'Organization:' }).first()).toContainText(organization);
+
+            // The queue filter offers the organization, and narrows to it.
+            await operator.goto('/operator/tickets');
+            await operator.getByRole('combobox', { name: 'Organization' }).selectOption({ label: organization });
+            await operator.getByRole('button', { name: 'Filter' }).click();
+            await expect(operator.getByText(ticket.number).first()).toBeVisible();
+        } finally {
+            await context.close();
+        }
+    }
+
+    test('9. a customer in one organization is told which, and the request carries it everywhere it is shown', async ({
+        page,
+        contextFor,
+    }) => {
+        const title = ticketTitle('single organization');
+
+        await signedIn(page, '/tickets/create');
+
+        // Stated, not chosen: no selector.
+        await expect(page.getByText('Requesting for E2E Customer Org')).toBeVisible();
+        await expect(page.getByRole('combobox', { name: /Organization/ })).toHaveCount(0);
+
+        await page.getByLabel(/^Subject/).fill(title);
+        await page.getByLabel(/^Description/).fill('One organization, so nothing to choose.');
+        await page.getByRole('button', { name: 'Submit request' }).click();
+        const created = await landedTicket(page, title);
+
+        // The detail page, and the list row (as text a screen reader also gets).
+        await expect(
+            page.locator('dt', { hasText: 'Organization' }).locator('xpath=following-sibling::dd[1]'),
+        ).toHaveText('E2E Customer Org');
+        await page.goto('/tickets');
+        await expect(page.locator(`a[href$="${created.url}"]`).locator('xpath=ancestor::li[1]')).toContainText('Organization: E2E Customer Org');
+
+        await operatorShows(contextFor, created, 'E2E Customer Org');
+    });
+
+    test('10. a customer in two organizations must choose one; a forged choice is refused by the server and shown, a real one is carried', async ({
+        contextFor,
+    }) => {
+        const title = ticketTitle('two organizations');
+
+        // An organization this customer is NOT in.
+        const foreignId = await organizationId(contextFor, 'E2E Customer Org');
+
+        const context = await contextFor('customerMulti', { viewport: DESKTOP });
+
+        try {
+            const page = await context.newPage();
+            await signedIn(page, '/tickets/create');
+
+            const select = page.getByRole('combobox', { name: /Organization/ });
+
+            // An explicit, required choice with no default; only this customer's own two organizations are offered.
+            await expect(select).toBeVisible();
+            await expect(select).toHaveAttribute('required', '');
+            await expect(select).toHaveValue('');
+            await expect(select.locator('option')).toHaveText(['Choose an organization', 'E2E Multi Org A', 'E2E Multi Org B']);
+            await expect(page.getByText('E2E Customer Org')).toHaveCount(0);
+            await expect(page.getByText('Requesting for')).toHaveCount(0);
+
+            await page.getByLabel(/^Subject/).fill(title);
+            await page.getByLabel(/^Description/).fill('Two organizations, so one must be named.');
+
+            // Left unchosen, the browser refuses to send it at all.
+            await page.getByRole('button', { name: 'Submit request' }).click();
+            await expect(page).toHaveURL(/\/tickets\/create$/);
+            // ...because the control itself is invalid (the browser's own constraint, not only a `required` attribute on the markup).
+            expect(await select.evaluate((element) => (element as HTMLSelectElement).validity.valueMissing)).toBe(true);
+
+            // Forged: the offered option's value is rewritten to an organization this customer is NOT in, then submitted through the real form.
+            await select.selectOption({ label: 'E2E Multi Org A' });
+            // The form submits React state, not the DOM: rewrite the option's value AND tell React (a `change` event), so the forged id is what
+            // the form really sends. (Without the event the page would submit the honest id and create a ticket in Multi Org A.)
+            await select.evaluate((element, id) => {
+                (element as HTMLSelectElement).selectedOptions[0]!.value = id;
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+            }, foreignId);
+            await expect(select).toHaveValue(foreignId);
+            await page.getByRole('button', { name: 'Submit request' }).click();
+
+            await expect(page.getByText(ORGANIZATION_REFUSAL)).toBeVisible();
+            await expect(page).toHaveURL(/\/tickets\/create$/);
+            // The refusal names nothing about the organization it refused (no name, no id).
+            await expect(page.getByText(/E2E Customer Org/)).toHaveCount(0);
+
+            // The honest choice goes through, and the request carries it.
+            await select.selectOption({ label: 'E2E Multi Org B' });
+            await page.getByRole('button', { name: 'Submit request' }).click();
+            const created = await landedTicket(page, title);
+            await expect(
+                page.locator('dt', { hasText: 'Organization' }).locator('xpath=following-sibling::dd[1]'),
+            ).toHaveText('E2E Multi Org B');
+
+            await operatorShows(contextFor, created, 'E2E Multi Org B');
+        } finally {
+            await context.close();
+        }
+    });
+
+    test('11. a customer in no organization is told why, is offered no form, and cannot raise a request by posting one', async ({
+        contextFor,
+    }) => {
+        // A REAL organization (it has a ticket, and another persona is a member), not a made-up id: the refusal must hold for one that exists.
+        const realId = await organizationId(contextFor, 'E2E Customer Org');
+        const context = await contextFor('customerNoOrg', { viewport: DESKTOP });
+
+        try {
+            const page = await context.newPage();
+            await signedIn(page, '/tickets/create');
+
+            await expect(page.getByRole('heading', { level: 1, name: 'New request' })).toBeVisible();
+            await expect(page.getByText("Your account isn't linked to an organization yet.")).toBeVisible();
+            await expect(page.getByLabel(/^Subject/)).toHaveCount(0);
+            await expect(page.getByRole('button', { name: 'Submit request' })).toHaveCount(0);
+            // No organization is named to them: there is none their account may see.
+            await expect(page.getByText(/E2E (Customer|Other|Operator|Multi)/)).toHaveCount(0);
+
+            // The server refuses the same request made by hand, with the same answer whatever organization is named.
+            const statuses = await page.evaluate(async (existing) => {
+                const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')!.content;
+                const send = async (organization: string | null) => {
+                    const body = new URLSearchParams({ title: 'E2E-no-org', description: 'x', category: 'General', priority: 'low' });
+                    if (organization !== null) body.set('organization_id', organization);
+                    const response = await fetch('/tickets', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body,
+                    });
+
+                    return { status: response.status, body: await response.json() };
+                };
+
+                return [await send(null), await send(existing), await send('999999')];
+            }, realId);
+
+            for (const attempt of statuses) {
+                expect(attempt.status).toBe(422);
+            }
+            // The unnamed one says "not linked"; every named one (real or not) says the same "not available".
+            expect(statuses[1]!.body.errors.organization_id).toEqual(statuses[2]!.body.errors.organization_id);
+
+            await page.goto('/tickets');
+            await expect(page.getByText("You haven't raised any requests yet.")).toBeVisible();
+        } finally {
+            await context.close();
+        }
+    });
 });

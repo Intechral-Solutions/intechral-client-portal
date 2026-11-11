@@ -35,6 +35,12 @@
                         <p class="text-xs font-medium mb-1 text-text-secondary">
                             {{ $ticket->ticket_number }} &middot; {{ $ticket->user->name }} &middot; {{ $ticket->created_at->format('d M Y H:i') }}
                         </p>
+                        <p class="text-xs mb-1 text-text-secondary">
+                            <span class="font-medium">Organization:</span> {{ $ticket->organization?->name ?? '—' }}
+                            @if ($ticket->submitted_by_id !== $ticket->user_id)
+                            &middot; <span class="font-medium">Submitted by:</span> {{ $ticket->submittedBy?->name ?? '—' }}
+                            @endif
+                        </p>
                         <h1 class="text-xl font-semibold text-text">{{ $ticket->title }}</h1>
                     </div>
                     <div class="flex shrink-0 gap-2">

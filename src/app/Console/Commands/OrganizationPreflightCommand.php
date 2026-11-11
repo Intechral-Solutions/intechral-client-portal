@@ -8,7 +8,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('organizations:preflight {--json : Print the report as JSON}')]
-#[Description('Read-only report on organization, company and membership data ahead of the managed-organization migrations: duplicate company links, organizations without a company, admin and operator-held admin memberships, the administrator-approval inventory, multi-organization users, attributed tickets (Release 1.0, MO-1A, MO-2A1)')]
+#[Description('Read-only report on organization, company and membership data ahead of the managed-organization migrations: duplicate company links, organizations without a company, admin and operator-held admin memberships, the administrator-approval inventory, multi-organization users, ticket attribution (Release 1.0, MO-1A, MO-2A1, R1-2)')]
 class OrganizationPreflightCommand extends Command
 {
     public function handle(OrganizationPreflight $preflight): int
@@ -23,7 +23,13 @@ class OrganizationPreflightCommand extends Command
         }
 
         $this->line("Organizations: {$report['organizations']}   CRM companies: {$report['companies']}   Companies without an organization: {$report['companiesWithoutOrganization']}");
-        $this->line('Tickets with a company attribution: '.$report['attributedTickets']['tickets'].' (across '.$report['attributedTickets']['companies'].' company/companies)');
+        $tickets = $report['ticketAttribution'];
+
+        if ($tickets['attributed']) {
+            $this->line('Tickets: '.$tickets['tickets'].' across '.count($tickets['perOrganization']).' organization(s); requesters no longer a member of their ticket\'s organization: '.$tickets['requesterNoLongerMember']);
+        } else {
+            $this->line('Tickets: '.$tickets['tickets'].' (attribution not migrated yet; '.$tickets['companyLinked'].' carry a legacy company link, none can be attributed)');
+        }
 
         if ($report['relationships'] === null) {
             $this->line('Managed relationships: not migrated yet (the MO-1A columns do not exist).');

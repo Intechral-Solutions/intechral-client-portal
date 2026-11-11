@@ -241,6 +241,37 @@ it('keeps the owners the command trusts equal to the identities DevSeeder seeds'
     }
 });
 
+it('removes the disposable requests of the customer in two organizations, in either organization, and nothing else of theirs', function () {
+    $this->seed(DevSeeder::class);
+    $multi = User::query()->where('email', 'e2e-customer-multi@intechral.test')->firstOrFail();
+    [$a, $b] = $multi->organizations()->orderBy('organizations.name')->get()->all();
+
+    $inA = ticketFor($multi, ['title' => 'E2E-multi in A', 'organization_id' => $a->id, 'submitted_by_id' => $multi->id]);
+    $inB = ticketFor($multi, ['title' => 'E2E-multi in B', 'organization_id' => $b->id, 'submitted_by_id' => $multi->id]);
+    $theirs = ticketFor($multi, ['title' => 'Not a disposable request', 'organization_id' => $a->id, 'submitted_by_id' => $multi->id]);
+
+    e2eCleanup()->assertSuccessful()->expectsOutputToContain('Tickets deleted: 2');
+
+    expect(Ticket::query()->whereKey($inA->id)->exists())->toBeFalse()
+        ->and(Ticket::query()->whereKey($inB->id)->exists())->toBeFalse()
+        // The title guard still decides; the owner allowlist only makes a ticket eligible, never every ticket of theirs.
+        ->and(Ticket::query()->whereKey($theirs->id)->exists())->toBeTrue()
+        // Their organizations and memberships are not the command's to touch.
+        ->and($multi->organizations()->count())->toBe(2);
+});
+
+it('does not trust the customer with no organization: they cannot own a ticket, and they are not an owner', function () {
+    $this->seed(DevSeeder::class);
+
+    expect(CleanupE2eTickets::OWNER_EMAILS)->not->toContain('e2e-customer-no-org@intechral.test');
+    $none = User::query()->where('email', 'e2e-customer-no-org@intechral.test')->firstOrFail();
+    $mine = ticketFor($none, ['title' => 'E2E-no-org']);
+
+    e2eCleanup()->assertSuccessful()->expectsOutputToContain('Nothing to remove');
+
+    expect(Ticket::query()->whereKey($mine->id)->exists())->toBeTrue();
+});
+
 it('never deletes the seeded fixture tickets TK-E2E00-00001 and TK-E2E00-00002, even beside eligible ones', function () {
     $this->seed(DevSeeder::class);
     $owner = User::query()->where('email', 'e2e-customer@intechral.test')->firstOrFail();

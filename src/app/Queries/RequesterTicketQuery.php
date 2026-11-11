@@ -6,6 +6,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The requester's own-ticket list (EPIC-017 §12, §19.1): the `/tickets` universe a customer
@@ -42,7 +43,10 @@ final class RequesterTicketQuery
     /** @param  array{search: string|null, status: string|null}  $filters */
     public static function paginate(User $user, array $filters): LengthAwarePaginator
     {
+        // R1-2B: each row also carries its organization's NAME, read by a subselect in this same query. An eager load would add a query to
+        // every page and break the pinned query budget (RequesterTicketPropsTest); the name is all the list needs.
         return Ticket::forUser($user)
+            ->addSelect(['organization_name' => DB::table('organizations')->select('name')->whereColumn('organizations.id', 'tickets.organization_id')->limit(1)])
             ->when($filters['search'], fn ($query, string $term) => $query->search($term, false))
             ->when($filters['status'], fn ($query, string $status) => $query->where('status', $status))
             ->orderByDesc('created_at')

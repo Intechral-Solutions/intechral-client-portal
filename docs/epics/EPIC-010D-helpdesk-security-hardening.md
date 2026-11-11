@@ -6,6 +6,7 @@
 **Planned:** 2026-09-24 (**Implemented** and **Verified:** 2026-09-24), against `epic-011e-projects-kanban` at `a09c723`
 **Implementation branch:** `hardening/epic-10d-helpdesk-security` (from `804ae6f`)
 **Work packages:** WP0 **Complete** (2026-09-24) · WP1 **Complete** (2026-09-24) · WP2 **Complete** (2026-09-24)
+**Amended (2026-11-10):** D3 (`company_id`) is answered by R1-2; see the [D3 amendment](#amendment-r1-2-2026-11-10-d3-is-answered-d1-is-not-reopened). D1 is unchanged. The text below is kept as history.
 **Superseded in part (2026-10-31):** Ticket numbering (H8, A3.5, P3a, P3b and the id-derived `TKT-{id}` allocator) is superseded by C6-R: random references `TK-XXXXX-XXXXX` ([ADR-008](../architecture/adr/ADR-008-ticket-public-reference.md)). The text below is kept as history.
 **Closeout:** [Closeout (2026-09-24)](#closeout-2026-09-24): lifecycle, what is verified now, first-production-release gate, final security and integrity contract
 **Amendments:** [Amendment 1 (2026-09-24)](#amendment-1-wp0-results-2026-09-24): WP0 results, H1–H9 confirmed, H9 sequencing rule, concurrency evidence, production preflight procedure, plan corrections; [Amendment 2 (2026-09-24)](#amendment-2-wp1-results-2026-09-24): WP1 results, final policy semantics, H1/H2/H3/H4/H9 fixed, defense-in-depth, WP2 notification de-duplication decision; [Amendment 3 (2026-09-24)](#amendment-3-wp2-results-2026-09-24): WP2 results, assignment eligibility, notification gating and de-duplication, bulk validation, CSV policy, id-derived Ticket numbers, concurrency results, lifecycle assessment
@@ -581,6 +582,10 @@ A Ticket may be assigned only to a user who **currently** holds `tickets.assign`
 ### D3 — Historical `company_id`
 
 No inference or backfill of historical Ticket company ownership. Whether new Tickets persist organization context belongs to the Helpdesk/Directory design. (Finding F-1 in §8 shows no application path writes `company_id` today; that stays as is.)
+
+#### Amendment (R1-2, 2026-11-10): D3 is answered; D1 is not reopened
+
+The paragraph above is the historical D3 and is kept. Release 1.0 answered its open question: new Tickets **do** persist organization context, as `tickets.organization_id` (the organization the Ticket is for) and `tickets.submitted_by_id` (the authenticated submitter), and `tickets.company_id`, which nothing ever wrote (F-1), is dropped. There is still **no inference or backfill** of historical Tickets: the migration refuses a populated table, so a database that holds Tickets is rebuilt. **D1 stands:** a customer sees their own Tickets, organization membership grants no visibility, and `tickets.view_org` stays reserved and unused. Attribution is data, not access. See [ADR-005 Amendment 2](../architecture/adr/ADR-005-organization-multitenancy.md#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope) and the [R1-2 record](../product/release-1.0-r1-2-ticket-attribution.md).
 
 ### D4 — Reply format
 

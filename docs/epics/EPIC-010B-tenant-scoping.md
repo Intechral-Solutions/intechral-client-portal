@@ -20,7 +20,7 @@ Correct organization scoping against the implemented membership schema and add M
 | `CrmCompany` | Yes | All organization IDs from `organization_members` | Direct `OrganizationScope`; fixed |
 | `CrmContact` | No | `company.organization_id` | Dedicated indirect scope; fixed |
 | `Organization` | No | Organization primary key through membership pivot | Dedicated membership scope; fixed |
-| `Ticket` | No | Owner or ticket company, plus policy/controller logic | Existing own/org access preserved; company input now tenant-validated |
+| `Ticket` | No (**Yes since R1-2, as attribution only**, see the amendment below) | Owner or ticket company, plus policy/controller logic | Existing own/org access preserved; company input now tenant-validated |
 | `Project` | No | Project membership or linked company¹ | Existing policy/index scoping preserved; company inputs now tenant-validated |
 | `Invoice` | No | Invoice client and policy | Existing own-record policy preserved; no generic scope applied |
 | `TimeEntry` | No | User ownership plus project/ticket context | Existing ownership/service logic preserved; no generic scope applied |
@@ -63,6 +63,10 @@ Results:
 - CRM and tenant scoping: 29 passed, 69 assertions
 - Adjacent tickets, projects, and billing: 101 passed, 217 assertions
 - Full MariaDB suite: **233 passed, 561 assertions** in 43.52 seconds
+
+## Amendment (R1-2, 2026-11-10): Tickets now carry `organization_id`
+
+The matrix above is the historical 10B result and is kept. Two cells are superseded for current Release 1.0 behaviour: `Ticket` now has a direct `organization_id` (plus `submitted_by_id`) and `tickets.company_id` is gone, so Ticket creation no longer validates a company. The boundary did **not** change: no scope was added, visibility is still the requester or an operator holding `tickets.assign`, and the new column is attribution, not access. See [ADR-005 Amendment 2](../architecture/adr/ADR-005-organization-multitenancy.md#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope) and the [R1-2 record](../product/release-1.0-r1-2-ticket-attribution.md).
 
 ## Follow-Up Boundaries
 

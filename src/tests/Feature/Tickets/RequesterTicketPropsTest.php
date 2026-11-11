@@ -24,6 +24,7 @@ use App\Models\TicketAttachment;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Rules\AllowedTicketAttachment;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -39,11 +40,11 @@ afterEach(function () {
     ticketCleanFakeStorage();
 });
 
-const PROPS_ROW_KEYS = ['number', 'title', 'status', 'statusLabel', 'priority', 'createdAt', 'createdAtHuman', 'href'];
+const PROPS_ROW_KEYS = ['number', 'title', 'organization', 'status', 'statusLabel', 'priority', 'createdAt', 'createdAtHuman', 'href'];
 
 /** Every key path the detail page may carry, own props only (`*` is a list index). */
 const PROPS_DETAIL_PATHS = [
-    'ticket', 'ticket.number', 'ticket.title', 'ticket.status', 'ticket.statusLabel', 'ticket.priority',
+    'ticket', 'ticket.number', 'ticket.title', 'ticket.organization', 'ticket.status', 'ticket.statusLabel', 'ticket.priority',
     'ticket.category', 'ticket.createdAt', 'ticket.createdAtHuman', 'ticket.handledBy',
     'conversation', 'conversation.*', 'conversation.*.key', 'conversation.*.kind', 'conversation.*.author',
     'conversation.*.author.name', 'conversation.*.body', 'conversation.*.createdAt', 'conversation.*.createdAtHuman',
@@ -58,7 +59,7 @@ const PROPS_DETAIL_PATHS = [
 /** Strings planted in operator-only fields; none may ever reach a requester. */
 const PROPS_SENTINELS = [
     'INTERNAL-NOTE-SENTINEL', 'internal-attachment-sentinel.pdf', 'Coworker-Time-SENTINEL', 'operator-history-sentinel',
-    'assignee-sentinel@example.test', 'Acme-Company-SENTINEL',
+    'assignee-sentinel@example.test',
 ];
 
 /**
@@ -74,13 +75,11 @@ function propsFixture(?User $owner = null): array
     $assignee = ticketAgent(['name' => 'Handler Hana', 'email' => 'assignee-sentinel@example.test']);
     $operator = ticketAgent(['name' => 'operator-history-sentinel']);
     $coworker = ticketUser('operator', ['name' => 'Coworker-Time-SENTINEL']);
-    $company = CrmCompany::factory()->create([
-        'name' => 'Acme-Company-SENTINEL',
-        'created_by' => $operator->id,
-        'organization_id' => Organization::factory()->create(['owner_id' => $operator->id])->id,
-    ]);
+    // R1-2B (owner decision E4): the ticket's organization NAME is sent to its requester, so it is no longer a sentinel; its id still never is
+    // (see 'sends the organization name, never an id' below).
+    $organization = Organization::factory()->create(['name' => 'Acme Ltd', 'owner_id' => $operator->id]);
     $ticket = ticketFor($owner, [
-        'status' => 'pending_user', 'assignee_id' => $assignee->id, 'company_id' => $company->id,
+        'status' => 'pending_user', 'assignee_id' => $assignee->id, 'organization_id' => $organization->id,
         'title' => 'Printer offline', 'description' => 'It prints nothing.', 'priority' => 'high',
     ]);
 
@@ -335,30 +334,65 @@ it('still refuses a direct reply POST to a closed ticket with 422 on body (the p
 
 // ── Create ─────────────────────────────────────────────────────────────────
 
-it('sends the create page its exact props, with no company selector data even for a multi-company member', function () {
+it('sends the create page its exact props: the actor\'s own organizations by id and name, and no company data', function () {
     $operator = ticketUser('operator');
     $member = ticketUser();
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['name' => 'Zed Holdings', 'owner_id' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
     // MO-1A: one company per organization (unique key), so a multi-company member belongs to two organizations.
-    $second = Organization::factory()->create(['owner_id' => $operator->id]);
+    $second = Organization::factory()->create(['name' => 'Acme Ltd', 'owner_id' => $operator->id]);
     $second->members()->attach($member, ['role' => 'member']);
-    CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
-    CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $second->id]);
+    CrmCompany::factory()->create(['name' => 'Zed Co', 'created_by' => $operator->id, 'organization_id' => $organization->id]);
+    CrmCompany::factory()->create(['name' => 'Acme Co', 'created_by' => $operator->id, 'organization_id' => $second->id]);
 
     $response = $this->actingAs($member)->get(route('tickets.create'))->assertOk();
     $own = ticketOwnProps($response);
 
-    expect(array_keys($own))->toEqualCanonicalizing(['categories', 'priorities', 'defaultPriority', 'attachmentPolicy'])
+    expect(array_keys($own))->toEqualCanonicalizing(['organizations', 'categories', 'priorities', 'defaultPriority', 'attachmentPolicy'])
+        // Ordered by name, id and name only.
+        ->and($own['organizations'])->toBe([['id' => $second->id, 'name' => 'Acme Ltd'], ['id' => $organization->id, 'name' => 'Zed Holdings']])
         ->and($own['categories'])->toBe(['General', 'Technical', 'Billing', 'Account', 'Other'])
         ->and(array_column($own['priorities'], 'value'))->toBe(['low', 'medium', 'high', 'critical'])
         ->and($own['defaultPriority'])->toBe('medium')
         ->and($own['attachmentPolicy'])->toBe(['maxFiles' => 10, 'maxSizeMb' => 20, 'extensions' => array_keys(AllowedTicketAttachment::ALLOWED)])
-        ->and(json_encode($own))->not->toContain('compan');
+        ->and(json_encode(Arr::except($own, 'organizations')))->not->toContain('compan')
+        ->and(json_encode($own))->not->toContain('Zed Co')->not->toContain('Acme Co');
 });
 
-it('confirms a new request with the approved flash, and never links a company', function () {
+it('sends the organization name on the list and the detail, never an id of it, and never the name of another organization the requester belongs to', function () {
+    $f = propsFixture();
+    // The requester is a member of ANOTHER organization too, and another requester's ticket sits in a third: neither name may appear.
+    ticketJoin($f['owner'], Organization::factory()->create(['name' => 'Other-Membership-SENTINEL']));
+    ticketFor(ticketUser(), ['organization_id' => Organization::factory()->create(['name' => 'Stranger-Tenant-SENTINEL'])->id, 'title' => 'Someone else']);
+
+    $list = $this->actingAs($f['owner'])->get(route('tickets.index'))->assertOk();
+    $detail = $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
+
+    expect(ticketOwnProps($list)['tickets']['data'][0]['organization'])->toBe('Acme Ltd')
+        ->and(ticketOwnProps($detail)['ticket']['organization'])->toBe('Acme Ltd');
+
+    foreach ([$list, $detail] as $response) {
+        $serialized = json_encode(ticketOwnProps($response));
+
+        expect($serialized)->not->toContain('organization_id')->not->toContain('submitted_by')
+            ->not->toContain('Stranger-Tenant-SENTINEL')->not->toContain('Other-Membership-SENTINEL')
+            // A name, not an identifier: no id-shaped key for the organization or the submitter on any row or detail.
+            ->and(ticketKeyPaths(ticketOwnProps($response)))->not->toContain('ticket.organizationId')->not->toContain('tickets.data.*.organizationId');
+    }
+});
+
+it('keeps the organization name on a ticket whose requester has since left the organization (E5): attribution is provenance', function () {
+    $f = propsFixture();
+    DB::table('organization_members')->where('user_id', $f['owner']->id)->delete();
+
+    $detail = $this->actingAs($f['owner'])->get(route('tickets.show', $f['ticket']))->assertOk();
+
+    expect(ticketOwnProps($detail)['ticket']['organization'])->toBe('Acme Ltd');
+});
+
+it('confirms a new request with the approved flash, and attributes it to the member\'s organization', function () {
     $member = ticketUser();
+    $organization = ticketJoin($member);
 
     $response = $this->actingAs($member)->post(route('tickets.store'), [
         'title' => 'Cannot log in', 'description' => 'Details', 'category' => 'Account', 'priority' => 'medium',
@@ -366,7 +400,7 @@ it('confirms a new request with the approved flash, and never links a company', 
 
     $ticket = Ticket::sole();
     $response->assertRedirect(route('tickets.show', $ticket))->assertSessionHas('status', "Request {$ticket->ticket_number} received.");
-    expect($ticket->company_id)->toBeNull();
+    expect($ticket->organization_id)->toBe($organization->id)->and($ticket->submitted_by_id)->toBe($member->id);
 });
 
 // ── Empty states and malformed queries ─────────────────────────────────────
