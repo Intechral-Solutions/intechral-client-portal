@@ -58,6 +58,16 @@ class OrganizationPreflightCommand extends Command
             ));
         }
 
+        if ($report['partnerSupport'] === null) {
+            $this->line('Partner support: not migrated yet (the R1-4 columns do not exist).');
+        } else {
+            $p = $report['partnerSupport'];
+            $this->line(sprintf(
+                'Partner support: %d designation(s); %d half-written, %d on a non-partner, %d operator-held, %d suspended; %d disabled organization(s)',
+                $p['designations'], count($p['incomplete']), count($p['onNonPartner']), count($p['heldByOperator']), count($p['heldBySuspended']), $p['disabledOrganizations']
+            ));
+        }
+
         foreach ($report['failures'] as $failure) {
             $this->components->error($failure);
         }

@@ -33,6 +33,9 @@ export type TicketsShowProps = {
     reply: ReplyState;
     attachmentPolicy: AttachmentPolicy;
     abilities: { create: boolean };
+    /** Partner support (R1-4) only: where "back" goes and where a reply is posted. A requester's page sends neither. */
+    backLink?: { href: string; label: string };
+    replyUrl?: string;
 };
 
 export function TicketsShowPage({
@@ -42,6 +45,8 @@ export function TicketsShowPage({
     reply,
     attachmentPolicy,
     abilities,
+    backLink,
+    replyUrl,
 }: TicketsShowProps) {
     // A sent reply is announced and the new entry takes focus (§17.9). Inertia may call the form's
     // `onSuccess` before or after the page re-renders with the server's updated conversation, so the
@@ -80,11 +85,11 @@ export function TicketsShowPage({
             <Head title={`${ticket.number} — ${ticket.title}`} />
             <PageFrame width="reading" measure="conversation" className="flex flex-col gap-6">
                 <Link
-                    href={index.url()}
+                    href={backLink?.href ?? index.url()}
                     className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-fit')}
                 >
                     <ArrowLeft aria-hidden="true" />
-                    All requests
+                    {backLink?.label ?? 'All requests'}
                 </Link>
 
                 <header className="flex flex-col gap-2 border-b border-rule pb-5">
@@ -127,6 +132,7 @@ export function TicketsShowPage({
                     reply={reply}
                     policy={attachmentPolicy}
                     canCreate={abilities.create}
+                    replyUrl={replyUrl}
                     onSent={() => {
                         sentFrom.current = conversation.length;
                         settle();
@@ -141,6 +147,12 @@ export function TicketsShowPage({
                             <dt className="text-xs text-text-secondary">Organization</dt>
                             <dd className="text-text">{ticket.organization}</dd>
                         </div>
+                        {ticket.requester ? (
+                            <div>
+                                <dt className="text-xs text-text-secondary">Requested by</dt>
+                                <dd className="text-text">{ticket.requester}</dd>
+                            </div>
+                        ) : null}
                         <div>
                             <dt className="text-xs text-text-secondary">Category</dt>
                             <dd className="text-text">{ticket.category}</dd>

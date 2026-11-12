@@ -20,6 +20,7 @@
         "organization_invitations.revoked_by->users.id": "RESTRICT/RESTRICT",
         "organization_members.admin_approved_by->users.id": "RESTRICT/RESTRICT",
         "organization_members.organization_id->organizations.id": "CASCADE/RESTRICT",
+        "organization_members.support_granted_by->users.id": "RESTRICT/RESTRICT",
         "organization_members.user_id->users.id": "CASCADE/RESTRICT",
         "organizations.managed_by_organization_id->organizations.id": "RESTRICT/RESTRICT",
         "organizations.owner_id->users.id": "RESTRICT/RESTRICT",

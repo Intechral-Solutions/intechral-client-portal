@@ -77,7 +77,7 @@ final class CustomerPilotGate
     ];
 
     /**
-     * What pilot mode adds: the Helpdesk and the customer's own projects.
+     * What pilot mode adds: the Helpdesk (and, for a designated partner support user, the `support.*` routes) and the customer's own projects.
      *
      * @var array<string, string|null>
      */
@@ -89,6 +89,13 @@ final class CustomerPilotGate
         'tickets.store' => null,
         'tickets.replies.store' => null,
         'tickets.attachment.download' => null,
+
+        // Release 1.0 (R1-4), partner support: the routes carry no capability of their own because the authority is the operator-issued grant, which
+        // PartnerSupportAccess reads from the tables and the controller enforces (404 for everyone without it). Absent in closed mode.
+        'support.index' => null,
+        'support.show' => null,
+        'support.replies.store' => null,
+        'support.attachment.download' => null,
 
         // The list and the overview, in the customer presentation only.
         'projects.index' => PermissionCatalogue::PROJECTS_VIEW,

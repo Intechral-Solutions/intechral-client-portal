@@ -710,7 +710,9 @@ it('leaves no other writer of organization membership: the legacy CrmService met
 
     // R1-3C: the one NAMED exception besides those two is the browser suite's own cleanup (`e2e:cleanup-invitees`), which only deletes the
     // memberships of accounts it removes, in local and testing only (OrganizationInvitationFlowTest pins "delete only").
-    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/CrmService.php', 'Services/OrganizationMembership.php']);
+    // R1-4: and PartnerSupportGrants, which writes ONLY the two support-designation columns (`support_granted_at`, `support_granted_by`) of an existing row,
+    // never a role, an approval or a membership; PartnerSupportAccessTest and PartnerSupportGrantsTest pin that it changes nothing else.
+    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/CrmService.php', 'Services/OrganizationMembership.php', 'Services/PartnerSupportGrants.php']);
 });
 
 it('takes the organization row lock before touching the membership table', function () {

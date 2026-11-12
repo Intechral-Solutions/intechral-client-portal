@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
+use App\Services\PartnerSupportAccess;
 use App\Shared\Pilot\CustomerPilotGate;
 
 /**
@@ -35,6 +36,41 @@ class TicketPolicy
     public function reply(User $user, Ticket $ticket): bool
     {
         return $this->view($user, $ticket);
+    }
+
+    /**
+     * Release 1.0 (R1-4): the PARTNER SUPPORT viewer class, its own named ability and deliberately not part of `view`. True only for effective
+     * partner support authority over this Ticket's organization, read from the tables on every call ({@see PartnerSupportAccess}). It is asked only
+     * by the `support.*` routes; no existing route, relation or presenter asks it, so a requester's and an operator's visibility are unchanged.
+     */
+    public function viewAsPartnerSupport(User $user, Ticket $ticket): bool
+    {
+        return PartnerSupportAccess::allows($user, $ticket);
+    }
+
+    /**
+     * A partner support user may add a PUBLIC reply to a supported request that is still being worked. It never carries an internal flag, a due date,
+     * a status change or an assignment: it authorizes exactly one thing, and TicketService::addPartnerSupportReply re-checks it under lock.
+     */
+    public function replyAsPartnerSupport(User $user, Ticket $ticket): bool
+    {
+        return $this->viewAsPartnerSupport($user, $ticket) && $ticket->isOpen();
+    }
+
+    /** A support user's attachment: on the opening message or on a PUBLIC reply of a ticket they support, never on an internal note. */
+    public function downloadAttachmentAsPartnerSupport(User $user, Ticket $ticket, TicketAttachment $attachment): bool
+    {
+        if ($attachment->ticket_id !== $ticket->id || ! $this->viewAsPartnerSupport($user, $ticket)) {
+            return false;
+        }
+
+        if ($attachment->reply_id === null) {
+            return true;
+        }
+
+        $reply = $attachment->reply;
+
+        return $reply !== null && $reply->ticket_id === $ticket->id && ! $reply->is_internal;
     }
 
     /**

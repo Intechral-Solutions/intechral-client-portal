@@ -1,12 +1,12 @@
 {{--
     Release 1.0 (MO-1A): the managed-organization relationship of one organization, for operators only (the controller passes
     $relationship only when the actor holds portal.operator AND crm.manage). An administrative link: it grants nobody any access
-    to the customer's tickets, projects, time or invoices. Every action is enforced on the server whatever this panel shows.
+    to the customer's tickets, projects, time or invoices (R1-4 support access is a separate, per-member operator grant). Every action is enforced on the server whatever this panel shows.
 --}}
 <div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
     <div>
         <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Partner relationship</h2>
-        <p class="mt-1 text-xs text-text-muted">Administrative only. It gives a partner no access to a customer's tickets, projects, time or invoices.</p>
+        <p class="mt-1 text-xs text-text-muted">Administrative only. The relationship alone gives a partner no access to a customer's tickets, projects, time or invoices. Partner support access is granted to named members separately, under Members.</p>
     </div>
 
     <x-ui.field-error for="relationship" />

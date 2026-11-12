@@ -4,6 +4,7 @@ namespace App\Shared\Navigation;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Services\PartnerSupportAccess;
 use App\Shared\Pilot\CustomerPilotGate;
 use App\Shared\Shell\ShellPresentation;
 use Illuminate\Http\Request;
@@ -257,6 +258,15 @@ final class NavigationBuilder
             ]);
         }
 
+        // Release 1.0 (R1-4): a designated partner support user is offered the supported-requests list. Presentation only (the routes answer 404 to
+        // anyone without the grant); an operator never holds one, and PartnerSupportAccess says so.
+        if (! $works && PartnerSupportAccess::holdsGrant($user)) {
+            $views[] = $this->item('helpdesk.support', 'Supported requests', route('support.index'), 'inertia', [
+                'support.index',
+                'support.show',
+            ]);
+        }
+
         if ($works) {
             $views[] = $this->item('helpdesk.reports', 'Reports', route('operator.tickets.reports'), 'document', [
                 'operator.tickets.reports',
@@ -271,7 +281,7 @@ final class NavigationBuilder
             key: 'helpdesk',
             label: 'Helpdesk',
             icon: 'life-buoy',
-            patterns: ['tickets.*', 'operator.tickets.*'],
+            patterns: ['tickets.*', 'operator.tickets.*', 'support.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, $views)],
             focused: $this->focusedEntry('Support', 20, 'helpdesk.requests'),
