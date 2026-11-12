@@ -1,9 +1,13 @@
 <?php
 
-use App\Models\Invitation;
+require_once __DIR__.'/InvitationTestHelpers.php';
+
+use App\Models\OrganizationInvitation;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\OrganizationInvitations;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -27,7 +31,7 @@ function oauthContext(string $intent, string $provider = 'google', array $target
         'intent' => $intent,
         'provider' => $provider,
         'initiatingUserId' => null,
-        'invitationToken' => null,
+        'invitationHash' => null,
         'startedAt' => now()->toIso8601String(),
         ...$target,
     ];
@@ -42,6 +46,7 @@ test('guest redirect stores explicit login context and replaces stale context', 
         ->assertSessionHas('oauth_context.intent', 'login')
         ->assertSessionHas('oauth_context.provider', 'google')
         ->assertSessionMissing('oauth_context.invitationToken')
+        ->assertSessionHas('oauth_context', fn (array $context) => $context['invitationHash'] === null)
         ->assertSessionMissing('oauth_context.initiatingUserId');
 });
 
@@ -57,27 +62,28 @@ test('profile redirect stores link context bound to the current user', function 
         ->assertSessionHas('oauth_context.initiatingUserId', $user->id);
 });
 
-test('invitation redirect stores server side invitation context for a guest', function () {
+test('invitation redirect stores server side invitation context for a guest: the HASH, never the token', function () {
     Socialite::fake('google', fakeSocialUser());
-    $invitation = Invitation::factory()->pending()->create();
+    [, $token] = regInvOpen();
 
     $this->get(route('sso.redirect', [
         'provider' => 'google',
-        'invitation' => $invitation->token,
+        'invitation' => $token,
     ]))->assertRedirect('https://socialite.fake/google/authorize')
         ->assertSessionHas('oauth_context.intent', 'invitation')
-        ->assertSessionHas('oauth_context.invitationToken', $invitation->token);
+        ->assertSessionHas('oauth_context.invitationHash', OrganizationInvitations::hashToken($token))
+        ->assertSessionMissing('oauth_context.invitationToken');
 });
 
 test('authenticated users cannot initiate invitation registration', function () {
     Socialite::fake('google', fakeSocialUser());
     $user = User::factory()->create();
-    $invitation = Invitation::factory()->pending()->create();
+    [, $token] = regInvOpen();
 
     $this->actingAs($user)
         ->get(route('sso.redirect', [
             'provider' => 'google',
-            'invitation' => $invitation->token,
+            'invitation' => $token,
         ]))->assertRedirect(route('profile.show'))
         ->assertSessionMissing('oauth_context');
 });
@@ -226,43 +232,51 @@ test('link callback rejects a different authenticated user', function () {
     $this->assertAuthenticatedAs($current);
 });
 
-test('invitation intent creates and authenticates only the invited passwordless user', function () {
+test('invitation intent creates and authenticates only the invited passwordless user, as an ordinary member', function () {
     Socialite::fake('microsoft', fakeSocialUser([
         'id' => 'microsoft-123',
         'email' => ' INVITED@example.com ',
     ]));
-    $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+    [$invitation] = regInvOpen('invited@example.com');
 
     $this->withSession([
         'oauth_context' => oauthContext('invitation', 'microsoft', [
-            'invitationToken' => $invitation->token,
+            'invitationHash' => $invitation->token_hash,
         ]),
     ])->get(route('sso.callback', 'microsoft'))
         ->assertRedirect(route('dashboard'));
 
     $user = User::where('email', 'invited@example.com')->firstOrFail();
+    $member = DB::table('organization_members')->where('user_id', $user->id)->sole();
     $this->assertAuthenticatedAs($user);
     expect($user->password)->toBeNull()
-        ->and($user->invitation_id)->toBe($invitation->id)
+        ->and($user->invitation_id)->toBeNull()
         ->and($user->hasRole('user'))->toBeTrue()
-        ->and($invitation->fresh()->status)->toBe('accepted');
+        ->and($user->getRoleNames()->all())->toBe(['user'])
+        ->and((int) $member->organization_id)->toBe($invitation->organization_id)
+        ->and($member->role)->toBe('member')
+        ->and($member->admin_approved_at)->toBeNull()
+        ->and($user->socialAccounts()->where('provider', 'microsoft')->where('provider_id', 'microsoft-123')->exists())->toBeTrue()
+        ->and(OrganizationInvitation::find($invitation->id)->state())->toBe(OrganizationInvitation::ACCEPTED);
 });
 
-test('invitation email mismatch is retryable and leaves the invitation pending', function () {
+test('invitation email mismatch leaves the invitation open and never rebuilds a link', function () {
     Socialite::fake('google', fakeSocialUser(['email' => 'different@example.com']));
-    $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+    [$invitation, $token] = regInvOpen('invited@example.com');
 
-    $this->withSession([
+    $response = $this->withSession([
         'oauth_context' => oauthContext('invitation', target: [
-            'invitationToken' => $invitation->token,
+            'invitationHash' => $invitation->token_hash,
         ]),
     ])->get(route('sso.callback', 'google'))
-        ->assertRedirect(route('invitation.show', $invitation->token))
-        ->assertSessionHasErrors('email');
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors(['email' => 'The provider account email does not match the invitation email.']);
 
     $this->assertGuest();
-    expect($invitation->fresh()->status)->toBe('pending')
-        ->and(User::where('email', 'invited@example.com')->exists())->toBeFalse();
+    expect($response->headers->get('Location'))->not->toContain($token)->not->toContain($invitation->token_hash)
+        ->and(OrganizationInvitation::find($invitation->id)->state())->toBe(OrganizationInvitation::PENDING)
+        ->and(User::where('email', 'invited@example.com')->exists())->toBeFalse()
+        ->and(DB::table('organization_members')->count())->toBe(0);
 });
 
 test('database prevents linking two identities from the same provider to one user', function () {
@@ -288,18 +302,21 @@ test('invitation intent never falls through to linked account login', function (
         'provider' => 'google',
         'provider_id' => 'provider-123',
     ]);
-    $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+    [$invitation] = regInvOpen('invited@example.com');
 
     $this->withSession([
         'oauth_context' => oauthContext('invitation', target: [
-            'invitationToken' => $invitation->token,
+            'invitationHash' => $invitation->token_hash,
         ]),
     ])->get(route('sso.callback', 'google'))
-        ->assertRedirect(route('invitation.show', $invitation->token));
+        ->assertRedirect(route('login'));
 
+    // The provider identity already belongs to another account: refused, rolled back, nobody signed in. The invitation is untouched (a refused
+    // attempt writes nothing), so the recipient can still use the password form.
     $this->assertGuest();
-    expect($invitation->fresh()->status)->toBe('expired')
-        ->and(User::count())->toBe(1);
+    expect(OrganizationInvitation::find($invitation->id)->state())->toBe(OrganizationInvitation::PENDING)
+        ->and(User::where('email', 'invited@example.com')->exists())->toBeFalse()
+        ->and(DB::table('organization_members')->count())->toBe(0);
 });
 
 test('callback context cannot be replayed', function () {

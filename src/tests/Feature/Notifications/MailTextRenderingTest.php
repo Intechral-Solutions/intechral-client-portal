@@ -1,9 +1,10 @@
 <?php
 
-use App\Models\Invitation;
+use App\Models\Organization;
+use App\Models\OrganizationInvitation;
 use App\Models\TicketStatusHistory;
-use App\Notifications\InvitationNotification;
 use App\Notifications\NewTicketAlertNotification;
+use App\Notifications\OrganizationInvitationNotification;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
 use App\Notifications\TicketStatusNotification;
@@ -13,6 +14,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 
@@ -224,13 +226,18 @@ describe('TicketRepliedNotification', function () {
     });
 });
 
-describe('InvitationNotification', function () {
-    it('shows the inviter name literally in the HTML and the text part', function (string $name, string $payload) {
+describe('OrganizationInvitationNotification', function () {
+    it('shows the inviter name and the organization name literally in the HTML and the text part', function (string $name, string $payload) {
         mtrAssertLiteral(function (string $text) {
+            // Both names are user-authored (an operator typed the organization's, the inviter chose their own). The mail is sent only for a LIVE
+            // invitation of an authorized issuer, so the fixture is one.
             $inviter = ticketUser('operator', ['name' => $text]);
-            $invitation = Invitation::factory()->create(['invited_by' => $inviter->id]);
+            $organization = Organization::factory()->create(['name' => mb_substr($text, 0, 255), 'owner_id' => $inviter->id]);
+            $token = Str::random(64);
+            $invitation = OrganizationInvitation::factory()->withToken($token)->forAddress('new.person@desk.invalid')
+                ->state(['organization_id' => $organization->id, 'invited_by' => $inviter->id])->create();
 
-            return [new InvitationNotification($invitation), fn ($n) => Notification::route('mail', 'new.person@desk.invalid')->notifyNow($n)];
+            return [new OrganizationInvitationNotification($invitation->id, $token), fn ($n) => Notification::route('mail', 'new.person@desk.invalid')->notifyNow($n)];
         }, $payload, [rtrim(route('invitation.show', ['token' => 'x']), 'x')]);
     })->with(mtrPayloadSets());
 });

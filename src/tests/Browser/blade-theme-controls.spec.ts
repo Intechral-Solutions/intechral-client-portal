@@ -628,28 +628,17 @@ test.describe('Finance', () => {
 // ═══ System ═══════════════════════════════════════════════════════════════════════
 
 test.describe('System', () => {
-    test('users: list and the invite modal', async ({ page }) => {
+    test('users: list', async ({ page }) => {
         test.setTimeout(180_000);
 
         for (const { theme, viewport } of MODES) {
             const tokens = await visit(page, '/admin/users', theme, viewport);
 
-            await expectInk(inMain(page).getByRole('button', { name: 'Invite User' }), tokens);
+            // The organization-less "Invite User" modal was retired in R1-3B; invitations are issued from an organization's page (R1-3C).
+            await expect(inMain(page).getByRole('button', { name: 'Invite User' })).toHaveCount(0);
             await expect(inMain(page).getByRole('searchbox', { name: 'Search by name or email…' })).toBeVisible();
             await expectSecondary(inMain(page).getByRole('button', { name: 'Search', exact: true }), tokens);
             await expectControlContract(page, tokens);
-
-            // The hand-built modal's behaviour is unchanged: it opens on click, and its field keeps its id.
-            await inMain(page).getByRole('button', { name: 'Invite User' }).click();
-            await expect(page.locator('#invite-modal')).toBeVisible();
-            await expectInk(inMain(page).getByRole('button', { name: 'Send Invitation' }), tokens);
-            const email = inMain(page).getByLabel('Email address');
-            await expect(email).toHaveAttribute('id', 'invite-email');
-            await email.focus();
-            await page.keyboard.press('Shift+Tab');
-            await page.keyboard.press('Tab');
-            expect(await style(email, 'outline-style')).toBe('solid');
-            expect(await style(email, 'outline-color')).toBe(tokens.focus);
         }
     });
 

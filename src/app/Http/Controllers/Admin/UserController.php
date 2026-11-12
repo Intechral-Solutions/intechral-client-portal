@@ -34,7 +34,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $user->load('roles', 'invitation.invitedBy', 'socialAccounts');
+        $user->load('roles', 'organizationInvitation.organization', 'organizationInvitation.inviter', 'socialAccounts');
         $allRoles = Role::orderBy('name')->get();
         $activity = Activity::causedBy($user)
             ->orWhere('subject_type', User::class)

@@ -206,12 +206,12 @@ it('names the organization member controls and the user-role group', function ()
         ->and(uiNames($show, '//input[@name="roles[]"]'))->each->not->toBe('');
 });
 
-it('names the invite modal email field by its existing label and keeps its id', function () {
+it('keeps the users search field named, and the retired invite modal gone (R1-3B)', function () {
     $html = uiPage($this, 'operator', route('users.index'));
     $xpath = uiDom($html);
 
-    expect(uiOne($xpath, '//input[@id="invite-email"]')->getAttribute('name'))->toBe('email')
-        ->and(uiAccessibleName($xpath, uiOne($xpath, '//input[@id="invite-email"]')))->toBe('Email address')
+    expect($xpath->query('//*[@id="invite-modal"]')->length)->toBe(0)
+        ->and($xpath->query('//input[@id="invite-email"]')->length)->toBe(0)
         ->and(uiNames($html, '//input[@name="search"]'))->toBe(['Search by name or email…']);
 });
 

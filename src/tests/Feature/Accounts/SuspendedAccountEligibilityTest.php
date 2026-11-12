@@ -6,9 +6,10 @@ use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Models\User;
-use App\Notifications\InvitationNotification;
+use App\Notifications\OrganizationInvitationNotification;
 use App\Notifications\TicketRepliedNotification;
 use App\Rules\ProjectTaskAssignee;
+use App\Services\OrganizationInvitations;
 use App\Services\TicketService;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\PermissionRegistrar;
 
 require_once __DIR__.'/../Projects/ProjectTestHelpers.php';
 
@@ -122,11 +124,13 @@ describe('notifications', function () {
 
     it('leaves notifications routed to an address alone (the invitation is not a user notification)', function () {
         Notification::fake();
+        $organization = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $this->operator->givePermissionTo(['portal.operator', 'crm.manage']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $this->actingAs($this->operator)->post(route('invitations.store'), ['email' => 'new.person@example.com'])
-            ->assertSessionHasNoErrors();
+        app(OrganizationInvitations::class)->issue($organization, 'new.person@example.com', $this->operator);
 
-        Notification::assertSentOnDemand(InvitationNotification::class);
+        Notification::assertSentOnDemand(OrganizationInvitationNotification::class);
     });
 });
 

@@ -189,7 +189,6 @@ describe('issue', function () {
         $actor = match ($case) {
             'a customer' => oinvCustomer(),
             'an approved organization administrator' => tap(oinvCustomer(), fn ($admin) => DB::table('organization_members')->insert(['organization_id' => $this->org->id, 'user_id' => $admin->id, 'role' => 'admin', 'admin_approved_at' => now(), 'admin_approved_by' => $this->operator->id, 'created_at' => now(), 'updated_at' => now()])),
-            'a holder of users.invite alone' => tap(User::factory()->create(), fn ($u) => $u->givePermissionTo('users.invite')),
             'a holder of org.invite alone' => tap(User::factory()->create(), fn ($u) => $u->givePermissionTo('org.invite')),
             'a holder of crm.manage without eligibility' => tap(User::factory()->create(), fn ($u) => $u->givePermissionTo('crm.manage')),
             'a holder of portal.operator without crm.manage' => tap(User::factory()->create(), fn ($u) => $u->givePermissionTo('portal.operator')),
@@ -200,7 +199,7 @@ describe('issue', function () {
         expect(fn () => oinv()->issue($this->org, 'x@example.test', $actor))->toThrow(AuthorizationException::class);
         expect(oinvFootprint())->toBe($before)->and($this->sent)->toBe([]);
     })->with([
-        'a customer', 'an approved organization administrator', 'a holder of users.invite alone', 'a holder of org.invite alone',
+        'a customer', 'an approved organization administrator', 'a holder of org.invite alone',
         'a holder of crm.manage without eligibility', 'a holder of portal.operator without crm.manage', 'a suspended operator',
     ]);
 
@@ -1199,7 +1198,6 @@ describe('single-writer fences', function () {
         expect($callers)->toBe([
             'Http/Controllers/Admin/RoleController.php',  // store(): a NEW role has no holders, so it changes nobody's authority
             'Services/AccessGrants.php',                  // the guarded, hooked paths (the methods are pinned below)
-            'Services/InvitationService.php',             // legacy invitation acceptance: a NEW account's built-in role (removed in R1-3B)
             'Services/OperatorBootstrap.php',             // grants a NEW account its role
             'Services/OrganizationInvitations.php',       // a NEW account's built-in `user` role (the method is pinned below)
         ]);

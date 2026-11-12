@@ -63,11 +63,18 @@
                             @endif
                         </dd>
                     </div>
-                    @if ($user->invitation)
+                    @if ($user->organizationInvitation)
+                    {{-- R1-3 provenance: the organization invitation this account accepted. Names are user-authored; Blade escapes them. --}}
                     <div class="flex justify-between gap-4">
-                        <dt class="text-text-secondary">Invited by</dt>
-                        <dd class="text-text">
-                            {{ $user->invitation->invitedBy?->name ?? '—' }}
+                        <dt class="text-text-secondary">Joined by invitation</dt>
+                        <dd class="text-right text-text">
+                            Joined
+                            @can('crm.manage')
+                            <x-ui.link variant="row" :href="route('organizations.show', $user->organizationInvitation->organization_id)">{{ $user->organizationInvitation->organization?->name ?? 'an organization' }}</x-ui.link>
+                            @else
+                            {{ $user->organizationInvitation->organization?->name ?? 'an organization' }}
+                            @endcan
+                            by invitation from {{ $user->organizationInvitation->inviter?->name ?? '—' }}
                         </dd>
                     </div>
                     @endif

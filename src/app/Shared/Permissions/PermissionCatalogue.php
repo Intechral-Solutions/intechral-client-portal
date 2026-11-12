@@ -16,10 +16,8 @@ namespace App\Shared\Permissions;
  */
 final class PermissionCatalogue
 {
-    // ── Users & Invitations ────────────────────────────────
+    // ── Users ──────────────────────────────────────────────
     const USERS_VIEW = 'users.view';
-
-    const USERS_INVITE = 'users.invite';
 
     const USERS_MANAGE = 'users.manage';
 
@@ -137,7 +135,7 @@ final class PermissionCatalogue
     {
         return [
             // Users
-            self::USERS_VIEW, self::USERS_INVITE, self::USERS_MANAGE, self::USERS_ADMIN,
+            self::USERS_VIEW, self::USERS_MANAGE, self::USERS_ADMIN,
             // Roles
             self::ROLES_VIEW, self::ROLES_MANAGE, self::ROLES_ADMIN,
             // Settings

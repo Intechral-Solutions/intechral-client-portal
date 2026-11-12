@@ -7,19 +7,21 @@
  */
 
 use App\Exceptions\LastAccountAdministratorException;
-use App\Models\Invitation;
 use App\Models\SocialAccount;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\AccountLifecycleService;
 use App\Shared\Permissions\PermissionCatalogue;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
 require_once __DIR__.'/PilotTestHelpers.php';
+require_once __DIR__.'/../Auth/InvitationTestHelpers.php';
 require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 
 beforeEach(function () {
@@ -223,7 +225,7 @@ function pilotSocialUser(array $attributes = []): SocialiteUser
 
 function pilotOauthContext(string $intent, array $target = []): array
 {
-    return ['intent' => $intent, 'provider' => 'google', 'initiatingUserId' => null, 'invitationToken' => null, 'startedAt' => now()->toIso8601String(), ...$target];
+    return ['intent' => $intent, 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => null, 'startedAt' => now()->toIso8601String(), ...$target];
 }
 
 it('refuses SSO sign-in for a customer with the unlinked-identity answer, and signs an operator in', function () {
@@ -263,43 +265,46 @@ it('signs a customer in with SSO in legacy mode (the proof that the mode is what
 
 it('refuses SSO invitation acceptance in pilot mode, creating no account and keeping the invitation', function () {
     Socialite::fake('google', pilotSocialUser(['email' => 'invited@example.com']));
-    $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+    [$invitation, $token] = regInvOpen('invited@example.com');
     pilotMode('pilot');
 
-    $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $invitation->token]))
-        ->assertRedirect(route('invitation.show', $invitation->token))
+    $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]))
+        ->assertRedirect(route('invitation.show', $token))
         ->assertSessionHasErrors('provider');
 
-    $this->withSession(['oauth_context' => pilotOauthContext('invitation', ['invitationToken' => $invitation->token])])
+    // A context that somehow names the invitation (it holds a hash, so there is no link to go back to): the login page, nothing created.
+    $this->withSession(['oauth_context' => pilotOauthContext('invitation', ['invitationHash' => $invitation->token_hash])])
         ->get(route('sso.callback', 'google'))
-        ->assertRedirect(route('invitation.show', $invitation->token))
-        ->assertSessionHasErrors('provider');
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors('email');
 
     $this->assertGuest();
     expect(User::where('email', 'invited@example.com')->exists())->toBeFalse()
-        ->and($invitation->fresh()->status)->toBe('pending');
+        ->and(DB::table('organization_invitations')->find($invitation->id)->accepted_at)->toBeNull();
 });
 
 it('offers the invitation page the password form only in pilot mode', function () {
-    $invitation = Invitation::factory()->pending()->create();
+    [, $token] = regInvOpen();
 
     pilotMode('pilot');
-    $this->get(route('invitation.show', $invitation->token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', false));
+    $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', false));
 
     pilotMode('legacy');
-    $this->get(route('invitation.show', $invitation->token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', true));
+    $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', true));
 });
 
-it('still accepts a password invitation in pilot mode', function () {
+it('still accepts a password invitation in pilot mode, as an ordinary member of the invited organization', function () {
     Notification::fake();
-    $invitation = Invitation::factory()->pending()->create(['email' => 'newcustomer@example.com']);
+    [$invitation, $token] = regInvOpen('newcustomer@example.com');
     pilotMode('pilot');
 
-    $this->post(route('invitation.register', $invitation->token), [
+    $this->post(route('invitation.register', $token), [
         'name' => 'New Customer', 'password' => 'Str0ng!Passw0rd-xyz', 'password_confirmation' => 'Str0ng!Passw0rd-xyz',
     ])->assertRedirect(route('dashboard'));
 
-    expect(User::where('email', 'newcustomer@example.com')->firstOrFail()->hasRole('user'))->toBeTrue();
+    $user = User::where('email', 'newcustomer@example.com')->firstOrFail();
+    expect($user->hasRole('user'))->toBeTrue()
+        ->and(DB::table('organization_members')->where('user_id', $user->id)->where('organization_id', $invitation->organization_id)->where('role', 'member')->exists())->toBeTrue();
 });
 
 it('refuses SSO linking for a signed-in customer and offers no provider on the profile', function () {
@@ -383,14 +388,17 @@ it('answers a missing, empty, repeated or unknown SSO invitation token with the 
     expect(session('oauth_context.intent'))->toBe('login');
 })->with(['closed', 'pilot', 'legacy']);
 
-it('leaves an unrelated, expired or accepted invitation unusable through SSO, creating nothing', function () {
+it('leaves an expired, accepted or revoked invitation unusable through SSO, creating nothing', function () {
     Socialite::fake('google', pilotSocialUser(['email' => 'late@example.com']));
     pilotMode('pilot');
-    $accepted = Invitation::factory()->create(['email' => 'late@example.com', 'status' => 'accepted']);
-    $expired = Invitation::factory()->create(['email' => 'late2@example.com', 'status' => 'expired']);
+    [, $expired] = regInvOpen('late@example.com', null, null, ['expires_at' => now()->subMinute()]);
+    [$acceptedRow, $accepted] = regInvOpen('late2@example.com');
+    DB::table('organization_invitations')->where('id', $acceptedRow->id)->update(['accepted_at' => now(), 'accepted_user_id' => User::factory()->create()->id, 'live_email' => null]);
+    [$revokedRow, $revoked] = regInvOpen('late3@example.com');
+    DB::table('organization_invitations')->where('id', $revokedRow->id)->update(['revoked_at' => now(), 'revoked_reason' => 'operator', 'live_email' => null]);
 
-    foreach ([$accepted, $expired] as $invitation) {
-        $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $invitation->token]))
+    foreach ([$expired, $accepted, $revoked, Str::random(64)] as $token) {
+        $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]))
             ->assertRedirect(route('login'))
             ->assertSessionHasErrors('email');
     }

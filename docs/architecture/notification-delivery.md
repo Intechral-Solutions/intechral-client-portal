@@ -6,7 +6,7 @@ worker runs it, how long a send can take, how often it is retried, and what it s
 **Companions:** [Account Lifecycle](./account-lifecycle.md) (the suspension check) · [Authentication Flow](./auth-flow.md)
 (invitations).
 
-Five notifications are queued (`ShouldQueue`): `InvitationNotification`, `TicketCreatedNotification`,
+Five notifications are queued (`ShouldQueue`): `OrganizationInvitationNotification` (R1-3; it replaced the retired `InvitationNotification`), `TicketCreatedNotification`,
 `TicketRepliedNotification` and, since S1 (EPIC-017 O3), `NewTicketAlertNotification` and `TicketStatusNotification`
 ([section 6](#6-the-o3-notifications-s1)). Password reset is **not** queued and remains synchronous: it is sent inside the request, with no
 retries and no send-time check of its own. It does, however, use the same SMTP transport and so **inherits the new
@@ -21,7 +21,7 @@ is therefore decided there, from persisted state read fresh, never from the seri
 
 | Notification | Dropped at send time when | Rule |
 |---|---|---|
-| `InvitationNotification` | the invitation was re-issued, accepted, expired by time, or deleted | the row is re-read and must satisfy `Invitation::isPending()`, the rule the accept link itself uses. `InvitationService::invite()` marks every earlier pending invitation for the address `expired`, so a re-issued link is dead and is not mailed. A deleted row is discarded (`#[DeleteWhenMissingModels]`). |
+| `OrganizationInvitationNotification` | the invitation row is gone; it was superseded (re-issued), revoked, accepted or expired by time; the token no longer matches the row (`hash_equals`); the organization is gone; the address now has an account; the issuer is no longer a membership manager | six facts re-read from the tables (never the permission cache): open, hash equality, organization, no account, issuer authority. It carries scalars only (the invitation id and the token), so there is no model to restore and no `#[DeleteWhenMissingModels]`: a missing row simply returns `false` and the mail is dropped, not failed. Encrypted (`ShouldBeEncrypted`) and `ShouldQueueAfterCommit`. |
 | `TicketRepliedNotification` | the ticket or reply is gone; the reply is not on this ticket; the reply is an internal note; the recipient may no longer **view** the ticket | `Gate::forUser($recipient)->allows('view', $freshTicket)`: the `TicketPolicy` every ticket screen uses (owner, or `tickets.assign` and not a restricted customer, so an assignee who keeps `tickets.assign` but loses `portal.operator` is cut off). The reply's `ticket_id` must equal the ticket being authorised. No access rule of its own. |
 | all three | the recipient was suspended after queueing | unchanged: `SkipSuspendedRecipients` on `NotificationSending` (R0.9-1C). |
 | both ticket notifications | the ticket (or reply) was deleted | unchanged: `#[DeleteWhenMissingModels]` discards the job; no `failed_jobs` row. |
@@ -187,3 +187,11 @@ which the preflight should have prevented). The test suite pins it to empty in `
 address that the staging mail sink captures. Configuration proves the address is well formed; **that mail reaches it is proved only by a real alert**, which
 the first-install acceptance and the production acceptance each record. The alert is a convenient independent record of every ticket reference issued, so the
 destination should be a mailbox that is kept; it is no longer the continuity mechanism C6 once relied on, which [ADR-008](./adr/ADR-008-ticket-public-reference.md) (C6-R) replaced.
+
+**Invitation endpoints: throttle and client address (R1-3B).** The registration page, its POST and the SSO initiation (when it carries an invitation) are throttled
+per client IP (`invitation` 60/min, `invitation-register` 20/min, `invitation-sso` 30/min) and answered with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`
+([Authentication Flow](./auth-flow.md#invitation-credential-protections-r1-3b)). The limiters key on `$request->ip()`, and **no trusted proxy is configured**, so that is the
+immediate peer, exactly as for the existing `login` and `two-factor` limiters. If the shared host's web server forwards every request from one address, a per-IP limiter becomes a
+global one: a legitimate invitee could be throttled by other people's traffic and the limiter gives no per-client protection. The limits are generous for that reason. **Staging
+verification step:** request an invitation page a few times from a known client and confirm (for example from a temporary log of `$request->ip()` or the throttle's cache key) that
+the address the limiter keys on is the client's, not the web server's. Changing proxy trust is a host decision outside the R1-3 package.

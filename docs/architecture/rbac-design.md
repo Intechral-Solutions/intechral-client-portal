@@ -47,7 +47,6 @@ cms.publish
 cms.admin
 
 users.view
-users.invite
 users.manage
 users.admin
 

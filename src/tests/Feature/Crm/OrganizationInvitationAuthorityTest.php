@@ -58,7 +58,7 @@ function oiaAccount(string $case): array
         'a suspended account holding both' => $user->givePermissionTo(['portal.operator', 'crm.manage']) && false,
         'a customer' => $user->assignRole('user') && false,
         'an account with no roles and no permissions' => false,
-        'users.invite and org.invite without the capabilities' => $user->givePermissionTo(['users.invite', 'org.invite']) && false,
+        'org.invite without the capabilities' => $user->givePermissionTo(['org.invite']) && false,
     };
 
     return [$user, $manager];
@@ -79,7 +79,7 @@ const OIA_CASES = [
     'a suspended account holding both',
     'a customer',
     'an account with no roles and no permissions',
-    'users.invite and org.invite without the capabilities',
+    'org.invite without the capabilities',
 ];
 
 it('answers exactly what the manageMembership policy answers, from the tables alone', function (string $case) {

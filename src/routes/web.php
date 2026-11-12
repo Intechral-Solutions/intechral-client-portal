@@ -46,20 +46,26 @@ Route::get('/', function () {
 //               GET/POST /confirm-password, GET/POST /user/profile-information,
 //               GET/POST /user/password, GET/POST /user/two-factor-*
 
-// Invitation-based registration (replaces Fortify registration)
-Route::middleware('guest')->group(function () {
-    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.show');
-    Route::post('/invitation/{token}', [InvitationController::class, 'register'])->name('invitation.register');
+// Invitation-based registration (replaces Fortify registration). Release 1.0 (R1-3B): the token resolves ONLY through the hashed organization
+// invitations; GET reads and never consumes. These three routes carry the token in their URL, so they share the credential protections:
+// `Referrer-Policy: no-referrer` + `Cache-Control: no-store` + not remembered as the session's previous URL (ProtectInvitationCredential) and
+// a per-client-IP limiter (AppServiceProvider::registerInvitationRateLimiters). Names and URL shapes are unchanged: the customer pilot's
+// allow-list pins them.
+// The credential protections come first, ahead of `guest`: a signed-in user who opens an invitation link is redirected by `guest`, and that
+// request must not leave the token-bearing URL in their session either.
+Route::middleware(['invitation.credential', 'guest'])->group(function () {
+    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->middleware('throttle:invitation')->name('invitation.show');
+    Route::post('/invitation/{token}', [InvitationController::class, 'register'])->middleware('throttle:invitation-register')->name('invitation.register');
 });
 
-// SSO (Socialite)
-Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('sso.redirect');
+// SSO (Socialite). `sso.redirect` carries an invitation token when it is started from an invitation link: then, and only then, it gets the same
+// protections and its own limiter (a no-op without an `invitation` query, so ordinary SSO login is untouched). The callback carries only the
+// provider's code and state; the invitation lives in the session as a hash.
+Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+    ->middleware(['invitation.credential:query', 'throttle:invitation-sso'])->name('sso.redirect');
 Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('sso.callback');
 
-// Operator: send invitation
-Route::middleware(['auth', 'can:users.invite'])->group(function () {
-    Route::post('/invitations', [InvitationController::class, 'store'])->name('invitations.store');
-});
+// (The organization-less operator invitation, POST /invitations, was retired in R1-3B. Issuance is by organization, on the organization page.)
 
 // Admin: role management
 Route::middleware(['auth', 'can:roles.view'])->prefix('admin')->name('roles.')->group(function () {

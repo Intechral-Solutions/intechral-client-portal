@@ -236,7 +236,7 @@ it('R1: partitions the catalogue into customer defaults, operational and present
 
 it('R1: records the approved sizes and a reason for every neutral capability', function () {
     expect(ShellPresentationResolver::OPERATIONAL)->toHaveCount(11)
-        ->and(ShellPresentationResolver::PRESENTATION_NEUTRAL)->toHaveCount(20) // 19 + portal.operator (R0.9-CS1)
+        ->and(ShellPresentationResolver::PRESENTATION_NEUTRAL)->toHaveCount(19) // 19 + portal.operator (R0.9-CS1), less users.invite (retired, R1-3B)
         ->and(PermissionCatalogue::userDefaults())->toHaveCount(4) // R1-1: the customer minimum
         ->and(presentationCustomerCapabilities())->toHaveCount(12); // 4 + the 8 explicitly grantable (the 0.9 defaults)
 

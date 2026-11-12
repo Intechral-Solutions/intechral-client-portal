@@ -62,7 +62,6 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'tickets.submitted_by_id -> users' => 'RESTRICT/RESTRICT (tickets_submitted_by_id_foreign)',
         // Nullable pointers: the record stays and the pointer is cleared.
         'cms_pages.updated_by -> users' => 'SET NULL/RESTRICT (cms_pages_updated_by_foreign)',
-        'invitations.invited_by -> users' => 'SET NULL/RESTRICT (invitations_invited_by_foreign)',
         'project_milestones.completed_by -> users' => 'SET NULL/RESTRICT (project_milestones_completed_by_foreign)',
         'tasks.assignee_id -> users' => 'SET NULL/RESTRICT (project_tasks_assignee_id_foreign)',
         'ticket_due_date_changes.user_id -> users' => 'SET NULL/RESTRICT (ticket_due_date_changes_user_id_foreign)',

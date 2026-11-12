@@ -233,7 +233,9 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
         'crm' => ['GET', '/crm/companies'],
         'users admin' => ['GET', '/admin/users'],
         'roles admin' => ['GET', '/admin/roles'],
-        'send invitation' => ['POST', '/invitations', ['email' => 'x@example.com']],
+        // R1-3B retired the organization-less invitation: the route no longer exists, so it is refused like any unknown one. R1-3C adds the
+        // operator-only organization invitation routes (organizations.*, already denylisted) and their rows here.
+        'retired organization-less invitation (route removed)' => ['POST', '/invitations', ['email' => 'x@example.com']],
         // SSO for a signed-in customer (link intent)
         'sso redirect' => ['GET', '/auth/google/redirect'],
         'sso callback' => ['GET', '/auth/google/callback'],

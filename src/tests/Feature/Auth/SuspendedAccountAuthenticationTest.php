@@ -1,7 +1,6 @@
 <?php
 
 use App\Auth\ActiveUserProvider;
-use App\Models\Invitation;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\AccountLifecycleService;
@@ -15,6 +14,8 @@ use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\Fortify;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+
+require_once __DIR__.'/InvitationTestHelpers.php';
 
 /*
  * Release 0.9 (H3, R0.9-1C): every way an existing account can become or stay authenticated refuses a suspended
@@ -309,7 +310,7 @@ describe('SSO', function () {
         $account = SocialAccount::create(['user_id' => $user->id, 'provider' => 'google', 'provider_id' => 'provider-123', 'token' => 'stored']);
         suspendAccount($user);
 
-        $context = ['intent' => 'login', 'provider' => 'google', 'initiatingUserId' => null, 'invitationToken' => null, 'startedAt' => now()->toIso8601String()];
+        $context = ['intent' => 'login', 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => null, 'startedAt' => now()->toIso8601String()];
 
         $this->withSession(['oauth_context' => $context])
             ->get(route('sso.callback', 'google'))
@@ -326,7 +327,7 @@ describe('SSO', function () {
         suspendAccount($user);
         app(AccountLifecycleService::class)->reactivate($user, User::role('operator')->firstOrFail());
 
-        $context = ['intent' => 'login', 'provider' => 'google', 'initiatingUserId' => null, 'invitationToken' => null, 'startedAt' => now()->toIso8601String()];
+        $context = ['intent' => 'login', 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => null, 'startedAt' => now()->toIso8601String()];
 
         $this->withSession(['oauth_context' => $context])
             ->get(route('sso.callback', 'google'))
@@ -341,13 +342,13 @@ describe('invitation acceptance', function () {
         $user = User::factory()->create(['email' => 'invited@example.com']);
         suspendAccount($user);
         $before = DB::table('users')->where('id', $user->id)->first();
-        $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+        [, $token] = regInvOpen('invited@example.com');
 
-        $this->post(route('invitation.register', $invitation->token), [
+        $this->post(route('invitation.register', $token), [
             'name' => 'Someone Else',
             'password' => 'NewStr0ng!Pass99',
             'password_confirmation' => 'NewStr0ng!Pass99',
-        ])->assertRedirect(route('invitation.show', $invitation->token));
+        ])->assertRedirect(route('invitation.show', $token));
 
         $this->assertGuest();
         expect(DB::table('users')->where('id', $user->id)->first())->toEqual($before)
@@ -358,13 +359,13 @@ describe('invitation acceptance', function () {
         Socialite::fake('google', SocialiteUser::fake(['id' => 'new-identity', 'name' => 'Invited', 'email' => 'invited@example.com']));
         $user = User::factory()->create(['email' => 'invited@example.com']);
         suspendAccount($user);
-        $invitation = Invitation::factory()->pending()->create(['email' => 'invited@example.com']);
+        [$invitation] = regInvOpen('invited@example.com');
 
-        $context = ['intent' => 'invitation', 'provider' => 'google', 'initiatingUserId' => null, 'invitationToken' => $invitation->token, 'startedAt' => now()->toIso8601String()];
+        $context = ['intent' => 'invitation', 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => $invitation->token_hash, 'startedAt' => now()->toIso8601String()];
 
         $this->withSession(['oauth_context' => $context])
             ->get(route('sso.callback', 'google'))
-            ->assertRedirect(route('invitation.show', $invitation->token));
+            ->assertRedirect(route('login'));
 
         $this->assertGuest();
         expect($user->fresh()->isSuspended())->toBeTrue()

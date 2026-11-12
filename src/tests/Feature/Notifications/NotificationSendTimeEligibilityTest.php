@@ -12,13 +12,14 @@
  * the worker, not by the job. The mail transport is the array mailer, so "sent" means a MessageSent event.
  */
 
-use App\Models\Invitation;
+use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Notifications\InvitationNotification;
+use App\Notifications\OrganizationInvitationNotification;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
-use App\Services\InvitationService;
+use App\Services\AccountLifecycleService;
+use App\Services\OrganizationInvitations;
 use App\Services\TicketService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -102,7 +103,7 @@ function wp1FailInsideShouldSend(string $table): object
  * were restored, the outage struck inside shouldSend(), the queue saw that very exception and released the job for a
  * retry, and nothing was sent, dropped or failed.
  */
-function wp1RunIntoOutage(object $probe): void
+function wp1RunIntoOutage(object $probe, bool $restoresModels = true): void
 {
     $occurred = [];
     $released = [];
@@ -115,7 +116,8 @@ function wp1RunIntoOutage(object $probe): void
 
     wp1WorkerRunsOnce();
 
-    expect($probe->restored)->toBeGreaterThan(0, 'the serialized models were restored before shouldSend() ran')
+    // A notification that carries only scalars (the organization invitation: ids and a token, never a model) restores nothing.
+    expect($restoresModels ? $probe->restored : 0)->toBeGreaterThan($restoresModels ? 0 : -1, 'the serialized models were restored before shouldSend() ran')
         ->and($probe->struck)->toBe(1, 'the outage struck exactly once, inside shouldSend()')
         ->and($occurred)->toHaveCount(1)
         ->and($occurred[0])->toBe($probe->thrown, 'the queue saw the very exception raised inside shouldSend()')
@@ -129,22 +131,38 @@ function wp1Operator(): User
     return ticketUser('operator');
 }
 
+/** Issue an organization invitation as a real operator; returns [row, issuing operator, organization]. The mail is queued after commit. */
+function wp1Issue(string $email = 'new.person@example.com', ?User $operator = null, ?Organization $organization = null): array
+{
+    $operator ??= wp1Operator();
+    $organization ??= Organization::factory()->create(['owner_id' => $operator->id]);
+
+    return [app(OrganizationInvitations::class)->issue($organization, $email, $operator), $operator, $organization];
+}
+
+/** The token a sent mail carries, taken from its link, so a test can say WHICH invitation was mailed. */
+function wp1MailedToken(object $message): string
+{
+    preg_match('#/invitation/([A-Za-z0-9]{64})#', (string) $message->getHtmlBody(), $matches);
+
+    return $matches[1] ?? '';
+}
+
 describe('invitations', function () {
-    it('sends the live invitation (control)', function () {
-        $invitation = app(InvitationService::class)->invite('new.person@example.com', wp1Operator());
+    it('sends the live invitation (control), with a link the registration page resolves', function () {
+        [$invitation] = wp1Issue();
 
         wp1WorkerRunsOnce();
 
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])
             ->and($this->sent)->toHaveCount(1)
-            ->and($this->sent[0]->getHtmlBody())->toContain($invitation->token);
+            ->and(OrganizationInvitations::hashToken(wp1MailedToken($this->sent[0])))->toBe($invitation->token_hash)
+            ->and(app(OrganizationInvitations::class)->findOpen(wp1MailedToken($this->sent[0]))?->is($invitation))->toBeTrue();
     });
 
     it('does not send an obsolete invitation: only the re-issued link is mailed', function () {
-        $service = app(InvitationService::class);
-        $operator = wp1Operator();
-        $first = $service->invite('new.person@example.com', $operator);
-        $second = $service->invite('new.person@example.com', $operator);
+        [$first, $operator, $organization] = wp1Issue();
+        [$second] = wp1Issue('new.person@example.com', $operator, $organization);
 
         wp1WorkerRunsOnce();
         wp1WorkerRunsOnce();
@@ -152,13 +170,40 @@ describe('invitations', function () {
         // Both jobs are consumed (the obsolete one by dropping its mail, not by failing); exactly one mail leaves.
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])
             ->and($this->sent)->toHaveCount(1)
-            ->and($this->sent[0]->getHtmlBody())->toContain($second->token)->not->toContain($first->token);
+            ->and(OrganizationInvitations::hashToken(wp1MailedToken($this->sent[0])))->toBe($second->token_hash)->not->toBe($first->token_hash);
     });
 
     it('does not send an invitation that was accepted before the worker ran', function () {
-        $service = app(InvitationService::class);
-        $invitation = $service->invite('new.person@example.com', wp1Operator());
-        $service->acceptWithPassword($invitation->token, 'New Person', 'a-Strong-Passw0rd!');
+        [$invitation] = wp1Issue();
+        // The plaintext is known only to the encrypted queued job, so the acceptance is written as acceptance leaves the row.
+        DB::table('organization_invitations')->where('id', $invitation->id)->update(['accepted_at' => now(), 'accepted_user_id' => User::factory()->create(['email' => 'new.person@example.com'])->id, 'live_email' => null]);
+
+        wp1WorkerRunsOnce();
+
+        expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
+    });
+
+    it('does not send an invitation that was revoked before the worker ran', function () {
+        [$invitation, $operator, $organization] = wp1Issue();
+        app(OrganizationInvitations::class)->revoke($organization, $invitation->id, $operator);
+
+        wp1WorkerRunsOnce();
+
+        expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
+    });
+
+    it('does not send an invitation whose issuer was suspended before the worker ran', function () {
+        [, $operator] = wp1Issue();
+        app(AccountLifecycleService::class)->suspend($operator, wp1Operator(), 'test');
+
+        wp1WorkerRunsOnce();
+
+        expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
+    });
+
+    it('does not send an invitation whose address became an account before the worker ran', function () {
+        wp1Issue('new.person@example.com');
+        User::factory()->create(['email' => 'new.person@example.com']);
 
         wp1WorkerRunsOnce();
 
@@ -166,17 +211,17 @@ describe('invitations', function () {
     });
 
     it('does not send an invitation that expired by time before the worker ran', function () {
-        app(InvitationService::class)->invite('new.person@example.com', wp1Operator());
+        wp1Issue();
 
-        $this->travel(49)->hours();
+        $this->travel(OrganizationInvitations::LIFETIME_DAYS * 24 + 1)->hours();
         wp1WorkerRunsOnce();
 
         expect(wp1QueueState())->toBe(['jobs' => 0, 'failed' => 0])->and($this->sent)->toBeEmpty();
     });
 
     it('discards, rather than fails, an invitation that no longer exists', function () {
-        $invitation = app(InvitationService::class)->invite('new.person@example.com', wp1Operator());
-        $invitation->delete();
+        [$invitation] = wp1Issue();
+        DB::table('organization_invitations')->where('id', $invitation->id)->delete();
 
         wp1WorkerRunsOnce();
 
@@ -184,10 +229,10 @@ describe('invitations', function () {
     });
 
     it('does not mistake a transient database failure for ineligibility: the job is retried and then delivered', function () {
-        app(InvitationService::class)->invite('new.person@example.com', wp1Operator());
-        $outage = wp1FailInsideShouldSend('invitations');
+        wp1Issue();
+        $outage = wp1FailInsideShouldSend('organization_invitations');
 
-        wp1RunIntoOutage($outage);
+        wp1RunIntoOutage($outage, restoresModels: false);
         expect($this->sent)->toBeEmpty()
             ->and(DB::table('jobs')->value('available_at') - now()->timestamp)->toBeBetween(58, 60);
 
@@ -347,12 +392,11 @@ describe('retry contract', function () {
         $owner = ticketUser();
         $ticket = ticketFor($owner);
         $reply = ticketReply($ticket, wp1Operator(), false);
-        $invitation = Invitation::factory()->create();
 
         $jobs = [
             new SendQueuedNotifications($owner, new TicketCreatedNotification($ticket), ['mail']),
             new SendQueuedNotifications($owner, new TicketRepliedNotification($ticket, $reply), ['mail']),
-            new SendQueuedNotifications($owner, new InvitationNotification($invitation), ['mail']),
+            new SendQueuedNotifications($owner, new OrganizationInvitationNotification(1, str_repeat('a', 64)), ['mail']),
         ];
 
         foreach ($jobs as $job) {

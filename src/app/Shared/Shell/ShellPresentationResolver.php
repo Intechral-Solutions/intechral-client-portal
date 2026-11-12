@@ -62,7 +62,6 @@ final class ShellPresentationResolver
      * @var array<string, string>
      */
     public const PRESENTATION_NEUTRAL = [
-        PermissionCatalogue::USERS_INVITE => 'Only POST /invitations; its UI sits on the users index, which needs users.view.',
         PermissionCatalogue::USERS_MANAGE => 'Every user-management route also requires users.view.',
         PermissionCatalogue::USERS_ADMIN => 'Defined and never checked anywhere.',
         PermissionCatalogue::ROLES_MANAGE => 'Every role-management route also requires roles.view.',

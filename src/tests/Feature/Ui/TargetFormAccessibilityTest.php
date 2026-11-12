@@ -146,7 +146,8 @@ function uiTargetPages(): array
         },
 
         // ── System ───────────────────────────────────────────────────────────────
-        'users.index' => fn ($t) => [uiGet($t, uiActor('operator'), route('users.index')), 2],
+        // R1-3B removed the invite modal (its email field was the second labelable control), so the search field is the one that remains.
+        'users.index' => fn ($t) => [uiGet($t, uiActor('operator'), route('users.index')), 1],
         'users.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('users.show', uiActor('user'))), 2],
         'roles.index' => fn ($t) => [uiGet($t, uiActor('operator'), route('roles.index')), 0],
         'roles.create' => fn ($t) => [uiGet($t, uiActor('operator'), route('roles.create')), 40],

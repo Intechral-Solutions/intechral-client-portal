@@ -9,16 +9,6 @@
             <h1 class="text-2xl font-semibold text-text">Users</h1>
             <p class="mt-1 text-sm text-text-secondary">Manage platform users and their roles.</p>
         </div>
-        @can('users.invite')
-        <x-ui.button type="button"
-                     onclick="document.getElementById('invite-modal').removeAttribute('hidden')"
-                     class="shrink-0">
-            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-            </svg>
-            Invite User
-        </x-ui.button>
-        @endcan
     </div>
 
     {{-- Flash --}}
@@ -96,29 +86,5 @@
     @endif
 
 </div>
-
-{{-- Invite modal --}}
-@can('users.invite')
-<div id="invite-modal" hidden
-     class="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-    <div class="w-full max-w-md rounded-lg border p-6 shadow-xl bg-surface border-rule">
-        <h2 class="mb-4 text-lg font-semibold text-text">Invite User</h2>
-        <form method="POST" action="{{ route('invitations.store') }}">
-            @csrf
-            <div class="mb-4 space-y-2">
-                <x-ui.label for="invite-email">Email address</x-ui.label>
-                <x-ui.input type="email" name="email" id="invite-email" required autocomplete="off"
-                            placeholder="user@example.com" class="w-full" />
-                <x-ui.field-error for="invite-email" error-key="email" />
-            </div>
-            <div class="flex gap-3">
-                <x-ui.button type="submit">Send Invitation</x-ui.button>
-                <x-ui.button type="button" variant="ghost"
-                             onclick="document.getElementById('invite-modal').setAttribute('hidden', '')">Cancel</x-ui.button>
-            </div>
-        </form>
-    </div>
-</div>
-@endcan
 
 @endsection

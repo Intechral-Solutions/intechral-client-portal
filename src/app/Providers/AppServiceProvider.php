@@ -23,18 +23,21 @@ use App\Support\Runtime\RuntimeStartupGuard;
 use App\Support\TestDatabaseSafety;
 use App\View\Composers\ShellComposer;
 use Illuminate\Cache\CacheManager;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Foundation\Events\DiagnosingHealth;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
@@ -103,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        $this->registerInvitationRateLimiters();
+
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
@@ -122,5 +127,29 @@ class AppServiceProvider extends ServiceProvider
         // numbered/prev/next behaviour are unchanged.
         Paginator::defaultView('pagination.direction-d');
         Paginator::defaultSimpleView('pagination.simple-direction-d');
+    }
+
+    /**
+     * Release 1.0 (R1-3B): throttles for the three requests that carry an invitation token in their URL (docs/product/
+     * release-1.0-r1-3-organization-invitations.md, 5.8 and 5.9). Keyed by client IP ONLY: never by the token (a cache key would put the
+     * credential in the cache store) and never by the address it names.
+     *
+     *  - `invitation`: the registration page (a read). Generous; a mail scanner that follows the link must not lock the recipient out.
+     *  - `invitation-register`: the POST, which also calls the compromised-password service and hashes a password, so it is the cost lever.
+     *  - `invitation-sso`: the SSO initiation, and ONLY when it carries an `invitation` query. Ordinary SSO login is `Limit::none()`, untouched.
+     *
+     * THE CLIENT-IP ASSUMPTION (documented, not changed here). No trusted proxy is configured (`bootstrap/app.php`), so `$request->ip()` is
+     * the immediate peer, exactly as for the `login` and `two-factor` limiters. If the shared host's web server forwards every request from
+     * one address, a per-IP limiter degrades into a GLOBAL one (legitimate invitees throttled by each other's traffic) and gives no per-client
+     * protection. The limits are generous for that reason, and the observation of the address the limiter really keys on is a staging step
+     * (docs/architecture/notification-delivery.md). Changing proxy trust is a host decision outside this package.
+     */
+    private function registerInvitationRateLimiters(): void
+    {
+        RateLimiter::for('invitation', fn (Request $request) => Limit::perMinute(60)->by((string) $request->ip()));
+        RateLimiter::for('invitation-register', fn (Request $request) => Limit::perMinute(20)->by((string) $request->ip()));
+        RateLimiter::for('invitation-sso', fn (Request $request) => $request->query->has('invitation')
+            ? Limit::perMinute(30)->by((string) $request->ip())
+            : Limit::none());
     }
 }
