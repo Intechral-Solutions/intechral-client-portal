@@ -11,7 +11,7 @@ import { AuthLayout } from '@/layouts/auth-layout';
 import { register } from '@/routes/invitation';
 
 type InvitationRegisterProps = {
-    invitation: { email: string; expiresAt: string };
+    invitation: { email: string; organizationName: string; expiresAt: string };
     token: string;
     /** False while single sign-on is deferred (Release 0.9 pilot): the password form is the only way in. */
     providersAvailable?: boolean;
@@ -44,7 +44,15 @@ export default function InvitationRegisterPage({
             <Head title="Accept invitation" />
             <AuthLayout
                 title="Accept invitation"
-                subtitle={`Create an account for ${invitation.email}`}
+                subtitle={
+                    <>
+                        You have been invited to join{' '}
+                        <span className="font-medium text-foreground">
+                            {invitation.organizationName}
+                        </span>
+                        . Create an account for {invitation.email}.
+                    </>
+                }
             >
                 <form onSubmit={submit} className="space-y-5">
                     <div className="space-y-2">

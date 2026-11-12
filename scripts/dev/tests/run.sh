@@ -42,6 +42,9 @@ case "$*" in
     *"e2e:cleanup-tickets"*)
         n=$(cat "$STUB_LOG.cleanups" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.cleanups"
         if [[ $n -eq 0 ]]; then exit "${STUB_SWEEP_RC:-0}"; else exit "${STUB_CLEANUP_RC:-0}"; fi ;;
+    *"e2e:cleanup-invitees"*)
+        n=$(cat "$STUB_LOG.invitees" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.invitees"
+        if [[ $n -eq 0 ]]; then exit "${STUB_INVITEE_SWEEP_RC:-0}"; else exit "${STUB_INVITEE_RC:-0}"; fi ;;
     *"e2e_suite_probe"*) exit "${STUB_SUITE_RUNNING_RC:-1}" ;;
     *"e2e_ticket_dirs"*)
         n=$(cat "$STUB_LOG.dirs" 2>/dev/null || echo 0); echo $((n + 1)) >"$STUB_LOG.dirs"
@@ -77,7 +80,7 @@ dev_run() {
     fi
     shift # --
     : >"$WORK/docker.log"
-    rm -f "$WORK/docker.log.counts" "$WORK/docker.log.cleanups" "$WORK/docker.log.dirs"
+    rm -f "$WORK/docker.log.counts" "$WORK/docker.log.cleanups" "$WORK/docker.log.dirs" "$WORK/docker.log.invitees"
     rm -rf "$WORK/e2e.lock"
     rm -rf "$WORK/backups"
     OUT="$(printf '%s' "$stdin_text" |
@@ -567,9 +570,56 @@ assert_rc 0
 assert_out "WARNING: product-data counts changed"
 assert_out "Ticket count back at its baseline"
 
+begin "test:e2e runs the invitee cleanup after each ticket cleanup, as the web-server user, pinned to the dev target, with no arguments"
+dev_run -- test:e2e tests/Browser/organization-invitations.spec.ts
+assert_rc 0
+INVITEES="$(grep -c 'e2e:cleanup-invitees' <<<"$LOG")"
+[[ $INVITEES -eq 2 ]] && ok || bad "expected the invitee cleanup twice (sweep, post-run), got $INVITEES"
+T1="$(line_of e2e:cleanup-tickets 1)" I1="$(line_of e2e:cleanup-invitees 1)" BASE="$(line_of 'mariadb -N' 1)" PW="$(line_of 'npm run test:e2e')"
+T2="$(line_of e2e:cleanup-tickets 2)" I2="$(line_of e2e:cleanup-invitees 2)" AFTER="$(line_of 'mariadb -N' 2)"
+[[ -n $T1 && -n $I1 && -n $T2 && -n $I2 ]] && ok || bad "a cleanup step is missing from the log: $LOG"
+[[ $T1 -lt $I1 && $I1 -lt $BASE && $BASE -lt $PW && $PW -lt $T2 && $T2 -lt $I2 && $I2 -lt $AFTER ]] && ok \
+    || bad "wrong order (tickets=$T1 invitees=$I1 baseline=$BASE playwright=$PW tickets=$T2 invitees=$I2 after=$AFTER): $LOG"
+assert_out "E2E invitee cleanup (recovery sweep, before the suite)"
+assert_out "E2E invitee cleanup (after the suite)"
+assert_out "invitee cleanup exit: 0"
+INV_LINE="$(grep 'e2e:cleanup-invitees' <<<"$LOG" | head -1)"
+[[ $INV_LINE == *" -u portal "* && $INV_LINE != *" -u 0 "* ]] && ok || bad "the invitee cleanup must run as the web-server user, not root: $INV_LINE"
+[[ $INV_LINE == *"APP_ENV=local"* && $INV_LINE == *"DB_DATABASE=portal"* ]] && ok || bad "the invitee cleanup target is not pinned to the dev contract: $INV_LINE"
+[[ $INV_LINE == *"php artisan e2e:cleanup-invitees --no-interaction" ]] && ok || bad "unexpected arguments on the invitee cleanup command: $INV_LINE"
+
+begin "test:e2e stops before the suite when the invitee recovery sweep fails or refuses a target"
+export STUB_INVITEE_SWEEP_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "the invitee recovery sweep failed or refused a target"
+assert_log_lacks "npm run test:e2e"
+assert_log_lacks "mariadb"
+unset STUB_INVITEE_SWEEP_RC
+
+begin "test:e2e reports an invitee cleanup failure even when Playwright and the ticket cleanup passed"
+export STUB_INVITEE_RC=1
+dev_run -- test:e2e
+assert_rc 1
+assert_out "Playwright exit: 0 | ticket cleanup exit: 0"
+assert_out "invitee cleanup exit: 1"
+assert_out "The invitee cleanup failed or refused a target"
+unset STUB_INVITEE_RC
+
+begin "test:e2e keeps a Playwright failure when the invitee cleanup also fails, and still runs it after a failed suite"
+export STUB_PW_RC=4 STUB_INVITEE_RC=1
+dev_run -- test:e2e
+assert_rc 4
+assert_out "Playwright exit: 4"
+assert_out "invitee cleanup exit: 1"
+INVITEES="$(grep -c 'e2e:cleanup-invitees' <<<"$LOG")"
+[[ $INVITEES -eq 2 ]] && ok || bad "the post-run invitee cleanup must still run after a failed suite, got $INVITEES call(s)"
+unset STUB_PW_RC STUB_INVITEE_RC
+
 begin "test:e2e --list runs no cleanup, no sweep and no lock"
 dev_run -- test:e2e --list
 assert_log_lacks "e2e:cleanup-tickets"
+assert_log_lacks "e2e:cleanup-invitees"
 assert_log_lacks "e2e_suite_probe"
 [[ ! -e $WORK/e2e.lock ]] && ok || bad "--list took the lock"
 
@@ -578,6 +628,7 @@ export STUB_RESOLVE_DEV='env=local\nconnection=mysql\ndatabase=other\nhost=db\np
 dev_run -- test:e2e
 assert_rc 1
 assert_log_lacks "e2e:cleanup-tickets"
+assert_log_lacks "e2e:cleanup-invitees"
 
 begin "the ticket count is part of the shared count query, after the three existing fields"
 # shellcheck disable=SC2016
@@ -589,6 +640,9 @@ begin "no per-test or per-worker path runs the untargeted ticket cleanup"
 # else (a fixture, a spec, a support helper) would run it while other workers are mid-test.
 USERS="$(grep -rl 'e2e:cleanup-tickets' "$ROOT/src/tests/Browser" "$ROOT/src/playwright.config.ts" 2>/dev/null | sed "s#^$ROOT/##" | sort)"
 [[ $USERS == "src/tests/Browser/support/global-teardown.ts" ]] && ok || bad "unexpected users of the cleanup command in the browser suite: $USERS"
+# The invitee cleanup is bound by the same rule: the untargeted command is allowed in the once-per-suite globalTeardown only.
+USERS="$(grep -rl 'e2e:cleanup-invitees' "$ROOT/src/tests/Browser" "$ROOT/src/playwright.config.ts" 2>/dev/null | sed "s#^$ROOT/##" | sort)"
+[[ $USERS == "src/tests/Browser/support/global-teardown.ts" ]] && ok || bad "unexpected users of the invitee cleanup command in the browser suite: $USERS"
 grep -q "globalTeardown: './tests/Browser/support/global-teardown.ts'" "$ROOT/src/playwright.config.ts" && ok \
     || bad "playwright.config.ts does not register the suite-level globalTeardown"
 grep -q "workers: 3" "$ROOT/src/playwright.config.ts" && ok || bad "the three-worker session-isolation cap changed"
@@ -662,6 +716,9 @@ if command -v node >/dev/null 2>&1 && node --experimental-strip-types -e '0' >/d
 #!/usr/bin/env bash
 printf 'php %s\n' "$*" >>"$TD_LOG"
 echo "stub cleanup output"
+case "$*" in
+    *e2e:cleanup-invitees*) exit "${TD_PHP_RC_INVITEES:-${TD_PHP_RC:-0}}" ;;
+esac
 exit "${TD_PHP_RC:-0}"
 PHP
     chmod +x "$TD/php"
@@ -677,9 +734,15 @@ PHP
     [[ $TD_OUT == *"Handed to ./dev test:e2e"* ]] && ok || bad "the hand-off was not announced: $TD_OUT"
     run_teardown E2E_UNRELATED=1
     [[ $TD_RC -eq 0 ]] && ok || bad "a direct run whose cleanup succeeds must succeed (rc=$TD_RC): $TD_OUT"
-    [[ $(cat "$TD/log") == "php artisan e2e:cleanup-tickets --no-interaction" ]] && ok || bad "a direct run must run exactly the untargeted command: $(cat "$TD/log")"
+    [[ $(cat "$TD/log") == "php artisan e2e:cleanup-tickets --no-interaction
+php artisan e2e:cleanup-invitees --no-interaction" ]] && ok || bad "a direct run must run exactly the two untargeted commands, tickets first: $(cat "$TD/log")"
     run_teardown E2E_UNRELATED=1 TD_PHP_RC=1
     [[ $TD_RC -eq 7 && $TD_OUT == *"THROWN: E2E ticket cleanup failed (exit 1)"* ]] && ok || bad "a direct run whose cleanup is refused (e.g. a permission mismatch) must be fatal (rc=$TD_RC): $TD_OUT"
+    [[ $(cat "$TD/log") == "php artisan e2e:cleanup-tickets --no-interaction
+php artisan e2e:cleanup-invitees --no-interaction" ]] && ok || bad "a failed ticket cleanup must not stop the invitee cleanup from running: $(cat "$TD/log")"
+    [[ $TD_OUT == *"E2E invitee cleanup failed (exit 1)"* ]] && ok || bad "both failures must be reported when both cleanups fail: $TD_OUT"
+    run_teardown E2E_UNRELATED=1 TD_PHP_RC_INVITEES=1
+    [[ $TD_RC -eq 7 && $TD_OUT == *"THROWN: E2E invitee cleanup failed (exit 1)"* && $TD_OUT != *"ticket cleanup failed"* ]] && ok || bad "a refused or failed invitee cleanup alone must be fatal (rc=$TD_RC): $TD_OUT"
     run_teardown E2E_TICKET_CLEANUP_OWNER=somebody-else TD_PHP_RC=1
     [[ $TD_RC -eq 7 ]] && ok || bad "only the exact hand-off value defers; anything else is a direct run (rc=$TD_RC): $TD_OUT"
 else

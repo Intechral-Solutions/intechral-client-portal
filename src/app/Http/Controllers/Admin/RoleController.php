@@ -80,7 +80,7 @@ class RoleController extends Controller
 
         // Release 0.9 (H3): refused if it would remove the last active account administrator's users.view or
         // users.manage.
-        $this->grants->syncRolePermissions($role, $validated['permissions'] ?? []);
+        $this->grants->syncRolePermissions($role, $validated['permissions'] ?? [], $request->user());
 
         activity()->causedBy(auth()->user())
             ->performedOn($role)

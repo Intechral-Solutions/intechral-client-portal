@@ -54,11 +54,14 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'time_entry_blocks.user_id -> users' => 'CASCADE/RESTRICT (time_entry_blocks_user_id_foreign)',
         // Release 1.0 (MO-2A1): added later by its own migration, RESTRICT from the start (the approving operator is provenance).
         'organization_members.admin_approved_by -> users' => 'RESTRICT/RESTRICT (organization_members_admin_approved_by_foreign)',
+        // Release 1.0 (R1-3A): every user reference of an organization invitation is provenance, RESTRICT from the start.
+        'organization_invitations.invited_by -> users' => 'RESTRICT/RESTRICT (organization_invitations_invited_by_foreign)',
+        'organization_invitations.revoked_by -> users' => 'RESTRICT/RESTRICT (organization_invitations_revoked_by_foreign)',
+        'organization_invitations.accepted_user_id -> users' => 'RESTRICT/RESTRICT (organization_invitations_accepted_user_id_foreign)',
         // Release 1.0 (R1-2A): the submitter of a ticket is provenance, RESTRICT from the start (the requester, tickets.user_id, is the H1 key above).
         'tickets.submitted_by_id -> users' => 'RESTRICT/RESTRICT (tickets_submitted_by_id_foreign)',
         // Nullable pointers: the record stays and the pointer is cleared.
         'cms_pages.updated_by -> users' => 'SET NULL/RESTRICT (cms_pages_updated_by_foreign)',
-        'invitations.invited_by -> users' => 'SET NULL/RESTRICT (invitations_invited_by_foreign)',
         'project_milestones.completed_by -> users' => 'SET NULL/RESTRICT (project_milestones_completed_by_foreign)',
         'tasks.assignee_id -> users' => 'SET NULL/RESTRICT (project_tasks_assignee_id_foreign)',
         'ticket_due_date_changes.user_id -> users' => 'SET NULL/RESTRICT (ticket_due_date_changes_user_id_foreign)',

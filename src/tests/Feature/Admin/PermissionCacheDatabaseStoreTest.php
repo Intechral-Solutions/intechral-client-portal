@@ -46,10 +46,12 @@ uses()->group('database-cache-security');
  *     should be ordered happened to be. It is not an assertion that the trace contains nothing else.
  *  3. A reader that must write its cache entry while a writer's transaction is open does so only against a writer that holds no
  *     row of that entry (the raw writer path loads no mapping) and with a lock wait bounded to a few seconds, so a violated
- *     assumption fails loudly and quickly instead of hanging. A reader whose write COULD wait for the writer (it stores the
- *     very row a loading writer has inserted, DB-L3) is never waited for while that transaction is open: it is released only
- *     after the transaction has ended. A write that waits can only complete after the commit, which is the post-commit
- *     "straddle" of scenario A.
+ *     assumption fails loudly and quickly instead of hanging. A reader whose write COULD wait for a writer is never waited for
+ *     while that transaction is open: it is released only after the transaction has ended. (Before R1-3A a LOADING writer held the
+ *     very row a reader stores, DB-L3; its epoch is now advanced first, so it holds only its own private key. The writer's delete of
+ *     the absent legacy key still takes a GAP lock in the cache index, so DB-L3 seeds a committed bounding row first and asserts
+ *     "no wait" only under that controlled condition; without it the outcome would depend on the random epoch tokens.) A write that
+ *     waits can only complete after the commit, which is the post-commit "straddle" of scenario A.
  *  4. No wait is a sleep or a poll of information_schema: a wait is for a flag file that the other process creates, bounded
  *     at 60 s, and a timeout, a crash or a lock-wait error fails the test. Nothing here is skipped.
  *
@@ -605,8 +607,8 @@ describe('a cache miss while a revocation is in flight', function () {
             $e0 = dcsEpoch();
 
             // The shape of the built-in role synchronization: raw SQL, then an explicit epoch advance in the same transaction.
-            // It loads no mapping, so it holds no row of the key this reader stores. (A writer that DID load the mapping would
-            // hold that row, and a reader storing the same entry would wait for its commit: see DB-L3.) The reader's write
+            // It loads no mapping, so it holds no row of the key this reader stores. (Since R1-3A's R4 a writer that loads the
+            // mapping stores it under its own private epoch, so it would not hold that row either: see DB-L3.) The reader's write
             // therefore needs no lock the writer holds, and its lock wait is bounded, so waiting for it here, while the
             // writer's transaction is open, cannot become a deadlock: a wrong assumption fails within 5 s, never passes.
             $writer = dcsWriterOpen($world, ['path' => 'raw']);
@@ -786,15 +788,26 @@ describe('locking (latency and availability of the cache write; not an authoriza
         });
     })->with('release 0.9 profile');
 
-    it('DB-L3: a reader that stores the very entry a LOADING writer\'s open transaction has inserted waits for that transaction, and succeeds after it', function (array $layout) {
+    it('DB-L3: a reader that stores the entry under the OLD epoch does not wait for a LOADING writer\'s open transaction (R1-3A R4: the writer loads under its own private epoch)', function (array $layout) {
         dcsWorld($layout['connection'], function ($world) {
             dcsSupportWorld($world);
             $e0 = dcsEpoch();
-            // syncRolePermissions loads the permission mapping and, on a miss, stores it under the current epoch, inside its
-            // transaction. That uncommitted row is the one a concurrent reader's own miss would store.
+
+            // THE CONTROLLED CONDITION. The writer's transaction deletes the (absent) unsuffixed legacy permission-cache key, which in InnoDB
+            // takes a GAP lock on the cache table's key index up to the next existing row. Where the reader's old-epoch key `<base>:<e0>` falls
+            // relative to that next row depends on the random epoch tokens already in the table, so without a bound the reader may or may not
+            // fall inside the gap and this test would be nondeterministic. A COMMITTED row `<base>:0` (it sorts before every hex epoch token)
+            // is always the next row after the legacy key, so the gap ends before any real epoch key, and the reader's key lies outside it.
+            DB::table('cache')->insert(['key' => $world->prefix.config('permission.cache.key').':0', 'value' => serialize('bound'), 'expiration' => time() + 300]);
+
+            // syncRolePermissions loads the permission mapping inside its transaction. Before R1-3A it stored that copy under the CURRENT epoch,
+            // the very row a concurrent reader's own miss would store, so the reader waited for the writer's commit (a latency and
+            // availability property, not an authorization one; this test used to assert the wait and a 1205 error). Since R1-3A's R4 the
+            // hook advances the epoch FIRST (before it locks invitations, to avoid a three-transaction cycle), so the copy it loads is
+            // stored under its own private epoch key, which no reader can name before the commit. The reader's key is the old one.
             $writer = dcsWriterOpen($world);
 
-            DB::statement('set session innodb_lock_wait_timeout = 1');
+            DB::statement('set session innodb_lock_wait_timeout = 1'); // the probe: a wait fails it within a second
             $error = null;
             try {
                 dcsReaderWrite($world, $e0);
@@ -803,11 +816,13 @@ describe('locking (latency and availability of the cache write; not an authoriza
             } finally {
                 DB::statement('set session innodb_lock_wait_timeout = 50');
             }
-            dcsWriterEnd($world, $writer, 'commit');
-            dcsReaderWrite($world, $e0);
+            $result = dcsWriterEnd($world, $writer, 'commit');
 
-            expect($error)->toBe(1205, 'the reader\'s upsert waited for the writer\'s uncommitted row of the same key (this is why DB-F2 uses a writer that loads nothing)')
-                ->and(dcsEntryExists($world, $e0))->toBeTrue('and the same write succeeds once the writer has committed');
+            expect($error)->toBeNull('the reader\'s upsert of the old-epoch entry waited for the writer (lock error '.var_export($error, true).'): the writer must load under its own private epoch')
+                ->and(dcsEntryExists($world, $e0))->toBeTrue('the reader stored the (now obsolete) old-epoch entry without waiting')
+                // The revocation did advance the epoch, in the writer's transaction and, committed, for everyone after it.
+                ->and($result['epochInTransaction'])->not->toBe($e0)
+                ->and(dcsEpoch())->not->toBe($e0);
         });
     })->with('release 0.9 profile');
 });

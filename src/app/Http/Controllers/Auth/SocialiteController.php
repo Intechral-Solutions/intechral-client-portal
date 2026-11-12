@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Exceptions\InvitationEmailMismatchException;
-use App\Exceptions\InvitationUnavailableException;
+use App\Exceptions\OrganizationInvitationException;
+use App\Http\Controllers\Auth\Concerns\WithholdsQueryDetails;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
-use App\Services\InvitationService;
+use App\Services\InvitationAcceptance;
+use App\Services\OrganizationInvitations;
 use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -16,13 +17,39 @@ use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
 
+/**
+ * Single sign-on: login, linking a provider to the signed-in account, and accepting an ORGANIZATION invitation (Release 1.0, R1-3B).
+ *
+ * THE INVITATION CONTEXT (docs/product/release-1.0-r1-3-organization-invitations.md, 7.3). Starting the flow from an invitation link stores
+ * `{intent: invitation, provider, initiatingUserId: null, invitationHash, startedAt}` in the session. The HASH of the token, never the token:
+ * the plaintext does not enter the session, and the hash is treated as a server-side credential too. It is never put in a redirect, a prop,
+ * a log line or a request parameter, and the callback never reads a token from its own request: it resolves the invitation by that hash and
+ * lets {@see OrganizationInvitations::acceptByHash()} revalidate everything (the invitation, the issuer's authority, the provider address
+ * against the invited one) under lock. The context is
+ *
+ *  - one-time (`pull`: consumed whether or not the callback succeeds),
+ *  - bound to its provider, and
+ *  - good for {@see INVITATION_CONTEXT_MAX_AGE_SECONDS} only.
+ *
+ * Because the context holds a hash and not a token, NO failure path can rebuild an invitation link from session state: a provider failure, an
+ * old or foreign context, an address mismatch and a dead invitation all end at the login page with a message that says to open the link from
+ * the email again. (The one redirect that does name a link is the DEFERRED answer on initiation, built from the token the request itself just
+ * carried.) SSO stays deferred for customers in `closed` and `pilot` mode, exactly as before: this class does not widen it.
+ */
 class SocialiteController extends Controller
 {
+    use WithholdsQueryDetails;
+
     private const CONTEXT_KEY = 'oauth_context';
 
     private const SUPPORTED_PROVIDERS = ['google', 'microsoft'];
 
-    public function __construct(private readonly InvitationService $service) {}
+    /** How long a started invitation sign-in may take at the provider (consent screens, a second factor) before it is refused. */
+    public const INVITATION_CONTEXT_MAX_AGE_SECONDS = 600;
+
+    private const INVITATION_FAILED = 'This invitation could not be completed. Open the link from your email again.';
+
+    public function __construct(private readonly OrganizationInvitations $invitations) {}
 
     public function redirect(Request $request, string $provider): RedirectResponse
     {
@@ -41,9 +68,10 @@ class SocialiteController extends Controller
             $queried = $request->query('invitation');
             $token = is_string($queried) ? $queried : '';
 
-            // An empty, repeated (array) or unknown token is the ordinary "no longer available" answer, decided before
-            // anything is built from it (R0.9-CS1: an empty token used to reach route('invitation.show', '') and 500).
-            if ($token === '' || ! $this->service->findValid($token)) {
+            // An empty, repeated (array), malformed, unknown or dead token is the ordinary "no longer available" answer, decided before
+            // anything is built from it (R0.9-CS1: an empty token used to reach route('invitation.show', '') and 500). A retired legacy
+            // token is just another unknown one: findOpen() reads only the hashed organization invitations.
+            if ($token === '' || ! $this->withoutQueryDetails(fn () => $this->invitations->findOpen($token))) {
                 return redirect()->route('login')
                     ->withErrors(['email' => 'This invitation is no longer available.'])
                     ->with('error', 'This invitation is no longer available.');
@@ -57,7 +85,8 @@ class SocialiteController extends Controller
                 'intent' => 'invitation',
                 'provider' => $provider,
                 'initiatingUserId' => null,
-                'invitationToken' => $token,
+                // The hash, never the token: the plaintext does not enter the session.
+                'invitationHash' => OrganizationInvitations::hashToken($token),
                 'startedAt' => now()->toIso8601String(),
             ];
         } elseif ($request->user()) {
@@ -65,7 +94,7 @@ class SocialiteController extends Controller
                 'intent' => 'link',
                 'provider' => $provider,
                 'initiatingUserId' => $request->user()->getKey(),
-                'invitationToken' => null,
+                'invitationHash' => null,
                 'startedAt' => now()->toIso8601String(),
             ];
         } else {
@@ -73,7 +102,7 @@ class SocialiteController extends Controller
                 'intent' => 'login',
                 'provider' => $provider,
                 'initiatingUserId' => null,
-                'invitationToken' => null,
+                'invitationHash' => null,
                 'startedAt' => now()->toIso8601String(),
             ];
         }
@@ -106,13 +135,14 @@ class SocialiteController extends Controller
         // Release 0.9 (R0.9-CS1): SSO is deferred for the first pilot. An invitation always creates a customer
         // account, so it is refused while the pilot gate is on; an existing customer is refused in login().
         if ($context['intent'] === 'invitation' && CustomerPilotGate::ssoDeferred()) {
-            return $this->invitationSsoDeferred($context['invitationToken']);
+            // No link to offer: the context holds a hash, and a link is never rebuilt from session state.
+            return $this->invitationFailure('Single sign-on is not available yet. Open your invitation email again and create a password to accept the invitation.');
         }
 
         return match ($context['intent']) {
             'login' => $this->login($provider, $socialUser),
             'link' => $this->link($request, $provider, $socialUser, $context['initiatingUserId']),
-            'invitation' => $this->registerViaInvitation($provider, $socialUser, $context['invitationToken']),
+            'invitation' => $this->registerViaInvitation($provider, $socialUser, $context['invitationHash']),
         };
     }
 
@@ -192,26 +222,43 @@ class SocialiteController extends Controller
         return redirect()->route('profile.show')->with('status', ucfirst($provider).' account connected.');
     }
 
-    private function registerViaInvitation(string $provider, SocialiteUser $socialUser, string $token): RedirectResponse
+    /**
+     * The provider's verified identity against the invitation, resolved BY HASH. The core compares the provider's address with the invited one
+     * (one normalizer) under the issuer, organization and invitation locks, revalidates the invitation and the issuer's authority, and creates
+     * the account, the `user` role, the linked identity and the ordinary membership atomically. A refusal writes nothing and leaves the
+     * invitation as it was.
+     */
+    private function registerViaInvitation(string $provider, SocialiteUser $socialUser, string $invitationHash): RedirectResponse
     {
+        $acceptance = InvitationAcceptance::withProvider($provider, [
+            'name' => $socialUser->getName(),
+            'email' => $socialUser->getEmail(),
+            'provider_id' => (string) $socialUser->getId(),
+            ...$this->tokenAttributes($socialUser),
+        ]);
+
         try {
-            $user = $this->service->acceptWithSocialAccount($token, $provider, [
-                'name' => $socialUser->getName(),
-                'email' => $socialUser->getEmail(),
-                'provider_id' => $socialUser->getId(),
-                ...$this->tokenAttributes($socialUser),
-            ]);
-        } catch (InvitationEmailMismatchException) {
-            return redirect()->route('invitation.show', $token)
-                ->withErrors(['email' => 'The provider account email does not match the invitation email.'])
-                ->with('error', 'The provider account email does not match the invitation email.');
-        } catch (InvitationUnavailableException) {
-            return redirect()->route('invitation.show', $token);
+            $user = $this->withoutQueryDetails(fn () => $this->invitations->acceptByHash($invitationHash, $acceptance));
+        } catch (OrganizationInvitationException $exception) {
+            // An address mismatch leaves the invitation open, so the message says so; every dead link is the one uniform answer.
+            return $this->invitationFailure(
+                $exception->reason === OrganizationInvitationException::EMAIL_MISMATCH
+                    ? 'The provider account email does not match the invitation email.'
+                    : 'This invitation is no longer available.'
+            );
         }
 
         Auth::login($user, remember: true);
 
         return redirect()->route('dashboard');
+    }
+
+    /** Where every failed invitation sign-in ends: the login page, with a message. It never carries, or rebuilds, an invitation link. */
+    private function invitationFailure(string $message): RedirectResponse
+    {
+        return redirect()->route('login')
+            ->withErrors(['email' => $message])
+            ->with('error', $message);
     }
 
     private function invitationSsoDeferred(string $token): RedirectResponse
@@ -225,28 +272,38 @@ class SocialiteController extends Controller
 
     private function validContext(mixed $context, string $provider): bool
     {
-        if (
-            ! is_array($context)
-            || ($context['provider'] ?? null) !== $provider
-            || ! isset($context['startedAt'])
-            || ! is_string($context['startedAt'])
-            || \DateTimeImmutable::createFromFormat(DATE_ATOM, $context['startedAt']) === false
-        ) {
+        if (! is_array($context) || ($context['provider'] ?? null) !== $provider || ! isset($context['startedAt']) || ! is_string($context['startedAt'])) {
+            return false;
+        }
+
+        $startedAt = \DateTimeImmutable::createFromFormat(DATE_ATOM, $context['startedAt']);
+
+        // A context from before R1-3B carried the PLAINTEXT token (`invitationToken`) and no age limit. Such a context is never honoured, for
+        // any intent: it is refused whole, and `pull` has already removed it from the session.
+        if ($startedAt === false || ($context['invitationToken'] ?? null) !== null) {
             return false;
         }
 
         return match ($context['intent'] ?? null) {
             'login' => ($context['initiatingUserId'] ?? null) === null
-                && ($context['invitationToken'] ?? null) === null,
+                && ($context['invitationHash'] ?? null) === null,
             'link' => isset($context['initiatingUserId'])
                 && is_int($context['initiatingUserId'])
-                && ($context['invitationToken'] ?? null) === null,
+                && ($context['invitationHash'] ?? null) === null,
             'invitation' => ($context['initiatingUserId'] ?? null) === null
-                && isset($context['invitationToken'])
-                && is_string($context['invitationToken'])
-                && $context['invitationToken'] !== '',
+                && is_string($context['invitationHash'] ?? null)
+                && preg_match('/\A[0-9a-f]{64}\z/', $context['invitationHash']) === 1
+                && $this->freshEnough($startedAt),
             default => false,
         };
+    }
+
+    /** The invitation intent has a maximum age; a start time in the future (beyond a minute of clock skew) is as unusable as an old one. */
+    private function freshEnough(\DateTimeImmutable $startedAt): bool
+    {
+        $age = now()->getTimestamp() - $startedAt->getTimestamp();
+
+        return $age >= -60 && $age <= self::INVITATION_CONTEXT_MAX_AGE_SECONDS;
     }
 
     private function contextFailure(Request $request): RedirectResponse
@@ -260,9 +317,8 @@ class SocialiteController extends Controller
     private function providerFailure(Request $request, array $context, string $provider): RedirectResponse
     {
         if ($context['intent'] === 'invitation') {
-            return redirect()->route('invitation.show', $context['invitationToken'])
-                ->withErrors(['provider' => 'Authentication via '.ucfirst($provider).' failed. Please try again.'])
-                ->with('error', 'Authentication via '.ucfirst($provider).' failed. Please try again.');
+            // The context was consumed by `pull` and holds only a hash: there is no link to go back to, and none is rebuilt.
+            return $this->invitationFailure(self::INVITATION_FAILED);
         }
 
         return redirect()->route($request->user() ? 'profile.show' : 'login')

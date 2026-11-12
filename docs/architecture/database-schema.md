@@ -15,25 +15,32 @@
 | two_factor_secret | text nullable | Encrypted TOTP secret |
 | two_factor_recovery_codes | text nullable | Encrypted recovery codes |
 | two_factor_confirmed_at | timestamp nullable | |
-| invited_by | bigint FK users | Operator who invited this user |
-| invitation_id | bigint FK invitations | |
+| invited_by | bigint FK users | Who invited this user (written by organization-invitation acceptance; SET NULL on delete). The legacy `invitation_id` column was removed in R1-3B. |
 | remember_token | varchar(100) nullable | |
 | created_at / updated_at | timestamps | |
 | disabled_at | timestamp nullable | Reversible account suspension (decision H3). The column exists (R0.9-1B); nothing reads or writes it yet, so enforcement (login, sessions, candidate lists, notifications) and the suspend/reinstate action are R0.9-1C |
 
 There is no `deleted_at` column and no soft delete.
 
-### `invitations`
+### `organization_invitations` (Release 1.0, R1-3A)
+An invitation of one NEW person into ONE organization. Written only by `App\Services\OrganizationInvitations`; the full design is in [the design record](../product/release-1.0-r1-3-organization-invitations.md), section 4.1.
+
 | Column | Type | Notes |
 |--------|------|-------|
 | id | bigint PK | |
-| email | varchar(255) | Invitee email |
-| token | varchar(64) unique | Random 64-character token, currently stored in plaintext |
-| invited_by | bigint FK users nullable | |
-| status | enum | `pending`, `accepted` or `expired` |
-| accepted_at | timestamp nullable | |
-| expires_at | timestamp | Set to +48 hours when issued |
+| organization_id | bigint FK organizations | RESTRICT; an invitation always names exactly one organization |
+| email | varchar(255) | Normalized (lower-case, trimmed) |
+| token_hash | char(64) unique | SHA-256 of the token; the plaintext is never stored |
+| invited_by | bigint FK users | RESTRICT (provenance) |
+| expires_at | datetime | Issue time + 7 days |
+| accepted_at / accepted_user_id | datetime / bigint FK users unique | RESTRICT |
+| revoked_at / revoked_by / revoked_reason | datetime / bigint FK users / varchar(32) | RESTRICT; `revoked_at` is the state, the reason is a closed set of codes |
+| live_email | varchar(255) nullable | The uniqueness slot, unique with `organization_id` |
 | created_at / updated_at | timestamps | |
+
+There is no status and no role column: state is derived. **The legacy organization-less `invitations` table (plaintext tokens) and `users.invitation_id` were removed in R1-3B** by migration `2026_11_12_090000_retire_legacy_invitations`; the historical migrations that created them are unchanged and the Release 0.9 rehearsal baseline still builds them.
+
+**Reporting and integrity (R1-3C).** `php artisan organizations:preflight` reports the table read-only, **ids and counts only** (never an address, token or hash): totals by derived state, the open invitations by id and by organization, open invitations that cannot be accepted (the address is now an account, or the issuer is no longer a membership manager through a path the revocation hooks do not cover: warnings), unknown revocation codes (a warning), and **failures** for rows the service can never write: an open row holding no slot, a slot that is not the address, an accepted row still holding the slot, accepted and revoked at once, an acceptance half recorded, a revocation reason or actor without a revocation. A revoked or expired row that **keeps its slot is legitimate** (the system revocations and time never write it; issuance releases it) and is never reported. The rehearsal integrity snapshot carries the same six rules as zero-expected checks (`organization_invitations:*`), **only on a database that has the table** (the Release 0.9 rehearsal baseline does not, so it has none of them; its row digests and the `fk_orphans:` checks cover the rest). Both use the application's clock for "open", never the database server's.
 
 ### `social_accounts`
 | Column | Type | Notes |

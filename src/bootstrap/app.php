@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\ProtectInvitationCredential;
 use App\Shared\Pilot\CustomerPilotGate;
 use App\Support\Runtime\CronFailureMarker;
 use App\Support\Runtime\RuntimeChallenges;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -36,6 +38,13 @@ return Application::configure(basePath: dirname(__DIR__))
             EnforceCustomerPilotSurface::class,
             HandleInertiaRequests::class,
         ]);
+
+        // Release 1.0 (R1-3B): response protections for requests that carry an invitation token in the URL (routes/web.php).
+        $middleware->alias(['invitation.credential' => ProtectInvitationCredential::class]);
+
+        // ...and OUTSIDE the throttle, so a 429 on these routes carries the same headers as the page it stands in for (an unlisted middleware
+        // would be sorted after the throttle, which is in the framework's priority list).
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: ProtectInvitationCredential::class);
 
         // Release 0.9 (R0.9-CS1): the customer pilot boundary needs the session user, and must refuse a route before
         // route-model binding loads anything for it.

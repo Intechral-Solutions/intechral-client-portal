@@ -120,6 +120,7 @@ final class IntegritySnapshot
         $this->invoiceChecks();
         $this->organizationChecks($schema);
         $this->membershipChecks($schema);
+        $this->invitationChecks($schema);
         $files = $this->fileChecks();
 
         $digests = $this->digests($schema['columns']);
@@ -356,6 +357,31 @@ final class IntegritySnapshot
         $this->check('organization_members:approved_not_admin', "select count(*) as n from organization_members where admin_approved_at is not null and role <> 'admin'");
         // The two columns are written together and cleared together.
         $this->check('organization_members:approval_incomplete', 'select count(*) as n from organization_members where (admin_approved_at is null) <> (admin_approved_by is null)');
+    }
+
+    /**
+     * Release 1.0 (R1-3): only once the invitation table exists. Every one is zero on any database the application itself wrote; a row the
+     * service can never write is reported, not assumed away. The same rules as `organizations:preflight`, as counts only (no address,
+     * token or hash). The table's foreign keys are covered by the generic `fk_orphans:` checks above.
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    private function invitationChecks(array $schema): void
+    {
+        if (! isset($schema['columns']['organization_invitations'])) {
+            return;
+        }
+
+        $this->check(
+            'organization_invitations:open_without_slot',
+            'select count(*) as n from organization_invitations where accepted_at is null and revoked_at is null and expires_at > ? and live_email is null',
+            // The application's clock, as the application stores `expires_at`: never the database server's own time zone.
+            [now()->format('Y-m-d H:i:s')]);
+        $this->check('organization_invitations:slot_is_not_the_address', 'select count(*) as n from organization_invitations where live_email is not null and live_email <> email');
+        $this->check('organization_invitations:accepted_still_holding_slot', 'select count(*) as n from organization_invitations where accepted_at is not null and live_email is not null');
+        $this->check('organization_invitations:accepted_and_revoked', 'select count(*) as n from organization_invitations where accepted_at is not null and revoked_at is not null');
+        $this->check('organization_invitations:acceptance_half_recorded', 'select count(*) as n from organization_invitations where (accepted_at is null) <> (accepted_user_id is null)');
+        $this->check('organization_invitations:revocation_detail_without_revocation', 'select count(*) as n from organization_invitations where revoked_at is null and (revoked_reason is not null or revoked_by is not null)');
     }
 
     /** @param  array<string, mixed>  $schema */

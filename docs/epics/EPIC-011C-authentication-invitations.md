@@ -63,7 +63,7 @@ The following stay ordinary server routes and must not become React pages:
 | `POST /user/confirm-password` | `password.confirm.store` | Fortify confirmation action only |
 | `POST /two-factor-challenge` | `two-factor.login.store` | Fortify challenge action only |
 | `POST /invitation/{token}` | `invitation.register` | Invitation acceptance action only |
-| `POST /invitations` | `invitations.store` | Operator invitation creation UI belongs to a later admin phase |
+| `POST /invitations` | `invitations.store` | Operator invitation creation UI belongs to a later admin phase. **Retired (Release 1.0, R1-3B):** the route no longer exists; the operator invites into one organization from the organization page (R1-3C, `organizations.invitations.store`) |
 | `GET /user/confirmed-password-status` | `password.confirmation` | Focused authenticated JSON status endpoint used by Profile |
 
 Profile-side 2FA setup, recovery codes, session management, social unlinking, and account details were completed in EPIC-011B and are not guest-auth pages in this phase.

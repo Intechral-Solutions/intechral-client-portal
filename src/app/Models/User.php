@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -21,7 +22,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'invitation_id',
         'invited_by',
     ];
 
@@ -69,9 +69,16 @@ class User extends Authenticatable
         return $this->getConnection()->transaction(fn () => parent::delete());
     }
 
-    public function invitation(): BelongsTo
+    /**
+     * Provenance of an account created by accepting an organization invitation (Release 1.0, R1-3): the invitation that this account
+     * accepted. At most one (`accepted_user_id` is unique); none for a legacy account or an account that was never invited. Read only:
+     * every write to `organization_invitations` goes through App\Services\OrganizationInvitations.
+     *
+     * @return HasOne<OrganizationInvitation, $this>
+     */
+    public function organizationInvitation(): HasOne
     {
-        return $this->belongsTo(Invitation::class);
+        return $this->hasOne(OrganizationInvitation::class, 'accepted_user_id');
     }
 
     public function inviter(): BelongsTo

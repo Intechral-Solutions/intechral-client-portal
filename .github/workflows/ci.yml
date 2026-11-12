@@ -204,7 +204,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Builds the dev image. queue and mailpit are not started: the suite does not need them.
+      # Builds the dev image. queue and mailpit are started LATER (below), once the application is installed and configured: only the
+      # organization-invitation journey needs them.
       - name: Start the dev stack (app, nginx, db, redis)
         run: docker compose up -d --wait app nginx
 
@@ -226,6 +227,42 @@ jobs:
       - name: Make storage writable for php-fpm
         run: chmod -R a+rwX src/storage src/bootstrap/cache
 
+      # R1-3C: organization-invitations.spec.ts reads the invitation mail the way its recipient does: the queue worker delivers it to
+      # Mailpit and the spec reads it from Mailpit's API (support/mailpit.ts). Started here, after composer, .env and migrate, so the worker
+      # boots an installed and configured application (started earlier it would crash-loop on a missing vendor directory and .env). Without
+      # them that spec FAILS naming this as the cause; it never skips.
+      #
+      # Mail isolation (checked, not assumed): the test mail transport is Mailpit on the compose network. This step refuses to go on if
+      # the configuration the worker and the application will read points anywhere else, so a changed .env.example can never make this
+      # job hand invitation mail to a real provider. Nothing in the job holds a provider credential.
+      - name: Start the queue worker and Mailpit (the invitation journey reads its mail)
+        run: |
+          grep -qx 'MAIL_MAILER=smtp' src/.env && grep -qx 'MAIL_HOST=mailpit' src/.env || {
+            echo '::error::src/.env does not deliver mail to the compose Mailpit service (MAIL_MAILER=smtp, MAIL_HOST=mailpit): refusing to run the invitation journey against another transport'
+            exit 1
+          }
+          grep -qx 'QUEUE_CONNECTION=redis' src/.env || {
+            echo '::error::src/.env does not queue on redis, which is the connection the compose queue worker consumes: invitation mail would never be delivered'
+            exit 1
+          }
+          docker compose up -d --wait queue mailpit
+
+      # `--wait` means "running", and neither service has a health check, so readiness is proven here: Mailpit answers its API on the
+      # published loopback port, and the worker container is up and running the queue consumer rather than restarting. A worker that
+      # cannot boot or reach redis shows up here, named, instead of as a 60 s mail timeout inside the spec.
+      - name: Verify the queue worker and Mailpit are ready
+        run: |
+          curl -fsS --retry 15 --retry-delay 2 --retry-connrefused -o /dev/null http://127.0.0.1:8025/api/v1/info
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if docker compose top queue 2>/dev/null | grep -q 'queue:work' && [ "$(docker compose ps --status running --services | grep -cx queue)" = 1 ]; then
+              echo 'queue worker is running'
+              exit 0
+            fi
+            sleep 3
+          done
+          echo '::error::the queue worker is not running queue:work (it exited or is restarting)'
+          exit 1
+
       # Evidence for the cross-UID path (EPIC-017 G3-A): Playwright runs as the runner's UID, php-fpm
       # writes the 0700 attachment directories as `portal`, and the wrapper's cleanup runs as `portal`.
       - name: Show the identities the E2E cleanup crosses
@@ -239,6 +276,18 @@ jobs:
       - name: Application log (on failure)
         if: failure()
         run: tail -n 200 src/storage/logs/laravel.log 2>/dev/null || echo 'No laravel.log was written.'
+
+      # Invitation diagnostics on failure, without credentials or mail content: the worker's own log lines (job names and outcomes; the
+      # job payload is encrypted and is never printed) with any 64-character token-shaped string masked as a precaution, and Mailpit's
+      # message COUNT only. The message bodies, which carry the invitation links, are never fetched here, and no Playwright trace
+      # (which records page content) is uploaded by this workflow.
+      - name: Invitation delivery diagnostics (on failure, no credentials)
+        if: failure()
+        run: |
+          echo '--- queue worker (last 60 lines, tokens masked)'
+          docker compose logs --no-color --tail=60 queue 2>&1 | sed -E 's/[A-Za-z0-9]{64}/<masked>/g' || true
+          echo '--- mailpit (message count only)'
+          curl -fsS http://127.0.0.1:8025/api/v1/info 2>/dev/null | sed -E 's/.*"Messages":([0-9]+).*/messages: \1/' || echo 'mailpit not reachable'
 
   # R0.9-CS1: the customer pilot browser spec against an application that is actually in PILOT mode, as a REQUIRED
   # test. A separate job on a fresh runner, so no pilot configuration, container or database ever touches the normal

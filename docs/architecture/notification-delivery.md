@@ -6,7 +6,7 @@ worker runs it, how long a send can take, how often it is retried, and what it s
 **Companions:** [Account Lifecycle](./account-lifecycle.md) (the suspension check) · [Authentication Flow](./auth-flow.md)
 (invitations).
 
-Five notifications are queued (`ShouldQueue`): `InvitationNotification`, `TicketCreatedNotification`,
+Five notifications are queued (`ShouldQueue`): `OrganizationInvitationNotification` (R1-3; it replaced the retired `InvitationNotification`), `TicketCreatedNotification`,
 `TicketRepliedNotification` and, since S1 (EPIC-017 O3), `NewTicketAlertNotification` and `TicketStatusNotification`
 ([section 6](#6-the-o3-notifications-s1)). Password reset is **not** queued and remains synchronous: it is sent inside the request, with no
 retries and no send-time check of its own. It does, however, use the same SMTP transport and so **inherits the new
@@ -21,7 +21,7 @@ is therefore decided there, from persisted state read fresh, never from the seri
 
 | Notification | Dropped at send time when | Rule |
 |---|---|---|
-| `InvitationNotification` | the invitation was re-issued, accepted, expired by time, or deleted | the row is re-read and must satisfy `Invitation::isPending()`, the rule the accept link itself uses. `InvitationService::invite()` marks every earlier pending invitation for the address `expired`, so a re-issued link is dead and is not mailed. A deleted row is discarded (`#[DeleteWhenMissingModels]`). |
+| `OrganizationInvitationNotification` | the invitation row is gone; it was superseded (re-issued), revoked, accepted or expired by time; the token no longer matches the row (`hash_equals`); the organization is gone; the address now has an account; the issuer is no longer a membership manager | six facts re-read from the tables (never the permission cache): open, hash equality, organization, no account, issuer authority. It carries scalars only (the invitation id and the token), so there is no model to restore and no `#[DeleteWhenMissingModels]`: a missing row simply returns `false` and the mail is dropped, not failed. Encrypted (`ShouldBeEncrypted`) and `ShouldQueueAfterCommit`. |
 | `TicketRepliedNotification` | the ticket or reply is gone; the reply is not on this ticket; the reply is an internal note; the recipient may no longer **view** the ticket | `Gate::forUser($recipient)->allows('view', $freshTicket)`: the `TicketPolicy` every ticket screen uses (owner, or `tickets.assign` and not a restricted customer, so an assignee who keeps `tickets.assign` but loses `portal.operator` is cut off). The reply's `ticket_id` must equal the ticket being authorised. No access rule of its own. |
 | all three | the recipient was suspended after queueing | unchanged: `SkipSuspendedRecipients` on `NotificationSending` (R0.9-1C). |
 | both ticket notifications | the ticket (or reply) was deleted | unchanged: `#[DeleteWhenMissingModels]` discards the job; no `failed_jobs` row. |
@@ -187,3 +187,29 @@ which the preflight should have prevented). The test suite pins it to empty in `
 address that the staging mail sink captures. Configuration proves the address is well formed; **that mail reaches it is proved only by a real alert**, which
 the first-install acceptance and the production acceptance each record. The alert is a convenient independent record of every ticket reference issued, so the
 destination should be a mailbox that is kept; it is no longer the continuity mechanism C6 once relied on, which [ADR-008](./adr/ADR-008-ticket-public-reference.md) (C6-R) replaced.
+
+**Invitation endpoints: throttle and client address (R1-3B).** The registration page, its POST and the SSO initiation (when it carries an invitation) are throttled
+per client IP (`invitation` 60/min, `invitation-register` 20/min, `invitation-sso` 30/min) and answered with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`
+([Authentication Flow](./auth-flow.md#invitation-credential-protections-r1-3b)). The limiters key on `$request->ip()`, and **no trusted proxy is configured**, so that is the
+immediate peer, exactly as for the existing `login` and `two-factor` limiters. If the shared host's web server forwards every request from one address, a per-IP limiter becomes a
+global one: a legitimate invitee could be throttled by other people's traffic and the limiter gives no per-client protection. The limits are generous for that reason. **Staging
+verification step:** request an invitation page a few times from a known client and confirm (for example from a temporary log of `$request->ip()` or the throttle's cache key) that
+the address the limiter keys on is the client's, not the web server's. Changing proxy trust is a host decision outside the R1-3 package.
+
+**Invitation issuance: the first production caller (R1-3C).** The mail is first queued by the operator's Invitations card: `OrganizationInvitationController::store` (also Resend) calls
+`OrganizationInvitations::issue`, which commits the invitation and **then** dispatches the notification (the notification is also `ShouldQueueAfterCommit`, so even a caller that was inside a transaction
+cannot enqueue early). Operator-visible consequences, each pinned in `OrganizationInvitationOperatorTest` against the real database queue and the array transport:
+
+- the message goes out **from the queue**, after the commit, to the normalized address; its link is `route('invitation.show', token)` for exactly this invitation, and only the token's hash is stored;
+- a **Resend** supersedes the open predecessor: the earlier link is dead and its **still-queued mail is dropped at send time** (so a recipient who has both queued receives one message, the live one); a
+  **revocation** does the same; so do the issuer's suspension, the address becoming an account, and the issuer losing the authority through a path the revocation hooks do not cover;
+- an unexpected **database failure** on issue or revoke (including a failure to enqueue) is reported through the same credential-safe path as the registration routes (`WithholdsQueryDetails`,
+  `InvitationDatabaseFailure`): the log carries SQLSTATE, the driver code, the violated key name and call-site locations, **never the recipient's address, the token, the hash or any binding**, and the operator
+  is answered a plain 500. A failure **before** the commit leaves no row and no job; a failure to enqueue **after** the commit leaves a Pending row and no mail (accepted risk R4 of the design record): the
+  card shows it as Pending and **Resend** recovers it;
+- **issuance is limited to 30 attempts an hour per authenticated operator** (`InvitationIssueThrottle`, the named limiter `invitation-issue`, keyed on the account id): a new invitation and a Resend are the same
+  route and share the allowance, every attempt counts (an invalid or refused one included), and the 31st answers 429 with `Retry-After` before the controller runs, so it creates, changes, audits and mails
+  nothing. **Revocation is not limited**, so an operator who has reached the limit can still kill a link. The routes are otherwise reachable only by an active account holding `portal.operator` and
+  `crm.manage`. The counter is a cache entry (the application's cache store); the browser suite's guarded local cleanup clears the seeded E2E operator's entry and nothing else.
+- **The mailed link's origin** is the worker's `APP_URL`: the link is built when the job runs, in a console process, never from the request that issued the invitation, so a hostile `Host` header cannot
+  redirect it (pinned in `OrganizationInvitationOperatorTest`, and in the browser suite against the configured `APP_URL`).

@@ -189,7 +189,7 @@ it('treats the Spatie catalogue, the owner and the managing partner as irrelevan
     DB::table('organizations')->where('id', $organization->id)->update(['managed_by_organization_id' => $partner->id]);
 
     $privileged = memCustomer();
-    $privileged->givePermissionTo(['org.admin', 'org.invite', 'org.manage_roles', 'users.admin', 'users.invite', 'crm.manage']);
+    $privileged->givePermissionTo(['org.admin', 'org.invite', 'org.manage_roles', 'users.admin', 'crm.manage']);
     memAttach($organization, $privileged, 'admin');
     $owner = User::find($organization->owner_id);
     memAttach($organization, $owner, 'member');
@@ -419,7 +419,7 @@ it('lets only an actor holding BOTH portal.operator and crm.manage change member
     $partnerAdmin->givePermissionTo('crm.manage');
     memAttach($partner, $partnerAdmin, 'admin', $this->operator);
     $orgPermissions = memCustomer();
-    $orgPermissions->givePermissionTo(['org.admin', 'org.invite', 'org.manage_roles', 'users.admin', 'users.manage', 'users.invite']);
+    $orgPermissions->givePermissionTo(['org.admin', 'org.invite', 'org.manage_roles', 'users.admin', 'users.manage']);
 
     // The `operator` ROLE NAME alone is not enough: strip the role's capabilities, then give the role to a new account.
     Role::findByName('operator')->revokePermissionTo(['portal.operator', 'crm.manage']);
@@ -708,7 +708,9 @@ it('leaves no other writer of organization membership: the legacy CrmService met
     // Project membership uses the same relation name on a different model.
     $writers = array_values(array_diff($writers, ['Services/ProjectService.php']));
 
-    expect($writers)->toBe(['Services/CrmService.php', 'Services/OrganizationMembership.php']);
+    // R1-3C: the one NAMED exception besides those two is the browser suite's own cleanup (`e2e:cleanup-invitees`), which only deletes the
+    // memberships of accounts it removes, in local and testing only (OrganizationInvitationFlowTest pins "delete only").
+    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/CrmService.php', 'Services/OrganizationMembership.php']);
 });
 
 it('takes the organization row lock before touching the membership table', function () {

@@ -110,12 +110,18 @@ it('switches between authenticator and recovery inputs and moves focus', async (
 it('renders an immutable invitation email and server-bound provider URLs', () => {
     render(
         <InvitationRegisterPage
-            invitation={{ email: 'invited@example.com', expiresAt: '2026-09-20T00:00:00Z' }}
+            invitation={{
+                email: 'invited@example.com',
+                organizationName: 'Acme Holdings',
+                expiresAt: '2026-09-20T00:00:00Z',
+            }}
             token="invitation-token"
         />,
     );
 
     expect(screen.getByLabelText('Email address')).toBeDisabled();
+    expect(screen.getByText('Acme Holdings')).toBeInTheDocument();
+    expect(screen.getByText(/You have been invited to join/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Microsoft' })).toHaveAttribute(
         'href',
         '/auth/microsoft/redirect?invitation=invitation-token',

@@ -2,16 +2,19 @@
 
 namespace App\Services;
 
+use App\Exceptions\OrganizationInvitationException;
 use App\Exceptions\OrganizationMembershipException;
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\OrganizationPolicy;
 use Closure;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Operator-side organization membership (Release 1.0, MO-2A1): add, promote, demote, remove, and the explicit approval of an
@@ -53,6 +56,8 @@ use InvalidArgumentException;
 final class OrganizationMembership
 {
     public const ADDED = 'organization member added';
+
+    public const ADDED_BY_INVITATION = 'organization member added (invitation accepted)';
 
     public const PROMOTED = 'organization member promoted to administrator (not approved)';
 
@@ -276,6 +281,97 @@ final class OrganizationMembership
 
             return true;
         });
+    }
+
+    /**
+     * INTERNAL to {@see OrganizationInvitations::accept()}: the membership an accepted invitation creates (Release 1.0, R1-3A). Not an
+     * operator action, so it does not call {@see authorize()}: the person it adds is the invitee, and the authority it relies on is the
+     * ISSUER's, re-checked from the tables below. It takes TWO identifiers and nothing else, no organization, role, inviter or approval flag:
+     * everything it relies on is read from the database, under lock, inside the call, and the row it writes is `role = member` with neither
+     * approval column named. Nothing a caller passes can change either.
+     *
+     * IT TAKES NO LOCKS OF ITS OWN AND TRUSTS NO CALLER'S TRANSACTION. The canonical order is user row (S, the issuer) -> organization row
+     * (X) -> invitation row (X). An arbitrary open transaction is not proof that anything was locked, let alone in that order, and a lock
+     * taken here late, after other rows, could close a cycle with a suspension. So this method requires PROOF that the acceptance
+     * orchestrator took those three locks, in order, in the transaction level it is running in
+     * ({@see OrganizationInvitations::holdsAcceptanceLocks()}, settable only by the orchestrator), and otherwise refuses with a
+     * LogicException. A source-level test pins that the orchestrator is its only caller.
+     *
+     * Everything is then re-read, under those locks (a locking read returns the latest committed row, whatever the snapshot): the
+     * invitation is open and still holds its slot, the issuer is still a membership manager (table-based, no cache), the recipient exists,
+     * is active, has the invitation's address (by database comparison) and is not already a member. Any failure throws and the
+     * orchestrator's transaction rolls everything back.
+     *
+     * @internal
+     *
+     * @throws LogicException when it is not called from the acceptance orchestrator inside its transaction
+     * @throws OrganizationInvitationException when the persisted invitation, its organization or its issuer no longer qualify
+     * @throws OrganizationMembershipException when the recipient is suspended or already a member
+     */
+    public function addFromInvitation(int $invitationId, User $recipient): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('addFromInvitation() runs only inside the acceptance transaction.');
+        }
+
+        if (! OrganizationInvitations::holdsAcceptanceLocks($invitationId)) {
+            throw new LogicException('addFromInvitation() runs only from OrganizationInvitations::accept(), inside the transaction in which it took its locks.');
+        }
+
+        $invitation = DB::table('organization_invitations')->where('id', $invitationId)->lockForUpdate()->first()
+            ?? throw OrganizationInvitationException::unavailable('unknown');
+
+        $now = now();
+        $open = $invitation->accepted_at === null
+            && $invitation->revoked_at === null
+            && Carbon::parse($invitation->expires_at)->gt($now)
+            && $invitation->live_email !== null
+            && $invitation->live_email === $invitation->email;
+
+        if (! $open) {
+            throw OrganizationInvitationException::unavailable('not_open');
+        }
+
+        $org = DB::table('organizations')->where('id', $invitation->organization_id)->lockForUpdate()->first(['id', 'name'])
+            ?? throw OrganizationInvitationException::unavailable('organization_missing');
+        $org->id = (int) $org->id;
+
+        if (! OrganizationAuthority::isMembershipManager((int) $invitation->invited_by)) {
+            throw OrganizationInvitationException::unavailable('issuer_unauthorized');
+        }
+
+        // The recipient, from the table and not from the model passed: it exists and carries exactly the invited address.
+        $account = DB::table('users')->where('id', $recipient->getKey())->where('email', $invitation->email)->first(['id', 'name', 'disabled_at'])
+            ?? throw OrganizationInvitationException::unavailable('recipient_address');
+        $account->id = (int) $account->id;
+
+        if ($account->disabled_at !== null) {
+            throw OrganizationMembershipException::suspended($account->name);
+        }
+
+        if ($this->membership($org->id, $account->id) !== null) {
+            throw OrganizationMembershipException::alreadyMember($account->name, $org->name);
+        }
+
+        // The role is a literal and neither approval column is named: an invitee is always an ordinary, unapproved member.
+        DB::table('organization_members')->insert([
+            'organization_id' => $org->id,
+            'user_id' => $account->id,
+            'role' => 'member',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        activity()->causedBy($recipient)->performedOn(Organization::withoutGlobalScopes()->findOrFail($org->id))
+            ->withProperties([
+                'user_id' => $account->id,
+                'member_name' => $account->name,
+                'invitation_id' => $invitationId,
+                'invited_by' => (int) $invitation->invited_by,
+                'old' => null,
+                'new' => ['role' => 'member', 'approved' => false],
+            ])
+            ->log(self::ADDED_BY_INVITATION);
     }
 
     // ── Reads (for the operator screen; call only for an actor who passed OrganizationPolicy::manageMembership) ──

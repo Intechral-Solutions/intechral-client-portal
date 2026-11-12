@@ -6,13 +6,13 @@
  */
 
 use App\Models\CmsPage;
-use App\Models\Invitation;
 use App\Models\Ticket;
 use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/PilotTestHelpers.php';
+require_once __DIR__.'/../Auth/InvitationTestHelpers.php';
 require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 
 beforeEach(function () {
@@ -132,12 +132,12 @@ it('keeps authentication, account management and sign-out working for a closed c
 
 it('still accepts a password invitation and offers no SSO, in closed mode', function () {
     Notification::fake();
-    $invitation = Invitation::factory()->pending()->create(['email' => 'closed-new@example.com']);
+    [, $token] = regInvOpen('closed-new@example.com');
     pilotMode('closed');
 
-    $this->get(route('invitation.show', $invitation->token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', false));
+    $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', false));
 
-    $this->post(route('invitation.register', $invitation->token), [
+    $this->post(route('invitation.register', $token), [
         'name' => 'Closed New', 'password' => 'Str0ng!Passw0rd-xyz', 'password_confirmation' => 'Str0ng!Passw0rd-xyz',
     ])->assertRedirect(route('dashboard'));
     $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page->component('dashboard/customer-unavailable'));

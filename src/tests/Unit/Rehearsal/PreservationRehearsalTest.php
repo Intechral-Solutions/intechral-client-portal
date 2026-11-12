@@ -65,7 +65,7 @@ it('applies M1, M2 and M3 to the populated baseline, after the fixtures, changin
         ->and($report['candidates'])->toBe(PRESERVATION_CANDIDATES)
         ->and($report['migration']['applied'])->toBe(PRESERVATION_CANDIDATES)
         ->and($report['migration']['applied_after_fixtures'])->toBeTrue()
-        ->and($report['migration']['populated_before'])->toBe(['migrations' => 45, 'fixture_rows' => 205, 'fixture_tables' => 33])
+        ->and($report['migration']['populated_before'])->toBe(['migrations' => 45, 'fixture_rows' => 203, 'fixture_tables' => 33])
         ->and($report['migration']['unexercised'])->toBe(RELEASE_1_0_CANDIDATES)
         ->and($report['migration']['differences'])->toBe([])
         ->and($report['baseline']['failures'])->toBe([])
@@ -94,6 +94,8 @@ it('changes the 14 approved keys and adds the column, as read back from the rehe
 });
 
 // 203 -> 205 (R0.9-CS1): the catalogue gained portal.operator, so the seeded permissions and role grants gained one row each.
+// 205 -> 203 (R1-3B): the catalogue lost users.invite, so the seeded permissions and the operator's role grants lost one row each. (The fixtures seed
+// permissions from the CURRENT catalogue; the legacy `invitations` rows they insert stay, because the pinned baseline migrations still build that table.)
 it('adds users.disabled_at to a populated users table without altering any existing user', function () {
     // M1 alone: the five fixture users exist before it runs, and the harness compares every one of their rows
     // (over the pre-migration columns) before and after.
@@ -101,7 +103,7 @@ it('adds users.disabled_at to a populated users table without altering any exist
 
     expect($exit)->toBe(0)
         ->and($report['migration']['differences'])->toBe([])
-        ->and($report['migration']['populated_before']['fixture_rows'])->toBe(205);
+        ->and($report['migration']['populated_before']['fixture_rows'])->toBe(203);
 
     $db = RehearsalTarget::primary()->connection();
 

@@ -19,6 +19,7 @@ use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyControll
 use App\Http\Controllers\Operator\TicketReportController;
 use App\Http\Controllers\Operator\TimeReportController;
 use App\Http\Controllers\Organization\OrganizationController;
+use App\Http\Controllers\Organization\OrganizationInvitationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\Organization\OrganizationRelationshipController;
 use App\Http\Controllers\ProfileController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\ProjectTimeController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
+use App\Support\InvitationIssueThrottle;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
@@ -46,20 +48,26 @@ Route::get('/', function () {
 //               GET/POST /confirm-password, GET/POST /user/profile-information,
 //               GET/POST /user/password, GET/POST /user/two-factor-*
 
-// Invitation-based registration (replaces Fortify registration)
-Route::middleware('guest')->group(function () {
-    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.show');
-    Route::post('/invitation/{token}', [InvitationController::class, 'register'])->name('invitation.register');
+// Invitation-based registration (replaces Fortify registration). Release 1.0 (R1-3B): the token resolves ONLY through the hashed organization
+// invitations; GET reads and never consumes. These three routes carry the token in their URL, so they share the credential protections:
+// `Referrer-Policy: no-referrer` + `Cache-Control: no-store` + not remembered as the session's previous URL (ProtectInvitationCredential) and
+// a per-client-IP limiter (AppServiceProvider::registerInvitationRateLimiters). Names and URL shapes are unchanged: the customer pilot's
+// allow-list pins them.
+// The credential protections come first, ahead of `guest`: a signed-in user who opens an invitation link is redirected by `guest`, and that
+// request must not leave the token-bearing URL in their session either.
+Route::middleware(['invitation.credential', 'guest'])->group(function () {
+    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->middleware('throttle:invitation')->name('invitation.show');
+    Route::post('/invitation/{token}', [InvitationController::class, 'register'])->middleware('throttle:invitation-register')->name('invitation.register');
 });
 
-// SSO (Socialite)
-Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('sso.redirect');
+// SSO (Socialite). `sso.redirect` carries an invitation token when it is started from an invitation link: then, and only then, it gets the same
+// protections and its own limiter (a no-op without an `invitation` query, so ordinary SSO login is untouched). The callback carries only the
+// provider's code and state; the invitation lives in the session as a hash.
+Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+    ->middleware(['invitation.credential:query', 'throttle:invitation-sso'])->name('sso.redirect');
 Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('sso.callback');
 
-// Operator: send invitation
-Route::middleware(['auth', 'can:users.invite'])->group(function () {
-    Route::post('/invitations', [InvitationController::class, 'store'])->name('invitations.store');
-});
+// (The organization-less operator invitation, POST /invitations, was retired in R1-3B. Issuance is by organization, on the organization page.)
 
 // Admin: role management
 Route::middleware(['auth', 'can:roles.view'])->prefix('admin')->name('roles.')->group(function () {
@@ -281,6 +289,13 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
     Route::post('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'approve'])->name('members.approve');
     Route::delete('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'revokeApproval'])->name('members.approval.revoke');
+
+    // Release 1.0 (R1-3C): organization-bound invitations, operator-only (`manageMembership`, checked by the controller and again by the
+    // service). Issue doubles as Resend. The invitation id is a plain integer looked up WITHIN the organization by the service.
+    // Issuance is limited to 30 attempts an hour per operator (InvitationIssueThrottle); revocation is deliberately NOT limited, so an
+    // operator who has reached the limit can still kill a link.
+    Route::post('/{organization}/invitations', [OrganizationInvitationController::class, 'store'])->middleware('throttle:'.InvitationIssueThrottle::NAME)->name('invitations.store');
+    Route::delete('/{organization}/invitations/{invitation}', [OrganizationInvitationController::class, 'destroy'])->whereNumber('invitation')->name('invitations.destroy');
 
     // Release 1.0 (MO-1A): partner designation and managed-customer links. Operator-only (OrganizationPolicy needs portal.operator AND
     // crm.manage; the route's `can:crm.manage` is only the first gate). The id is a plain integer, never a bound model: see the controller.

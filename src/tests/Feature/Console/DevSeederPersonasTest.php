@@ -87,7 +87,11 @@ it('R1-2: gives each persona that files requests one organization of its own, at
         // R1-2B: the organization-selection personas: two organizations, and none.
         ->and($slugs('e2e-customer-multi@intechral.test'))->toBe(['e2e-multi-org-a', 'e2e-multi-org-b'])
         ->and($slugs('e2e-customer-no-org@intechral.test'))->toBe([])
-        ->and(DB::table('organizations')->count())->toBe(5)
+        // R1-3C: the sixth organization is the one the invitation journey invites people INTO. It is seeded EMPTY: every person it ever holds
+        // is an account the browser spec created by accepting a real invitation, and `e2e:cleanup-invitees` removes exactly those.
+        ->and(DB::table('organizations')->where('slug', 'e2e-invitations-org')->count())->toBe(1)
+        ->and(DB::table('organization_members')->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')->where('organizations.slug', 'e2e-invitations-org')->count())->toBe(0)
+        ->and(DB::table('organizations')->count())->toBe(6)
         ->and(DB::table('organization_members')->count())->toBe(5)
         ->and(DB::table('organization_members')->where('role', '<>', 'member')->count())->toBe(0);
 

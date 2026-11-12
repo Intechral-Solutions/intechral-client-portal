@@ -50,6 +50,7 @@ spec files need that persona or how many cores the machine has. `playwright.conf
 | `e2e-customer-other@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 8); `contextFor('customerOther')` | A second, unrelated customer, used only to prove isolation: it is refused `e2e-customer`'s ticket and attachments and never lists them. It creates no ticket |
 | `e2e-customer-multi@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 10), `customer-pilot.spec.ts`; `contextFor('customerMulti')` | R1-2B: a customer in **two** organizations (`E2E Multi Org A` and `B`), so the create page offers an explicit required choice. Its disposable `E2E-…` requests are removed by the suite cleanup like every other (it is in the cleanup command's owner allowlist) |
 | `e2e-customer-no-org@intechral.test` | user (minimal) | `customer-helpdesk.spec.ts` (journey 11), `customer-pilot.spec.ts`; `contextFor('customerNoOrg')` | R1-2B: a customer in **no** organization: the create page explains instead of offering a form, and a request posted by hand is refused. It creates no ticket |
+| `e2e-invitee+<run>@example.test` (created by the spec, never seeded) and the seeded **`E2E Invitations Org`** (`e2e-invitations-org`, no members) | user (minimal), created by **accepting a real invitation** | `organization-invitations.spec.ts` (R1-3C) | The recipient side of the invitation journey: an operator invites the address into the E2E organization, the spec reads the mail from Mailpit, follows the link and registers. Every such account is removed once, after the suite, by `e2e:cleanup-invitees` (below); nothing else deletes a user. The organization is empty after seeding, and the cleanup refuses to touch any other organization's records |
 | `e2e-operational-member@intechral.test` | user + `projects.manage` (direct) | `shell.spec.ts`, `blade-shell.spec.ts`, `time-migration.spec.ts`, `tasks-migration.spec.ts`; `persona: 'operationalMember'` | A customer-scoped actor that still gets the **Operational** shell (`projects.manage` is an operator-surface capability), for specs whose subject is the rail, drawer, breadcrumb or timer pill and tray, which a plain customer no longer sees. It is the single owner of the member active-timer set that `time-migration.spec.ts` documents |
 | dynamically created manager (`e2e-wp3-manager-<timestamp>@intechral.test`) | user + `projects.manage` | `projects-migration.spec.ts` (membership test) | Created by the test itself to prove a *specific* non-admin manager's read-only membership view; a fresh, explicitly anonymous context (`contextFor('anonymous')`) is required so it doesn't inherit the project's authenticated `storageState` |
 
@@ -221,6 +222,119 @@ database needs `php artisan roles:sync` first, which you should only apply to a 
 the development default (legacy) and several are expected to fail against a pilot server (customer Invoices and Resources navigation,
 the customer project Overview), so run this file alone in that mode. It creates one project (tracked for cleanup like the other
 project specs) and no tickets.
+
+## Organization invitations (`organization-invitations.spec.ts`, R1-3C)
+
+Release 1.0, R1-3C. The operator-to-recipient journey in real Chromium, against the seeded `E2E Invitations Org`:
+the operator issues an invitation on the organization page, the recipient follows the link **in the mail**,
+registers with a password, and the operator sees the outcome. It also covers resend (the earlier link dies), revocation
+(the link is dead and the card says why), a link that was never issued, the recipient's validation, the operator
+form's keyboard and error behaviour, and the refusals (an ordinary customer, a guest, and the newly created member are
+all refused every operator route). Design record: [section 20](../product/release-1.0-r1-3-organization-invitations.md#20-r1-3c-implementation-record).
+
+**It reads the mail the way a recipient does.** An invitation's plaintext token is stored nowhere (the database holds
+only its hash), so the spec cannot read it from the application: it reads the message from **Mailpit's HTTP API**
+(`support/mailpit.ts`), exactly as a person reads their mailbox, and follows the link in it. That proves the whole
+chain: the route, the after-commit dispatch, the queue worker, the send-time check and the template. It therefore needs
+the stack's **`queue` and `mailpit` services**, which the dev stack starts and the hosted `browser` job now starts
+explicitly (`.github/workflows/ci.yml`, after the install step). `E2E_MAILPIT_URL` overrides the address (default
+`http://mailpit:8025`). When Mailpit cannot be reached the spec **fails**, naming this as the cause; it never skips and
+never invents a link.
+
+**Fixture ownership.** Every address is `e2e-invitee+<entropy>-<label>@example.test` (lower case, a reserved test
+domain); every invitation goes into `E2E Invitations Org` and nowhere else; no account exists except by accepting a
+real invitation. The spec deletes nothing.
+
+**Not here, on purpose.** The new member raising a request for the organization is proved in Pest (the operator-to-recipient
+journey in `OrganizationInvitationOperatorTest`, and the R1-3A and R1-3B suites). A ticket raised by an invitee is not
+one the ticket cleanup may delete (it is bound to the seeded customers), and the invitee cleanup refuses an account that
+has one, so a browser step that raised one would leave an undeletable account. Customer invitation single sign-on is
+deferred, so the spec does not touch a provider; whether the registration page also offers single sign-on depends on
+the customer-surface mode and is a Pest matter.
+
+**Referrer-Policy: what the browser actually sends is asserted, not what the server says.** The invitation page is a
+credential-bearing response (its URL holds the token). The application marks it `Referrer-Policy: no-referrer` and
+`Cache-Control: no-store` and, because a header alone is not enough, also renders `<meta name="referrer"
+content="no-referrer">` first in the document head, only on those responses (the middleware sets a request attribute;
+ordinary pages never carry the tag). The reason is a finding of the R1-3C review: the development nginx **appended**
+`strict-origin-when-cross-origin` after the application's header, a browser applies the **last** of several values, and
+Chromium therefore sent the full invitation URL as the `Referer` of every same-origin request the page made, which
+nginx logged. `.docker/nginx/default.conf` now supplies its default only when the application sent none (a `map` on
+`$sent_http_referrer_policy`), so a credential response leaves with exactly one `no-referrer` line and ordinary pages
+keep the stack default.
+
+The spec (`describe('the invitation link and what it may leak')`, and the recipient journey) proves it from the browser's
+side with `support/referer-capture.ts`, which records **every** request the context makes with its raw `Referer`:
+
+- the credential response has exactly one `Referrer-Policy` line, `no-referrer`, and the meta tag is the first element
+  after `<meta charset>`; an ordinary page (`/login`) keeps exactly the stack default and carries no meta tag;
+- over the page load (document, scripts, stylesheets, fonts), a same-origin `fetch`, an image, a link navigation and the
+  registration form's POST, **no request carries the invitation route in its `Referer`** (and the capture is shown to
+  have seen same-origin assets and the POST, so an empty result cannot pass by seeing nothing);
+- **a regression control**: a loopback proxy (`startLeakyProxy`) serves the page the way the old stack did (two
+  `Referrer-Policy` lines, no meta tag) and the same capture **does** see the token in same-origin asset `Referer`s, so
+  the check above is known to be able to fail. Verified by mutation on 2026-11-12: against the original nginx
+  configuration with the meta tag removed the capture test fails (`Received: http://…/invitation/<token>`); either
+  remedy alone keeps it green; with both removed the header and meta test fails.
+
+The access log still records the token-bearing **request line** (`GET /invitation/<token>`): that is inherent to a
+credential in a path, and the production web server's log handling remains a Release 1.0 preproduction requirement
+(release-1.0-r1-3-organization-invitations.md, 19.9 obligation 7), as does the effective policy on that host.
+
+**The mailed link's origin.** One test reads the invitation mail from Mailpit and asserts that its link is absolute and
+built on the **configured** `APP_URL` (`configuredAppOrigin()`: the environment, else `src/.env`, the file the worker
+reads). The journey then follows the link's *path* against the test's own base URL, because inside the container
+Playwright reaches the app under a different name than the public origin.
+
+**Single use.** After registering, the same link is opened in a **fresh anonymous browser context** and must show
+"Invitation unavailable": the answer is the invitation's own, not the `guest` middleware turning a signed-in browser
+away.
+
+**Issuance throttle.** Operators may issue 30 invitations an hour (`InvitationIssueThrottle`; Pest proves the 31st is a
+429 that changes nothing). A whole suite stays well under it, and repeated local runs would not: the invitee cleanup
+(below) clears the **seeded E2E operator's** counter, and only that account's, inside its environment guard. There is no
+route or option for it, and the production limit is unchanged.
+
+## E2E invitee cleanup
+
+The invitation journey accepts real invitations, so every run leaves an account, a membership and an invitation that
+nothing else deletes (there is no route or UI that deletes a user, and `tickets.user_id` and the other user keys are
+`RESTRICT`). A local/testing-only command removes exactly those: `php artisan e2e:cleanup-invitees`. It takes **no
+argument and no option**, and follows the same rules as `e2e:cleanup-tickets`: `local` and `testing` only (the runtime
+**and** the configured environment, so `--env` cannot authorise a run), once after the whole suite, never from a test or
+a worker.
+
+**Three markers at once.** An account is eligible only when (1) its address is exactly
+`e2e-invitee+<run>@example.test` (lower case), **and** (2) it was created by an **accepted** organization invitation,
+**and** (3) that invitation belongs to one of the suite's own organizations (`CleanupE2eInvitees::ORGANIZATION_SLUGS`,
+`e2e-invitations-org`). A pending, expired, revoked or superseded invitation is eligible only on the same address and the
+same organization. Anything that matches only part of that is **ambiguous**: it is reported and left, and the run exits
+non-zero.
+
+**Refused, deleting nothing of the account:** any role other than the built-in `user`; any direct permission; any
+operator eligibility or membership-management authority (read from the tables); a membership of an organization that is
+not the suite's; and **any row anywhere that references the account** other than the four kinds the command removes
+(its accepted invitation, its memberships, its password histories and its linked social accounts). The referencing
+tables are discovered from the schema's foreign keys at run time, so a table added later refuses the account until
+someone decides about it. A ticket, time entry, task, comment or project it created therefore blocks it; the ticket
+cleanup is not extended to cover invitees, and the invitee cleanup always runs **after** it.
+
+**One transaction per account**, in the global lock order (the account's own row, then the organizations ascending,
+then its invitations ascending), re-checking every rule under those locks, deleting in dependency order: invitations,
+memberships, password histories, social accounts, sessions, role assignment, then the user. A failure leaves that
+account whole and the run goes on to the rest, then exits non-zero (the report names ids and counts, never an address,
+a token or a hash). The activity log is audit and is never touched. It is idempotent.
+
+**One more thing, only one.** The same guarded run clears the seeded E2E operator's invitation-issuance counter (see
+"Issuance throttle" above): a cache key, reported as `Invitation issuance counter cleared for the seeded E2E operator.`
+(`CleanupE2eInviteesTest` pins that it clears that account's key and no other, and that a refused environment clears nothing).
+
+**Who runs it.** `./dev test:e2e` runs it twice, **after each ticket cleanup**: as the recovery sweep before the suite
+(a refusal stops the run before it starts, so the suite never stacks on something ambiguous) and after Playwright has
+exited. Its status is folded into the wrapper's final status and the summary line (`invitee cleanup exit: N`). A suite
+started by hand gets both cleanups, tickets first, from `globalTeardown`, and each failure is reported even if the other
+also failed. `CleanupE2eInviteesTest` pins every rule above; the `./dev` self-tests pin the order, the
+identity, the arguments and the failure policy.
 
 ## Shared records: never select by position
 

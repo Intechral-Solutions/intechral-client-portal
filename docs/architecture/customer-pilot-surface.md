@@ -39,7 +39,7 @@ the remaining H5 to H10 decisions, administrator recovery and operator MFA.
 There is no `is_operator` column and no user type. Identity is capabilities (Spatie permissions, through roles):
 
 - The built-in `user` role (`PermissionCatalogue::userDefaults()`) is what every invitation assigns
-  (`InvitationService::acceptWithPassword` and `acceptWithSocialAccount`). Since R1-1 it holds the customer minimum only:
+  (`OrganizationInvitations::accept` and `acceptByHash`, R1-3; the organization-less `InvitationService` is retired). Since R1-1 it holds the customer minimum only:
   `tickets.view`, `tickets.create`, `projects.view`, `cms.view`. It no longer carries `tickets.view_org`, `projects.view_org`,
   `tasks.view_org`, `billing.view`, `billing.view_org`, `time.log`, `time.view_own` or `time.view_org` (the `*.view_org` ones
   are read by no code path), so a managed customer organization inherits no billing, time or organization-wide access. A direct
@@ -81,8 +81,12 @@ holds neither, so only an explicit grant reaches those two rows). None of it is 
 | Helpdesk | `tickets.*`, `tickets.replies.store`, `tickets.attachment.download` | the approved surface |
 
 Operator-only routes (`operator.*`, `crm.*`, `organizations.*`, `admin/*`, `billing.invoices.*` management,
-`projects.create/store/edit/update/destroy/companies/members`, `invitations.store`) are capability-gated and unreachable
-by a customer; they are listed so the denylist is complete.
+`projects.create/store/edit/update/destroy/companies/members`; the retired `POST /invitations` no longer exists, R1-3B) are capability-gated and unreachable
+by a customer; they are listed so the denylist is complete. **R1-3C added two names under `organizations.*`: `organizations.invitations.store` (issue and Resend) and `organizations.invitations.destroy` (revoke).**
+They are operator-only twice over: the pilot gate does not allow-list them (so a customer in `closed` or `pilot` mode is answered 404 before any binding, which `CustomerPilotRouteBoundaryTest` pins with the
+customer being a member of the very organization), and the controller and the service both require `manageMembership` (an active account holding `portal.operator` and `crm.manage`), so in `legacy` mode
+an ordinary customer, an approved organization administrator, a partner administrator and a holder of `org.invite` alone are all refused (403, or 404 where the tenant scope already hides the organization). **No allow-list
+change**: the pilot route table is identical apart from these two operator-only names.
 
 ### 2.3 Serialized data a customer receives today
 
@@ -103,7 +107,7 @@ Removing a component does not remove props already sent. The Inertia props that 
   no business there; it is not customer functionality. It must keep working for Stripe and for the operator payment
   infrastructure, so the boundary does not apply to unauthenticated requests.
 - **SSO**: `login` (an existing linked account signs in directly through `Auth::login`, **bypassing the two-factor
-  challenge**), `invitation` (creates a new `user`-role account) and `link` (attaches a provider to the signed-in
+  challenge**), `invitation` (creates a new `user`-role account and an ordinary member of the invited organization) and `link` (attaches a provider to the signed-in
   account). Operators use SSO login and must not be disrupted.
 - **Attachments**: the only download route is `tickets.attachment.download`, authorized by `TicketPolicy::downloadAttachment`
   (own ticket, no internal-note attachments). The `storage.local` signed-URL route exists in development for the `local`
@@ -140,7 +144,7 @@ holding `portal.operator`), a guest and an unauthenticated external caller are u
 
 Everything else, by default; the allowlist is the control. Named so a review can check them: `billing.*`, `time.*`, `tasks.*`,
 `projects.board`, `projects.tasks.*`, `projects.time.index`, `projects.milestones.*`, `cms.*`, `sso.redirect` and `sso.callback`
-for a signed-in customer, `operator.*`, `crm.*`, `organizations.*`, `roles.*`, `users.*`, `invitations.store`, `webhooks.stripe`
+for a signed-in customer, `operator.*`, `crm.*`, `organizations.*`, `roles.*`, `users.*`, `webhooks.stripe`
 for a signed-in customer (Stripe itself is unauthenticated and unaffected), and every unnamed route. In closed mode the Helpdesk
 and projects are denied as well.
 
@@ -275,9 +279,12 @@ HTML, JSON, Inertia with the current asset version, Inertia with a stale or miss
     before. This also closes the path that signs a user in without the two-factor challenge.
   - *Invitation:* every invitation creates a customer account, so in closed and pilot mode SSO acceptance is refused at the
     redirect and the callback, no account is created and the invitation stays pending. The invitation page offers the password
-    form only (`providersAvailable`). Password acceptance is unchanged. A **missing, empty, repeated (array) or unknown**
-    `invitation` query value is answered at the redirect with the ordinary "This invitation is no longer available." sign-in
-    redirect before anything is built from it (an empty token used to reach `route('invitation.show', '')` and return 500).
+    form only (`providersAvailable`). Password acceptance is unchanged in the routes it uses (`invitation.show`, `invitation.register`,
+    still allow-listed by name) but, since R1-3B, resolves only organization invitations. A **missing, empty, repeated (array),
+    malformed, unknown, dead or retired-legacy** `invitation` query value is answered at the redirect with the ordinary "This
+    invitation is no longer available." sign-in redirect before anything is built from it (an empty token used to reach
+    `route('invitation.show', '')` and return 500). The session context holds the invitation's hash, never the token, so the
+    callback has no link to redirect to: it ends at the login page ([Authentication Flow](./auth-flow.md#openid-sso-flow)).
   - *Link:* `sso.redirect` and `sso.callback` are not on any allowlist, so a signed-in customer gets 404. The profile page lists
     no provider to connect; an already-connected provider is listed so it can be disconnected.
   - The login page keeps its provider buttons: a guest is not yet known to be a customer, and operators use them.

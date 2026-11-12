@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Organization;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\OrganizationInvitationList;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
 use Illuminate\Support\Facades\Gate;
@@ -45,7 +46,11 @@ class OrganizationController extends Controller
         // page (a customer holding a stray crm.manage) gets no relationship data at all, not a hidden section.
         $relationship = Gate::allows('manageRelationships', Organization::class) ? $this->relationshipPanel($organization) : null;
 
-        return view('organizations.show', compact('organization', 'availableUsers', 'relationship', 'memberships'));
+        // Release 1.0 (R1-3C): the Invitations card holds invitees' addresses and the names of inviters, so it is built only for an actor who
+        // may manage membership, like the member administration above. For anyone else the page has no such card at all, not a hidden one.
+        $invitations = $canManageMembership ? OrganizationInvitationList::for($organization->getKey()) : null;
+
+        return view('organizations.show', compact('organization', 'availableUsers', 'relationship', 'memberships', 'invitations'));
     }
 
     /** @return array<string, mixed> */

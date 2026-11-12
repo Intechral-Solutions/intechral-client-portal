@@ -280,6 +280,16 @@ run_ticket_cleanup() {
     dc exec -T -u "$WEB_USER" -e HOME=/tmp "$SVC_APP" env "APP_ENV=$DEV_ENV" "DB_DATABASE=$DEV_DB" "DB_HOST=$DEV_DB_HOST" php artisan e2e:cleanup-tickets --no-interaction </dev/null
 }
 
+# run_invitee_cleanup <label> - the E2E invitee cleanup command (Release 1.0, R1-3C) against the verified dev target. The browser suite's
+# invitation journey really accepts invitations, so every run leaves accounts, memberships and invitations that nothing else deletes. The
+# command takes no argument, is bound to the reserved address and the suite's own organization, and refuses anything ambiguous. It touches no
+# files, so it needs no particular identity; it runs as the web-server user like the ticket cleanup for uniformity. It runs AFTER the ticket
+# cleanup, because an account that owns a ticket is refused, never detached.
+run_invitee_cleanup() {
+    head_line "E2E invitee cleanup ($1)"
+    dc exec -T -u "$WEB_USER" -e HOME=/tmp "$SVC_APP" env "APP_ENV=$DEV_ENV" "DB_DATABASE=$DEV_DB" "DB_HOST=$DEV_DB_HOST" php artisan e2e:cleanup-invitees --no-interaction </dev/null
+}
+
 # cmd_test_e2e - one suite per database, with the ticket cleanup around it:
 #   lock + competing-suite probe -> recovery sweep -> baseline counts -> Playwright -> post-run cleanup ->
 #   after counts -> reconciliation (ticket rows AND attachment directories).
@@ -294,7 +304,7 @@ cmd_test_e2e() {
     require_docker
     require_running "$SVC_APP" "$SVC_NGINX" "$SVC_DB"
 
-    local before='' after='' dirs_before='' listing=0 arg pw_rc=0 cleanup_rc=0 reconcile_rc=0 dirs_rc=0 final_rc=0
+    local before='' after='' dirs_before='' listing=0 arg pw_rc=0 cleanup_rc=0 invitee_rc=0 reconcile_rc=0 dirs_rc=0 final_rc=0
     for arg in "$@"; do
         if [[ $arg == --list ]]; then listing=1; fi
     done
@@ -321,6 +331,12 @@ cmd_test_e2e() {
             die "the recovery sweep failed, so the ticket baseline would not be clean. Nothing was run. Fix the cause shown above, then run ./dev test:e2e again."
         fi
         say
+        # After the ticket sweep (an invitee that owns a ticket is refused, never detached). Idempotent; a refusal means something ambiguous
+        # is on the reserved address and a person must decide, so the suite does not start on top of it.
+        if ! run_invitee_cleanup "recovery sweep, before the suite"; then
+            die "the invitee recovery sweep failed or refused a target. Nothing was run. Fix the cause shown above, then run ./dev test:e2e again."
+        fi
+        say
         before="$(product_counts "$R_DB")" || die "could not read baseline counts."
         print_counts "Before" "$before"
         # After the sweep, so it holds only the directories of tickets this suite must not touch.
@@ -344,6 +360,9 @@ cmd_test_e2e() {
         # happened (a runner crash) is covered too.
         run_ticket_cleanup "after the suite" || cleanup_rc=$?
         say
+        # After the ticket cleanup, for the same reason as in the sweep.
+        run_invitee_cleanup "after the suite" || invitee_rc=$?
+        say
         after="$(product_counts "$R_DB")" || die "Playwright finished (exit $pw_rc) but the after-counts could not be read."
         print_counts "After" "$after"
         compare_counts "$before" "$after"
@@ -352,13 +371,14 @@ cmd_test_e2e() {
     fi
 
     final_rc=$pw_rc
-    if [[ $final_rc -eq 0 && ( $cleanup_rc -ne 0 || $reconcile_rc -ne 0 || $dirs_rc -ne 0 ) ]]; then final_rc=1; fi
+    if [[ $final_rc -eq 0 && ( $cleanup_rc -ne 0 || $invitee_rc -ne 0 || $reconcile_rc -ne 0 || $dirs_rc -ne 0 ) ]]; then final_rc=1; fi
 
     if [[ $listing -eq 0 ]]; then
         say
-        say "Playwright exit: $pw_rc | ticket cleanup exit: $cleanup_rc | ticket reconciliation: $([[ $reconcile_rc -eq 0 ]] && echo ok || echo FAILED) | attachment directories: $([[ $dirs_rc -eq 0 ]] && echo ok || echo FAILED)"
+        say "Playwright exit: $pw_rc | ticket cleanup exit: $cleanup_rc | ticket reconciliation: $([[ $reconcile_rc -eq 0 ]] && echo ok || echo FAILED) | attachment directories: $([[ $dirs_rc -eq 0 ]] && echo ok || echo FAILED) | invitee cleanup exit: $invitee_rc"
         [[ $pw_rc -eq 0 ]] || say "Failure traces (if any) stay inside the container at $E2E_OUTPUT_DIR."
         [[ $cleanup_rc -eq 0 ]] || say "${C_RED}The ticket cleanup failed:${C_RST} E2E tickets may remain. The next ./dev test:e2e sweeps them once the cause above is fixed."
+        [[ $invitee_rc -eq 0 ]] || say "${C_RED}The invitee cleanup failed or refused a target:${C_RST} E2E accounts, memberships or invitations may remain. The next ./dev test:e2e sweeps them once the cause above is fixed."
     fi
     return "$final_rc"
 }

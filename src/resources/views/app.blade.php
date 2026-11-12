@@ -12,6 +12,12 @@
       @if ($shellRoot['drawerSurface']) data-drawer-surface="{{ $shellRoot['drawerSurface'] }}" @endif>
 <head>
     <meta charset="utf-8">
+    {{-- Credential-bearing responses only (the invitation page and its POST; ProtectInvitationCredential sets the attribute). The header is
+         not enough on its own: a proxy may append its own Referrer-Policy and a browser applies the last value, which leaked the token URL
+         as a same-origin Referer. First in the head, before any request-making tag (preloads, scripts, stylesheets). --}}
+    @if (request()->attributes->get(\App\Http\Middleware\ProtectInvitationCredential::ATTRIBUTE))
+    <meta name="referrer" content="no-referrer">
+    @endif
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     @include('layouts.partials.shell.bootstrap')
