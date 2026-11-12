@@ -39,6 +39,7 @@ export function ReplySection({
     reply,
     policy,
     canCreate,
+    replyUrl,
     onSent,
 }: {
     /** The ticket's public reference: the reply URL is addressed by it, never by the numeric key. */
@@ -46,6 +47,8 @@ export function ReplySection({
     reply: ReplyState;
     policy: AttachmentPolicy;
     canCreate: boolean;
+    /** Where a reply is posted. Defaults to the requester's reply route; a partner support page passes its own (R1-4). */
+    replyUrl?: string;
     /** Called once the server has accepted the reply, so the page can announce it and focus it. */
     onSent: () => void;
 }) {
@@ -63,7 +66,7 @@ export function ReplySection({
     function submit(event: FormEvent) {
         event.preventDefault();
 
-        form.post(store.url(ticketReference), {
+        form.post(replyUrl ?? store.url(ticketReference), {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {

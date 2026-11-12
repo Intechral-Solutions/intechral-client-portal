@@ -26,6 +26,9 @@ use LogicException;
  * A plain SELECT is used only to NOMINATE the organization when the request names none (nothing is granted by it: the locked read of
  * that organization's membership decides), and a stale nomination can only produce a refusal or a request to choose.
  *
+ * R1-4: an organization that has been DISABLED (`organizations.disabled_at`) is refused like one that does not exist: no new request can be filed for
+ * it. Nothing else about filing changes; a requester's existing tickets are untouched.
+ *
  * Every read is on the tables directly, unscoped: no global scope, cache or earlier Eloquent relation may decide it.
  *
  * Refusals: an actor who may not create at all (suspended, or without `tickets.create`) is a 403. Everything about WHICH organization is
@@ -58,9 +61,10 @@ final class ServiceRequestAccess
         $organizationId = $requestedOrganizationId ?? $this->soleOrganization($actor);
 
         // 1. The organization row, shared lock: a removal holds it exclusively, so it is either finished (and seen below) or must wait.
-        $organization = DB::table('organizations')->where('id', $organizationId)->sharedLock()->first(['id']);
+        $organization = DB::table('organizations')->where('id', $organizationId)->sharedLock()->first(['id', 'disabled_at']);
 
-        if ($organization === null) {
+        // R1-4: a DISABLED organization is not available for a new request, with the same answer as one that does not exist.
+        if ($organization === null || $organization->disabled_at !== null) {
             throw $this->refusal($requestedOrganizationId === null ? self::NOT_LINKED : self::NOT_AVAILABLE);
         }
 
@@ -90,6 +94,7 @@ final class ServiceRequestAccess
         return DB::table('organization_members')
             ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')
             ->where('organization_members.user_id', $actor->getKey())
+            ->whereNull('organizations.disabled_at')
             ->orderBy('organizations.name')->orderBy('organizations.id')
             ->get(['organizations.id', 'organizations.name'])
             ->map(fn (object $row) => ['id' => (int) $row->id, 'name' => (string) $row->name])
@@ -112,7 +117,11 @@ final class ServiceRequestAccess
      */
     private function soleOrganization(User $actor): int
     {
-        $organizations = DB::table('organization_members')->where('user_id', $actor->getKey())->orderBy('organization_id')->pluck('organization_id');
+        $organizations = DB::table('organization_members')
+            ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')
+            ->whereNull('organizations.disabled_at')
+            ->where('organization_members.user_id', $actor->getKey())
+            ->orderBy('organization_members.organization_id')->pluck('organization_members.organization_id');
 
         return match ($organizations->count()) {
             0 => throw $this->refusal(self::NOT_LINKED),

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\OrganizationInvitationList;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
+use App\Services\PartnerSupportGrants;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -50,7 +51,15 @@ class OrganizationController extends Controller
         // may manage membership, like the member administration above. For anyone else the page has no such card at all, not a hidden one.
         $invitations = $canManageMembership ? OrganizationInvitationList::for($organization->getKey()) : null;
 
-        return view('organizations.show', compact('organization', 'availableUsers', 'relationship', 'memberships', 'invitations'));
+        // Release 1.0 (R1-4): support designations of a PARTNER's members, for an actor who may manage membership; and whether the organization is disabled.
+        // Also built for a NON-partner whose memberships carry designation data (a row the application never writes, which the preflight reports), so the
+        // operator can reach the Revoke control the preflight points to.
+        $support = $canManageMembership && ($organization->can_manage_customers || PartnerSupportGrants::anyDesignationData($organization->getKey()))
+            ? PartnerSupportGrants::rowsFor($organization->getKey())
+            : null;
+        $canManageRelationships = Gate::allows('manageRelationships', Organization::class);
+
+        return view('organizations.show', compact('organization', 'availableUsers', 'relationship', 'memberships', 'invitations', 'support', 'canManageRelationships'));
     }
 
     /** @return array<string, mixed> */

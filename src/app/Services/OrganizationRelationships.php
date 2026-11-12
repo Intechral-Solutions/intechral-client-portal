@@ -48,7 +48,13 @@ final class OrganizationRelationships
 
     public const CUSTOMER_UNLINKED = 'organization unlinked from managing partner';
 
+    public const DISABLED = 'organization disabled';
+
+    public const ENABLED = 'organization enabled';
+
     private const ATTEMPTS = 3;
+
+    public function __construct(private readonly PartnerSupportGrants $supportGrants) {}
 
     // ── Mutations ─────────────────────────────────────────
 
@@ -106,6 +112,54 @@ final class OrganizationRelationships
                 'old' => ['can_manage_customers' => true],
                 'new' => ['can_manage_customers' => false],
             ]);
+
+            // R1-4: this partner's support designations end with the designation, so a later re-designation cannot revive them. (Access already
+            // stops the moment `can_manage_customers` is false: PartnerSupportAccess reads it.) The organization row is locked exclusively above.
+            $this->supportGrants->revokeForPartner($row->id, $actor);
+
+            return true;
+        }, self::ATTEMPTS);
+    }
+
+    /**
+     * Disable an organization (Release 1.0, R1-4): an administrative, reversible state. A disabled organization is refused as the customer of a new
+     * request ({@see ServiceRequestAccess}) and ends partner support access to its tickets, and to those of its customers when it is a partner
+     * ({@see PartnerSupportAccess}). It does not remove members, change a role, delete a record or lock a requester out of their own existing tickets.
+     * Returns false when it already was disabled (its original time is kept).
+     */
+    public function disable(Organization $organization, User $actor): bool
+    {
+        $this->authorize($actor);
+
+        return DB::transaction(function () use ($organization, $actor): bool {
+            $row = $this->lockRaw($organization->getKey());
+
+            if ($row->disabled_at !== null) {
+                return false;
+            }
+
+            $now = now();
+            $this->write($organization, ['disabled_at' => $now]);
+            $this->audit($actor, $organization, self::DISABLED, ['old' => ['disabled' => false], 'new' => ['disabled' => true]]);
+
+            return true;
+        }, self::ATTEMPTS);
+    }
+
+    /** Re-enable a disabled organization. Returns false when it was not disabled. Re-grants nothing: only designations that still exist apply again. */
+    public function enable(Organization $organization, User $actor): bool
+    {
+        $this->authorize($actor);
+
+        return DB::transaction(function () use ($organization, $actor): bool {
+            $row = $this->lockRaw($organization->getKey());
+
+            if ($row->disabled_at === null) {
+                return false;
+            }
+
+            $this->write($organization, ['disabled_at' => null]);
+            $this->audit($actor, $organization, self::ENABLED, ['old' => ['disabled' => true], 'new' => ['disabled' => false]]);
 
             return true;
         }, self::ATTEMPTS);
@@ -283,6 +337,15 @@ final class OrganizationRelationships
                 throw OrganizationRelationshipException::companyPairing($row->name, $companies);
             }
         }
+    }
+
+    /** The organization row, exclusively locked, with `disabled_at` as it is now. */
+    private function lockRaw(int $id): object
+    {
+        $row = DB::table('organizations')->where('id', $id)->lockForUpdate()->first(['id', 'disabled_at']);
+        abort_if($row === null, 404);
+
+        return $row;
     }
 
     /** @param  array<string, mixed>  $changes */

@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
  * nothing and logs nothing. Enforcement at sign-in, on every request, in candidate lists and in notifications is
  * described in docs/architecture/account-lifecycle.md.
  *
+ * Suspension also clears any partner support designation the account holds (Release 1.0, R1-4; {@see PartnerSupportGrants::revokeHeldBy()}).
+ *
  * Both also permanently revoke the organization invitations the account issued that are still open (Release 1.0, R1-3A; see
  * {@see OrganizationInvitations}): suspension because the issuer lost authority, reactivation so that an invitation that survived a race with
  * the suspension can never come back. They run in the existing transaction, take no organization lock and never write the invitation's uniqueness slot (the revoked row keeps it until the next issuance releases it).
@@ -31,6 +33,7 @@ final class AccountLifecycleService
         private readonly AccountAdministrators $administrators,
         private readonly DatabaseSessionManager $sessions,
         private readonly OrganizationInvitations $invitations,
+        private readonly PartnerSupportGrants $supportGrants,
     ) {}
 
     /**
@@ -58,6 +61,10 @@ final class AccountLifecycleService
 
             // R1-3A: the open organization invitations this account issued are revoked, permanently, in this same transaction.
             $this->invitations->revokeIssuedBy([$account->getKey() => OrganizationInvitations::REASON_ISSUER_SUSPENDED], OrganizationInvitations::SOURCE_SUSPENSION, $actor);
+
+            // R1-4: a partner support designation ends with the suspension, permanently, in this same transaction, so a reactivation cannot revive it.
+            // (Access already stops at `disabled_at`; this makes the end permanent.) It takes the user row's exclusive lock, held above, as its serialization point.
+            $this->supportGrants->revokeHeldBy((int) $account->getKey(), $actor);
 
             activity()->causedBy($actor)
                 ->performedOn($account)

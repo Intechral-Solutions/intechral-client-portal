@@ -62,6 +62,9 @@ class TicketService
 
     public const CLOSED_REPLY_MESSAGE = 'This request is closed. Raise a new request if you need more help.';
 
+    /** Release 1.0 (R1-4): a partner support reply never reopens a request, so a resolved or closed one is simply refused. */
+    public const PARTNER_SUPPORT_CLOSED_MESSAGE = 'This request is resolved or closed. Ask Intechral or the requester to reopen it before replying.';
+
     /** Release 1.0: the furthest ahead an operator may set a due date, in days from now. */
     public const DUE_OVERRIDE_MAX_DAYS = 365;
 
@@ -181,6 +184,53 @@ class TicketService
         $ticket->setRawAttributes($current->getAttributes(), true);
 
         foreach ($this->replyRecipients($current, $user, $isInternal) as $recipient) {
+            $recipient->notify(new TicketRepliedNotification($current, $reply));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * Release 1.0 (R1-4): a PUBLIC reply from a partner support user, which is its own method so that {@see addReply()} (the requester's and the
+     * operator's) is untouched. In ONE transaction it locks the ticket row, then RE-DECIDES effective support authority under locks
+     * ({@see PartnerSupportAccess::assertLocked()}: a revocation committed before this point is seen, one that has not committed makes the
+     * check wait), and only then writes. A refusal is a 404 (the same answer as a ticket that does not exist) and a rollback.
+     *
+     *  - It is never internal, and carries no due-date adjustment: nothing here accepts either.
+     *  - It NEVER changes status. Replying is not a status control, so none of a customer's implicit transitions (`pending_user` to `in_progress`,
+     *    `resolved` to `open`) applies, and a resolved or closed request is refused (422 on `body`) rather than reopened.
+     *  - Files, notifications and their failure behaviour are exactly a public reply's: written inside the transaction and deleted on rollback; the
+     *    requester and the assignee are notified after commit by {@see replyRecipients()}, never the author.
+     *
+     * @param  list<UploadedFile>  $files
+     */
+    public function addPartnerSupportReply(Ticket $ticket, User $user, string $body, array $files = []): TicketReply
+    {
+        [$reply, $current] = $this->storeAttachments(function (array &$stored) use ($ticket, $user, $body, $files) {
+            $current = Ticket::query()->lockForUpdate()->findOrFail($ticket->getKey());
+
+            abort_unless(PartnerSupportAccess::assertLocked((int) $user->getKey(), (int) $current->organization_id), 404);
+
+            if (! $current->isOpen()) {
+                throw ValidationException::withMessages(['body' => self::PARTNER_SUPPORT_CLOSED_MESSAGE]);
+            }
+
+            $reply = $current->replies()->create([
+                'user_id' => $user->id,
+                'body' => $body,
+                'is_internal' => false,
+            ]);
+
+            foreach ($files as $file) {
+                $this->storeAttachment($current, $reply, $user, $file, $stored);
+            }
+
+            return [$reply, $current];
+        });
+
+        $ticket->setRawAttributes($current->getAttributes(), true);
+
+        foreach ($this->replyRecipients($current, $user, false) as $recipient) {
             $recipient->notify(new TicketRepliedNotification($current, $reply));
         }
 

@@ -7,6 +7,7 @@ use App\Models\TicketAttachment;
 use App\Models\TicketReply;
 use App\Rules\AllowedTicketAttachment;
 use App\Services\TicketService;
+use Closure;
 
 /**
  * The requester's view of a ticket (EPIC-017 §15, §19, §27): the ONLY place a customer-facing
@@ -88,9 +89,13 @@ final class RequesterTicketPresenter
      * `attachments`. The presenter filters again regardless: an internal reply handed to it is
      * dropped, and so is every attachment that does not belong to the ticket or to a public reply.
      *
+     * `$attachmentUrl` (R1-4) decides where an attachment link points; it defaults to the requester's download route. The partner support
+     * presenter passes its own, so the same public-thread shape can be served from the `support.*` routes without widening any requester route.
+     *
+     * @param  (Closure(TicketAttachment): string)|null  $attachmentUrl
      * @return array<string, mixed>
      */
-    public static function detail(Ticket $ticket): array
+    public static function detail(Ticket $ticket, ?Closure $attachmentUrl = null): array
     {
         $public = $ticket->replies->reject(fn (TicketReply $reply) => $reply->is_internal)->values();
 
@@ -102,7 +107,7 @@ final class RequesterTicketPresenter
                 'body' => $ticket->description,
                 'createdAt' => $ticket->created_at->toIso8601String(),
                 'createdAtHuman' => $ticket->created_at->diffForHumans(),
-                'attachments' => self::attachments($ticket, $ticket->attachments->whereNull('reply_id')),
+                'attachments' => self::attachments($ticket, $ticket->attachments->whereNull('reply_id'), $attachmentUrl),
             ],
             ...$public->map(fn (TicketReply $reply) => [
                 'key' => "reply-{$reply->id}",
@@ -111,7 +116,7 @@ final class RequesterTicketPresenter
                 'body' => $reply->body,
                 'createdAt' => $reply->created_at->toIso8601String(),
                 'createdAtHuman' => $reply->created_at->diffForHumans(),
-                'attachments' => self::attachments($ticket, $reply->attachments->where('reply_id', $reply->id)),
+                'attachments' => self::attachments($ticket, $reply->attachments->where('reply_id', $reply->id), $attachmentUrl),
             ])->all(),
         ];
 
@@ -173,9 +178,10 @@ final class RequesterTicketPresenter
 
     /**
      * @param  iterable<TicketAttachment>  $attachments
+     * @param  (Closure(TicketAttachment): string)|null  $attachmentUrl
      * @return list<array{id: int, filename: string, size: string, href: string}>
      */
-    private static function attachments(Ticket $ticket, iterable $attachments): array
+    private static function attachments(Ticket $ticket, iterable $attachments, ?Closure $attachmentUrl = null): array
     {
         $rows = [];
 
@@ -184,7 +190,7 @@ final class RequesterTicketPresenter
                 'id' => $attachment->id,
                 'filename' => $attachment->filename,
                 'size' => $attachment->formattedSize(),
-                'href' => route('tickets.attachment.download', [$ticket, $attachment]),
+                'href' => $attachmentUrl !== null ? $attachmentUrl($attachment) : route('tickets.attachment.download', [$ticket, $attachment]),
             ];
         }
 

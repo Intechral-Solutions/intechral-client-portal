@@ -22,6 +22,7 @@ use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\OrganizationInvitationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\Organization\OrganizationRelationshipController;
+use App\Http\Controllers\Organization\OrganizationSupportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\ProjectTaskListController;
 use App\Http\Controllers\ProjectTimeController;
+use App\Http\Controllers\Support\SupportRequestController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
@@ -119,6 +121,16 @@ Route::middleware(['auth', 'can:tickets.assign'])->prefix('operator')->name('ope
     Route::put('/tickets/{ticket}/status', [OperatorTicketController::class, 'updateStatus'])->name('status');
     Route::put('/tickets/{ticket}/assign', [OperatorTicketController::class, 'assign'])->name('assign');
     Route::post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])->name('replies.store');
+});
+
+// Partner support (Release 1.0, R1-4): designated partner staff read and publicly reply to their managed customers' requests. `auth` only: the authority is
+// the grant, read from the tables by PartnerSupportAccess on every request, and every refusal is a 404. There is deliberately no status, assignment, bulk,
+// report, export or note route here. Listed in CustomerPilotGate::PILOT_ROUTES (closed mode answers 404).
+Route::middleware('auth')->prefix('support/requests')->name('support.')->group(function () {
+    Route::get('/', [SupportRequestController::class, 'index'])->name('index');
+    Route::get('/{ticket}', [SupportRequestController::class, 'show'])->name('show');
+    Route::post('/{ticket}/replies', [SupportRequestController::class, 'reply'])->name('replies.store');
+    Route::get('/{ticket}/attachments/{attachment}', [SupportRequestController::class, 'downloadAttachment'])->whereNumber('attachment')->name('attachment.download');
 });
 
 // Admin: user management
@@ -296,6 +308,14 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     // operator who has reached the limit can still kill a link.
     Route::post('/{organization}/invitations', [OrganizationInvitationController::class, 'store'])->middleware('throttle:'.InvitationIssueThrottle::NAME)->name('invitations.store');
     Route::delete('/{organization}/invitations/{invitation}', [OrganizationInvitationController::class, 'destroy'])->whereNumber('invitation')->name('invitations.destroy');
+
+    // Release 1.0 (R1-4): partner support designation of a member of a PARTNER, and disabling or enabling an organization. Operator-only: grant and revoke need
+    // `manageMembership`, disable and enable `manageRelationships`, checked by the controller first and again by the service. Plain integer ids, never bound
+    // models, as for the relationship routes below.
+    Route::post('/{organizationId}/members/{userId}/support', [OrganizationSupportController::class, 'grant'])->whereNumber(['organizationId', 'userId'])->name('members.support.grant');
+    Route::delete('/{organizationId}/members/{userId}/support', [OrganizationSupportController::class, 'revoke'])->whereNumber(['organizationId', 'userId'])->name('members.support.revoke');
+    Route::post('/{organizationId}/disable', [OrganizationSupportController::class, 'disable'])->whereNumber('organizationId')->name('disable');
+    Route::post('/{organizationId}/enable', [OrganizationSupportController::class, 'enable'])->whereNumber('organizationId')->name('enable');
 
     // Release 1.0 (MO-1A): partner designation and managed-customer links. Operator-only (OrganizationPolicy needs portal.operator AND
     // crm.manage; the route's `can:crm.manage` is only the first gate). The id is a plain integer, never a bound model: see the controller.

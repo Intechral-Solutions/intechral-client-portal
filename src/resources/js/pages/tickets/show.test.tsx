@@ -439,3 +439,60 @@ it('shows the organization the request was raised for under Details', () => {
 
     expect(term.nextElementSibling).toHaveTextContent('Acme Ltd');
 });
+
+describe('as a partner support user (R1-4)', () => {
+    const support = {
+        backLink: { href: '/support/requests', label: 'Supported requests' },
+        replyUrl: '/support/requests/TK-00012-ABCDE/replies',
+        abilities: { create: false },
+    };
+
+    it('links back to the supported list, names the requester, and offers no new-request action', () => {
+        const base = props('open');
+        render(
+            <TicketsShowPage
+                {...base}
+                {...support}
+                ticket={{ ...base.ticket, requester: 'Rae Requester' }}
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: /Supported requests/ })).toHaveAttribute(
+            'href',
+            '/support/requests',
+        );
+        expect(screen.queryByRole('link', { name: /All requests/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Requested by')).toBeInTheDocument();
+        expect(screen.getByText('Rae Requester')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'New request' })).not.toBeInTheDocument();
+    });
+
+    it('posts the reply to the support route, not the requester route', async () => {
+        render(<TicketsShowPage {...props('open')} {...support} />);
+
+        await userEvent.type(screen.getByLabelText(/Your reply/), 'Try restarting it');
+        await userEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+        expect(submitted()).toHaveLength(1);
+        expect(submitted()[0]).toMatchObject({
+            method: 'post',
+            url: '/support/requests/TK-00012-ABCDE/replies',
+        });
+    });
+
+    it('offers no composer and no "New request" link on a resolved request, and shows the server message', () => {
+        const message =
+            'This request is resolved or closed. Ask Intechral or the requester to reopen it before replying.';
+        render(
+            <TicketsShowPage
+                {...props('resolved')}
+                {...support}
+                reply={{ allowed: false, notice: null, closedMessage: message }}
+            />,
+        );
+
+        expect(screen.getByText(message)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/Your reply/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'New request' })).not.toBeInTheDocument();
+    });
+});

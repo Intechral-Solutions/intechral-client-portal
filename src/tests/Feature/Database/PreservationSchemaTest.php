@@ -54,6 +54,7 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'time_entry_blocks.user_id -> users' => 'CASCADE/RESTRICT (time_entry_blocks_user_id_foreign)',
         // Release 1.0 (MO-2A1): added later by its own migration, RESTRICT from the start (the approving operator is provenance).
         'organization_members.admin_approved_by -> users' => 'RESTRICT/RESTRICT (organization_members_admin_approved_by_foreign)',
+        'organization_members.support_granted_by -> users' => 'RESTRICT/RESTRICT (organization_members_support_granted_by_foreign)',
         // Release 1.0 (R1-3A): every user reference of an organization invitation is provenance, RESTRICT from the start.
         'organization_invitations.invited_by -> users' => 'RESTRICT/RESTRICT (organization_invitations_invited_by_foreign)',
         'organization_invitations.revoked_by -> users' => 'RESTRICT/RESTRICT (organization_invitations_revoked_by_foreign)',

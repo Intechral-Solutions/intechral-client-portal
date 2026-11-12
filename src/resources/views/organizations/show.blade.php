@@ -18,6 +18,10 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
+    @if ($organization->disabled_at !== null)
+    <x-ui.alert variant="warning" class="mb-6">This organization is disabled (since {{ \Illuminate\Support\Carbon::parse($organization->disabled_at)->format('M j, Y') }}). No new request can be filed for it and partner support access to its requests is suspended. Nothing else is removed.</x-ui.alert>
+    @endif
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         <div class="space-y-6">
@@ -36,6 +40,24 @@
                 <p class="text-xs text-text-muted">Created</p>
                 <p class="text-sm text-text-secondary">{{ $organization->created_at->format('M j, Y') }}</p>
             </div>
+            @if ($canManageRelationships)
+            <div class="border-t pt-3 border-rule">
+                <p class="text-xs text-text-muted">Status</p>
+                <p class="text-sm text-text">{{ $organization->disabled_at === null ? 'Enabled' : 'Disabled' }}</p>
+                <x-ui.field-error for="support" class="mt-1" />
+                @if ($organization->disabled_at === null)
+                <form method="POST" action="{{ route('organizations.disable', $organization->id) }}" class="mt-2" onsubmit="return confirm('Disable {{ addslashes($organization->name) }}? No new request can be filed for it, and partner support access to its requests stops until it is enabled.')">
+                    @csrf
+                    <x-ui.button type="submit" variant="secondary" tone="danger" size="sm">Disable organization</x-ui.button>
+                </form>
+                @else
+                <form method="POST" action="{{ route('organizations.enable', $organization->id) }}" class="mt-2">
+                    @csrf
+                    <x-ui.button type="submit" variant="secondary" size="sm">Enable organization</x-ui.button>
+                </form>
+                @endif
+            </div>
+            @endif
         </div>
 
         @if ($relationship !== null)
@@ -135,6 +157,33 @@
                                     @endif
                                     <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Revoke approval</x-ui.button>
                                 </form>
+                                @endif
+                                @if ($support !== null && isset($support[$member->id]))
+                                @php($grant = $support[$member->id])
+                                {{-- R1-4: partner support designation. An operator act only; the role and approval above are not inputs. --}}
+                                <div class="flex flex-col items-end gap-1 border-t pt-2 border-rule">
+                                    @if ($grant->granted)
+                                    <p class="text-xs text-text">Support access: {{ $grant->inEffect ? 'in effect' : 'granted, not in effect' }}</p>
+                                    <p class="max-w-xs text-xs text-text-muted">Granted by {{ $grant->by ?? 'an operator' }}, {{ \Illuminate\Support\Carbon::parse($grant->at)->format('M j, Y') }}.@if ($grant->notInEffectBecause) Not in effect because {{ $grant->notInEffectBecause }}.@endif</p>
+                                    @elseif ($grant->incomplete)
+                                    <p class="text-xs text-text">Incomplete support record</p>
+                                    <p class="max-w-xs text-xs text-text-muted">It grants nothing. Revoke it to clear the record.</p>
+                                    @else
+                                    <p class="text-xs text-text-muted">No support access.</p>
+                                    @endif
+                                    @if ($grant->granted || $grant->incomplete)
+                                    <form method="POST" action="{{ route('organizations.members.support.revoke', [$organization->id, $member->id]) }}">
+                                        @csrf @method('DELETE')
+                                        <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Revoke support access</x-ui.button>
+                                    </form>
+                                    @endif
+                                    @if (! $grant->granted && $member->active && ! $member->operator)
+                                    <form method="POST" action="{{ route('organizations.members.support.grant', [$organization->id, $member->id]) }}">
+                                        @csrf
+                                        <x-ui.button type="submit" variant="secondary" size="sm">Grant support access</x-ui.button>
+                                    </form>
+                                    @endif
+                                </div>
                                 @endif
                                 @if ($member->role === 'admin' && ! $member->hasApprovalData && $member->refusal !== null)
                                 <p class="max-w-xs text-xs text-text-muted">Cannot be approved: {{ ['suspended' => 'the account is suspended', 'operator' => 'the account is an operator'][$member->refusal] ?? 'not an administrator' }}.</p>

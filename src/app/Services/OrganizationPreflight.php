@@ -80,6 +80,7 @@ final class OrganizationPreflight
         $relationships = $this->relationships($failures);
         $adminApproval = $this->adminApproval($failures, $warnings, $operators);
         $invitations = $this->invitations($failures, $warnings);
+        $partnerSupport = $this->partnerSupport($failures, $warnings, $operators);
 
         return [
             'duplicateLinks' => $duplicates,
@@ -94,6 +95,7 @@ final class OrganizationPreflight
             'relationships' => $relationships,
             'adminApproval' => $adminApproval,
             'invitations' => $invitations,
+            'partnerSupport' => $partnerSupport,
             'failures' => $failures,
             'warnings' => $warnings,
         ];
@@ -346,6 +348,66 @@ final class OrganizationPreflight
             'revokedWithUnknownReason' => $unknownReason,
             'violations' => $violations,
         ];
+    }
+
+    /**
+     * Partner support designations and disabled organizations (Release 1.0, R1-4), or null before the migration. IDS AND COUNTS ONLY.
+     *
+     * Failures are rows the application never writes: a half-written designation (one column), and a designation on an organization that is not a partner
+     * (it grants nothing, and removing a partner designation clears them). Warnings are facts for a person: a designation held by an operator or a suspended
+     * account is in no effect (a suspension clears it; an operator is never given one). It changes nothing and grants nobody anything.
+     *
+     * @param  list<string>  $failures
+     * @param  list<string>  $warnings
+     * @param  list<int>  $operators
+     * @return array<string, mixed>|null
+     */
+    private function partnerSupport(array &$failures, array &$warnings, array $operators): ?array
+    {
+        if (! Schema::hasColumn('organization_members', 'support_granted_at') || ! Schema::hasColumn('organizations', 'disabled_at')) {
+            return null;
+        }
+
+        $rows = DB::table('organization_members as m')
+            ->join('users as u', 'u.id', '=', 'm.user_id')
+            ->join('organizations as o', 'o.id', '=', 'm.organization_id')
+            ->where(fn ($query) => $query->whereNotNull('m.support_granted_at')->orWhereNotNull('m.support_granted_by'))
+            ->orderBy('m.organization_id')->orderBy('m.user_id')
+            ->get(['m.organization_id', 'm.user_id', 'm.support_granted_at as at', 'm.support_granted_by as by', 'u.disabled_at as user_disabled_at', 'o.can_manage_customers as partner', 'o.disabled_at as organization_disabled_at']);
+
+        $pair = fn (object $row): array => ['organization_id' => (int) $row->organization_id, 'user_id' => (int) $row->user_id];
+        $incomplete = $rows->filter(fn ($row) => ($row->at === null) !== ($row->by === null));
+        $complete = $rows->reject(fn ($row) => ($row->at === null) !== ($row->by === null));
+        $notPartner = $rows->filter(fn ($row) => ! $row->partner);
+        $operatorHeld = $complete->filter(fn ($row) => in_array((int) $row->user_id, $operators, true));
+        $suspendedHeld = $complete->filter(fn ($row) => $row->user_disabled_at !== null);
+
+        $report = [
+            'designations' => $complete->count(),
+            'incomplete' => $incomplete->map($pair)->values()->all(),
+            'onNonPartner' => $notPartner->map($pair)->values()->all(),
+            'heldByOperator' => $operatorHeld->map($pair)->values()->all(),
+            'heldBySuspended' => $suspendedHeld->map($pair)->values()->all(),
+            'disabledOrganizations' => (int) DB::table('organizations')->whereNotNull('disabled_at')->count(),
+        ];
+
+        if ($report['incomplete'] !== []) {
+            $failures[] = count($report['incomplete']).' membership(s) carry a half-written partner support record (a time without a grantor, or the reverse). It grants nothing; the application never writes one column without the other, so investigate, then revoke it on the organization page.';
+        }
+
+        if ($report['onNonPartner'] !== []) {
+            $failures[] = count($report['onNonPartner']).' partner support record(s) sit on a membership of an organization that is not a partner. They grant nothing; removing a partner designation clears them, so investigate, then revoke each one.';
+        }
+
+        if ($report['heldByOperator'] !== []) {
+            $warnings[] = count($report['heldByOperator']).' partner support designation(s) belong to an operator account. They are in no effect; revoke them.';
+        }
+
+        if ($report['heldBySuspended'] !== []) {
+            $warnings[] = count($report['heldBySuspended']).' partner support designation(s) belong to a suspended account. They are in no effect, and suspending an account clears them, so investigate how one survived; revoke it.';
+        }
+
+        return $report;
     }
 
     /** @return list<int> */

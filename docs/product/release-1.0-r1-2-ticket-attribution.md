@@ -1,6 +1,6 @@
 # Release 1.0: R1-2 Ticket organization attribution (D0 design record)
 
-**Status:** **implemented in one PR, packages A, B and C (2026-11-10), awaiting merge**; this record began as the D0 design (R1-2-D0, 2026-11-10), written against `origin/main` at `e88b1a8`. **Owner rulings of 2026-11-10 are incorporated (section E, "Ruling" lines):
+**Status:** **implemented in one PR, packages A, B and C (2026-11-10), merged as PR #61**; this record began as the D0 design (R1-2-D0, 2026-11-10), written against `origin/main` at `e88b1a8`. **Owner rulings of 2026-11-10 are incorporated (section E, "Ruling" lines):
 E1, E2, E3, E6 approved, E4 default accepted, E5 accepted with the explicit risk record in section I.** Nothing was implemented, migrated or deployed when it was written; Release 0.9
 staging was untouched, and still is. **R1-0 has since landed (PR #60, `79340a9`, 2026-11-10) and R1-2 was built on `feature/r1-2-ticket-attribution`** (see the implementation notes, sections J to L, at the end). Sections A to H are the approved design as written against `e88b1a8`; where R1-0 or the build changed a fact, the implementation notes say so and this record is not rewritten.
 

@@ -332,6 +332,8 @@ it('pins the reviewed allowlists: adding a customer route changes this test', fu
         'two-factor.login', 'two-factor.login.store', 'invitation.show', 'invitation.register',
     ])->and(array_keys(CustomerPilotGate::PILOT_ROUTES))->toEqualCanonicalizing([
         'tickets.index', 'tickets.show', 'tickets.create', 'tickets.store', 'tickets.replies.store', 'tickets.attachment.download',
+        // R1-4: partner support. No capability; the operator-issued designation is the authority (PartnerSupportAccess), 404 for everyone else.
+        'support.index', 'support.show', 'support.replies.store', 'support.attachment.download',
         'projects.index', 'projects.show',
     ])->and(CustomerPilotGate::WORKSPACES)->toBe(['closed' => ['home'], 'pilot' => ['home', 'helpdesk', 'projects']]);
 });

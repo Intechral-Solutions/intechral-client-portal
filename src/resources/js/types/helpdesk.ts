@@ -79,7 +79,14 @@ export type RequesterTicketDetail = {
     createdAtHuman: string;
     /** The assignee's name only, never their id or email (P6). */
     handledBy: string | null;
+    /** The requester's NAME, sent to a partner support user only (R1-4); a requester's own page never carries it. */
+    requester?: string;
 };
+
+/** One row of the partner support list (R1-4): the requester's public row plus the requester's name. Names only, no ids. */
+export type SupportTicketRow = RequesterTicketRow & { requester: string };
+
+export type SupportTicketPage = Paginated<SupportTicketRow> & { first_page_url: string };
 
 export type RequesterHistoryEntry = {
     statusLabel: string;

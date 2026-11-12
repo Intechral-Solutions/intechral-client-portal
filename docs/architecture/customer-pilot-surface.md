@@ -410,6 +410,9 @@ Hardening ahead of authorized support staff and managed customers (no new surfac
 - **Reuse of ticket visibility.** Ticket-linked task visibility (`TaskPolicy`) and ticket time attribution
   (`AccessibleTimeContext`) ask `TicketPolicy::viewAsRequesterOrOperator`, not `view`. A later widening of `view` for partner
   support personnel must not change that ability; ticket time additionally requires `viewInternal` (operator work).
+- **Partner support (R1-4).** The `support.*` routes are in the pilot allowlist (absent in closed mode) with no capability of their own: the authority is an
+  operator-issued, per-membership designation read from the tables on every request, and everyone without it gets a 404. `TicketPolicy::view`
+  and `viewAsRequesterOrOperator` are unchanged; the new viewer class has its own abilities. Contract: [R1-4](../product/release-1.0-r1-4-partner-support.md).
 - **Invoices.** Ownership and a payable state were never enough on their own. `ClientInvoiceController::index` (via
   `InvoicePolicy::viewOwn`) and `InvoicePolicy::pay` now require an explicit `billing.view`, as `InvoicePolicy::view` already did, so
   a customer with no billing capability (the built-in `user` role, and so every managed customer) can neither list invoices nor

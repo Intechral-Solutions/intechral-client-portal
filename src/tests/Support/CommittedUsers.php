@@ -44,6 +44,7 @@ final class CommittedUsers
             ['organization_invitations', 'accepted_user_id'], // organization_invitations.* (R1-3A, RESTRICT): provenance rows that name a user go first
             ['organization_invitations', 'revoked_by'],
             ['organization_invitations', 'invited_by'],
+            ['organization_members', 'support_granted_by'], // organization_members.support_granted_by (R1-4, RESTRICT): the designation rows an operator gave go first
             ['invoices', 'client_id'],        // invoices.client_id (items and payments cascade; time entries are detached)
             ['invoices', 'created_by'],       // invoices.created_by
             ['time_entries', 'user_id'],      // before the tasks and projects they reference (RESTRICT)
