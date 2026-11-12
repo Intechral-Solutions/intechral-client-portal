@@ -708,7 +708,9 @@ it('leaves no other writer of organization membership: the legacy CrmService met
     // Project membership uses the same relation name on a different model.
     $writers = array_values(array_diff($writers, ['Services/ProjectService.php']));
 
-    expect($writers)->toBe(['Services/CrmService.php', 'Services/OrganizationMembership.php']);
+    // R1-3C: the one NAMED exception besides those two is the browser suite's own cleanup (`e2e:cleanup-invitees`), which only deletes the
+    // memberships of accounts it removes, in local and testing only (OrganizationInvitationFlowTest pins "delete only").
+    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/CrmService.php', 'Services/OrganizationMembership.php']);
 });
 
 it('takes the organization row lock before touching the membership table', function () {

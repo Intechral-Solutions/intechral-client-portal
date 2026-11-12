@@ -40,6 +40,8 @@ An invitation of one NEW person into ONE organization. Written only by `App\Serv
 
 There is no status and no role column: state is derived. **The legacy organization-less `invitations` table (plaintext tokens) and `users.invitation_id` were removed in R1-3B** by migration `2026_11_12_090000_retire_legacy_invitations`; the historical migrations that created them are unchanged and the Release 0.9 rehearsal baseline still builds them.
 
+**Reporting and integrity (R1-3C).** `php artisan organizations:preflight` reports the table read-only, **ids and counts only** (never an address, token or hash): totals by derived state, the open invitations by id and by organization, open invitations that cannot be accepted (the address is now an account, or the issuer is no longer a membership manager through a path the revocation hooks do not cover: warnings), unknown revocation codes (a warning), and **failures** for rows the service can never write: an open row holding no slot, a slot that is not the address, an accepted row still holding the slot, accepted and revoked at once, an acceptance half recorded, a revocation reason or actor without a revocation. A revoked or expired row that **keeps its slot is legitimate** (the system revocations and time never write it; issuance releases it) and is never reported. The rehearsal integrity snapshot carries the same six rules as zero-expected checks (`organization_invitations:*`), **only on a database that has the table** (the Release 0.9 rehearsal baseline does not, so it has none of them; its row digests and the `fk_orphans:` checks cover the rest). Both use the application's clock for "open", never the database server's.
+
 ### `social_accounts`
 | Column | Type | Notes |
 |--------|------|-------|

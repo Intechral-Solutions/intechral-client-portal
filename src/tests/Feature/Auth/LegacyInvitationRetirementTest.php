@@ -224,13 +224,17 @@ describe('nothing in production code can read a legacy token or send a legacy in
 
     it('has no route that names the retired controller actions', function () {
         foreach (Route::getRoutes() as $route) {
-            expect($route->getActionName())->not->toContain('InvitationController@store')
+            // The retired action was `Auth\InvitationController@store`. R1-3C's operator action is a different controller in the
+            // Organization namespace (`organizations.invitations.store`), so the check names the namespace, not just the suffix.
+            expect($route->getActionName())->not->toBe('App\Http\Controllers\Auth\InvitationController@store')
                 ->and($route->getName())->not->toBe('invitations.store');
         }
 
         expect(array_map(fn ($r) => $r->uri().' '.implode('|', $r->methods()), array_filter(
             iterator_to_array(Route::getRoutes()),
-            fn ($r) => str_contains($r->uri(), 'invitation'),
+            // The PUBLIC surface only: nothing at /invitations (the retired operator route) and the one token route. The operator routes of
+            // R1-3C live under organizations/{organization}/invitations and are pinned in OrganizationInvitationOperatorTest.
+            fn ($r) => str_starts_with($r->uri(), 'invitation'),
         )))->toHaveCount(2); // invitation/{token}: GET|HEAD and POST
     });
 });

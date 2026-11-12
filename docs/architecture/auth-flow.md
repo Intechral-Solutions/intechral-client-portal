@@ -100,6 +100,11 @@ carries an `invitation` query; ordinary SSO login is untouched).
 
 - **Response headers** (`ProtectInvitationCredential`, outermost on these routes, so also on a 429 and on the redirect to the identity provider):
   `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+- **Document-level referrer policy** (R1-3C review remediation). The header alone is not enough: a proxy may append its own `Referrer-Policy`, and a browser applies the **last** value
+  (the development nginx did, and Chromium then sent the full invitation URL as the `Referer` of same-origin requests, which nginx logged). The middleware therefore also sets the request attribute
+  `credential_response`, and the Inertia root (`app.blade.php`) renders `<meta name="referrer" content="no-referrer">` immediately after `<meta charset>` when it is set, so the document's own policy
+  holds whatever a proxy adds. Ordinary pages never carry the tag. The development nginx supplies its default only when the application sent none. The production web server's behaviour and access-log
+  handling remain a preproduction requirement.
 - **Not in the session.** The framework stores every full-page GET's URL in the session store as the "previous URL". The middleware marks these requests
   as prefetches before they run (the framework's own switch for "not a navigation to remember"), so the token-bearing URL is never recorded, not even
   when a signed-in user opens the link and `guest` redirects them away. A test reads the real `sessions` table, including after a request the throttle answers with 429 and after one that ends in a database failure (500), each with only that request's own persisted row present.

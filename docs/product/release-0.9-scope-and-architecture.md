@@ -234,7 +234,7 @@ Neither rewrite is designed or ratified here. These are the constraints Release 
 | **H7** | Legal erasure and anonymization. | A separate design; anonymize in place and never cascade. Needs the owner's legal view. |
 | **H8** | Use of production data in rehearsal environments. | Fixtures only until decided; any production-derived data needs an anonymization rule. |
 | **H9** | Ownership of `APP_KEY` escrow and rotation. | Escrow separately from backups; name an owner. |
-| **H10** | Invitation-token delivery. Hashing the stored token requires the queued invitation mail to carry the plaintext token safely. | An encrypted queued notification carrying the token, or synchronous sending. |
+| **H10** | Invitation-token delivery. Hashing the stored token requires the queued invitation mail to carry the plaintext token safely. | An encrypted queued notification carrying the token, or synchronous sending. **Resolved for the invitation flow by Release 1.0 R1-3 (owner ruling D4, 2026-11):** the token is stored only as a SHA-256 hash and travels in an `ShouldBeEncrypted`, `ShouldQueueAfterCommit` notification ([design record](./release-1.0-r1-3-organization-invitations.md)). The other H10 sub-questions are unchanged. |
 
 ### 10.2 Other recommendations not yet ratified
 

@@ -464,7 +464,7 @@ use a custom role carrying the same permissions (`LastAccountAdministratorTest`)
   tests ran on a real Redis server (a dedicated step fails on any skip). It is evidence, not release approval, and predates
   R0.9-1E.
 - Not in this package: email normalization on write, removing `client_id` from mass assignment, invitation-token handling
-  (H10), and project and company delete policy (H6). They remain in the [§11](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery)
+  (H10; **resolved for the invitation flow in Release 1.0 R1-3**: a hashed token and an encrypted queued mail), and project and company delete policy (H6). They remain in the [§11](../product/release-0.9-scope-and-architecture.md#11-work-packages-and-parallel-hosting-discovery)
   row for R0.9-1D and need a decision on whether they follow in this package.
 
 ## Pending owner decisions

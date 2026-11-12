@@ -19,6 +19,7 @@ use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyControll
 use App\Http\Controllers\Operator\TicketReportController;
 use App\Http\Controllers\Operator\TimeReportController;
 use App\Http\Controllers\Organization\OrganizationController;
+use App\Http\Controllers\Organization\OrganizationInvitationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\Organization\OrganizationRelationshipController;
 use App\Http\Controllers\ProfileController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\ProjectTimeController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
+use App\Support\InvitationIssueThrottle;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
@@ -287,6 +289,13 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('or
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');
     Route::post('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'approve'])->name('members.approve');
     Route::delete('/{organization}/members/{user}/approval', [OrganizationMemberController::class, 'revokeApproval'])->name('members.approval.revoke');
+
+    // Release 1.0 (R1-3C): organization-bound invitations, operator-only (`manageMembership`, checked by the controller and again by the
+    // service). Issue doubles as Resend. The invitation id is a plain integer looked up WITHIN the organization by the service.
+    // Issuance is limited to 30 attempts an hour per operator (InvitationIssueThrottle); revocation is deliberately NOT limited, so an
+    // operator who has reached the limit can still kill a link.
+    Route::post('/{organization}/invitations', [OrganizationInvitationController::class, 'store'])->middleware('throttle:'.InvitationIssueThrottle::NAME)->name('invitations.store');
+    Route::delete('/{organization}/invitations/{invitation}', [OrganizationInvitationController::class, 'destroy'])->whereNumber('invitation')->name('invitations.destroy');
 
     // Release 1.0 (MO-1A): partner designation and managed-customer links. Operator-only (OrganizationPolicy needs portal.operator AND
     // crm.manage; the route's `can:crm.manage` is only the first gate). The id is a plain integer, never a bound model: see the controller.

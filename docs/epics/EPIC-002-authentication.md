@@ -21,7 +21,7 @@ Implement a complete, secure authentication system including invitation-based re
 **Acceptance Criteria:**
 - [x] Operator can send an invitation from the admin UI
 - [x] Invitation record stored in DB with token, email, expiry, and status
-- [x] Invitation email sent via queue with a signed URL (48-hour expiry)
+- [x] Invitation email sent via queue with a signed URL (48-hour expiry) *(historical: Release 1.0 replaced this flow: a hashed token, a seven-day expiry, an organization-bound invitation; see the [R1-3 record](../product/release-1.0-r1-3-organization-invitations.md))*
 - [ ] Re-sending an invitation invalidates the previous token
 - [x] Expired/used invitations return a clear error page
 
@@ -112,7 +112,7 @@ Implement a complete, secure authentication system including invitation-based re
 - `GET /invitation/{token}` — show invitation
 - `POST /invitation/{token}` — complete registration
 - `GET /auth/{provider}/redirect` + `/callback` — SSO flow
-- `POST /invitations` — operator sends invitation (`can:users.invite`)
+- `POST /invitations` — operator sends invitation (`can:users.invite`). **Superseded (Release 1.0, R1-3):** the organization-less operator invitation, this route, the `users.invite` permission and the `invitations` table are retired; an operator now invites a new person into one named organization from the organization page (`organizations.invitations.store`, authority `manageMembership`). See [the R1-3 record](../product/release-1.0-r1-3-organization-invitations.md).
 
 ### Known Gaps
 

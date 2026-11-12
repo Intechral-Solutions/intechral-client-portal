@@ -84,6 +84,7 @@ Coverage today: 203 rows in 33 tables and 4 real attachment files: users (operat
 - **schema** (tables, columns, column and table collations, primary and unique keys, non-unique indexes by table and column list, foreign keys with both their `ON DELETE` and `ON UPDATE` rules);
 - per-table **row counts** and a **digest of every row**, pinned to the baseline's columns so a candidate that adds a column does not change old rows' digests;
 - ~60 **checks that must be zero**: foreign-key orphans (declared and logical), attachment rows without files and files without rows, ticket references (canonical and unique; a legacy `TKT-` value left over fails until `tickets:rereference` has run), tasks, milestones, dependencies, time entries and blocks, invoice arithmetic, the EPIC-010D preflight gates, the project audit. A check that **cannot run counts as a failure**: a snapshot never passes by being unable to look;
+- six **invitation checks** (`organization_invitations:*`, Release 1.0, R1-3C) that exist **only on a database that has that table**: the Release 0.9 baseline does not, so they never run there and `InvitationIntegrityChecksTest` adds the real migration to the rehearsal primary to prove them (the same rules as `organizations:preflight`);
 - **facts** that must not move (preflight figures, next ticket id, role grants, counts by status);
 - **files** (size and SHA-256);
 - the migrations recorded as run.

@@ -21,11 +21,21 @@ use Symfony\Component\HttpFoundation\Response;
  *    and nothing else in this application reads that mark. A test pins the outcome (the stored session payload holds no token), so a
  *    framework change to that rule fails loudly instead of silently re-leaking.
  *
+ *  - `<meta name="referrer" content="no-referrer">` in the document head (`app.blade.php`), switched on by the request attribute
+ *    {@see self::ATTRIBUTE} that this middleware sets and nothing else sets. A header alone is not enough: a web server in front may APPEND
+ *    its own `Referrer-Policy` (the development nginx did, and a browser applies the LAST of several header values), and Chromium then sent
+ *    the full token-bearing URL as the `Referer` of every same-origin request the page made. The meta policy is the document's own and is
+ *    not overridden by a header, so the token URL is never a referrer whatever the proxy adds. Ordinary pages never set the attribute and
+ *    so never get the tag.
+ *
  * Because that previous URL is gone, and the page's `Referrer-Policy` means the browser sends no `Referer` on the POST either, a failed
  * registration cannot rely on `back()`: the controller names its redirect target itself.
  */
 final class ProtectInvitationCredential
 {
+    /** The request attribute the document root reads to render the referrer meta tag. Set here only. */
+    public const ATTRIBUTE = 'credential_response';
+
     public function handle(Request $request, Closure $next, string $when = 'always'): Response
     {
         if ($when === 'query' && ! $request->query->has('invitation')) {
@@ -33,6 +43,7 @@ final class ProtectInvitationCredential
         }
 
         $request->headers->set('Sec-Purpose', 'prefetch');
+        $request->attributes->set(self::ATTRIBUTE, true);
 
         $response = $next($request);
 

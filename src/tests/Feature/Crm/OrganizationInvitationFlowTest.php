@@ -1154,8 +1154,18 @@ describe('single-writer fences', function () {
 
         $writers = oinvPhpFiles()->filter(fn ($source) => preg_match($write, $source) === 1)->keys()->sort()->values()->all();
 
-        // Positive control: the pattern does see the one legitimate writer.
-        expect($writers)->toBe(['Services/OrganizationInvitations.php']);
+        // Positive control: the pattern does see the one legitimate writer. The one NAMED exception is the browser suite's own cleanup
+        // (R1-3C, `e2e:cleanup-invitees`): it deletes only, only in local and testing, only the rows of its reserved address in the suite's
+        // own organizations (the next test pins "delete only"; CleanupE2eInviteesTest pins the rest).
+        expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/OrganizationInvitations.php']);
+    });
+
+    it('lets the one named exception, the E2E invitee cleanup, only DELETE: it never inserts, updates or upserts organization_invitations or organization_members', function () {
+        $source = preg_replace('#/\*.*?\*/|//[^\n]*#s', '', oinvPhpFiles()['Console/Commands/CleanupE2eInvitees.php']);
+
+        expect($source)->not->toMatch('/(organization_invitations|organization_members)[^;]*->\s*(insert|insertGetId|insertOrIgnore|update|upsert|truncate|increment|decrement)\(/is')
+            ->and($source)->not->toMatch('/(insert\s+into|update|truncate)\s+`?(organization_invitations|organization_members)/i')
+            ->and($source)->not->toContain('OrganizationInvitation::')->and($source)->not->toContain('OrganizationMembership');
     });
 
     it('lets only the invitation service call addFromInvitation', function () {

@@ -195,3 +195,21 @@ immediate peer, exactly as for the existing `login` and `two-factor` limiters. I
 global one: a legitimate invitee could be throttled by other people's traffic and the limiter gives no per-client protection. The limits are generous for that reason. **Staging
 verification step:** request an invitation page a few times from a known client and confirm (for example from a temporary log of `$request->ip()` or the throttle's cache key) that
 the address the limiter keys on is the client's, not the web server's. Changing proxy trust is a host decision outside the R1-3 package.
+
+**Invitation issuance: the first production caller (R1-3C).** The mail is first queued by the operator's Invitations card: `OrganizationInvitationController::store` (also Resend) calls
+`OrganizationInvitations::issue`, which commits the invitation and **then** dispatches the notification (the notification is also `ShouldQueueAfterCommit`, so even a caller that was inside a transaction
+cannot enqueue early). Operator-visible consequences, each pinned in `OrganizationInvitationOperatorTest` against the real database queue and the array transport:
+
+- the message goes out **from the queue**, after the commit, to the normalized address; its link is `route('invitation.show', token)` for exactly this invitation, and only the token's hash is stored;
+- a **Resend** supersedes the open predecessor: the earlier link is dead and its **still-queued mail is dropped at send time** (so a recipient who has both queued receives one message, the live one); a
+  **revocation** does the same; so do the issuer's suspension, the address becoming an account, and the issuer losing the authority through a path the revocation hooks do not cover;
+- an unexpected **database failure** on issue or revoke (including a failure to enqueue) is reported through the same credential-safe path as the registration routes (`WithholdsQueryDetails`,
+  `InvitationDatabaseFailure`): the log carries SQLSTATE, the driver code, the violated key name and call-site locations, **never the recipient's address, the token, the hash or any binding**, and the operator
+  is answered a plain 500. A failure **before** the commit leaves no row and no job; a failure to enqueue **after** the commit leaves a Pending row and no mail (accepted risk R4 of the design record): the
+  card shows it as Pending and **Resend** recovers it;
+- **issuance is limited to 30 attempts an hour per authenticated operator** (`InvitationIssueThrottle`, the named limiter `invitation-issue`, keyed on the account id): a new invitation and a Resend are the same
+  route and share the allowance, every attempt counts (an invalid or refused one included), and the 31st answers 429 with `Retry-After` before the controller runs, so it creates, changes, audits and mails
+  nothing. **Revocation is not limited**, so an operator who has reached the limit can still kill a link. The routes are otherwise reachable only by an active account holding `portal.operator` and
+  `crm.manage`. The counter is a cache entry (the application's cache store); the browser suite's guarded local cleanup clears the seeded E2E operator's entry and nothing else.
+- **The mailed link's origin** is the worker's `APP_URL`: the link is built when the job runs, in a console process, never from the request that issued the invitation, so a hostile `Host` header cannot
+  redirect it (pinned in `OrganizationInvitationOperatorTest`, and in the browser suite against the configured `APP_URL`).

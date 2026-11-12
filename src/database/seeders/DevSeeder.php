@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Console\Commands\CleanupE2eInvitees;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
@@ -165,6 +166,10 @@ class DevSeeder extends Seeder
         $this->organization('e2e-multi-org-a', 'E2E Multi Org A', $customerMulti, [$customerMulti]);
         $this->organization('e2e-multi-org-b', 'E2E Multi Org B', $customerMulti, [$customerMulti]);
         // $customerNoOrg is deliberately in none.
+        // R1-3C: the organization the invitation journey invites people INTO (organization-invitations.spec.ts). It has NO members: every
+        // person it ever holds is an `e2e-invitee+<run>@example.test` account the spec created by accepting a real invitation, and
+        // `e2e:cleanup-invitees` removes exactly those, only from this organization (CleanupE2eInvitees::ORGANIZATION_SLUGS).
+        $this->organization(CleanupE2eInvitees::ORGANIZATION_SLUGS[0], 'E2E Invitations Org', $operator, []);
 
         // A fixed, idempotent fixture ticket (EPIC-011E WP7, §21): the task page's move to
         // React leaves the embedded Blade `x-time-tracker` with no remaining project/task host

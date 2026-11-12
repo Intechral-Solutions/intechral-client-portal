@@ -79,6 +79,7 @@ final class OrganizationPreflight
 
         $relationships = $this->relationships($failures);
         $adminApproval = $this->adminApproval($failures, $warnings, $operators);
+        $invitations = $this->invitations($failures, $warnings);
 
         return [
             'duplicateLinks' => $duplicates,
@@ -92,6 +93,7 @@ final class OrganizationPreflight
             'ticketAttribution' => $attributed,
             'relationships' => $relationships,
             'adminApproval' => $adminApproval,
+            'invitations' => $invitations,
             'failures' => $failures,
             'warnings' => $warnings,
         ];
@@ -252,6 +254,98 @@ final class OrganizationPreflight
         }
 
         return $report;
+    }
+
+    /**
+     * Organization invitations (Release 1.0, R1-3), or null before the table exists. IDS AND COUNTS ONLY: no address, token or hash appears,
+     * so the section is safe to keep as evidence (an invitee's address is operator-only data). It reads the tables directly, takes no
+     * lock and never touches the permission cache; the authority questions use the table-based predicate, exactly as acceptance does.
+     *
+     * STATE IS DERIVED (accepted, then revoked, then expired by the clock, otherwise open). Failures are rows the service can never write
+     * (an open row that holds no slot, a slot that is not the address, a terminal row that still holds the slot or two terminal states at
+     * once, an acceptance without its account or the reverse, a revocation detail without a revocation). A revoked or expired row that
+     * KEEPS its slot is legitimate (the system revocations and time never write it; issuance releases it, O4/R1) and is not reported.
+     * Warnings are facts for a person: an open invitation that cannot be accepted (the address is now an account, or the issuer is no
+     * longer a membership manager through a path the revocation hooks do not cover) and revocation codes this release does not know.
+     *
+     * @param  list<string>  $failures
+     * @param  list<string>  $warnings
+     * @return array<string, mixed>|null
+     */
+    private function invitations(array &$failures, array &$warnings): ?array
+    {
+        if (! Schema::hasTable('organization_invitations')) {
+            return null;
+        }
+
+        $now = now();
+        $rows = DB::table('organization_invitations as i')
+            ->orderBy('i.id')
+            ->get(['i.id', 'i.organization_id', 'i.invited_by', 'i.expires_at', 'i.accepted_at', 'i.accepted_user_id', 'i.revoked_at', 'i.revoked_by', 'i.revoked_reason', 'i.live_email', 'i.email']);
+
+        $state = function (object $row) use ($now): string {
+            return match (true) {
+                $row->accepted_at !== null => 'accepted',
+                $row->revoked_at !== null => 'revoked',
+                Carbon::parse($row->expires_at)->lte($now) => 'expired',
+                default => 'open',
+            };
+        };
+
+        $byState = $rows->groupBy($state);
+        $open = $byState->get('open', collect());
+        $ids = fn ($collection): array => $collection->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        $managers = OrganizationAuthority::membershipManagerIds($open->pluck('invited_by')->all());
+        $withAccount = $open->isEmpty() ? [] : DB::table('organization_invitations as i')
+            ->whereIn('i.id', $ids($open))
+            ->whereExists(fn ($query) => $query->selectRaw('1')->from('users')->whereColumn('users.email', 'i.email'))
+            ->orderBy('i.id')->pluck('i.id')->map(fn ($id) => (int) $id)->all();
+
+        $violations = [
+            'openWithoutSlot' => $ids($open->filter(fn ($row) => $row->live_email === null)),
+            'slotIsNotTheAddress' => $ids($rows->filter(fn ($row) => $row->live_email !== null && $row->live_email !== $row->email)),
+            'acceptedStillHoldingSlot' => $ids($rows->filter(fn ($row) => $row->accepted_at !== null && $row->live_email !== null)),
+            'acceptedAndRevoked' => $ids($rows->filter(fn ($row) => $row->accepted_at !== null && $row->revoked_at !== null)),
+            'acceptanceHalfRecorded' => $ids($rows->filter(fn ($row) => ($row->accepted_at === null) !== ($row->accepted_user_id === null))),
+            'revocationDetailWithoutRevocation' => $ids($rows->filter(fn ($row) => $row->revoked_at === null && ($row->revoked_reason !== null || $row->revoked_by !== null))),
+        ];
+
+        foreach ($violations as $rule => $found) {
+            if ($found !== []) {
+                $failures[] = 'Organization invitation rule broken ('.$rule.'): invitation(s) '.implode(', ', $found).'. The application never writes such a row; investigate how it happened. Nothing was changed.';
+            }
+        }
+
+        $issuerNotManager = $ids($open->filter(fn ($row) => ! in_array((int) $row->invited_by, $managers, true)));
+
+        if ($issuerNotManager !== []) {
+            $warnings[] = count($issuerNotManager).' open invitation(s) were issued by an account that is no longer a membership manager: acceptance refuses them and the mail is not sent. Revoke them on the organization page.';
+        }
+
+        if ($withAccount !== []) {
+            $warnings[] = count($withAccount).' open invitation(s) are for an address that already has an account: acceptance refuses them. Revoke them on the organization page.';
+        }
+
+        $unknownReason = $ids($rows->filter(fn ($row) => $row->revoked_at !== null && ! in_array($row->revoked_reason, OrganizationInvitations::REASONS, true)));
+
+        if ($unknownReason !== []) {
+            $warnings[] = count($unknownReason).' revoked invitation(s) carry no known revocation reason. They are read as revoked; the reason is descriptive only.';
+        }
+
+        return [
+            'total' => $rows->count(),
+            'open' => count($ids($open)),
+            'accepted' => $byState->get('accepted', collect())->count(),
+            'revoked' => $byState->get('revoked', collect())->count(),
+            'expired' => $byState->get('expired', collect())->count(),
+            'openIds' => $ids($open),
+            'openPerOrganization' => $open->groupBy('organization_id')->map(fn ($group, $organization) => ['organization_id' => (int) $organization, 'open' => $group->count()])->values()->all(),
+            'openIssuerNotMembershipManager' => $issuerNotManager,
+            'openAddressAlreadyAnAccount' => $withAccount,
+            'revokedWithUnknownReason' => $unknownReason,
+            'violations' => $violations,
+        ];
     }
 
     /** @return list<int> */

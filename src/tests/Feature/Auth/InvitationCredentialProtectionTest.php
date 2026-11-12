@@ -96,6 +96,42 @@ describe('response headers', function () {
             ->and($ordinary->headers->get('Cache-Control'))->not->toContain('no-store');
     });
 
+    it('include a document-level no-referrer policy on the invitation page, first in the head, and on no ordinary page', function () {
+        [, $token] = regInvOpen();
+        $meta = '<meta name="referrer" content="no-referrer">';
+
+        // A response header alone is not enough: a proxy can append its own Referrer-Policy and a browser applies the LAST value. The
+        // document's own policy is not overridden by a header (the development nginx did exactly that and the token URL leaked as a
+        // same-origin Referer), so the page carries it too, live or dead, ahead of every tag that makes a request.
+        foreach ([$token, 'not-a-token'] as $candidate) {
+            $html = $this->get(route('invitation.show', $candidate))->assertOk()->getContent();
+
+            expect($html)->toContain($meta)
+                ->and(substr_count($html, 'name="referrer"'))->toBe(1);
+
+            $head = substr($html, (int) strpos($html, '<head>'));
+            $position = static fn (string $needle) => strpos($head, $needle);
+
+            expect($position('<meta charset'))->toBeLessThan($position($meta))
+                ->and($position($meta))->toBeLessThan($position('<meta name="viewport"'))
+                ->and($position($meta))->toBeLessThan($position('rel="preload"') ?: PHP_INT_MAX)
+                ->and($position($meta))->toBeLessThan($position('<link rel="stylesheet"') ?: PHP_INT_MAX)
+                ->and($position($meta))->toBeLessThan($position('<script') ?: PHP_INT_MAX);
+        }
+
+        // Ordinary pages: no tag, so no unintended global no-referrer policy.
+        expect($this->get(route('login'))->assertOk()->getContent())->not->toContain('name="referrer"');
+        expect($this->get(route('password.request'))->getContent())->not->toContain('name="referrer"');
+    });
+
+    it('turn the meta tag on through the request attribute only, never through the URL or a header the client controls', function () {
+        // Whatever a client sends cannot switch the policy on or off: the attribute is set by the middleware on the credential routes alone.
+        $login = $this->withHeaders(['X-Credential-Response' => '1', 'Referrer-Policy' => 'no-referrer'])
+            ->get(route('login', ['credential_response' => 1]))->assertOk()->getContent();
+
+        expect($login)->not->toContain('name="referrer"');
+    });
+
     it('are not added to unrelated pages', function () {
         $login = $this->get(route('login'))->assertOk();
 

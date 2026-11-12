@@ -27,6 +27,11 @@ import { fileURLToPath } from 'node:url';
  * A non-zero result throws, which Playwright reports as a failed run: a ticket left behind, a storage
  * error and a refusal (linked time or tasks, an unsupported environment) are never swallowed. `php` missing is
  * reported the same way rather than skipped, because a skipped cleanup is a silent leak.
+ *
+ * The invitation journey (R1-3C) accepts real invitations, so it leaves accounts, memberships and invitations too. Their cleanup
+ * command is the same kind of thing (untargeted, bound to the reserved `e2e-invitee+…@example.test` address and the suite's own
+ * organization) and follows the same rule: it runs here, once, AFTER the ticket cleanup (an account that owns a ticket is refused, never
+ * detached), and never from a test or a worker. Both commands run even if the first fails, so one leak never hides the other.
  */
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -36,30 +41,42 @@ export const CLEANUP_OWNER_VARIABLE = 'E2E_TICKET_CLEANUP_OWNER';
 export default function globalTeardown() {
     if (process.env[CLEANUP_OWNER_VARIABLE] === 'dev') {
         process.stdout.write(
-            '\n[e2e cleanup] Handed to ./dev test:e2e: it removes the suite\'s tickets as the web-server user once Playwright has exited.\n',
+            "\n[e2e cleanup] Handed to ./dev test:e2e: it removes the suite's tickets as the web-server user once Playwright has exited.\n",
         );
 
         return;
     }
 
-    const result = spawnSync('php', ['artisan', 'e2e:cleanup-tickets', '--no-interaction'], {
-        cwd: appRoot,
-        encoding: 'utf8',
-    });
+    const failures: string[] = [];
 
-    if (result.stdout) process.stdout.write(`\n[e2e cleanup] ${result.stdout.trim().replace(/\n/g, '\n[e2e cleanup] ')}\n`);
-    if (result.stderr) process.stderr.write(result.stderr);
+    for (const [label, command, remains] of [
+        ['ticket', 'e2e:cleanup-tickets', 'Tickets'],
+        ['invitee', 'e2e:cleanup-invitees', 'Accounts, memberships or invitations'],
+    ] as const) {
+        const result = spawnSync('php', ['artisan', command, '--no-interaction'], {
+            cwd: appRoot,
+            encoding: 'utf8',
+        });
 
-    if (result.error) {
-        throw new Error(
-            `E2E ticket cleanup could not start (${result.error.message}). Run the suite with ./dev test:e2e.`,
-        );
+        if (result.stdout)
+            process.stdout.write(
+                `\n[e2e cleanup] ${result.stdout.trim().replace(/\n/g, '\n[e2e cleanup] ')}\n`,
+            );
+        if (result.stderr) process.stderr.write(result.stderr);
+
+        if (result.error) {
+            failures.push(
+                `E2E ${label} cleanup could not start (${result.error.message}). Run the suite with ./dev test:e2e.`,
+            );
+        } else if (result.status !== 0) {
+            failures.push(
+                `E2E ${label} cleanup failed (exit ${result.status}). ${remains} may remain; fix the cause shown above ` +
+                    'and run ./dev test:e2e: its recovery sweep runs the cleanup as the web-server user.',
+            );
+        }
     }
 
-    if (result.status !== 0) {
-        throw new Error(
-            `E2E ticket cleanup failed (exit ${result.status}). Tickets may remain; fix the cause shown above ` +
-                'and run ./dev test:e2e: its recovery sweep runs the cleanup as the web-server user.',
-        );
+    if (failures.length > 0) {
+        throw new Error(failures.join(' '));
     }
 }

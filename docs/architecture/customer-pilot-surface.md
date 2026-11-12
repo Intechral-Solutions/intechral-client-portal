@@ -82,7 +82,11 @@ holds neither, so only an explicit grant reaches those two rows). None of it is 
 
 Operator-only routes (`operator.*`, `crm.*`, `organizations.*`, `admin/*`, `billing.invoices.*` management,
 `projects.create/store/edit/update/destroy/companies/members`; the retired `POST /invitations` no longer exists, R1-3B) are capability-gated and unreachable
-by a customer; they are listed so the denylist is complete.
+by a customer; they are listed so the denylist is complete. **R1-3C added two names under `organizations.*`: `organizations.invitations.store` (issue and Resend) and `organizations.invitations.destroy` (revoke).**
+They are operator-only twice over: the pilot gate does not allow-list them (so a customer in `closed` or `pilot` mode is answered 404 before any binding, which `CustomerPilotRouteBoundaryTest` pins with the
+customer being a member of the very organization), and the controller and the service both require `manageMembership` (an active account holding `portal.operator` and `crm.manage`), so in `legacy` mode
+an ordinary customer, an approved organization administrator, a partner administrator and a holder of `org.invite` alone are all refused (403, or 404 where the tenant scope already hides the organization). **No allow-list
+change**: the pilot route table is identical apart from these two operator-only names.
 
 ### 2.3 Serialized data a customer receives today
 

@@ -43,8 +43,9 @@
         @endif
         </div>
 
+        <div class="lg:col-span-2 space-y-6">
         {{-- Members --}}
-        <div class="lg:col-span-2 rounded-lg border overflow-hidden bg-surface border-rule">
+        <div class="rounded-lg border overflow-hidden bg-surface border-rule">
             <div class="px-5 py-4 border-b border-rule">
                 <h2 class="text-sm font-semibold text-text">Members</h2>
                 @if ($memberships !== null)
@@ -186,6 +187,11 @@
                 <x-ui.field-error for="role" class="mt-2" />
             </div>
             @endif
+        </div>
+
+        @if ($invitations !== null)
+        @include('organizations._invitations')
+        @endif
         </div>
     </div>
 </div>

@@ -14,6 +14,8 @@
 use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Models\CmsPage;
 use App\Models\Invoice;
+use App\Models\Organization;
+use App\Models\OrganizationInvitation;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -26,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -176,6 +179,8 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
     $item = $fx['task']->checklistItems()->first()->id;
     $m = $fx['milestone']->id;
     $entry = $fx['entry']->id;
+    $o = $fx['organization']->id;
+    $i = $fx['invitation']->id;
 
     return [
         // Finance and payments
@@ -233,9 +238,14 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
         'crm' => ['GET', '/crm/companies'],
         'users admin' => ['GET', '/admin/users'],
         'roles admin' => ['GET', '/admin/roles'],
-        // R1-3B retired the organization-less invitation: the route no longer exists, so it is refused like any unknown one. R1-3C adds the
-        // operator-only organization invitation routes (organizations.*, already denylisted) and their rows here.
+        // R1-3B retired the organization-less invitation: the route no longer exists, so it is refused like any unknown one.
         'retired organization-less invitation (route removed)' => ['POST', '/invitations', ['email' => 'x@example.com']],
+        // R1-3C: the operator-only organization invitation routes (organizations.*, denylisted for customers). The customer is a member of
+        // this very organization, so only the gate, not membership or an absent record, is what answers 404.
+        'organization page (invitations card)' => ['GET', "/organizations/{$o}"],
+        'issue organization invitation' => ['POST', "/organizations/{$o}/invitations", ['email' => 'sneaky@example.test']],
+        'resend organization invitation' => ['POST', "/organizations/{$o}/invitations", ['email' => 'pilot-target@example.test']],
+        'revoke organization invitation' => ['DELETE', "/organizations/{$o}/invitations/{$i}"],
         // SSO for a signed-in customer (link intent)
         'sso redirect' => ['GET', '/auth/google/redirect'],
         'sso callback' => ['GET', '/auth/google/callback'],
@@ -252,6 +262,13 @@ function pilotExcludedFixture(): array
     $fx = pilotProjectFor($customer);
     $invoice = pilotInvoiceFor($customer);
     $page = CmsPage::factory()->create(['title' => 'PILOT-SECRET page', 'slug' => 'pilot-secret-page', 'status' => 'published', 'published_at' => now()]);
+
+    // R1-3C: an organization the customer belongs to, with one open invitation of it (the target of the refused operator routes).
+    $organization = Organization::factory()->create(['owner_id' => $fx['operator']->id]);
+    $organization->members()->attach($customer->id, ['role' => 'member']);
+    $fx['organization'] = $organization;
+    $fx['invitation'] = OrganizationInvitation::factory()->forAddress('pilot-target@example.test')
+        ->state(['organization_id' => $organization->id, 'invited_by' => $fx['operator']->id])->create();
 
     return [$customer, $fx, $invoice, $page];
 }
@@ -289,6 +306,10 @@ it('leaves every excluded record exactly as it was after the refused mutations',
         'project' => $fx['project']->fresh()->only(['name', 'status']),
         'milestone_completed' => $fx['milestone']->fresh()->completed_at?->toIso8601String(),
         'invoice' => $invoice->fresh()->status,
+        'invitations' => OrganizationInvitation::query()->orderBy('id')->get()->toArray(),
+        'organizationMembers' => DB::table('organization_members')->orderBy('organization_id')->orderBy('user_id')->get()->toArray(),
+        'jobs' => DB::table('jobs')->count(),
+        'users' => User::count(),
     ];
 
     foreach (pilotExcludedRequests($fx, $invoice, $page) as $request) {
@@ -306,6 +327,10 @@ it('leaves every excluded record exactly as it was after the refused mutations',
         ->and($fx['project']->fresh()->only(['name', 'status']))->toBe($before['project'])
         ->and($fx['milestone']->fresh()->completed_at?->toIso8601String())->toBe($before['milestone_completed'])
         ->and($invoice->fresh()->status)->toBe($before['invoice'])
+        // R1-3C: the refused operator routes issued, superseded and revoked nothing, and queued nothing.
+        ->and(OrganizationInvitation::query()->orderBy('id')->get()->toArray())->toBe($before['invitations'])
+        ->and(DB::table('organization_members')->orderBy('organization_id')->orderBy('user_id')->get()->toArray())->toEqual($before['organizationMembers'])
+        ->and(DB::table('jobs')->count())->toBe($before['jobs'])->and(User::count())->toBe($before['users'])
         ->and(Project::whereKey($fx['project']->id)->exists())->toBeTrue();
 });
 

@@ -8,6 +8,8 @@ use Illuminate\Database\QueryException;
 
 /**
  * A database failure while an invitation credential is in play must not put that credential in the application log.
+ * Also used by the operator's issue and revoke actions (R1-3C, OrganizationInvitationController): there the insert binds the token's hash AND
+ * the recipient's address, which is operator-supplied personal data, and neither may reach the log either.
  *
  * Laravel's QueryException message embeds the SQL WITH its bindings, and an invitation lookup binds the token's hash (the plaintext never
  * reaches the database). The hash cannot be turned back into a link, but it is the server-side credential the single-sign-on callback holds

@@ -277,3 +277,130 @@ it('fails on an approved administrator row changed after its approval, as diagno
     expect(app(OrganizationPreflight::class)->report()['failures'])->toBe([]);
     $this->artisan('organizations:preflight')->assertSuccessful();
 });
+
+// ── Release 1.0 (R1-3): organization invitations ─────────────────────────────
+
+/** An invitation row written straight to the table (the service is the only writer in app/; this is a fixture). */
+function preflightInvitation(Organization $organization, User $issuer, string $email, array $state = []): int
+{
+    return (int) DB::table('organization_invitations')->insertGetId(array_merge([
+        'organization_id' => $organization->id, 'email' => $email, 'live_email' => $email, 'token_hash' => hash('sha256', $email.random_int(1, PHP_INT_MAX)),
+        'invited_by' => $issuer->id, 'expires_at' => now()->addDays(7), 'created_at' => now(), 'updated_at' => now(),
+    ], $state));
+}
+
+it('reports the invitation counts by derived state, ids only, and passes on data the service could have written', function () {
+    $operator = User::factory()->create();
+    $operator->givePermissionTo(['portal.operator', 'crm.manage']);
+    $acme = Organization::factory()->create(['owner_id' => $operator->id]);
+    $globex = Organization::factory()->create(['owner_id' => $operator->id]);
+    $member = User::factory()->create();
+
+    $openA = preflightInvitation($acme, $operator, 'a@example.test');
+    $openB = preflightInvitation($acme, $operator, 'b@example.test');
+    $openC = preflightInvitation($globex, $operator, 'c@example.test');
+    // Expired by the clock, and a hook-revoked row that KEEPS its slot: both are legitimate.
+    preflightInvitation($acme, $operator, 'old@example.test', ['expires_at' => now()->subDay()]);
+    preflightInvitation($acme, $operator, 'hooked@example.test', ['revoked_at' => now(), 'revoked_reason' => 'issuer_suspended']);
+    preflightInvitation($acme, $operator, 'gone@example.test', ['live_email' => null, 'revoked_at' => now(), 'revoked_by' => $operator->id, 'revoked_reason' => 'operator']);
+    preflightInvitation($acme, $operator, 'in@example.test', ['live_email' => null, 'accepted_at' => now(), 'accepted_user_id' => $member->id]);
+
+    $report = app(OrganizationPreflight::class)->report();
+    $invitations = $report['invitations'];
+
+    expect($invitations)->toMatchArray(['total' => 7, 'open' => 3, 'accepted' => 1, 'revoked' => 2, 'expired' => 1])
+        ->and($invitations['openIds'])->toBe([$openA, $openB, $openC])
+        ->and($invitations['openPerOrganization'])->toBe([['organization_id' => $acme->id, 'open' => 2], ['organization_id' => $globex->id, 'open' => 1]])
+        ->and($invitations['openIssuerNotMembershipManager'])->toBe([])->and($invitations['openAddressAlreadyAnAccount'])->toBe([])
+        ->and(array_filter($invitations['violations']))->toBe([])
+        ->and($report['failures'])->toBe([])->and(collect($report['warnings'])->filter(fn (string $warning) => str_contains($warning, 'nvitation')))->toBeEmpty()
+        // Ids and counts only: no address, token or hash anywhere in the report.
+        ->and(json_encode($report))->not->toContain('@example.test')->and(json_encode($report))->not->toMatch('/[0-9a-f]{64}/');
+
+    $this->artisan('organizations:preflight')->expectsOutputToContain('Organization invitations: 3 open, 1 accepted, 2 revoked, 1 expired (7 in total)')->assertSuccessful();
+    $this->artisan('organizations:preflight', ['--json' => true])->assertSuccessful();
+});
+
+it('warns, without failing, about an open invitation that cannot be accepted: the address is an account, or the issuer lost the authority', function () {
+    $operator = User::factory()->create();
+    $operator->givePermissionTo(['portal.operator', 'crm.manage']);
+    $lapsed = User::factory()->create();
+    $lapsed->givePermissionTo(['portal.operator', 'crm.manage']);
+    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $taken = preflightInvitation($organization, $operator, 'taken@example.test');
+    User::factory()->create(['email' => 'Taken@Example.test']);
+    $orphan = preflightInvitation($organization, $lapsed, 'orphan@example.test');
+    preflightInvitation($organization, $operator, 'fine@example.test');
+    DB::table('model_has_permissions')->where('model_id', $lapsed->id)->delete();   // a path no hook covers
+
+    $report = app(OrganizationPreflight::class)->report();
+
+    expect($report['failures'])->toBe([])
+        ->and($report['invitations']['openAddressAlreadyAnAccount'])->toBe([$taken])
+        ->and($report['invitations']['openIssuerNotMembershipManager'])->toBe([$orphan])
+        ->and(collect($report['warnings'])->filter(fn (string $warning) => str_contains($warning, 'open invitation(s)')))->toHaveCount(2)
+        ->and(implode(' ', $report['warnings']))->toContain('no longer a membership manager')->and(implode(' ', $report['warnings']))->toContain('already has an account');
+
+    $this->artisan('organizations:preflight')->assertSuccessful();
+});
+
+it('fails on an invitation row the service can never write, naming the rule and the id, and never the address', function (string $rule, array $state) {
+    $operator = User::factory()->create();
+    $operator->givePermissionTo(['portal.operator', 'crm.manage']);
+    $member = User::factory()->create();
+    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $id = preflightInvitation($organization, $operator, 'x@example.test', array_map(fn ($value) => match ($value) {
+        '@member' => $member->id, '@operator' => $operator->id, '@now' => now(), default => $value
+    }, $state));
+
+    $report = app(OrganizationPreflight::class)->report();
+
+    expect($report['invitations']['violations'][$rule])->toBe([$id])
+        ->and($report['failures'])->toHaveCount(1)->and($report['failures'][0])->toContain($rule)->toContain((string) $id)->not->toContain('x@example.test');
+
+    $this->artisan('organizations:preflight')->assertFailed();
+
+    // The same data without the one broken row is clean.
+    DB::table('organization_invitations')->delete();
+    expect(app(OrganizationPreflight::class)->report()['failures'])->toBe([]);
+})->with([
+    'an open row that holds no slot' => ['openWithoutSlot', ['live_email' => null]],
+    'a slot that is not the address' => ['slotIsNotTheAddress', ['live_email' => 'other@example.test']],
+    'an accepted row still holding the slot' => ['acceptedStillHoldingSlot', ['accepted_at' => '@now', 'accepted_user_id' => '@member']],
+    'accepted and revoked at once' => ['acceptedAndRevoked', ['live_email' => null, 'accepted_at' => '@now', 'accepted_user_id' => '@member', 'revoked_at' => '@now', 'revoked_reason' => 'operator']],
+    'an acceptance without its account' => ['acceptanceHalfRecorded', ['live_email' => null, 'accepted_at' => '@now']],
+    'a revocation reason without a revocation' => ['revocationDetailWithoutRevocation', ['revoked_reason' => 'operator']],
+    'an actor without a revocation' => ['revocationDetailWithoutRevocation', ['revoked_by' => '@operator']],
+]);
+
+it('warns about a revocation code it does not know, and reads the row as revoked', function () {
+    $operator = User::factory()->create();
+    $operator->givePermissionTo(['portal.operator', 'crm.manage']);
+    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $id = preflightInvitation($organization, $operator, 'x@example.test', ['live_email' => null, 'revoked_at' => now(), 'revoked_reason' => 'something_new']);
+
+    $report = app(OrganizationPreflight::class)->report();
+
+    expect($report['invitations']['revokedWithUnknownReason'])->toBe([$id])->and($report['invitations']['revoked'])->toBe(1)->and($report['invitations']['open'])->toBe(0)
+        ->and($report['failures'])->toBe([])->and(collect($report['warnings'])->filter(fn (string $warning) => str_contains($warning, 'revocation reason')))->toHaveCount(1);
+});
+
+it('reads no lock and writes nothing while it counts invitations', function () {
+    $operator = User::factory()->create();
+    $operator->givePermissionTo(['portal.operator', 'crm.manage']);
+    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    preflightInvitation($organization, $operator, 'x@example.test');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $before = DB::table('organization_invitations')->get()->toJson();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    app(OrganizationPreflight::class)->report();
+    $statements = collect(DB::getQueryLog())->pluck('query')->map(fn (string $sql) => strtolower(ltrim($sql)));
+    DB::disableQueryLog();
+
+    expect($statements->filter(fn (string $sql) => ! str_starts_with($sql, 'select') && ! str_starts_with($sql, 'show')))->toBeEmpty()
+        ->and($statements->filter(fn (string $sql) => str_contains($sql, 'for update') || str_contains($sql, 'lock in share mode') || str_contains($sql, 'for share')))->toBeEmpty()
+        ->and($statements->filter(fn (string $sql) => str_contains($sql, '`cache`')))->toBeEmpty()
+        ->and(DB::table('organization_invitations')->get()->toJson())->toBe($before);
+});

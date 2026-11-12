@@ -15,6 +15,7 @@ use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
 use App\Support\Database\MigrationProfileGuard;
+use App\Support\InvitationIssueThrottle;
 use App\Support\Permissions\EpochPermissionRegistrar;
 use App\Support\Permissions\PermissionCacheEpoch;
 use App\Support\Runtime\CronFailureMarker;
@@ -137,6 +138,7 @@ class AppServiceProvider extends ServiceProvider
      *  - `invitation`: the registration page (a read). Generous; a mail scanner that follows the link must not lock the recipient out.
      *  - `invitation-register`: the POST, which also calls the compromised-password service and hashes a password, so it is the cost lever.
      *  - `invitation-sso`: the SSO initiation, and ONLY when it carries an `invitation` query. Ordinary SSO login is `Limit::none()`, untouched.
+     *  - `invitation-issue`: an OPERATOR issuing an invitation (new or Resend), 30 an hour per account, on the issuing route only; see {@see InvitationIssueThrottle}.
      *
      * THE CLIENT-IP ASSUMPTION (documented, not changed here). No trusted proxy is configured (`bootstrap/app.php`), so `$request->ip()` is
      * the immediate peer, exactly as for the `login` and `two-factor` limiters. If the shared host's web server forwards every request from
@@ -148,6 +150,7 @@ class AppServiceProvider extends ServiceProvider
     {
         RateLimiter::for('invitation', fn (Request $request) => Limit::perMinute(60)->by((string) $request->ip()));
         RateLimiter::for('invitation-register', fn (Request $request) => Limit::perMinute(20)->by((string) $request->ip()));
+        RateLimiter::for(InvitationIssueThrottle::NAME, InvitationIssueThrottle::limit(...));
         RateLimiter::for('invitation-sso', fn (Request $request) => $request->query->has('invitation')
             ? Limit::perMinute(30)->by((string) $request->ip())
             : Limit::none());

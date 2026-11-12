@@ -119,8 +119,8 @@ token-value or browser tests, and it does not read Blade (that is `BladeThemeGua
 ### `browser` — the Playwright suite
 
 `./dev test:e2e` itself, on the dev stack from `docker-compose.yml`: the image is built, `app`,
-`nginx`, `db` and `redis` are started (the queue worker and Mailpit are not; the suite does not use
-them), then, inside the app container as the runner's UID:GID, `composer install`, `npm ci`,
+`nginx`, `db` and `redis` are started (the queue worker and Mailpit are started later, below, because only the
+invitation journey needs them), then, inside the app container as the runner's UID:GID, `composer install`, `npm ci`,
 `.env` from `.env.example`, `key:generate`, `migrate --seed` and `npm run build`. As locally, the suite
 runs against the migrated and seeded **development** database (`APP_ENV=local`, so `DevSeeder`
 provides the personas and the three `e2e-*` fixtures), through the real login form, with the image's
@@ -313,6 +313,25 @@ the tail of `laravel.log`; Playwright traces are not uploaded.
   The runner-UID versus `portal` path ran on hosted CI for the first time in [run 38287646296](https://github.com/Intechral-Solutions/intechral-client-portal/actions/runs/38287646296) on draft PR #30: Playwright as `1001:1001`, php-fpm
   and the cleanup as `portal` `1000:1000`; the wrapper reported 3 tickets and 2 attachment files (1 directory) removed and
   both baselines restored (EPIC-017 A2.13). One run is evidence, not a guarantee: it stays the authoritative leak check.
+  **Invitees (R1-3C).** The organization-invitation journey accepts real invitations, so the wrapper also runs
+  `e2e:cleanup-invitees` after each ticket cleanup (the recovery sweep before the suite, and after Playwright), and a
+  refusal or failure fails the run ([E2E invitee cleanup](e2e-browser-suite.md#e2e-invitee-cleanup)). The hosted
+  `browser` job additionally starts the stack's `queue` and `mailpit` services, **after** the install step (a worker
+  started before composer and `.env` would crash-loop): `organization-invitations.spec.ts` reads the invitation mail from
+  Mailpit's API and fails, naming this, when either is missing. Owner-approved (R1-3C remediation); the steps are:
+  (1) **mail isolation checked, not assumed**: before starting them the job refuses to go on unless `src/.env` says
+  `MAIL_MAILER=smtp`, `MAIL_HOST=mailpit` and `QUEUE_CONNECTION=redis` (the transport is the compose Mailpit, and redis is
+  the connection the compose worker consumes), so a changed `.env.example` cannot hand invitation mail to a real provider
+  or leave it queued where no worker looks; (2) `docker compose up -d --wait queue mailpit`; (3) **readiness proven**,
+  because neither service has a health check and `--wait` only means "running": Mailpit's API answers on the loopback
+  port (with retries) and the worker container is up and running `queue:work` rather than restarting, otherwise the job
+  fails there, named, instead of as a 60 s mail timeout in the spec; (4) on failure, **credential-free diagnostics**: the
+  worker's last 60 log lines with 64-character token-shaped strings masked, and Mailpit's message **count** only (message
+  bodies, which carry the links, are never fetched; the job payload is encrypted; no Playwright trace is uploaded by
+  this workflow). Cleanup is the runner's: the containers and Mailpit's mailbox die with it, and the spec also removes
+  its own messages best-effort. The pilot job needs neither service (it runs the pilot spec only). The shell steps were
+  syntax-checked and the guard exercised against `.env.example` locally; the workflow itself is **unproven on hosted CI**
+  until the first run (a merge gate after the PR is opened, not a gate for the local commit).
   A test whose project-create redirect times out before the id is registered with
   `cleanup.trackProject` also leaves that project behind (EPIC-015 A2.12 #5, A4.12 #6, A5.11): under a
   contended local machine this has happened several times. Hosted CI starts from an empty database and
