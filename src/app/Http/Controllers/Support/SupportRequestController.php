@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Support;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\TicketController;
 use App\Http\Presenters\PartnerSupportPresenter;
+use App\Http\Presenters\RequesterTicketPresenter;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\User;
@@ -44,6 +46,54 @@ class SupportRequestController extends Controller
             'filters' => $filters,
             'statusOptions' => PartnerSupportPresenter::statusOptions(),
         ]);
+    }
+
+    /**
+     * Release 1.0 (R1-5): raise a request for a contact at a managed customer. The options are the customers this actor supports RIGHT NOW and their
+     * eligible contacts (`PartnerSupportAccess::creationOptions`), for display; the server decides again, under locks, when the request arrives.
+     */
+    public function create(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless(Gate::forUser($user)->allows('createAsPartnerSupport', Ticket::class), 404);
+
+        return Inertia::render('support/create', [
+            'customers' => PartnerSupportAccess::creationOptions((int) $user->getKey()),
+            'categories' => TicketController::CATEGORIES,
+            'priorities' => RequesterTicketPresenter::priorityOptions(),
+            'defaultPriority' => 'medium',
+            'attachmentPolicy' => RequesterTicketPresenter::attachmentPolicy(),
+        ]);
+    }
+
+    /**
+     * `organization_id` and `requester_id` are REQUESTS: integers, never `exists:` (that rule would tell the caller which organizations and accounts
+     * exist). Whether the actor supports that organization, and whether that account is an eligible contact of it, is decided inside the creation
+     * transaction. The submitter is the authenticated user and nothing in the payload; a `user_id`, `submitted_by_id`, status or assignee in the
+     * payload is not validated, not read and not honoured.
+     */
+    public function store(Request $request, TicketService $service)
+    {
+        abort_unless(Gate::forUser($request->user())->allows('createAsPartnerSupport', Ticket::class), 404);
+
+        $validated = $request->validate([
+            ...TicketController::contentRules(),
+            'organization_id' => ['required', 'integer', 'min:1'],
+            'requester_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $ticket = $service->createForCustomerContact(
+            $request->user(),
+            (int) $validated['organization_id'],
+            (int) $validated['requester_id'],
+            $validated,
+            $request->file('attachments', []),
+        );
+
+        return redirect()->route('support.show', $ticket)
+            ->with('status', "Request {$ticket->ticket_number} received.");
     }
 
     public function show(Request $request, Ticket $ticket): Response

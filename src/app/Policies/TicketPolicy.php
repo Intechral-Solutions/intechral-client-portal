@@ -49,6 +49,16 @@ class TicketPolicy
     }
 
     /**
+     * Release 1.0 (R1-5): whether the actor may use the partner support CREATION page and route at all: they hold an effective support grant right now
+     * ({@see PartnerSupportAccess::holdsGrant()}). Which customer and which contact is decided inside the creation transaction
+     * (`ServiceRequestAccess::attributionForPartnerSupport`); this is the door, not the room.
+     */
+    public function createAsPartnerSupport(User $user): bool
+    {
+        return PartnerSupportAccess::holdsGrant($user);
+    }
+
+    /**
      * A partner support user may add a PUBLIC reply to a supported request that is still being worked. It never carries an internal flag, a due date,
      * a status change or an assignment: it authorizes exactly one thing, and TicketService::addPartnerSupportReply re-checks it under lock.
      */

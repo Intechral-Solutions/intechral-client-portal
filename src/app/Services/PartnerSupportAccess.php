@@ -86,6 +86,13 @@ final class PartnerSupportAccess
             ->whereNull('p.disabled_at');
     }
 
+    /** The locked refusals of {@see refusal()}: the account itself may not act (suspended, an operator), the customer is not one they support, the named contact is not eligible. */
+    public const REFUSED_ACTOR = 'actor';
+
+    public const REFUSED_ORGANIZATION = 'organization';
+
+    public const REFUSED_CONTACT = 'contact';
+
     /**
      * The same rule, as locking reads, for the reply transaction. MUST run inside the transaction that already holds the ticket row
      * (`FOR UPDATE`), and takes its own locks in the order user (S) -> the customer and partner organization rows together, ascending id (S) -> membership (S).
@@ -97,14 +104,42 @@ final class PartnerSupportAccess
      */
     public static function assertLocked(int $actorId, int $organizationId): bool
     {
+        return self::refusal($actorId, $organizationId) === null;
+    }
+
+    /**
+     * Release 1.0 (R1-5): the same locked decision, for CREATING a request on a supported customer's behalf, with the named CONTACT (the requester)
+     * decided in the same transaction. Runs inside the Ticket creation transaction, before the INSERT. `null` means: effective authority over the
+     * customer organization AND the contact is an eligible customer contact of it right now. Otherwise the reason, so the caller can answer 404 for
+     * the account itself (suspended, or an operator), and a field error for the organization or the contact. A missing or revoked grant is an
+     * ORGANIZATION refusal, so an unmanaged customer, one managed by another partner and a designation revoked mid-request are indistinguishable. The contact is looked at only after the organization has been proven
+     * supported, so nothing about a contact is learned for a customer the actor does not support.
+     *
+     * Lock order (a prefix-compatible extension of the reply's): the users S and the contact together, ascending id (shared) -> the customer and
+     * partner organization rows together, ascending id (shared) -> the actor's partner membership (shared) -> the contact's customer membership
+     * (shared). Every writer of these rows takes the user row, then the organization row, then the membership row, so there is no cycle.
+     *
+     * "Eligible contact" is {@see OrganizationAuthority::customerContactIds()} (active, not an operator, may raise and read a request: tables, no
+     * cache) AND a current membership row of the customer organization. The role, administrator approval and a CRM link are not inputs.
+     */
+    public static function refusal(int $actorId, int $organizationId, ?int $contactId = null): ?string
+    {
         if (DB::transactionLevel() < 1) {
-            throw new LogicException('PartnerSupportAccess::assertLocked() runs only inside the reply transaction.');
+            throw new LogicException('PartnerSupportAccess::refusal() runs only inside the creation or reply transaction.');
         }
 
-        $user = DB::table('users')->where('id', $actorId)->sharedLock()->first(['id', 'disabled_at']);
+        // The contact is NOMINATED by a plain read and only an EXISTING id is locked: a locking read of an id above the highest user takes a gap lock
+        // on the end of the index, which a concurrent registration's INSERT (an invitation acceptance, user S -> organization X -> insert) would
+        // wait on while this waits on its organization lock. Whether the contact exists is not decided here; it is decided below, after the customer
+        // is proven supported, from what the locks then show.
+        $nominatedContact = $contactId !== null && DB::table('users')->where('id', $contactId)->exists() ? $contactId : null;
+
+        $users = DB::table('users')->whereIn('id', array_values(array_unique(array_filter([$actorId, $nominatedContact]))))
+            ->orderBy('id')->sharedLock()->get(['id', 'disabled_at'])->keyBy('id');
+        $user = $users->get($actorId);
 
         if ($user === null || $user->disabled_at !== null) {
-            return false;
+            return self::REFUSED_ACTOR;
         }
 
         // The partner is NOMINATED by a plain read, then BOTH organization rows are locked in ONE statement in ascending id order, the order
@@ -114,7 +149,7 @@ final class PartnerSupportAccess
         $nominated = DB::table('organizations')->where('id', $organizationId)->value('managed_by_organization_id');
 
         if ($nominated === null || (int) $nominated === $organizationId) {
-            return false;
+            return self::REFUSED_ORGANIZATION;
         }
 
         $rows = DB::table('organizations')->whereIn('id', [$organizationId, (int) $nominated])->orderBy('id')->sharedLock()
@@ -125,18 +160,77 @@ final class PartnerSupportAccess
         if ($customer === null || $partner === null
             || $customer->disabled_at !== null || (int) $customer->managed_by_organization_id !== (int) $partner->id
             || ! $partner->can_manage_customers || $partner->disabled_at !== null) {
-            return false;
+            return self::REFUSED_ORGANIZATION;
         }
 
         $membership = DB::table('organization_members')
             ->where('organization_id', $partner->id)->where('user_id', $actorId)
             ->sharedLock()->first(['support_granted_at', 'support_granted_by']);
 
+        // No complete grant on THIS customer's partner is "this customer is not one you support", the same answer for an unmanaged organization, one
+        // managed by another partner, and a designation that was revoked while the request was in flight. Only the account itself (suspended, an
+        // operator) is a refusal of the ACTOR; whether the actor holds any grant at all is the caller's own earlier, unlocked 404.
         if ($membership === null || $membership->support_granted_at === null || $membership->support_granted_by === null) {
-            return false;
+            return self::REFUSED_ORGANIZATION;
         }
 
-        return ! OrganizationAuthority::isOperator($actorId);
+        if (OrganizationAuthority::isOperator($actorId)) {
+            return self::REFUSED_ACTOR;
+        }
+
+        if ($contactId === null) {
+            return null;
+        }
+
+        // The LOCKED row decides whether the contact is active: a suspension that committed after this transaction's read view began (the unlocked
+        // grant read, or any earlier plain read) is seen here and not in the snapshot that customerContactIds() reads. The rest of that predicate
+        // (not an operator, the two capabilities) is a table read outside the locks, the accepted residual of every permission read (design record 7).
+        $contact = $users->get($contactId);
+
+        if ($contact === null || $contact->disabled_at !== null) {
+            return self::REFUSED_CONTACT;
+        }
+
+        $contactMember = DB::table('organization_members')
+            ->where('organization_id', $customer->id)->where('user_id', $contactId)->sharedLock()->first(['id']);
+
+        if ($contactMember === null || OrganizationAuthority::customerContactIds([$contactId]) !== [$contactId]) {
+            return self::REFUSED_CONTACT;
+        }
+
+        return null;
+    }
+
+    /**
+     * The creation page's options, for display only (an ordinary read, no lock; the creation transaction decides again): per supported customer
+     * organization, its eligible contacts. Id, name and email of the contact, ordered by name, and nothing else (no role, no other membership).
+     * Built from {@see supportedOrganizations()} and {@see OrganizationAuthority::customerContactIds()}, so it cannot offer a customer or contact
+     * the creation rule would refuse (a stale page can only produce a refusal).
+     *
+     * @return list<array{id: int, name: string, contacts: list<array{id: int, name: string, email: string}>}>
+     */
+    public static function creationOptions(int $actorId): array
+    {
+        if (! self::holdsGrant($actorId)) {
+            return [];
+        }
+
+        $customers = self::supportedOrganizations($actorId)->orderBy('c.name')->orderBy('c.id')->get();
+
+        $members = DB::table('organization_members as cm')
+            ->join('users as cu', 'cu.id', '=', 'cm.user_id')
+            ->whereIn('cm.organization_id', $customers->pluck('id')->all())
+            ->orderBy('cu.name')->orderBy('cu.id')
+            ->get(['cm.organization_id', 'cu.id', 'cu.name', 'cu.email']);
+
+        $eligible = array_flip(OrganizationAuthority::customerContactIds($members->pluck('id')->map(fn ($id) => (int) $id)->all()));
+
+        return $customers->map(fn (object $customer) => [
+            'id' => (int) $customer->id,
+            'name' => (string) $customer->name,
+            'contacts' => $members->where('organization_id', $customer->id)->filter(fn (object $m) => isset($eligible[(int) $m->id]))
+                ->map(fn (object $m) => ['id' => (int) $m->id, 'name' => (string) $m->name, 'email' => (string) $m->email])->values()->all(),
+        ])->values()->all();
     }
 
     private static function id(User|int $actor): int

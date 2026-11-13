@@ -35,6 +35,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
 use App\Support\InvitationIssueThrottle;
+use App\Support\PartnerSupportCreateThrottle;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
@@ -128,6 +129,9 @@ Route::middleware(['auth', 'can:tickets.assign'])->prefix('operator')->name('ope
 // report, export or note route here. Listed in CustomerPilotGate::PILOT_ROUTES (closed mode answers 404).
 Route::middleware('auth')->prefix('support/requests')->name('support.')->group(function () {
     Route::get('/', [SupportRequestController::class, 'index'])->name('index');
+    // R1-5: literal routes before the `{ticket}` wildcard.
+    Route::get('/create', [SupportRequestController::class, 'create'])->name('create');
+    Route::post('/', [SupportRequestController::class, 'store'])->middleware('throttle:'.PartnerSupportCreateThrottle::NAME)->name('store');
     Route::get('/{ticket}', [SupportRequestController::class, 'show'])->name('show');
     Route::post('/{ticket}/replies', [SupportRequestController::class, 'reply'])->name('replies.store');
     Route::get('/{ticket}/attachments/{attachment}', [SupportRequestController::class, 'downloadAttachment'])->whereNumber('attachment')->name('attachment.download');

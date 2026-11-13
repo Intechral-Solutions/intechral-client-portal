@@ -264,6 +264,7 @@ final class NavigationBuilder
             $views[] = $this->item('helpdesk.support', 'Supported requests', route('support.index'), 'inertia', [
                 'support.index',
                 'support.show',
+                'support.create',
             ]);
         }
 

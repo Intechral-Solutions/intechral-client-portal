@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { LifeBuoy } from 'lucide-react';
+import { LifeBuoy, Plus } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import { TicketPriority, TicketStatus } from '@/components/helpdesk/ticket-status';
@@ -12,7 +12,7 @@ import { FilterChip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FilterBar, FilterField, FilterSearch } from '@/components/ui/filter-bar';
 import { NativeSelect } from '@/components/ui/native-select';
-import { index } from '@/routes/support';
+import { create, index } from '@/routes/support';
 import type {
     RequesterTicketFilters,
     SelectOption,
@@ -147,6 +147,12 @@ export function SupportIndexPage({ tickets, filters, statusOptions }: SupportInd
                     overline="Support"
                     title="Supported requests"
                     description="Requests from the organizations you support. You can read each conversation and reply to it."
+                    actions={
+                        <Link href={create.url()} className={buttonVariants()}>
+                            <Plus aria-hidden="true" />
+                            New request
+                        </Link>
+                    }
                 />
 
                 <FilterBar

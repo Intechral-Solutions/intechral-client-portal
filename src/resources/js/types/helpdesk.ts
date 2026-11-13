@@ -16,6 +16,13 @@ export type TicketPriorityValue = 'low' | 'medium' | 'high' | 'critical';
  */
 export type OrganizationOption = { id: number; name: string };
 
+/** One customer a partner support user may raise a request for, with the contacts who may be the requester (R1-5). Display options only. */
+export type SupportCustomerOption = {
+    id: number;
+    name: string;
+    contacts: { id: number; name: string; email: string }[];
+};
+
 export type RequesterTicketRow = {
     /** The public reference (`TK-XXXXX-XXXXX`): the ticket's only public identity. The numeric key is never sent. */
     number: string;

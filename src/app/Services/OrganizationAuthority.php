@@ -178,6 +178,37 @@ final class OrganizationAuthority
             ->all();
     }
 
+    /**
+     * Release 1.0 (R1-5): the subset of the given accounts that may be the REQUESTER of a partner-originated request, ascending, from the TABLES
+     * ALONE (no permission cache, no lock, so it is safe inside an organization-locked transaction for the reason {@see isMembershipManager()}
+     * gives). A customer contact is an ACTIVE account that is NOT an operator (an operator is staff, never a customer contact: the operator
+     * surface, not `/tickets`, is where one works) and holds the capabilities of a customer who could raise and read a request themselves:
+     * `tickets.create` and `tickets.view`, each directly or through any role. Whether the contact belongs to the customer organization is a
+     * separate, locked fact ({@see PartnerSupportAccess}); nothing here reads membership.
+     *
+     * @param  list<int>  $userIds
+     * @return list<int>
+     */
+    public static function customerContactIds(array $userIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $userIds)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('users.id', $ids)
+            ->whereNull('users.disabled_at')
+            ->whereNotIn('users.id', self::operatorIds() ?: [0])
+            ->where(self::holds(PermissionCatalogue::TICKETS_CREATE))
+            ->where(self::holds(PermissionCatalogue::TICKETS_VIEW))
+            ->orderBy('users.id')
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /** The account holds the permission directly or through one of its roles (the same reading as AccountAdministrators::holds). */
     private static function holds(string $permission): Closure
     {

@@ -93,6 +93,8 @@ final class CustomerPilotGate
         // Release 1.0 (R1-4), partner support: the routes carry no capability of their own because the authority is the operator-issued grant, which
         // PartnerSupportAccess reads from the tables and the controller enforces (404 for everyone without it). Absent in closed mode.
         'support.index' => null,
+        'support.create' => null,
+        'support.store' => null,
         'support.show' => null,
         'support.replies.store' => null,
         'support.attachment.download' => null,
