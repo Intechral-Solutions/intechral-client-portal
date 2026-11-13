@@ -190,7 +190,7 @@ it('allows authorized embedded task and ticket timer contexts', function () {
     $this->actingAs(User::findOrFail($user->id))
         ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()
-        ->assertJsonPath('context.type', 'Ticket');
+        ->assertJsonPath('context.type', 'Request');
 });
 
 // FLIPPED IN EPIC-017 WP2 (O1, N1): this test's subject is the context DTO, not eligibility. Ticket
@@ -228,7 +228,7 @@ it('identifies the context record by id on every timer context DTO', function ()
     $this->actingAs($user)
         ->postJson(route('time.timer.start'), ticketTimeContext($ticket))
         ->assertOk()
-        ->assertJsonPath('context.type', 'Ticket')
+        ->assertJsonPath('context.type', 'Request')
         ->assertJsonPath('context.id', $ticket->id);
 
     $contexts = collect($this->actingAs($user)->getJson(route('time.timers.active'))->assertOk()->json())
@@ -238,7 +238,7 @@ it('identifies the context record by id on every timer context DTO', function ()
     expect($contexts->all())->toBe([
         'Project' => $project->id,
         'Task' => $task->id,
-        'Ticket' => $ticket->id,
+        'Request' => $ticket->id,
     ]);
 });
 

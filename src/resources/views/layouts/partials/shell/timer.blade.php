@@ -93,7 +93,7 @@
 
         <div data-timer-empty class="px-3 py-4">
             <p class="text-sm text-text">No timers running.</p>
-            <p class="mt-1 text-xs text-text-muted">Start one from a task or ticket, or from the Time screen.</p>
+            <p class="mt-1 text-xs text-text-muted">Start one from a task or request, or from the Time screen.</p>
         </div>
 
         <ul data-timer-rows hidden class="max-h-[60vh] overflow-y-auto overscroll-contain"></ul>

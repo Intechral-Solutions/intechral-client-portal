@@ -457,7 +457,7 @@ test.describe('signing out', () => {
 
         // L15: administration lives under System. An operator holds every permission, so if the
         // boundary leaked at all it would leak here.
-        for (const absent of ['Manage', 'Users', 'Roles', 'Organizations', 'Ticket Queue']) {
+        for (const absent of ['Manage', 'Users', 'Roles', 'Organizations', 'Service request queue']) {
             await expect(page.getByRole('menu').getByText(absent, { exact: true })).toHaveCount(0);
         }
 
@@ -472,7 +472,7 @@ test.describe('signing out', () => {
             await expect(page.getByRole('menuitem', { name: item })).toBeVisible();
         }
 
-        for (const absent of ['Manage', 'Users', 'Roles', 'Organizations', 'Ticket Queue']) {
+        for (const absent of ['Manage', 'Users', 'Roles', 'Organizations', 'Service request queue']) {
             await expect(page.getByRole('menu').getByText(absent, { exact: true })).toHaveCount(0);
         }
 

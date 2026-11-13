@@ -190,7 +190,7 @@ async function expectDangerTrigger(control: Locator, tokens: Tokens) {
 }
 
 /**
- * A page-header action (a fixed-height control such as "New Ticket") stays whole at the current viewport:
+ * A page-header action (a fixed-height control such as "New Request") stays whole at the current viewport:
  * inside it horizontally, its label on ONE line and inside the control's box vertically, and it receives
  * the pointer at its own centre. A label that wraps inside the fixed `h-9` control overflows the box (the
  * 390px defect this guards), which shows as two line boxes and as text outside the control's edges.
@@ -334,7 +334,7 @@ test.describe('Helpdesk as an operator', () => {
             await expectSecondary(page.locator('#main-content').getByRole('link', { name: 'Reports', exact: true }), tokens);
 
             // Selection: the select-all checkbox is named, uses the selection accent, and drives the bulk bar.
-            const selectAll = inMain(page).getByRole('checkbox', { name: 'Select all tickets on this page' });
+            const selectAll = inMain(page).getByRole('checkbox', { name: 'Select all requests on this page' });
             if ((await selectAll.count()) > 0) {
                 expect(await style(selectAll, 'accent-color')).toBe(tokens.accent);
                 await selectAll.check();
@@ -342,7 +342,7 @@ test.describe('Helpdesk as an operator', () => {
                 await expect(inMain(page).getByLabel('Bulk action')).toBeVisible();
                 await expect(inMain(page).getByLabel('Assign to')).toBeVisible();
                 await expectSecondary(inMain(page).getByRole('button', { name: 'Apply', exact: true }), tokens);
-                await expect(inMain(page).getByRole('checkbox', { name: /^Select ticket / }).first()).toBeChecked();
+                await expect(inMain(page).getByRole('checkbox', { name: /^Select request / }).first()).toBeChecked();
                 await selectAll.uncheck();
             }
 

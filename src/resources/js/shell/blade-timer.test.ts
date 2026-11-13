@@ -26,7 +26,12 @@ function timer(overrides: Partial<ActiveTimer> = {}): ActiveTimer {
         started_at: '2026-09-28T11:59:50.000Z',
         server_now: '2026-09-28T12:00:00.000Z',
         description: 'Original',
-        context: { type: 'Ticket', id: 7, label: 'TK-00042-ABCDE', url: '/tickets/TK-00042-ABCDE' },
+        context: {
+            type: 'Request',
+            id: 7,
+            label: 'TK-00042-ABCDE',
+            url: '/tickets/TK-00042-ABCDE',
+        },
         ...overrides,
     };
 }
@@ -207,7 +212,7 @@ describe('first paint: the last confirmed state, or nothing', () => {
 
         expect(pill().hidden).toBe(false);
         expect(pill().dataset.timerRunning).toBe('true');
-        expect(text('[data-timer-label]')).toBe('Ticket: TK-00042-ABCDE');
+        expect(text('[data-timer-label]')).toBe('Request: TK-00042-ABCDE');
         // Ordering: at the instant it became visible the running state was already drawn.
         expect(reveals).toEqual([{ running: 'true', idleShown: false, error: false }]);
     });
@@ -239,7 +244,7 @@ describe('first paint: the last confirmed state, or nothing', () => {
         // The second read is still unresolved: the last confirmed state stays exactly as drawn.
         expect(pill().hidden).toBe(false);
         expect(pill().dataset.timerRunning).toBe('true');
-        expect(text('[data-timer-label]')).toBe('Ticket: TK-00042-ABCDE');
+        expect(text('[data-timer-label]')).toBe('Request: TK-00042-ABCDE');
 
         await respond([]);
 
@@ -277,7 +282,7 @@ describe('first paint: the last confirmed state, or nothing', () => {
         // The existing semantics: the confirmed timer stays drawn, with the danger border and a Retry.
         expect(pill().hidden).toBe(false);
         expect(pill().dataset.timerRunning).toBe('true');
-        expect(text('[data-timer-label]')).toBe('Ticket: TK-00042-ABCDE');
+        expect(text('[data-timer-label]')).toBe('Request: TK-00042-ABCDE');
         expect(trigger().classList.contains('border-danger')).toBe(true);
         expect(document.querySelector<HTMLElement>('[data-timer-retry]')!.hidden).toBe(false);
     });
@@ -302,15 +307,15 @@ it('draws the running state with the shared elapsed and label derivations', asyn
     expect(pill().dataset.timerCount).toBe('1');
     expect(text('[data-timer-elapsed="wide"]')).toBe('0:00:10');
     expect(text('[data-timer-elapsed="narrow"]')).toBe('0:00');
-    expect(text('[data-timer-label]')).toBe('Ticket: TK-00042-ABCDE');
+    expect(text('[data-timer-label]')).toBe('Request: TK-00042-ABCDE');
     expect(trigger().getAttribute('aria-label')).toBe(
-        'Running timer: Ticket: TK-00042-ABCDE. Show timers',
+        'Running timer: Request: TK-00042-ABCDE. Show timers',
     );
     // The idle affordance is gone and the Stop control has arrived, named for its context.
     expect(document.querySelector<HTMLElement>('[data-timer-idle]')!.hidden).toBe(true);
     const stop = document.querySelector<HTMLElement>('[data-shell-timer-stop]')!;
     expect(stop.hidden).toBe(false);
-    expect(stop.getAttribute('aria-label')).toBe('Stop timer: Ticket: TK-00042-ABCDE');
+    expect(stop.getAttribute('aria-label')).toBe('Stop timer: Request: TK-00042-ABCDE');
 });
 
 it('shows the newest timer inline and counts the others', async () => {

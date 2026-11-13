@@ -259,7 +259,7 @@ export function TimerTray({ nowMs }: { nowMs: number }) {
                     <div className="px-3 py-4">
                         <p className="text-sm text-text">No timers running.</p>
                         <p className="mt-1 text-xs text-text-muted">
-                            Start one from a task or ticket, or from the Time screen.
+                            Start one from a task or request, or from the Time screen.
                         </p>
                     </div>
                 ) : (

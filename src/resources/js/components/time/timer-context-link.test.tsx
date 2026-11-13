@@ -35,13 +35,13 @@ it('links a still-Blade kind with a plain document anchor, and a migrated kind w
         <>
             <TimerContextLink kind="Project" url="/projects/1/board" label="Portal" />
             <TimerContextLink kind="task" url="/projects/1/tasks/2" label="Task" />
-            <TimerContextLink kind="Ticket" url="/tickets/3" label="Ticket" />
+            <TimerContextLink kind="Request" url="/tickets/3" label="Request" />
         </>,
     );
 
     expect(screen.getByRole('link', { name: 'Portal' })).toHaveAttribute('data-router', 'inertia');
     expect(screen.getByRole('link', { name: 'Task' })).toHaveAttribute('data-router', 'inertia');
-    expect(screen.getByRole('link', { name: 'Ticket' })).not.toHaveAttribute('data-router');
+    expect(screen.getByRole('link', { name: 'Request' })).not.toHaveAttribute('data-router');
     expect(screen.getByRole('link', { name: 'Portal' })).toHaveAttribute(
         'href',
         '/projects/1/board',
@@ -53,7 +53,7 @@ it('uses an Inertia link only for a kind that has been flipped, and matches type
         <>
             <TimerContextLink kind="Project" url="/projects/1/board" label="From timer" />
             <TimerContextLink kind="project" url="/projects/1/board" label="From entry" />
-            <TimerContextLink kind="Ticket" url="/tickets/3" label="Ticket" />
+            <TimerContextLink kind="Request" url="/tickets/3" label="Request" />
         </>,
     );
 
@@ -65,7 +65,7 @@ it('uses an Inertia link only for a kind that has been flipped, and matches type
         'data-router',
         'inertia',
     );
-    expect(screen.getByRole('link', { name: 'Ticket' })).not.toHaveAttribute('data-router');
+    expect(screen.getByRole('link', { name: 'Request' })).not.toHaveAttribute('data-router');
 });
 
 it('renders plain text, never a link, when there is no destination', () => {

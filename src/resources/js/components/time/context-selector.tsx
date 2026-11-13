@@ -95,7 +95,7 @@ export function ContextSelector({ idPrefix, value, onChange, disabled, error }: 
                     <option value="">None</option>
                     <option value="project">Project</option>
                     <option value="task">Task</option>
-                    <option value="ticket">Ticket</option>
+                    <option value="ticket">Request</option>
                 </NativeSelect>
             </div>
 

@@ -41,7 +41,7 @@ class TicketBulkController extends Controller
             $tickets = Ticket::whereIn('ticket_number', $references)->get();
 
             if ($tickets->count() !== count($references)) {
-                throw ValidationException::withMessages(['ticket_refs' => 'One or more selected tickets no longer exist.']);
+                throw ValidationException::withMessages(['ticket_refs' => 'One or more selected requests no longer exist.']);
             }
 
             $applied = 0;
@@ -72,7 +72,7 @@ class TicketBulkController extends Controller
             return [$applied, $skipped];
         });
 
-        $summary = $applied === 1 ? '1 ticket updated.' : "{$applied} tickets updated.";
+        $summary = $applied === 1 ? '1 request updated.' : "{$applied} requests updated.";
 
         if ($skipped === []) {
             return back()->with('status', $summary);
@@ -82,7 +82,7 @@ class TicketBulkController extends Controller
 
         // Nothing changed: say so as an error rather than a success banner.
         if ($applied === 0) {
-            return back()->withErrors(['bulk' => 'No tickets were updated. '.$detail]);
+            return back()->withErrors(['bulk' => 'No requests were updated. '.$detail]);
         }
 
         return back()->with('status', $summary.' '.$detail);

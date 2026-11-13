@@ -105,9 +105,9 @@ class TicketCreatedNotification extends Notification implements ShouldQueue
         }
 
         $message = (new MailMessage)
-            ->subject("[{$ticket->ticket_number}] Ticket received: ".MailText::plain($ticket->title))
+            ->subject("[{$ticket->ticket_number}] Request received: ".MailText::plain($ticket->title))
             ->greeting(MailText::line('Hello ', MailText::escape($notifiable->name), ','))
-            ->line("Your support ticket **{$ticket->ticket_number}** has been received.");
+            ->line("Your service request **{$ticket->ticket_number}** has been received.");
 
         if ($ticket->raisedByAnother()) {
             $message->line(MailText::line('**', MailText::escape($ticket->submittedBy?->name ?: 'Partner support', 255), '** raised this request for you at **', MailText::escape($ticket->organization?->name ?: 'your organization', 255), '**.'));
@@ -116,7 +116,7 @@ class TicketCreatedNotification extends Notification implements ShouldQueue
         return $message
             ->line(MailText::line('**Subject:** ', MailText::escape($ticket->title)))
             ->line('**Priority:** '.ucfirst($ticket->priority))
-            ->action('View Ticket', route('tickets.show', $ticket))
+            ->action('View request', route('tickets.show', $ticket))
             ->line("We'll get back to you as soon as possible.");
     }
 }

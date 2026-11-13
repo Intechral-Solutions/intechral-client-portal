@@ -36,7 +36,7 @@ it('BASELINE H5: an operator assigns a tickets.assign holder, and the change is 
     $this->actingAs($operator)
         ->put(route('operator.tickets.assign', $ticket), ['assignee_id' => $eligible->id])
         ->assertRedirect()
-        ->assertSessionHas('status', 'Ticket assignment updated.');
+        ->assertSessionHas('status', 'Request assignment updated.');
 
     expect($ticket->fresh()->assignee_id)->toBe($eligible->id);
     $log = Activity::forSubject($ticket)->sole();
@@ -169,7 +169,7 @@ it('TARGET H5: bulk assignment to an eligible user assigns every selected ticket
         ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$t1->ticket_number, $t2->ticket_number], 'action' => 'assign', 'assignee_id' => $agent->id])
         ->assertRedirect()
         ->assertSessionHasNoErrors()
-        ->assertSessionHas('status', '2 tickets updated.');
+        ->assertSessionHas('status', '2 requests updated.');
 
     expect([$t1->fresh()->assignee_id, $t2->fresh()->assignee_id])->toBe([$agent->id, $agent->id])
         ->and(Activity::forSubject($t1)->count())->toBe(1)

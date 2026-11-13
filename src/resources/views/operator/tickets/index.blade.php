@@ -1,11 +1,11 @@
-@extends('layouts.app', ['title' => 'Ticket Queue'])
+@extends('layouts.app', ['title' => 'Service request queue'])
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
     <div class="mb-8 flex items-start justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold text-text">Ticket Queue</h1>
+            <h1 class="text-2xl font-semibold text-text">Service request queue</h1>
             <p class="mt-1 text-sm text-text-secondary">Triage, assign, and manage all support requests.</p>
         </div>
         <div class="flex items-center gap-2">
@@ -73,9 +73,9 @@
             <thead>
                 <tr class="bg-surface-sunken">
                     <th class="px-4 py-3">
-                        <x-ui.checkbox id="select-all" aria-label="Select all tickets on this page" />
+                        <x-ui.checkbox id="select-all" aria-label="Select all requests on this page" />
                     </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Ticket</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Request</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Priority</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Status</th>
                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">Assignee</th>
@@ -89,7 +89,7 @@
                 <tr class="transition-colors hover:bg-surface-hover">
                     <td class="px-4 py-3">
                         <x-ui.checkbox name="ticket_refs[]" id="ticket-cb-{{ $ticket->ticket_number }}" value="{{ $ticket->ticket_number }}"
-                                       aria-label="Select ticket {{ $ticket->ticket_number }}" class="ticket-cb" />
+                                       aria-label="Select request {{ $ticket->ticket_number }}" class="ticket-cb" />
                     </td>
                     <td class="px-4 py-3">
                         <p class="font-medium text-sm text-text">{{ $ticket->title }}</p>
@@ -125,7 +125,7 @@
                 @empty
                 <tr>
                     <td colspan="8" class="px-6 py-10 text-center text-sm text-text-secondary">
-                        No tickets found.
+                        No service requests found.
                     </td>
                 </tr>
                 @endforelse

@@ -155,7 +155,7 @@ describe('the operator surfaces', function () {
         $header = array_shift($rows);
         $row = collect($rows)->firstWhere(0, $ticket->ticket_number);
 
-        expect($header)->toBe(['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'])
+        expect($header)->toBe(['Request #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'])
             ->and($row[5])->toBe('Rita Requester')
             ->and($row[11])->toBe("'=HYPERLINK(\"https://evil.invalid\",\"x\")")
             ->and($row[12])->toBe("'+SUM(1+1)");

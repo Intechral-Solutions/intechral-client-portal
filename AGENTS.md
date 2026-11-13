@@ -10,6 +10,11 @@ Durable rules for coding agents working in this repository. The design contract 
 - Blade views are guarded by `tests/Unit/Configuration/BladeThemeGuardTest.php`; run it after any `resources/views` change.
 - `./dev check` is the full local gate. `./dev test:e2e` runs the browser suite.
 
+## Terminology
+
+User-facing text says **service request** (full name) or **request** (short form), and **Helpdesk** for the workspace; it never says "ticket". `Ticket` stays the technical name of the model,
+tables, routes, permissions and APIs. Glossary and rules: [`docs/product/release-1.0-r1-7-service-request-terminology.md`](docs/product/release-1.0-r1-7-service-request-terminology.md).
+
 ## Design system (React)
 
 - **Shared primitives own their visual styling.** Callers of `components/ui/*` add layout (margin, width, flex/grid placement),

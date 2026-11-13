@@ -27,7 +27,7 @@ const props: DashboardPageProps = {
     metrics: [
         {
             key: 'tickets',
-            label: 'Open Tickets',
+            label: 'Open Requests',
             value: 3,
             supportingText: 'Needs attention',
             href: '/tickets',
@@ -71,7 +71,7 @@ const props: DashboardPageProps = {
         },
     ],
     quickActions: [
-        { key: 'new-ticket', label: 'New Ticket', href: '/tickets/create', visit: 'document' },
+        { key: 'new-ticket', label: 'New Request', href: '/tickets/create', visit: 'document' },
         { key: 'log-time', label: 'Log Time', href: '/time', visit: 'inertia' },
     ],
     crmSummary: null,
@@ -105,7 +105,7 @@ describe('Home', () => {
         expect(within(list as HTMLElement).getAllByRole('term')).toHaveLength(4);
         expect(within(list as HTMLElement).getAllByRole('definition')).toHaveLength(4);
 
-        expect(screen.getByText('Open Tickets')).toBeVisible();
+        expect(screen.getByText('Open Requests')).toBeVisible();
         expect(screen.getByText('4.5h')).toBeVisible();
 
         // Numbers are mono and tabular — a console reads columns of figures, not prose.
@@ -149,7 +149,7 @@ describe('Home', () => {
         expect(projects).toHaveAttribute('href', '/projects');
         expect(projects).toHaveAttribute('data-inertia', 'true');
 
-        const tickets = screen.getByRole('link', { name: /Open Tickets/ });
+        const tickets = screen.getByRole('link', { name: /Open Requests/ });
         expect(tickets).toHaveAttribute('href', '/tickets');
         expect(tickets).not.toHaveAttribute('data-inertia');
 
@@ -157,7 +157,7 @@ describe('Home', () => {
             'data-inertia',
             'true',
         );
-        expect(screen.getByRole('link', { name: 'New Ticket' })).not.toHaveAttribute(
+        expect(screen.getByRole('link', { name: 'New Request' })).not.toHaveAttribute(
             'data-inertia',
         );
     });
@@ -166,9 +166,9 @@ describe('Home', () => {
         renderHome();
 
         // The accessible name carries label, value and supporting text: a link called only
-        // "Open Tickets" would make a screen reader user open the page to learn the number.
+        // "Open Requests" would make a screen reader user open the page to learn the number.
         expect(
-            screen.getByRole('link', { name: 'Open Tickets: 3. Needs attention' }),
+            screen.getByRole('link', { name: 'Open Requests: 3. Needs attention' }),
         ).toBeVisible();
     });
 
@@ -186,7 +186,7 @@ describe('Home', () => {
 
         // §21.2 asks for real copy: Home has no filter to clear, so the empty state says what would
         // put something here instead of implying something was filtered away.
-        expect(screen.getByText('No open tickets')).toBeVisible();
+        expect(screen.getByText('No open requests')).toBeVisible();
         expect(screen.getByText(/New support activity appears in this list/)).toBeVisible();
     });
 
