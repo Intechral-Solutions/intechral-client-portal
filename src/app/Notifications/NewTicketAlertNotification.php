@@ -17,7 +17,7 @@ use Illuminate\Queue\Attributes\Tries;
  *
  * It goes to ONE configured destination, `HELPDESK_NOTIFY_ADDRESS`, as an on-demand (address) notification: never to the
  * requester, never to the `tickets.assign` holders, and never to an account, so the suspended-recipient listener has nothing to
- * decide here. What it says is deliberately small: the number, the title, the category and priority, who raised it and for which organization (R1-2B), a short
+ * decide here. What it says is deliberately small: the number, the title, the category and priority, who raised it (the submitter too, when partner support raised it for a contact: R1-6) and for which organization (R1-2B), a short
  * preview of the description and a link to the operator page. No attachment names, no reply, no internal note, no requester address.
  * Every piece of user-authored text is escaped for the Markdown template (F-3, {@see MailText}).
  *
@@ -46,10 +46,16 @@ class NewTicketAlertNotification extends Notification implements ShouldQueue
         $ticket = $this->ticket;
         $requester = MailText::escape($ticket->user?->name ?: 'a customer');
 
+        // R1-6: a request partner support raised for a contact (R1-5) names the ACTUAL submitter, as the operator page and the CSV report do.
+        // Names only: no address, and nothing about the submitter's own organization beyond what the Organization line already says.
+        $line = $ticket->raisedByAnother()
+            ? MailText::line("**{$ticket->ticket_number}** was submitted by ", MailText::escape($ticket->submittedBy?->name ?: 'partner support'), ' (partner support) on behalf of ', $requester, '.')
+            : MailText::line("**{$ticket->ticket_number}** was raised by ", $requester, '.');
+
         return (new MailMessage)
             ->subject("[{$ticket->ticket_number}] New request: ".MailText::plain($ticket->title, 150))
             ->greeting('New support request')
-            ->line(MailText::line("**{$ticket->ticket_number}** was raised by ", $requester, '.'))
+            ->line($line)
             ->line(MailText::line('**Organization:** ', MailText::escape($ticket->organization?->name ?: 'unknown', 255)))
             ->line(MailText::line('**Subject:** ', MailText::escape($ticket->title, 255)))
             ->line(MailText::line('**Category:** ', MailText::escape($ticket->category, 100)))

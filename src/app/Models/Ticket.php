@@ -143,6 +143,12 @@ class Ticket extends Model
         return $this->belongsTo(Organization::class, 'organization_id')->withoutGlobalScopes();
     }
 
+    /** Release 1.0 (R1-6): whether someone other than the requester raised this request (partner support raising it for a contact, R1-5). */
+    public function raisedByAnother(): bool
+    {
+        return (int) $this->submitted_by_id !== (int) $this->user_id;
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_id');

@@ -86,15 +86,15 @@ it('records the contact as requester, the managed customer as organization and t
     expect(DB::table('ticket_status_histories')->where('ticket_id', $ticket->id)->count())->toBe(0);
 });
 
-it('mails the REQUESTER their receipt and the helpdesk its alert, and the submitter nothing', function () {
+it('mails the REQUESTER their receipt, the SUBMITTER their own confirmation and the helpdesk its alert (R1-6; detail in PartnerParticipantNotificationsTest)', function () {
     config(['helpdesk.notify_address' => 'helpdesk@desk.invalid']);
     $w = psWorld();
 
     $this->actingAs($w['staff'])->post(route('support.store'), pscPayload($w))->assertRedirect();
 
-    Notification::assertSentTo($w['requester'], TicketCreatedNotification::class);
-    Notification::assertNotSentTo($w['staff'], TicketCreatedNotification::class);
-    Notification::assertSentTimes(TicketCreatedNotification::class, 1);
+    Notification::assertSentTo($w['requester'], TicketCreatedNotification::class, fn ($n) => $n->audience === TicketCreatedNotification::FOR_REQUESTER);
+    Notification::assertSentTo($w['staff'], TicketCreatedNotification::class, fn ($n) => $n->audience === TicketCreatedNotification::FOR_SUBMITTER);
+    Notification::assertSentTimes(TicketCreatedNotification::class, 2);
     Notification::assertSentOnDemandTimes(NewTicketAlertNotification::class, 1);
 });
 

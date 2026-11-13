@@ -14,6 +14,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Gate;
+use InvalidArgumentException;
 
 /**
  * A queued mail about a ticket (or reply) that no longer exists has nothing left to say, so the job is
@@ -25,6 +26,13 @@ use Illuminate\Support\Facades\Gate;
  * (TicketService::replyRecipients() decided at dispatch). A recipient who lost access in between (an assignee whose
  * `tickets.assign` was revoked, a restricted customer) gets nothing. The check is the ticket policy's `view`, the
  * rule every ticket screen uses; no access rule of its own. An internal note is never mailed, as at dispatch.
+ *
+ * Release 1.0 (R1-6): a second audience, {@see FOR_PARTNER_SUPPORT}, for a partner support PARTICIPANT of the request (the staff member who
+ * submitted it, or who has replied publicly). It is the same public reply, but it is authorised by the partner support rule instead:
+ * `viewAsPartnerSupport` (effective authority read from the tables when the job runs, so a designation revoked, a suspension, a
+ * relationship moved or an organization disabled while the mail was queued sends nothing), and the link goes to the SUPPORT page, which the
+ * recipient may open, never to the requester's. The mail names the requester and the organization and carries only what a support user
+ * may already read: the public reply's text. No attachment name, no internal note, and never a reply the reader could not open there.
  */
 #[Tries(3)]
 #[Backoff(60, 180)]
@@ -33,10 +41,27 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /** The requester or the assignee: authorised by the ticket policy's `view`. */
+    public const FOR_PARTICIPANT = 'participant';
+
+    /** A partner support participant: authorised by `viewAsPartnerSupport`. */
+    public const FOR_PARTNER_SUPPORT = 'partner_support';
+
     public function __construct(
         public readonly Ticket $ticket,
         public readonly TicketReply $reply,
-    ) {}
+        public readonly string $audience = self::FOR_PARTICIPANT,
+    ) {
+        if (! in_array($audience, [self::FOR_PARTICIPANT, self::FOR_PARTNER_SUPPORT], true)) {
+            throw new InvalidArgumentException("Unknown audience '{$audience}'.");
+        }
+    }
+
+    /** A job serialized before R1-6 has no `audience` in its payload: it is the ordinary participant mail it always was. */
+    private function audience(): string
+    {
+        return $this->audience ?? self::FOR_PARTICIPANT;
+    }
 
     public function via(object $notifiable): array
     {
@@ -59,7 +84,16 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
             return false;
         }
 
-        return $notifiable instanceof Authenticatable && Gate::forUser($notifiable)->allows('view', $ticket);
+        if (! $notifiable instanceof Authenticatable) {
+            return false;
+        }
+
+        if ($this->audience() === self::FOR_PARTNER_SUPPORT) {
+            // The author is never told about their own reply, even if the recipient list is ever built wrongly.
+            return (int) $notifiable->getAuthIdentifier() !== (int) $reply->user_id && Gate::forUser($notifiable)->allows('viewAsPartnerSupport', $ticket);
+        }
+
+        return Gate::forUser($notifiable)->allows('view', $ticket);
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -69,12 +103,19 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
         $body = MailText::plain($this->reply->body);
         $preview = MailText::line(MailText::escape(rtrim(mb_substr($body, 0, 200))), mb_strlen($body) > 200 ? '...' : '');
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("[{$this->ticket->ticket_number}] New reply: ".MailText::plain($this->ticket->title))
-            ->greeting(MailText::line('Hello ', MailText::escape($notifiable->name), ','))
-            ->line("A new reply has been added to ticket **{$this->ticket->ticket_number}**.")
+            ->greeting(MailText::line('Hello ', MailText::escape($notifiable->name), ','));
+
+        if ($this->audience() === self::FOR_PARTNER_SUPPORT) {
+            $message->line(MailText::line("A new reply has been added to request **{$this->ticket->ticket_number}** for **", MailText::escape($this->ticket->user?->name ?: 'a contact', 255), '** at **', MailText::escape($this->ticket->organization?->name ?: 'the organization', 255), '**.'));
+        } else {
+            $message->line("A new reply has been added to ticket **{$this->ticket->ticket_number}**.");
+        }
+
+        return $message
             ->line(MailText::line('**', MailText::escape($this->reply->user->name), '** wrote:'))
             ->line($preview)
-            ->action('View Ticket', route('tickets.show', $this->ticket));
+            ->action($this->audience() === self::FOR_PARTNER_SUPPORT ? 'View request' : 'View Ticket', route($this->audience() === self::FOR_PARTNER_SUPPORT ? 'support.show' : 'tickets.show', $this->ticket));
     }
 }

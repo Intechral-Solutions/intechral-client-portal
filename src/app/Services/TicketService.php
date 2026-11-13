@@ -9,6 +9,7 @@ use App\Models\TicketReply;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
 use App\Notifications\NewTicketAlertNotification;
+use App\Notifications\PartnerReplyAlertNotification;
 use App\Notifications\TicketCreatedNotification;
 use App\Notifications\TicketRepliedNotification;
 use App\Notifications\TicketStatusNotification;
@@ -23,6 +24,7 @@ use App\Support\Helpdesk\TicketReferenceGenerator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Notifications\Notification as BaseNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -110,8 +112,8 @@ class TicketService
      *
      * `$organizationId` and `$requesterId` are what the actor asked for, never an authority. A refusal throws before anything is written.
      *
-     * Email semantics are unchanged: the REQUESTER receives the receipt a requester always receives, and the operator alert goes out. The submitter
-     * is not mailed; a notice to the submitter and "raised by" wording are R1-6.
+     * Email (R1-6): the REQUESTER receives the receipt a requester always receives, which now says who raised it; the SUBMITTER receives a confirmation
+     * of their own; the operator alert goes out and names the submitter. Each is its own after-commit hand-over.
      *
      * @throws ValidationException on `organization_id` or `requester_id`
      * @throws NotFoundHttpException when the actor holds no effective authority
@@ -131,6 +133,14 @@ class TicketService
             // The same guard a reply mail applies: never a suspended account.
             if ($requester !== null && ! $requester->isSuspended()) {
                 $requester->notify(new TicketCreatedNotification($ticket));
+            }
+        });
+        // R1-6: the staff member who submitted it gets their own confirmation (their own hand-over, so neither can stop the other). A staff member who
+        // is also the contact is the requester and has just been sent the receipt; a suspended account, or one whose authority has already ended,
+        // is not mailed (TicketCreatedNotification decides again when the worker runs it).
+        $this->handOffAfterCommit(function () use ($ticket, $actor) {
+            if ((int) $ticket->user_id !== (int) $actor->getKey() && ! $actor->isSuspended() && Gate::forUser($actor)->allows('viewAsPartnerSupport', $ticket)) {
+                $actor->notify(new TicketCreatedNotification($ticket, TicketCreatedNotification::FOR_SUBMITTER));
             }
         });
         $this->handOffAfterCommit(fn () => $this->alertOperators($ticket));
@@ -237,9 +247,7 @@ class TicketService
 
         $ticket->setRawAttributes($current->getAttributes(), true);
 
-        foreach ($this->replyRecipients($current, $user, $isInternal) as $recipient) {
-            $recipient->notify(new TicketRepliedNotification($current, $reply));
-        }
+        $this->notifyOfReply($current, $reply, $user, $isInternal, false);
 
         return $reply;
     }
@@ -253,8 +261,8 @@ class TicketService
      *  - It is never internal, and carries no due-date adjustment: nothing here accepts either.
      *  - It NEVER changes status. Replying is not a status control, so none of a customer's implicit transitions (`pending_user` to `in_progress`,
      *    `resolved` to `open`) applies, and a resolved or closed request is refused (422 on `body`) rather than reopened.
-     *  - Files, notifications and their failure behaviour are exactly a public reply's: written inside the transaction and deleted on rollback; the
-     *    requester and the assignee are notified after commit by {@see replyRecipients()}, never the author.
+     *  - Files and their failure behaviour are exactly a public reply's: written inside the transaction and deleted on rollback. The requester and
+     *    the assignee are notified by {@see replyRecipients()}, never the author, and Intechral is alerted when no assignee could be ({@see notifyOfReply()}).
      *
      * @param  list<UploadedFile>  $files
      */
@@ -284,9 +292,7 @@ class TicketService
 
         $ticket->setRawAttributes($current->getAttributes(), true);
 
-        foreach ($this->replyRecipients($current, $user, false) as $recipient) {
-            $recipient->notify(new TicketRepliedNotification($current, $reply));
-        }
+        $this->notifyOfReply($current, $reply, $user, false, true);
 
         return $reply;
     }
@@ -517,19 +523,30 @@ class TicketService
      */
     private function alertOperators(Ticket $ticket): void
     {
+        $this->alertHelpdesk($ticket, 'The new-ticket operator alert', new NewTicketAlertNotification($ticket));
+    }
+
+    /** R1-6: the same destination and the same failure behaviour, for a partner support reply nobody at Intechral was told about. */
+    private function alertOperatorsOfPartnerReply(Ticket $ticket, TicketReply $reply): void
+    {
+        $this->alertHelpdesk($ticket, 'The partner support reply alert', new PartnerReplyAlertNotification($ticket, $reply));
+    }
+
+    private function alertHelpdesk(Ticket $ticket, string $what, BaseNotification $notification): void
+    {
         $address = HelpdeskNotifyAddress::usable();
 
         if ($address === null) {
             Log::log(
                 app()->environment('production') ? 'error' : 'warning',
-                'The new-ticket operator alert was skipped: HELPDESK_NOTIFY_ADDRESS is not set to a usable address.',
+                "{$what} was skipped: HELPDESK_NOTIFY_ADDRESS is not set to a usable address.",
                 ['ticket_id' => $ticket->getKey()],
             );
 
             return;
         }
 
-        Notification::route('mail', $address)->notify(new NewTicketAlertNotification($ticket));
+        Notification::route('mail', $address)->notify($notification);
     }
 
     /**
@@ -626,6 +643,72 @@ class TicketService
         }
 
         throw new TicketReferenceExhausted('No unique ticket reference could be issued in '.self::REFERENCE_ATTEMPTS.' attempts.');
+    }
+
+    /**
+     * Everything a reply announces, once it has committed. Nothing for an internal note.
+     *
+     *  1. The requester and the assignee ({@see replyRecipients()}), exactly as before.
+     *  2. R1-6: when the author is NOT partner support, the partner support PARTICIPANTS ({@see partnerParticipants()}), as the separate
+     *     partner audience of the reply mail, which links to the support page and is re-authorised when the worker runs it.
+     *  3. R1-6: when the author IS partner support and no assignee is among the recipients (none assigned, or the assignee is suspended or may no
+     *     longer view the request), one alert to the helpdesk address, so Intechral is not left unaware of a reply. An assignee who IS mailed
+     *     makes the alert redundant, so there is never both for one reply.
+     *
+     * The R1-6 hand-overs are queued first and each is its own after-commit hand-over (a failure is reported, never thrown, and cannot stop another).
+     * The pre-existing requester/assignee dispatch is untouched, including how it fails.
+     */
+    private function notifyOfReply(Ticket $ticket, TicketReply $reply, User $author, bool $isInternal, bool $byPartnerSupport): void
+    {
+        if ($isInternal) {
+            return;
+        }
+
+        $recipients = $this->replyRecipients($ticket, $author, false);
+
+        if ($byPartnerSupport) {
+            if (! $recipients->contains(fn (User $recipient) => $ticket->assignee_id !== null && (int) $recipient->getKey() === (int) $ticket->assignee_id)) {
+                $this->handOffAfterCommit(fn () => $this->alertOperatorsOfPartnerReply($ticket, $reply));
+            }
+        } else {
+            $this->handOffAfterCommit(function () use ($ticket, $reply, $author, $recipients) {
+                foreach ($this->partnerParticipants($ticket, $author, $recipients) as $participant) {
+                    $participant->notify(new TicketRepliedNotification($ticket, $reply, TicketRepliedNotification::FOR_PARTNER_SUPPORT));
+                }
+            });
+        }
+
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new TicketRepliedNotification($ticket, $reply));
+        }
+    }
+
+    /**
+     * Release 1.0 (R1-6): the partner support staff who take part in this request: the one who SUBMITTED it, and any who has posted a PUBLIC reply on it
+     * (so a self-raised request a partner has helped with still tells them the answer). Candidates only; the decision is the partner support
+     * rule itself ({@see PartnerSupportAccess::allows()}, read from the tables right now), which is also what the worker asks again: a staff member
+     * whose designation was revoked, who was suspended, or whose partner no longer manages this customer is simply not a participant any more, and
+     * an operator, the requester and a member of the customer organization can never pass it.
+     *
+     * Never the author, never the requester or a recipient already mailed (so nobody is told twice), never a suspended account. Replies by other
+     * partner staff do not notify them in turn (R1-6 covers the requester's and an operator's replies).
+     *
+     * @param  Collection<int, User>  $alreadyMailed
+     * @return Collection<int, User>
+     */
+    private function partnerParticipants(Ticket $ticket, User $author, Collection $alreadyMailed): Collection
+    {
+        $candidateIds = TicketReply::query()->where('ticket_id', $ticket->getKey())->where('is_internal', false)->pluck('user_id')
+            ->push($ticket->submitted_by_id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->reject(fn (int $id) => $id === (int) $author->getKey() || $id === (int) $ticket->user_id || $alreadyMailed->contains(fn (User $u) => (int) $u->getKey() === $id))
+            ->values();
+
+        return User::query()->whereIn('id', $candidateIds)->orderBy('id')->get()
+            ->reject(fn (User $candidate) => $candidate->isSuspended())
+            ->filter(fn (User $candidate) => PartnerSupportAccess::allows($candidate, $ticket))
+            ->values();
     }
 
     /**

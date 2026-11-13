@@ -144,5 +144,5 @@ Built as designed with the §11 revisions. Operator-visible additions beyond §8
 - Disabling an organization is reversible and leaves designations in place; enabling restores access through those that still exist.
 - Hosted CI and the browser suites have not run for this branch.
 - Provenance: a partner's reply shows as an ordinary public reply under the author's name; the operator ticket page does not say "via partner support" (deferred to the UX convergence backlog by the owner).
-- A partner reply on an unassigned request alerts nobody at Intechral: the unassigned-reply alert is R1-6 scope (owner ruling).
+- A partner reply on an unassigned request alerts nobody at Intechral: the unassigned-reply alert is R1-6 scope (owner ruling); since built, see the [R1-6 design record](./release-1.0-r1-6-participant-notifications.md).
 - The support list is the partner's current managed customers as a whole; there is no per-customer scope (MO-3 territory).
