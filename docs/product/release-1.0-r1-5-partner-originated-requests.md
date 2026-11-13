@@ -66,7 +66,7 @@ After creation the staff member lands on the R1-4 support page of the new reques
 ## 5. Email semantics (unchanged) and what is recorded for R1-6
 
 The **requester** (the contact) receives the ordinary receipt (`TicketCreatedNotification`, "Your support ticket ... has been received"), unless suspended; the operator alert is sent as before. The **submitter is not mailed** and neither mail says the request was raised by partner support.
-Recorded for R1-6 rather than built: a creation notice to the submitter; "raised for you by <partner staff>" wording in the requester's receipt; the operator alert naming the submitter (the operator page and the CSV report already show "Submitted by" when it differs); notifying the partner when the requester or an operator replies.
+Recorded for R1-6 (since built: [R1-6 design record](./release-1.0-r1-6-participant-notifications.md)): a creation notice to the submitter; "raised for you by <partner staff>" wording in the requester's receipt; the operator alert naming the submitter (the operator page and the CSV report already show "Submitted by" when it differs); notifying the partner when the requester or an operator replies.
 
 ## 6. Not in R1-5
 

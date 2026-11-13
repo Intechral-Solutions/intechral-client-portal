@@ -77,7 +77,7 @@ Merged on `main` up to `fec5c81`:
 | R1-4 additions (partner support) | **One additive migration, not a rehearsal candidate:** `2026_11_13_090000_add_partner_support_grant_and_organization_disable` (`organization_members.support_granted_at`, `support_granted_by` with a foreign key in `database/profile/foreign-keys.json`; `organizations.disabled_at`). No row is changed, so nobody holds a designation and no organization is disabled after it runs. **No `roles:sync` step:** authority is the operator-issued designation, not a permission. No new queued class and no configuration. Record: [R1-4](./release-1.0-r1-4-partner-support.md) |
 | New commands | `organizations:preflight`; `e2e:cleanup-invitees` (development and CI only: `local` and `testing`, narrow by design, never part of a deployment) |
 | Configuration | no new keys |
-| Queue | no new queued class; the six Release 0.9 classes only. Restart workers after the swap as usual |
+| Queue | the six Release 0.9 classes, plus **one new queued class from R1-6**: `PartnerReplyAlertNotification` (helpdesk alert for a partner reply nobody at Intechral would otherwise hear about; same retry policy). `TicketCreatedNotification` and `TicketRepliedNotification` gain an `audience` option and re-check recipients when the worker runs them; a job queued before the deploy still sends as it did. Restart workers after the swap as usual. Record: [R1-6](./release-1.0-r1-6-participant-notifications.md) |
 | Rehearsal | optional. The four migrations are pinned candidates in `database/rehearsal/candidates.php` and were rehearsed; their SHA-256 pins mean none of those files may be edited. A new migration need not be added there |
 
 ## Recovery
@@ -93,3 +93,4 @@ release directory remains an ordinary release operation, with its own conditions
 3. Hosted CI, including the full Pest suite and the browser suites, is green on the release commit.
 4. On any non-empty database, `organizations:preflight` has been run and the owner has reviewed its findings.
 5. **Before any real customer is onboarded to production:** a verified backup and a **tested restore** of the Release 1.0 database exist ([Backup and recovery](../operations/backup-and-recovery.md)).
+6. **Reply throttling (owner ruling 2026-11-12, required before RC1; scheduled with the security-hardening work, not R1-6):** the reply routes (requester, operator and partner-support) carry no rate limit, and R1-6 adds recipients per reply. Add a **shared per-account limiter** across the applicable reply routes, with limits appropriate to normal operator activity, in the manner of `PartnerSupportCreateThrottle` and `InvitationIssueThrottle`.
