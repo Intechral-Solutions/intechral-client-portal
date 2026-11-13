@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\Sso\ProviderIdentity;
+use App\Auth\Sso\SsoProviders;
 use App\Exceptions\OrganizationInvitationException;
 use App\Http\Controllers\Auth\Concerns\WithholdsQueryDetails;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
+use App\Models\User;
 use App\Services\InvitationAcceptance;
 use App\Services\OrganizationInvitations;
 use App\Shared\Pilot\CustomerPilotGate;
@@ -13,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Fortify\Fortify;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
@@ -34,15 +38,13 @@ use Throwable;
  * Because the context holds a hash and not a token, NO failure path can rebuild an invitation link from session state: a provider failure, an
  * old or foreign context, an address mismatch and a dead invitation all end at the login page with a message that says to open the link from
  * the email again. (The one redirect that does name a link is the DEFERRED answer on initiation, built from the token the request itself just
- * carried.) SSO stays deferred for customers in `closed` and `pilot` mode, exactly as before: this class does not widen it.
+ * carried.) SSO stays deferred for customers in `closed` mode ({@see CustomerPilotGate::ssoDeferred()}); Release 1.0 enables it in `pilot` mode, and only for a provider whose credentials are configured.
  */
 class SocialiteController extends Controller
 {
     use WithholdsQueryDetails;
 
     private const CONTEXT_KEY = 'oauth_context';
-
-    private const SUPPORTED_PROVIDERS = ['google', 'microsoft'];
 
     /** How long a started invitation sign-in may take at the provider (consent screens, a second factor) before it is refused. */
     public const INVITATION_CONTEXT_MAX_AGE_SECONDS = 600;
@@ -53,7 +55,7 @@ class SocialiteController extends Controller
 
     public function redirect(Request $request, string $provider): RedirectResponse
     {
-        abort_unless(in_array($provider, self::SUPPORTED_PROVIDERS, true), 404);
+        abort_unless(SsoProviders::supported($provider), 404);
 
         $request->session()->forget(self::CONTEXT_KEY);
         $hasInvitation = $request->query->has('invitation');
@@ -81,6 +83,10 @@ class SocialiteController extends Controller
                 return $this->invitationSsoDeferred($token);
             }
 
+            if (! SsoProviders::configured($provider)) {
+                return $this->invitationSsoDeferred($token, ucfirst($provider).' sign-in is not available. Create a password to accept this invitation.');
+            }
+
             $context = [
                 'intent' => 'invitation',
                 'provider' => $provider,
@@ -89,6 +95,8 @@ class SocialiteController extends Controller
                 'invitationHash' => OrganizationInvitations::hashToken($token),
                 'startedAt' => now()->toIso8601String(),
             ];
+        } elseif (! SsoProviders::configured($provider)) {
+            return $this->providerUnavailable($request, $provider);
         } elseif ($request->user()) {
             $context = [
                 'intent' => 'link',
@@ -114,7 +122,7 @@ class SocialiteController extends Controller
 
     public function callback(Request $request, string $provider): RedirectResponse
     {
-        abort_unless(in_array($provider, self::SUPPORTED_PROVIDERS, true), 404);
+        abort_unless(SsoProviders::supported($provider), 404);
 
         $context = $request->session()->pull(self::CONTEXT_KEY);
 
@@ -123,7 +131,17 @@ class SocialiteController extends Controller
         }
 
         try {
+            if (! SsoProviders::configured($provider)) {
+                throw new \RuntimeException('provider not configured');
+            }
+
             $socialUser = Socialite::driver($provider)->user();
+            $identity = ProviderIdentity::from($provider, $socialUser);
+
+            // Without a stable subject there is no identity to find, link or create: refused whole, for every intent.
+            if ($identity->subject === null) {
+                throw new \RuntimeException('provider returned no subject');
+            }
         } catch (Throwable $exception) {
             report(new \RuntimeException(
                 'OAuth provider request failed for '.$provider.' ('.get_debug_type($exception).').'
@@ -132,45 +150,44 @@ class SocialiteController extends Controller
             return $this->providerFailure($request, $context, $provider);
         }
 
-        // Release 0.9 (R0.9-CS1): SSO is deferred for the first pilot. An invitation always creates a customer
-        // account, so it is refused while the pilot gate is on; an existing customer is refused in login().
+        // Release 0.9 (R0.9-CS1): SSO is deferred in `closed` mode. An invitation always creates a customer
+        // account, so it is refused while the gate defers it; an existing customer is refused in login().
         if ($context['intent'] === 'invitation' && CustomerPilotGate::ssoDeferred()) {
             // No link to offer: the context holds a hash, and a link is never rebuilt from session state.
             return $this->invitationFailure('Single sign-on is not available yet. Open your invitation email again and create a password to accept the invitation.');
         }
 
         return match ($context['intent']) {
-            'login' => $this->login($provider, $socialUser),
-            'link' => $this->link($request, $provider, $socialUser, $context['initiatingUserId']),
-            'invitation' => $this->registerViaInvitation($provider, $socialUser, $context['invitationHash']),
+            'login' => $this->login($request, $provider, $identity, $socialUser),
+            'link' => $this->link($request, $provider, $identity, $socialUser, $context['initiatingUserId']),
+            'invitation' => $this->registerViaInvitation($request, $provider, $identity, $socialUser, $context['invitationHash']),
         };
     }
 
-    private function login(string $provider, SocialiteUser $socialUser): RedirectResponse
+    private function login(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser): RedirectResponse
     {
         $account = SocialAccount::query()
             ->where('provider', $provider)
-            ->where('provider_id', $socialUser->getId())
+            ->where('provider_id', $identity->subject)
             ->with('user')
             ->first();
 
         // Release 0.9 (H3): this signs the user in directly, not through the user provider, so it checks suspension
         // itself. A suspended account gets the unlinked-identity answer: nothing discloses its existence or state.
-        // Release 0.9 (R0.9-CS1): SSO sign-in is deferred for pilot customers (it also bypasses the two-factor
-        // challenge). They get the same answer as an unlinked identity; operators are unaffected.
-        if (! $account || $account->user->isSuspended() || CustomerPilotGate::restricts($account->user)) {
+        // Release 0.9 (R0.9-CS1): SSO sign-in is deferred for customers while the gate defers it (closed mode). They get the same answer as an
+        // unlinked identity; operators are unaffected.
+        if (! $account || $account->user->isSuspended() || (CustomerPilotGate::ssoDeferred() && CustomerPilotGate::restricts($account->user))) {
             return redirect()->route('login')
                 ->withErrors(['email' => 'That provider account is not linked to a portal account.'])
                 ->with('error', 'That provider account is not linked to a portal account.');
         }
 
         $this->updateToken($account, $socialUser);
-        Auth::login($account->user, remember: true);
 
-        return redirect()->intended(route('dashboard'));
+        return $this->signIn($request, $account->user);
     }
 
-    private function link(Request $request, string $provider, SocialiteUser $socialUser, int $initiatingUserId): RedirectResponse
+    private function link(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser, int $initiatingUserId): RedirectResponse
     {
         $user = $request->user();
 
@@ -180,19 +197,19 @@ class SocialiteController extends Controller
                 ->with('error', 'This provider connection could not be verified.');
         }
 
-        $identity = SocialAccount::query()
+        $existing = SocialAccount::query()
             ->where('provider', $provider)
-            ->where('provider_id', $socialUser->getId())
+            ->where('provider_id', $identity->subject)
             ->first();
 
-        if ($identity) {
-            if ($identity->user_id !== $user->getKey()) {
+        if ($existing) {
+            if ($existing->user_id !== $user->getKey()) {
                 return redirect()->route('profile.show')
                     ->withErrors(['provider' => 'That provider account is already connected elsewhere.'])
                     ->with('error', 'That provider account is already connected elsewhere.');
             }
 
-            $this->updateToken($identity, $socialUser);
+            $this->updateToken($existing, $socialUser);
 
             return redirect()->route('profile.show')->with('status', ucfirst($provider).' account connected.');
         }
@@ -206,7 +223,7 @@ class SocialiteController extends Controller
         try {
             $user->socialAccounts()->create([
                 'provider' => $provider,
-                'provider_id' => $socialUser->getId(),
+                'provider_id' => $identity->subject,
                 ...$this->tokenAttributes($socialUser),
             ]);
         } catch (QueryException) {
@@ -228,29 +245,67 @@ class SocialiteController extends Controller
      * the account, the `user` role, the linked identity and the ordinary membership atomically. A refusal writes nothing and leaves the
      * invitation as it was.
      */
-    private function registerViaInvitation(string $provider, SocialiteUser $socialUser, string $invitationHash): RedirectResponse
+    private function registerViaInvitation(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser, string $invitationHash): RedirectResponse
     {
+        // Verified-email enforcement, failing closed: the provider must have asserted, in the claim it is documented to use, that it verified this
+        // address (ProviderIdentity). No evidence, an ambiguous value or no address at all stops here, before the invitation is read, and writes
+        // nothing: the invitation stays exactly as it was and the password path remains.
+        if ($identity->verifiedEmail === null) {
+            return $this->invitationFailure(ucfirst($provider).' did not confirm that your email address is verified, so it cannot be used to accept this invitation. Open the link from your email again and create a password instead.');
+        }
+
         $acceptance = InvitationAcceptance::withProvider($provider, [
-            'name' => $socialUser->getName(),
-            'email' => $socialUser->getEmail(),
-            'provider_id' => (string) $socialUser->getId(),
+            'name' => $identity->name,
+            'email' => $identity->verifiedEmail,
+            'provider_id' => $identity->subject,
             ...$this->tokenAttributes($socialUser),
         ]);
 
         try {
             $user = $this->withoutQueryDetails(fn () => $this->invitations->acceptByHash($invitationHash, $acceptance));
         } catch (OrganizationInvitationException $exception) {
-            // An address mismatch leaves the invitation open, so the message says so; every dead link is the one uniform answer.
-            return $this->invitationFailure(
-                $exception->reason === OrganizationInvitationException::EMAIL_MISMATCH
-                    ? 'The provider account email does not match the invitation email.'
-                    : 'This invitation is no longer available.'
-            );
+            // An address mismatch and a provider account that already belongs to a portal account both leave the invitation open, and both
+            // concern only the person who just authenticated as that provider account, so each gets its accurate message. Every dead link is
+            // the one uniform answer.
+            return $this->invitationFailure(match (true) {
+                $exception->reason === OrganizationInvitationException::EMAIL_MISMATCH => 'The provider account email does not match the invitation email.',
+                $exception->detail === 'identity_taken' => 'That '.ucfirst($provider).' account is already connected to a portal account. Sign in with it from the login page, or use a different '.ucfirst($provider).' account for this invitation.',
+                default => 'This invitation is no longer available.',
+            });
+        }
+
+        // A new account has no second factor to ask for.
+        return $this->signIn($request, $user);
+    }
+
+    /**
+     * The one place an SSO identity becomes a session. A provider sign-in is the FIRST factor only, exactly as a password is: an account that has
+     * confirmed two-factor authentication is sent to Fortify's own challenge (the user is not signed in until the code is accepted, and the
+     * challenge regenerates the session itself), never straight in. Otherwise the session identifier is regenerated before the sign-in is
+     * established, so an identifier planted before the provider round trip cannot be carried into the authenticated session.
+     */
+    private function signIn(Request $request, User $user): RedirectResponse
+    {
+        $request->session()->regenerate(destroy: true);
+
+        if (filled($user->two_factor_secret) && ! (Fortify::confirmsTwoFactorAuthentication() && is_null($user->two_factor_confirmed_at))) {
+            $request->session()->put(['login.id' => $user->getKey(), 'login.remember' => true]);
+
+            return redirect()->route('two-factor.login');
         }
 
         Auth::login($user, remember: true);
 
-        return redirect()->route('dashboard');
+        return redirect()->intended(route('dashboard'));
+    }
+
+    private function providerUnavailable(Request $request, string $provider): RedirectResponse
+    {
+        $message = ucfirst($provider).' sign-in is not available.';
+
+        return redirect()->route($request->user() ? 'profile.show' : 'login')
+            ->withErrors(['provider' => $message])
+            ->with('error', $message);
     }
 
     /** Where every failed invitation sign-in ends: the login page, with a message. It never carries, or rebuilds, an invitation link. */
@@ -261,10 +316,8 @@ class SocialiteController extends Controller
             ->with('error', $message);
     }
 
-    private function invitationSsoDeferred(string $token): RedirectResponse
+    private function invitationSsoDeferred(string $token, string $message = 'Single sign-on is not available yet. Create a password to accept this invitation.'): RedirectResponse
     {
-        $message = 'Single sign-on is not available yet. Create a password to accept this invitation.';
-
         return redirect()->route('invitation.show', $token)
             ->withErrors(['provider' => $message])
             ->with('error', $message);

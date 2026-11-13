@@ -875,6 +875,8 @@ The independent R1-3B security review returned **SAFE AFTER TARGETED REMEDIATION
 
 **Mutation probes (all caught):** prefetch mark removed (7 failures, including the 429 and 500 persisted-session tests); original chained as `previous`; original message reported; ignore-args guard removed; driver text added to the diagnostics; violated key, SQLSTATE or connection dropped; frame arguments added; 500 changed to 503.
 
+**Update (Release 1.0 SSO completion):** items 1, 3, 4 and 5 below are implemented (the session identifier is regenerated at sign-in rather than at initiation) and item 2 is implemented but **not yet verified live**; see [SSO completion](./release-1.0-sso-completion.md). The host checks (items 6 and 7) remain.
+
 **Release 1.0 preproduction requirements recorded (not implemented here, none in F1–F3):**
 
 1. **F4. An accurate `identity_taken` response** before invitation SSO is enabled.

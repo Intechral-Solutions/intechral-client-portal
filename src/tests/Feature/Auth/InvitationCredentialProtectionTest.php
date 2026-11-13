@@ -81,7 +81,7 @@ describe('response headers', function () {
     });
 
     it('are on the SSO initiation when it carries an invitation, including the redirect to the provider, and only then', function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         [, $token] = regInvOpen();
 
         $started = $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]))->assertRedirect('https://socialite.fake/google/authorize');
@@ -164,7 +164,7 @@ describe('throttling', function () {
     });
 
     it('limits the SSO initiation only when it carries an invitation; ordinary SSO login is never limited by it', function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
 
         for ($i = 0; $i < 30; $i++) {
             $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => 'dead']))->assertRedirect(route('login'));
@@ -216,7 +216,7 @@ describe('where the credential may and may not be', function () {
         expect(credSessionDump())->not->toContain($token)->not->toContain($invitation->token_hash)
             ->and(session('_previous.url'))->not->toContain($token);
 
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]));
         expect(session('_previous.url'))->not->toContain($token);
     });
@@ -288,7 +288,7 @@ describe('where the credential may and may not be', function () {
         // Inertia's server middleware answers an Inertia request's redirect-with-fragment with a 409 so the client does a full visit that keeps the
         // fragment, and skips that for a prefetch. If one of these routes ever redirected to a URL with a `#`, that behaviour would silently differ.
         [, $token] = regInvOpen();
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         // The asset version is resolved by the middleware on a request, so one ordinary request comes first; without a matching version Inertia
         // answers a GET with a 409 "reload" instead of reaching the route.
         $this->get(route('login'))->assertOk();
@@ -323,9 +323,9 @@ describe('where the credential may and may not be', function () {
     });
 
     it('keeps it out of the session when the customer pilot gate refuses the request before the controller (404), with the headers still set', function () {
-        pilotMode('pilot');
+        pilotMode('closed');
         [, $token] = regInvOpen();
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
 
         // A signed-in customer asking `sso.redirect` for an invitation: the gate answers 404 (the route is not on the allow-list).
         $response = $this->actingAs(pilotCustomer())->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]))->assertNotFound();
@@ -407,7 +407,7 @@ describe('a database failure while a credential is in play', function () {
     it('is reported without SQL or bindings on every path that looks the invitation up, and answers a plain 500', function (string $path) {
         $token = str_repeat('b', 64);
         $hash = OrganizationInvitations::hashToken($token);
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         $this->withoutMiddleware(ThrottleRequests::class);
         credFailQueries($this, 'organization_invitations');
 
@@ -422,7 +422,7 @@ describe('a database failure while a credential is in play', function () {
         $token = str_repeat('b', 64);
         $hash = OrganizationInvitations::hashToken($token);
         $email = 'private.recipient@example.test';
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         $this->withoutMiddleware(ThrottleRequests::class);
         credFailQueries($this, 'organization_invitations', credDuplicateKey($hash.' '.$email));
 
@@ -507,7 +507,7 @@ describe('a database failure while a credential is in play', function () {
     it('keeps the credential out of the PERSISTED session of a request that ends in a database failure (500)', function (string $path) {
         $token = str_repeat('b', 64);
         $hash = OrganizationInvitations::hashToken($token);
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'x@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
         $this->withoutMiddleware(ThrottleRequests::class);
         credFailQueries($this, 'organization_invitations');
 
