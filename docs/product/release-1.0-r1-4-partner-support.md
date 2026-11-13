@@ -118,7 +118,7 @@ revocation row of §5 followed by an immediate 404 with no cache flush; no inter
 
 ## 10. Explicitly not in R1-4
 
-Partner-originated requests with a named contact (R1-5), participant notifications (R1-6), terminology (R1-7), partner-administrator self-service grants (MO-3), organization-wide customer visibility, a
+Partner-originated requests with a named contact (R1-5, since built: [design record](./release-1.0-r1-5-partner-originated-requests.md)), participant notifications (R1-6), terminology (R1-7), partner-administrator self-service grants (MO-3), organization-wide customer visibility, a
 per-customer grant scope (the unit is the partner's current managed customers), any permission framework. Support users' own tickets stay ordinary requester tickets.
 
 ## 11. Independent design challenge (Opus, 2026-11-12): SAFE AFTER TARGETED REVISIONS

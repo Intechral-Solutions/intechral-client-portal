@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
 class TicketService
@@ -82,6 +83,70 @@ class TicketService
      */
     public function create(User $user, array $data, array $files = [], ?int $organizationId = null): Ticket
     {
+        $ticket = $this->createAttributed(
+            $user,
+            $data,
+            $files,
+            fn (): TicketAttribution => $this->access->attributionFor($user, $organizationId),
+        );
+
+        // After commit only: a mail must never describe a ticket that rolled back, and a mail that cannot be queued must never make a
+        // ticket that DID commit look as if it failed. Each hand-over is its own after-commit callback, so one failing (reported, not thrown)
+        // cannot stop the other, whether this runs on its own or inside a caller's transaction.
+        $this->handOffAfterCommit(fn () => $user->notify(new TicketCreatedNotification($ticket)));
+        $this->handOffAfterCommit(fn () => $this->alertOperators($ticket));
+
+        return $ticket;
+    }
+
+    /**
+     * Release 1.0 (R1-5): a request raised by partner support staff for a CONTACT at a managed customer organization. Same creation path as
+     * {@see create()} (the reference, the attachments, the rollback and deadlock-retry contract, the operator alert), with one difference: the
+     * three attribution values are decided by {@see ServiceRequestAccess::attributionForPartnerSupport()} and are independent.
+     *
+     *  - `tickets.user_id`: `$requesterId`, the contact, only if an eligible customer contact of the organization;
+     *  - `tickets.organization_id`: `$organizationId`, only if `$actor` holds effective support authority over it, re-decided under locks;
+     *  - `tickets.submitted_by_id`: `$actor`, the authenticated partner staff member.
+     *
+     * `$organizationId` and `$requesterId` are what the actor asked for, never an authority. A refusal throws before anything is written.
+     *
+     * Email semantics are unchanged: the REQUESTER receives the receipt a requester always receives, and the operator alert goes out. The submitter
+     * is not mailed; a notice to the submitter and "raised by" wording are R1-6.
+     *
+     * @throws ValidationException on `organization_id` or `requester_id`
+     * @throws NotFoundHttpException when the actor holds no effective authority
+     */
+    public function createForCustomerContact(User $actor, int $organizationId, int $requesterId, array $data, array $files = []): Ticket
+    {
+        $ticket = $this->createAttributed(
+            $actor,
+            $data,
+            $files,
+            fn (): TicketAttribution => $this->access->attributionForPartnerSupport($actor, $organizationId, $requesterId),
+        );
+
+        $this->handOffAfterCommit(function () use ($ticket) {
+            $requester = $ticket->user()->first();
+
+            // The same guard a reply mail applies: never a suspended account.
+            if ($requester !== null && ! $requester->isSuspended()) {
+                $requester->notify(new TicketCreatedNotification($ticket));
+            }
+        });
+        $this->handOffAfterCommit(fn () => $this->alertOperators($ticket));
+
+        return $ticket;
+    }
+
+    /**
+     * The creation transaction both entry points share. `$attribute` runs first inside it, before any write, and once (the collision-retry loop
+     * can never re-decide it); a refusal rolls the transaction back, so no ticket, reply, attachment row, file, mail or job exists afterwards.
+     * `$uploader` is who the attachment rows record.
+     *
+     * @param  callable(): TicketAttribution  $attribute
+     */
+    private function createAttributed(User $uploader, array $data, array $files, callable $attribute): Ticket
+    {
         $priority = $data['priority'];
         $hours = Ticket::SLA_HOURS[$priority];
 
@@ -89,13 +154,10 @@ class TicketService
         // only inside that transaction; storeAttachments() deletes every written file when it
         // rolls back (F-7). The public reference is random and issued with the row (C6-R, ADR-008);
         // the row's numeric id stays internal, and private files are stored under it.
-        $work = function (array &$stored) use ($user, $data, $priority, $hours, $files, $organizationId) {
-            // Before any write, and once: the collision-retry loop below can never re-decide it. A refusal rolls the transaction back,
-            // so no ticket, reply, attachment row, file, mail or job exists afterwards.
-            $attribution = $this->access->attributionFor($user, $organizationId);
+        $work = function (array &$stored) use ($uploader, $data, $priority, $hours, $files, $attribute) {
+            $attribution = $attribute();
 
             $ticket = $this->createWithReference($attribution, [
-                'user_id' => $user->id,
                 'title' => $data['title'],
                 'description' => $data['description'],
                 'category' => $data['category'],
@@ -105,21 +167,13 @@ class TicketService
             ]);
 
             foreach ($files as $file) {
-                $this->storeAttachment($ticket, null, $user, $file, $stored);
+                $this->storeAttachment($ticket, null, $uploader, $file, $stored);
             }
 
             return $ticket;
         };
 
-        $ticket = $this->retryingDeadlock(fn () => $this->storeAttachments($work));
-
-        // After commit only: a mail must never describe a ticket that rolled back, and a mail that cannot be queued must never make a
-        // ticket that DID commit look as if it failed. Each hand-over is its own after-commit callback, so one failing (reported, not thrown)
-        // cannot stop the other, whether this runs on its own or inside a caller's transaction.
-        $this->handOffAfterCommit(fn () => $user->notify(new TicketCreatedNotification($ticket)));
-        $this->handOffAfterCommit(fn () => $this->alertOperators($ticket));
-
-        return $ticket;
+        return $this->retryingDeadlock(fn () => $this->storeAttachments($work));
     }
 
     /**
@@ -557,6 +611,7 @@ class TicketService
             try {
                 return DB::transaction(function () use ($attribution, $attributes, $generator) {
                     $ticket = new Ticket([...$attributes, 'ticket_number' => $generator->next()]);
+                    $ticket->user_id = $attribution->requesterId;
                     $ticket->organization_id = $attribution->organizationId;
                     $ticket->submitted_by_id = $attribution->submittedById;
                     $ticket->save();

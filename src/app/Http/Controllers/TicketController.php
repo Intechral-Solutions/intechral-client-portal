@@ -25,6 +25,23 @@ class TicketController extends Controller
 {
     public const CATEGORIES = ['General', 'Technical', 'Billing', 'Account', 'Other'];
 
+    /**
+     * The rules for the content of a new request (subject, description, category, priority, attachments), shared by every creation form so the
+     * requester's and the partner support one cannot drift (R1-5). Who it is for is each caller's own business.
+     *
+     * @return array<string, mixed>
+     */
+    public static function contentRules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'category' => ['required', 'string', 'in:'.implode(',', self::CATEGORIES)],
+            'priority' => ['required', 'in:low,medium,high,critical'],
+            ...AllowedTicketAttachment::rules(),
+        ];
+    }
+
     public function index(Request $request): Response
     {
         /** @var User $user */
@@ -65,12 +82,8 @@ class TicketController extends Controller
         // transaction by ServiceRequestAccess. The submitter and requester are the authenticated user and nothing in the payload. The
         // old `company_id` input is gone: nothing ever persisted it, and the column is dropped.
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['required', 'string'],
-            'category' => ['required', 'string', 'in:'.implode(',', self::CATEGORIES)],
-            'priority' => ['required', 'in:low,medium,high,critical'],
+            ...self::contentRules(),
             'organization_id' => ['nullable', 'integer', 'min:1'],
-            ...AllowedTicketAttachment::rules(),
         ]);
 
         $ticket = $service->create(

@@ -43,6 +43,11 @@ final class ServiceRequestAccess
 
     public const CHOOSE = 'Choose the organization this request is for.';
 
+    /** Release 1.0 (R1-5): one message per field for a partner-originated request, whatever the reason, so a field cannot be used to probe. */
+    public const SUPPORT_CUSTOMER_UNAVAILABLE = 'That customer is not available for this request.';
+
+    public const SUPPORT_CONTACT_UNAVAILABLE = 'That contact is not available for this request.';
+
     /**
      * @param  int|null  $requestedOrganizationId  the organization the actor named, or null to let the server pick the only one
      *
@@ -77,8 +82,53 @@ final class ServiceRequestAccess
             throw $this->refusal($requestedOrganizationId === null ? self::NOT_LINKED : self::NOT_AVAILABLE);
         }
 
-        // The submitter is the authenticated actor and nobody else: never an input.
-        return new TicketAttribution((int) $organization->id, (int) $actor->getKey());
+        // The submitter and the requester are the authenticated actor and nobody else: never an input.
+        return new TicketAttribution((int) $organization->id, (int) $actor->getKey(), (int) $actor->getKey());
+    }
+
+    /**
+     * Release 1.0 (R1-5): the attribution of a request a PARTNER SUPPORT user raises for a contact at a managed customer organization. The three
+     * values are decided here, from current rows, inside the creation transaction, and independently:
+     *
+     *  - the SUBMITTER is the authenticated actor: never an input;
+     *  - the ORGANIZATION must be one the actor holds effective support authority over RIGHT NOW (an operator-issued grant on a partner that
+     *    manages it; neither side disabled), re-decided under locks by {@see PartnerSupportAccess::refusal()};
+     *  - the REQUESTER (the contact) must be an eligible customer contact of THAT organization: a current member, active, not an operator, able to
+     *    raise and read a request. The request names both ids; neither is believed.
+     *
+     * Ordinary creation ({@see attributionFor()}) is untouched: it never admits a requester other than the actor, and this method is reachable only
+     * from the partner support route. The actor needs no `tickets.create`: the grant is the authority, exactly as for the R1-4 reply. An operator
+     * is refused (PartnerSupportAccess: an operator never holds effective support authority).
+     *
+     * Refusals: an actor who holds no effective grant at all, or whose account may not act, is a 404 (the support routes' contract: nothing confirms an organization is supported);
+     * the organization and the contact are 422s on `organization_id` and `requester_id` with ONE message each, whatever the reason (missing,
+     * not a member, not eligible, suspended), so neither field can be used to probe.
+     *
+     * @throws ValidationException
+     */
+    public function attributionForPartnerSupport(User $actor, int $organizationId, int $requesterId): TicketAttribution
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('ServiceRequestAccess must run inside the Ticket creation transaction.');
+        }
+
+        // The door, again, so no caller of the service can reach the locked decision without it (the route asks the same before validation): an
+        // ordinary, unlocked read of the tables, taken before any lock. Without ANY effective grant it is the 404 of every support route.
+        abort_unless(PartnerSupportAccess::holdsGrant($actor), 404);
+
+        $refusal = PartnerSupportAccess::refusal((int) $actor->getKey(), $organizationId, $requesterId);
+
+        abort_if($refusal === PartnerSupportAccess::REFUSED_ACTOR, 404);
+
+        if ($refusal === PartnerSupportAccess::REFUSED_ORGANIZATION) {
+            throw ValidationException::withMessages(['organization_id' => self::SUPPORT_CUSTOMER_UNAVAILABLE]);
+        }
+
+        if ($refusal === PartnerSupportAccess::REFUSED_CONTACT) {
+            throw ValidationException::withMessages(['requester_id' => self::SUPPORT_CONTACT_UNAVAILABLE]);
+        }
+
+        return new TicketAttribution($organizationId, (int) $actor->getKey(), $requesterId);
     }
 
     /**

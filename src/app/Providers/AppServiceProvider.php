@@ -16,6 +16,7 @@ use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
 use App\Support\Database\MigrationProfileGuard;
 use App\Support\InvitationIssueThrottle;
+use App\Support\PartnerSupportCreateThrottle;
 use App\Support\Permissions\EpochPermissionRegistrar;
 use App\Support\Permissions\PermissionCacheEpoch;
 use App\Support\Runtime\CronFailureMarker;
@@ -151,6 +152,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('invitation', fn (Request $request) => Limit::perMinute(60)->by((string) $request->ip()));
         RateLimiter::for('invitation-register', fn (Request $request) => Limit::perMinute(20)->by((string) $request->ip()));
         RateLimiter::for(InvitationIssueThrottle::NAME, InvitationIssueThrottle::limit(...));
+        // Release 1.0 (R1-5): partner support raising a request for a contact mails a third party; limited per account, on that route only.
+        RateLimiter::for(PartnerSupportCreateThrottle::NAME, PartnerSupportCreateThrottle::limit(...));
         RateLimiter::for('invitation-sso', fn (Request $request) => $request->query->has('invitation')
             ? Limit::perMinute(30)->by((string) $request->ip())
             : Limit::none());

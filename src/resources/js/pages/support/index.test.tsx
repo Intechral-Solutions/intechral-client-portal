@@ -68,11 +68,16 @@ it('lists each supported request with its organization, requester and the suppor
     expect(screen.getAllByText(/Rae Requester/).length).toBeGreaterThan(0);
 });
 
-it('says there is nothing yet, without offering to raise a request', () => {
+it('says there is nothing yet, and offers the creation page in the header only', () => {
     render(<SupportIndexPage {...props([])} />);
 
     expect(screen.getByText('There are no supported requests yet.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /New request/ })).not.toBeInTheDocument();
+    // R1-5: one entry point, the page header's. The page itself is reachable only with a grant (the list route answers 404 without one).
+    expect(screen.getAllByRole('link', { name: /New request/ })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /New request/ })).toHaveAttribute(
+        'href',
+        '/support/requests/create',
+    );
 });
 
 it('distinguishes a filtered-empty list', () => {

@@ -127,7 +127,7 @@ class Ticket extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** The submitter: the authenticated actor who created the row. Equal to the requester until partner-originated requests exist (R1-5). */
+    /** The submitter: the authenticated actor who created the row. Equal to the requester except on a request partner support raised for a managed customer's contact (R1-5). */
     public function submittedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by_id');

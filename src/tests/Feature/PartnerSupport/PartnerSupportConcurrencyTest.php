@@ -11,6 +11,15 @@
  *   B. a revocation that commits after the reply started             -> the reply SEES it (a locking read returns the latest committed row) and is refused
  *   C. an operator re-submitting the customer link during a reply     -> the link WAITS (1205), it does not deadlock (1213): both rows are locked in ascending id order
  *   D. a suspension during a reply                                    -> the suspension WAITS on the user row, then clears the designation
+ *
+ * R1-5 (creating a request for a contact) re-decides the same authority, plus the CONTACT's eligibility, in the creation transaction:
+ *   F. a revocation during a creation                                 -> the revocation WAITS (1205); the request commits; the next creation is refused (404, no grant)
+ *   G. a revocation that commits after the creation started           -> the creation SEES it, is refused (422 on the customer) and writes nothing
+ *   H. a contact suspension during a creation                         -> the suspension WAITS on the user row; once applied the next creation is a 422 on the contact
+ *   I. a contact's membership removed after the creation started      -> the creation SEES it, is refused (422 on the contact) and writes nothing
+ *   K. a contact suspended after the creation's first read but before its locks -> the creation SEES it on the LOCKED row (422 on the contact)
+ *   L. the actor suspended after the same first read                -> the creation is refused as the ACCOUNT (404), nothing written
+ *   J. the creation's locks: users together, then organizations together, each ascending, in that order
  */
 
 use App\Models\CrmCompany;
@@ -18,6 +27,7 @@ use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\AccountLifecycleService;
+use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
 use App\Services\PartnerSupportAccess;
 use App\Services\PartnerSupportGrants;
@@ -25,6 +35,7 @@ use App\Services\TicketService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -57,6 +68,8 @@ function psRaceFixture(): array
     DB::commit();
 
     $permissions = collect(['portal.operator', 'crm.manage'])->map(fn ($name) => Permission::create(['name' => $name, 'guard_name' => 'web']));
+    // R1-5: the contact (requester) must be able to raise and read a request.
+    $customerPermissions = collect(['tickets.create', 'tickets.view'])->map(fn ($name) => Permission::create(['name' => $name, 'guard_name' => 'web']));
     $actor = User::factory()->create();
     $actor->givePermissionTo($permissions->all());
     app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -75,6 +88,7 @@ function psRaceFixture(): array
 
     $staff = User::factory()->create();
     $requester = User::factory()->create();
+    $requester->givePermissionTo($customerPermissions->all());
     DB::table('organization_members')->insert([
         ['organization_id' => $partner->id, 'user_id' => $staff->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()],
         ['organization_id' => $customer->id, 'user_id' => $requester->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()],
@@ -84,7 +98,7 @@ function psRaceFixture(): array
 
     DB::connection('ps_race_b')->statement('SET SESSION innodb_lock_wait_timeout = 1');
 
-    return compact('actor', 'partner', 'customer', 'staff', 'requester', 'ticket') + ['permissions' => $permissions->pluck('id')->all()];
+    return compact('actor', 'partner', 'customer', 'staff', 'requester', 'ticket') + ['permissions' => $permissions->merge($customerPermissions)->pluck('id')->all()];
 }
 
 function psRaceCleanup(array $f): void
@@ -100,7 +114,7 @@ function psRaceCleanup(array $f): void
     DB::table('organizations')->whereIn('id', $organizations)->update(['owner_id' => $f['actor']->id]);
     CommittedUsers::delete($users);
     DB::table('organizations')->whereIn('id', $organizations)->delete();
-    DB::table('model_has_permissions')->where('model_id', $f['actor']->id)->where('model_type', User::class)->delete();
+    DB::table('model_has_permissions')->whereIn('model_id', [$f['actor']->id, $f['requester']->id])->where('model_type', User::class)->delete();
     Permission::whereIn('id', $f['permissions'])->delete();
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 }
@@ -278,6 +292,212 @@ it('D. a suspension during a reply waits on the user row, then clears the design
 
         expect(psRaceSecond(fn () => app(AccountLifecycleService::class)->suspend($f['staff'], $f['actor'], 'race')))->toBeTrue();
         expect(DB::table('organization_members')->where('user_id', $f['staff']->id)->value('support_granted_at'))->toBeNull();
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+// ── R1-5: creating a request for a contact ─────────────────────────────
+
+function psRaceCreate(array $f, ?User $actor = null): Ticket
+{
+    return app(TicketService::class)->createForCustomerContact(
+        $actor ?? $f['staff'], $f['customer']->id, $f['requester']->id,
+        ['title' => 'Race', 'description' => 'Raced.', 'category' => 'General', 'priority' => 'low'],
+    );
+}
+
+function psRaceCreated(array $f): int
+{
+    return DB::table('tickets')->where('organization_id', $f['customer']->id)->where('title', 'Race')->count();
+}
+
+it('F. a revocation during a creation waits for it, the request commits with its provenance, and the next creation is refused', function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            fn () => psRaceCreate($f),
+            ['from `organization_members`', 'lock in share mode'],
+            fn () => psRaceSecond(fn () => app(PartnerSupportGrants::class)->revoke($f['partner'], $f['staff'], $f['actor']))
+        );
+
+        expect($during)->toBeInstanceOf(QueryException::class)
+            ->and(psRaceCode($during))->toBe(1205, 'the revocation waited on the membership row the creation holds')
+            ->and(psRaceCreated($f))->toBe(1);
+
+        $row = DB::table('tickets')->where('title', 'Race')->first();
+        expect([(int) $row->user_id, (int) $row->submitted_by_id, (int) $row->organization_id])->toBe([$f['requester']->id, $f['staff']->id, $f['customer']->id]);
+
+        expect(psRaceSecond(fn () => app(PartnerSupportGrants::class)->revoke($f['partner'], $f['staff'], $f['actor'])))->toBeTrue();
+        // Committed before the next creation starts: no grant at all, the door's 404 (mid-flight it is the 422 of G).
+        expect(fn () => psRaceCreate($f))->toThrow(HttpException::class)
+            ->and(psRaceCreated($f))->toBe(1);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('G. a revocation that commits after the creation started is seen by it, which is refused and writes nothing', function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            function () use ($f) {
+                try {
+                    psRaceCreate($f);
+                    $this->fail('a revoked designation must be refused');
+                } catch (ValidationException $e) {
+                    expect(array_keys($e->errors()))->toBe(['organization_id']);
+                }
+            },
+            ['select `managed_by_organization_id` from `organizations`'],
+            fn () => psRaceSecond(fn () => app(PartnerSupportGrants::class)->revoke($f['partner'], $f['staff'], $f['actor']))
+        );
+
+        expect($during)->toBeTrue('the revocation committed while the creation was in flight')
+            ->and(psRaceCreated($f))->toBe(0);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('H. a contact suspension during a creation waits on the user row; afterwards the contact is refused', function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            fn () => psRaceCreate($f),
+            ['from `organization_members`', 'lock in share mode'],
+            fn () => psRaceSecond(fn () => app(AccountLifecycleService::class)->suspend($f['requester'], $f['actor'], 'race'))
+        );
+
+        expect($during)->toBeInstanceOf(QueryException::class)
+            ->and(psRaceCode($during))->toBe(1205, 'the suspension waited on the contact user row the creation holds shared')
+            ->and(psRaceCreated($f))->toBe(1);
+
+        expect(psRaceSecond(fn () => app(AccountLifecycleService::class)->suspend($f['requester'], $f['actor'], 'race')))->toBeTrue();
+
+        try {
+            psRaceCreate($f);
+            $this->fail('a suspended contact must be refused');
+        } catch (ValidationException $e) {
+            expect(array_keys($e->errors()))->toBe(['requester_id']);
+        }
+        expect(psRaceCreated($f))->toBe(1);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it("I. a contact's membership removed after the creation started is seen by it, which is refused on the contact and writes nothing", function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            function () use ($f) {
+                try {
+                    psRaceCreate($f);
+                    $this->fail('a contact who left the customer must be refused');
+                } catch (ValidationException $e) {
+                    expect(array_keys($e->errors()))->toBe(['requester_id']);
+                }
+            },
+            ['select `managed_by_organization_id` from `organizations`'],
+            fn () => psRaceSecond(fn () => app(OrganizationMembership::class)->remove($f['customer'], $f['requester'], $f['actor']))
+        );
+
+        expect($during)->toBe('succeeded', 'the removal ran to completion while the creation was in flight')
+            ->and(psRaceCreated($f))->toBe(0);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('J. the creation locks the users together, then the organizations together, each ascending and shared, and nothing earlier', function () {
+    $f = psRaceFixture();
+
+    try {
+        $locking = [];
+        DB::listen(function ($query) use (&$locking) {
+            if ($query->connectionName !== 'ps_race_b' && str_contains($query->sql, 'lock in share mode')) {
+                $locking[] = $query;
+            }
+        });
+
+        psRaceCreate($f);
+
+        $tables = array_map(fn ($q) => preg_match('/from `(\w+)`/', $q->sql, $m) ? $m[1] : '?', $locking);
+
+        expect($tables)->toBe(['users', 'organizations', 'organization_members', 'organization_members'])
+            ->and($locking[0]->sql)->toContain('in (?, ?)')->toContain('order by `id`')
+            ->and($locking[0]->bindings)->toContain($f['staff']->id)->toContain($f['requester']->id)
+            ->and($locking[1]->sql)->toContain('in (?, ?)')->toContain('order by `id`');
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('K. a contact suspended after the creation read its grant but before it took its locks is refused, from the locked row and not the snapshot', function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            function () use ($f) {
+                try {
+                    psRaceCreate($f);
+                    $this->fail('a contact suspended before the locks must be refused');
+                } catch (ValidationException $e) {
+                    expect(array_keys($e->errors()))->toBe(['requester_id']);
+                }
+            },
+            // The unlocked grant read (the door): it starts the transaction's read view, so the suspension below commits AFTER the snapshot.
+            ['support_granted_at', 'select exists'],
+            fn () => psRaceSecond(fn () => app(AccountLifecycleService::class)->suspend($f['requester'], $f['actor'], 'race'))
+        );
+
+        expect($during)->toBeTrue('the suspension committed while the creation was in flight')
+            ->and(psRaceCreated($f))->toBe(0);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('L. an actor suspended after the creation read its grant is refused as the account (404) and nothing is written', function () {
+    $f = psRaceFixture();
+
+    try {
+        $during = psRaceDuring(
+            function () use ($f) {
+                expect(fn () => psRaceCreate($f))->toThrow(HttpException::class);
+            },
+            ['support_granted_at', 'select exists'],
+            fn () => psRaceSecond(fn () => app(AccountLifecycleService::class)->suspend($f['staff'], $f['actor'], 'race'))
+        );
+
+        expect($during)->toBeTrue('the suspension committed while the creation was in flight')
+            ->and(psRaceCreated($f))->toBe(0);
+    } finally {
+        psRaceCleanup($f);
+    }
+});
+
+it('M. a contact id that does not exist takes no lock on the users index: only the actor row is locked', function () {
+    $f = psRaceFixture();
+
+    try {
+        $locking = [];
+        DB::listen(function ($query) use (&$locking) {
+            if ($query->connectionName !== 'ps_race_b' && str_contains($query->sql, 'from `users`') && str_contains($query->sql, 'lock in share mode')) {
+                $locking[] = $query;
+            }
+        });
+
+        expect(fn () => app(TicketService::class)->createForCustomerContact($f['staff'], $f['customer']->id, 99999999, ['title' => 'Race', 'description' => 'Raced.', 'category' => 'General', 'priority' => 'low']))
+            ->toThrow(ValidationException::class);
+
+        expect($locking)->toHaveCount(1)
+            ->and($locking[0]->bindings)->toBe([$f['staff']->id]);
     } finally {
         psRaceCleanup($f);
     }

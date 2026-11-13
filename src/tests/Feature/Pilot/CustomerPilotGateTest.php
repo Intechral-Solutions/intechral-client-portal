@@ -334,6 +334,8 @@ it('pins the reviewed allowlists: adding a customer route changes this test', fu
         'tickets.index', 'tickets.show', 'tickets.create', 'tickets.store', 'tickets.replies.store', 'tickets.attachment.download',
         // R1-4: partner support. No capability; the operator-issued designation is the authority (PartnerSupportAccess), 404 for everyone else.
         'support.index', 'support.show', 'support.replies.store', 'support.attachment.download',
+        // R1-5: raising a request for a managed customer's contact. Same authority; the creation transaction re-decides customer and contact.
+        'support.create', 'support.store',
         'projects.index', 'projects.show',
     ])->and(CustomerPilotGate::WORKSPACES)->toBe(['closed' => ['home'], 'pilot' => ['home', 'helpdesk', 'projects']]);
 });
