@@ -366,7 +366,7 @@ class TimeEntryService
         $stream = fopen('php://temp', 'w+');
         fputcsv(
             $stream,
-            ['Date', 'User', 'Project', 'Task', 'Ticket', 'Description', 'Hours', 'Billable', 'Billed'],
+            ['Date', 'User', 'Project', 'Task', 'Request', 'Description', 'Hours', 'Billable', 'Billed'],
             escape: '',
         );
 

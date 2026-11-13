@@ -88,7 +88,7 @@ it('contains no administrative destination and no Manage grouping', async () => 
         'Roles',
         'Organizations',
         'CMS Pages',
-        'Ticket Queue',
+        'Service request queue',
         'Time Reports',
         'System Users',
     ]) {

@@ -76,7 +76,7 @@ describe('one running timer', () => {
         mount([
             timer({
                 context: {
-                    type: 'Ticket',
+                    type: 'Request',
                     id: 7,
                     label: 'TK-00042-ABCDE',
                     url: '/tickets/TK-00042-ABCDE',
@@ -86,10 +86,10 @@ describe('one running timer', () => {
         await settle();
 
         expect(screen.getByText('0:00:10')).toBeInTheDocument();
-        expect(screen.getByText('Ticket: TK-00042-ABCDE')).toBeInTheDocument();
+        expect(screen.getByText('Request: TK-00042-ABCDE')).toBeInTheDocument();
         // The Stop action names what it will stop, so it is unambiguous out of context.
         expect(
-            screen.getByRole('button', { name: 'Stop timer: Ticket: TK-00042-ABCDE' }),
+            screen.getByRole('button', { name: 'Stop timer: Request: TK-00042-ABCDE' }),
         ).toBeInTheDocument();
         // One timer needs no disclosure chevron and no count badge.
         expect(screen.queryByText(/^\+\d/)).not.toBeInTheDocument();

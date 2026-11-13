@@ -21,7 +21,7 @@ require_once __DIR__.'/TicketTestHelpers.php';
 
 // R1-2B: the column that was "Submitter" is the REQUESTER (tickets.user_id) and is now called so; "Organization" and "Submitted by" are appended,
 // so every earlier column keeps its position.
-const TICKET_CSV_HEADER = ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'];
+const TICKET_CSV_HEADER = ['Request #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'];
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -57,9 +57,9 @@ it('BASELINE H7: header row, content type and filename; no BOM', function () {
 
     expect(ticketParseCsv($csv)[0])->toBe(TICKET_CSV_HEADER)
         ->and(str_starts_with($csv, "\xEF\xBB\xBF"))->toBeFalse()
-        ->and(strtok($csv, "\n"))->toBe('"Ticket #",Title,Category,Priority,Status,Requester,Assignee,Created,Resolved,"SLA Due","Effective Due",Organization,"Submitted by"')
+        ->and(strtok($csv, "\n"))->toBe('"Request #",Title,Category,Priority,Status,Requester,Assignee,Created,Resolved,"SLA Due","Effective Due",Organization,"Submitted by"')
         ->and($response->headers->get('Content-Type'))->toStartWith('text/csv')
-        ->and($response->headers->get('Content-Disposition'))->toBe('attachment; filename="tickets-2026-09-24.csv"');
+        ->and($response->headers->get('Content-Disposition'))->toBe('attachment; filename="service-requests-2026-09-24.csv"');
 });
 
 it('TARGET H7: formula-leading titles are neutralized with a leading apostrophe', function (string $title) {

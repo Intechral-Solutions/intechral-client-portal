@@ -54,7 +54,7 @@ class NewTicketAlertNotification extends Notification implements ShouldQueue
 
         return (new MailMessage)
             ->subject("[{$ticket->ticket_number}] New request: ".MailText::plain($ticket->title, 150))
-            ->greeting('New support request')
+            ->greeting('New service request')
             ->line($line)
             ->line(MailText::line('**Organization:** ', MailText::escape($ticket->organization?->name ?: 'unknown', 255)))
             ->line(MailText::line('**Subject:** ', MailText::escape($ticket->title, 255)))

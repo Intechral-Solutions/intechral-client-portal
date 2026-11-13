@@ -199,7 +199,7 @@ describe('TicketCreatedNotification', function () {
         [$user, $ticket] = mtrTicket("Printer\r\nBcc: attacker@evil.example\nbroken");
         $subject = (new TicketCreatedNotification($ticket))->toMail($user)->subject;
 
-        expect($subject)->toBe("[{$ticket->ticket_number}] Ticket received: Printer Bcc: attacker@evil.example broken")->not->toContain("\n")->not->toContain("\r");
+        expect($subject)->toBe("[{$ticket->ticket_number}] Request received: Printer Bcc: attacker@evil.example broken")->not->toContain("\n")->not->toContain("\r");
     });
 });
 

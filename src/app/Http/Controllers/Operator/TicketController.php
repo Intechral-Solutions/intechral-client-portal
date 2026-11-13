@@ -91,7 +91,7 @@ class TicketController extends Controller
 
         $service->transition($ticket, auth()->user(), $validated['status']);
 
-        return back()->with('status', 'Ticket status updated to "'.Ticket::operatorStatusLabel($validated['status']).'".');
+        return back()->with('status', 'Request status updated to "'.Ticket::operatorStatusLabel($validated['status']).'".');
     }
 
     public function assign(Request $request, Ticket $ticket, TicketService $service)
@@ -106,6 +106,6 @@ class TicketController extends Controller
 
         $service->assign($ticket, $validated['assignee_id'] === null ? null : (int) $validated['assignee_id'], auth()->user());
 
-        return back()->with('status', 'Ticket assignment updated.');
+        return back()->with('status', 'Request assignment updated.');
     }
 }

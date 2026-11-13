@@ -2,7 +2,7 @@
     EPIC-016 WP1: the semantic link seam (Direction D §2.2 "Link / info", EPIC-016 §6 row-link grammar, P2).
 
     <x-ui.link href="...">View</x-ui.link>                       standalone links and row actions: text-accent
-    <x-ui.link href="..." variant="quiet">Back to tickets</x-ui.link>   quieter, underlined
+    <x-ui.link href="..." variant="quiet">Back to requests</x-ui.link>   quieter, underlined
     <x-ui.link href="..." variant="row">{{ $title }}</x-ui.link>         a row's primary identifier
 
     Carries the exact focusRing string with `rounded-control`. Callers add layout classes only; `href`,

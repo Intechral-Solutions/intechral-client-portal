@@ -116,7 +116,7 @@ describe('a request raised by partner support', function () {
 
         expect($html)->toContain('Pat Partner')->toContain('raised this request for you at')->toContain('Charter')->toContain('Printer offline')
             ->toContain('href="'.route('tickets.show', $ticket).'"')->not->toContain(route('support.show', $ticket))
-            ->and($mail->subject)->toBe("[{$ticket->ticket_number}] Ticket received: Printer offline");
+            ->and($mail->subject)->toBe("[{$ticket->ticket_number}] Request received: Printer offline");
     });
 
     it('gives the submitter a confirmation that names the contact and organization and links to the SUPPORT page, never the requester page', function () {

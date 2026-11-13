@@ -212,7 +212,7 @@ class TicketService
 
         // Release 1.0: the same rule as TicketPolicy::adjustDueDate, held again here so no caller can reach the write without it.
         if ($dueDate !== null && $isCustomer) {
-            throw new AuthorizationException('Only an operator may change a ticket due date.');
+            throw new AuthorizationException('Only an operator may change a request due date.');
         }
 
         [$reply, $current] = $this->storeAttachments(function (array &$stored) use ($ticket, $user, $body, $isInternal, $files, $isCustomer, $dueDate) {
@@ -476,7 +476,7 @@ class TicketService
 
         if ($assignee === null || ! self::isAssignable($assignee)) {
             throw ValidationException::withMessages([
-                'assignee_id' => 'The selected assignee cannot be assigned tickets.',
+                'assignee_id' => 'The selected assignee cannot be assigned requests.',
             ]);
         }
     }

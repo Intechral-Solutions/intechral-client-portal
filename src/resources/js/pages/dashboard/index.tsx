@@ -266,7 +266,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                     ) : null}
 
                     <Section
-                        title="Recent tickets"
+                        title="Recent requests"
                         actions={
                             ticketsMetric ? (
                                 <DestinationLink
@@ -313,7 +313,7 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                             // ("waiting on you") that only one of the two audiences actually has.
                             <EmptyState
                                 icon={TicketCheck}
-                                title="No open tickets"
+                                title="No open requests"
                                 description="New support activity appears in this list as it arrives."
                             />
                         )}

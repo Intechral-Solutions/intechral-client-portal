@@ -1,5 +1,5 @@
 export type TimerContext = {
-    type: 'Project' | 'Task' | 'Ticket';
+    type: 'Project' | 'Task' | 'Request';
     id: number;
     label: string;
     url: string | null;

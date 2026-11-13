@@ -110,12 +110,12 @@ class TicketRepliedNotification extends Notification implements ShouldQueue
         if ($this->audience() === self::FOR_PARTNER_SUPPORT) {
             $message->line(MailText::line("A new reply has been added to request **{$this->ticket->ticket_number}** for **", MailText::escape($this->ticket->user?->name ?: 'a contact', 255), '** at **', MailText::escape($this->ticket->organization?->name ?: 'the organization', 255), '**.'));
         } else {
-            $message->line("A new reply has been added to ticket **{$this->ticket->ticket_number}**.");
+            $message->line("A new reply has been added to request **{$this->ticket->ticket_number}**.");
         }
 
         return $message
             ->line(MailText::line('**', MailText::escape($this->reply->user->name), '** wrote:'))
             ->line($preview)
-            ->action($this->audience() === self::FOR_PARTNER_SUPPORT ? 'View request' : 'View Ticket', route($this->audience() === self::FOR_PARTNER_SUPPORT ? 'support.show' : 'tickets.show', $this->ticket));
+            ->action($this->audience() === self::FOR_PARTNER_SUPPORT ? 'View request' : 'View request', route($this->audience() === self::FOR_PARTNER_SUPPORT ? 'support.show' : 'tickets.show', $this->ticket));
     }
 }

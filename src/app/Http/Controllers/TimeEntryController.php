@@ -312,7 +312,7 @@ class TimeEntryController extends Controller
     {
         if ($entry->ticket_id && $entry->ticket) {
             return [
-                'type' => 'Ticket',
+                'type' => 'Request',
                 'id' => $entry->ticket_id,
                 'reference' => $entry->ticket->ticket_number,
                 'label' => $entry->ticket->ticket_number.' — '.Str::limit($entry->ticket->title, 40),
@@ -444,7 +444,7 @@ class TimeEntryController extends Controller
         $ticketId = array_key_exists('ticket_id', $submitted) ? $submitted['ticket_id'] : $entry->ticket_id;
 
         if ($ticketId !== null && ! AccessibleTimeContext::allows($request->user(), 'ticket', $ticketId)) {
-            throw ValidationException::withMessages(['ticket_id' => 'The selected ticket id is invalid.']);
+            throw ValidationException::withMessages(['ticket_id' => 'The selected request is invalid.']);
         }
     }
 

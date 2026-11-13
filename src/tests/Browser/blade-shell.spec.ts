@@ -356,7 +356,7 @@ test('the Blade account menu is personal, keyboard-operable, and owns Appearance
         'Users',
         'Roles',
         'Organizations',
-        'Ticket Queue',
+        'Service request queue',
         'Time Reports',
     ]) {
         await expect(menu.getByText(absent, { exact: true })).toHaveCount(0);

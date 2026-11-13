@@ -66,7 +66,7 @@ class TicketReportController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $filename = 'tickets-'.now()->format('Y-m-d').'.csv';
+        $filename = 'service-requests-'.now()->format('Y-m-d').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -77,7 +77,7 @@ class TicketReportController extends Controller
         // index. The column that was called "Submitter" is the REQUESTER (tickets.user_id), and is now labelled so.
         $callback = function () use ($tickets) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Ticket #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'], escape: '');
+            fputcsv($out, ['Request #', 'Title', 'Category', 'Priority', 'Status', 'Requester', 'Assignee', 'Created', 'Resolved', 'SLA Due', 'Effective Due', 'Organization', 'Submitted by'], escape: '');
 
             foreach ($tickets as $t) {
                 // Free-text and user-controlled cells are formula-neutralized (EPIC-010D H7);

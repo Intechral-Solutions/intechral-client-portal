@@ -130,7 +130,7 @@ it('still sends the mail for a ticket that exists', function () {
     });
 
     expect(ticketWorkerRunsOnce())->toBe(['jobs' => 0, 'failed' => 0])
-        ->and($sent)->toBe(["[{$ticket->ticket_number}] Ticket received: {$ticket->title}"]);
+        ->and($sent)->toBe(["[{$ticket->ticket_number}] Request received: {$ticket->title}"]);
 });
 
 it('still sends a reply mail for a ticket and reply that exist', function () {

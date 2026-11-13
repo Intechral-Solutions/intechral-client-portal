@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Ticket Reports'])
+@extends('layouts.app', ['title' => 'Service request reports'])
 
 @section('content')
 <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 space-y-8">
@@ -74,7 +74,7 @@
                     <thead>
                         <tr>
                             <th class="text-left py-2 pr-6 font-semibold text-text-secondary">Date</th>
-                            <th class="text-right py-2 font-semibold text-text-secondary">Tickets</th>
+                            <th class="text-right py-2 font-semibold text-text-secondary">Requests</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-rule">
@@ -98,7 +98,7 @@
                 <thead>
                     <tr>
                         <th class="text-left py-2 pr-6 font-semibold text-text-secondary">Assignee</th>
-                        <th class="text-right py-2 pr-6 font-semibold text-text-secondary">Tickets</th>
+                        <th class="text-right py-2 pr-6 font-semibold text-text-secondary">Requests</th>
                         <th class="text-right py-2 font-semibold text-text-secondary">Avg Hours</th>
                     </tr>
                 </thead>

@@ -115,7 +115,7 @@ it('HD-P1: an impossible transition is skipped per ticket and the flash reports 
     $this->actingAs($this->operator)
         ->post(route('operator.tickets.bulk'), ['ticket_refs' => [$open->ticket_number, $closed->ticket_number], 'action' => 'resolve'])
         ->assertRedirect()
-        ->assertSessionHas('status', fn ($m) => str_starts_with($m, '1 ticket updated. Skipped 1: '.$closed->ticket_number.' (Closed → Resolved is not allowed)'));
+        ->assertSessionHas('status', fn ($m) => str_starts_with($m, '1 request updated. Skipped 1: '.$closed->ticket_number.' (Closed → Resolved is not allowed)'));
 
     expect($open->fresh()->status)->toBe('resolved')
         ->and($closed->fresh()->status)->toBe('closed')
