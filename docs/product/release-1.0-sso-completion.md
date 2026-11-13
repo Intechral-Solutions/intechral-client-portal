@@ -86,7 +86,17 @@ Verdict **SAFE AFTER TARGETED REMEDIATION**: no account-takeover, unauthorised-c
 - **Info, recorded:** Google's and Microsoft's "verified" flags say the address was verified at some time, not that the holder controls it today (an address outside `gmail.com` without an `hd` claim; a personal Microsoft account). Exploiting it still needs the invitation token **and** that stale account, so it is accepted. The signing-key issuer binding was missing from the first residual list and is now implemented rather than a residual.
 - **Controls the reviewer found unpinned, now pinned:** the real key-set shape, signature under a matching kid, `none`/HS256, key-issuer binding, destruction of the old session row. Still only fakes: the real Google and Microsoft drivers inside the controller flow (`email_verified` from `userinfo`, `xms_edov` from a real token), which is exactly the live check in section 7.
 
-## 10. Recorded for the next (hardening) package, not done here
+## 10. Owner rulings (2026-11-13) and outstanding release gates
+
+1. **Microsoft tenant policy:** `common` is retained provisionally (organizational and personal accounts); live verification is required before production activation; verified-email handling stays fail-closed.
+2. **MFA:** SSO is the first factor only; an account with a confirmed local second factor completes the existing challenge; provider-side MFA is not substituted.
+3. **Provider registration:** test app registrations for Google and Microsoft are authorised; credentials are supplied separately through secure environment configuration, are never committed, and are not needed by hosted CI.
+4. **Carried into the next security-hardening assessment:** fresh authentication before account linking, provider-token storage, remember-me behaviour, operator MFA policy.
+5. **Identifier check (before commit):** the Microsoft identity is `{tid}.{oid}` built only from the validated, GUID-checked, lower-cased claims of a token whose issuer, signing-key issuer and tenant policy have all been verified; it never uses the address or any display attribute (pinned by test).
+
+**Outstanding release gates (not proved by mocked or locally signed tokens):** live Google sign-in, linking and invitation acceptance; live Microsoft organizational-account sign-in, linking and invitation acceptance; Microsoft personal-account behaviour including whether verified-email evidence (`xms_edov`) is available; the second-factor challenge where enabled; and the failure behaviour for missing claims, provider errors and rejected invitations.
+
+## 11. Recorded for the next (hardening) package, not done here
 
 - A fresh-authentication requirement before linking a provider; a per-account throttle on the SSO routes beyond the invitation-initiation limiter.
 - Stored provider tokens (`social_accounts.token`, `refresh_token`) are plaintext columns and are not used after sign-in; stop storing them or encrypt them.
