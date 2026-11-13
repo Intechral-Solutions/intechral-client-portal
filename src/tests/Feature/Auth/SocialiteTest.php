@@ -17,7 +17,7 @@ beforeEach(function () {
 
 function fakeSocialUser(array $attributes = []): SocialiteUser
 {
-    return SocialiteUser::fake([
+    return SocialiteUser::fake(['email_verified' => true, 'xms_edov' => true,
         'id' => 'provider-123',
         'name' => 'Provider Person',
         'email' => 'provider@example.com',
