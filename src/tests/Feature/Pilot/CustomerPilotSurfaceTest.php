@@ -216,11 +216,11 @@ it('still lets a customer sign in with a password and reach the Home', function 
     $this->get('/dashboard')->assertOk();
 });
 
-// ── SSO is deferred for customers, not for operators ──────────────────────────
+// ── SSO is deferred for customers in closed mode, not for operators; pilot mode enables it (SsoCompletionTest) ──────────────────────────
 
 function pilotSocialUser(array $attributes = []): SocialiteUser
 {
-    return SocialiteUser::fake(['id' => 'pilot-provider-1', 'name' => 'Provider Person', 'email' => 'provider@example.com', ...$attributes]);
+    return SocialiteUser::fake(['email_verified' => true, 'id' => 'pilot-provider-1', 'name' => 'Provider Person', 'email' => 'provider@example.com', ...$attributes]);
 }
 
 function pilotOauthContext(string $intent, array $target = []): array
@@ -228,11 +228,11 @@ function pilotOauthContext(string $intent, array $target = []): array
     return ['intent' => $intent, 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => null, 'startedAt' => now()->toIso8601String(), ...$target];
 }
 
-it('refuses SSO sign-in for a customer with the unlinked-identity answer, and signs an operator in', function () {
+it('refuses SSO sign-in for a customer in closed mode with the unlinked-identity answer, and signs an operator in', function () {
     Socialite::fake('google', pilotSocialUser());
     $customer = pilotCustomer();
     SocialAccount::create(['user_id' => $customer->id, 'provider' => 'google', 'provider_id' => 'pilot-provider-1']);
-    pilotMode('pilot');
+    pilotMode('closed');
 
     $this->withSession(['oauth_context' => pilotOauthContext('login')])
         ->get(route('sso.callback', 'google'))
@@ -263,10 +263,10 @@ it('signs a customer in with SSO in legacy mode (the proof that the mode is what
     $this->assertAuthenticatedAs($customer);
 });
 
-it('refuses SSO invitation acceptance in pilot mode, creating no account and keeping the invitation', function () {
+it('refuses SSO invitation acceptance in closed mode, creating no account and keeping the invitation', function () {
     Socialite::fake('google', pilotSocialUser(['email' => 'invited@example.com']));
     [$invitation, $token] = regInvOpen('invited@example.com');
-    pilotMode('pilot');
+    pilotMode('closed');
 
     $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => $token]))
         ->assertRedirect(route('invitation.show', $token))
@@ -283,11 +283,14 @@ it('refuses SSO invitation acceptance in pilot mode, creating no account and kee
         ->and(DB::table('organization_invitations')->find($invitation->id)->accepted_at)->toBeNull();
 });
 
-it('offers the invitation page the password form only in pilot mode', function () {
+it('offers the invitation page the password form only in closed mode', function () {
     [, $token] = regInvOpen();
 
-    pilotMode('pilot');
+    pilotMode('closed');
     $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', false));
+
+    pilotMode('pilot');
+    $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', true));
 
     pilotMode('legacy');
     $this->get(route('invitation.show', $token))->assertInertia(fn (Assert $page) => $page->where('providersAvailable', true));
@@ -307,10 +310,10 @@ it('still accepts a password invitation in pilot mode, as an ordinary member of 
         ->and(DB::table('organization_members')->where('user_id', $user->id)->where('organization_id', $invitation->organization_id)->where('role', 'member')->exists())->toBeTrue();
 });
 
-it('refuses SSO linking for a signed-in customer and offers no provider on the profile', function () {
+it('refuses SSO linking for a signed-in customer in closed mode and offers no provider on the profile', function () {
     Socialite::fake('google', pilotSocialUser());
     $customer = pilotCustomer();
-    pilotMode('pilot');
+    pilotMode('closed');
 
     $this->actingAs($customer)->get(route('sso.redirect', 'google'))->assertNotFound();
     $this->actingAs($customer)->withSession(['oauth_context' => pilotOauthContext('link', ['initiatingUserId' => $customer->id])])
@@ -323,7 +326,7 @@ it('refuses SSO linking for a signed-in customer and offers no provider on the p
 it('lets a customer who already has a connected provider disconnect it', function () {
     $customer = pilotCustomer(['password' => bcrypt('Password1!')]);
     SocialAccount::create(['user_id' => $customer->id, 'provider' => 'google', 'provider_id' => 'pilot-provider-1']);
-    pilotMode('pilot');
+    pilotMode('closed');
 
     $this->actingAs($customer)->get(route('profile.show'))->assertInertia(fn (Assert $page) => $page
         ->where('connectedAccounts', [['provider' => 'google', 'connected' => true]]));
@@ -420,7 +423,7 @@ it('keeps the operator’s SSO sign-in working when the invitation token is empt
     $this->assertAuthenticatedAs($operator);
 });
 
-it('refuses SSO for a closed-mode customer exactly as in pilot mode', function () {
+it('refuses SSO for a closed-mode customer with the unlinked-identity answer', function () {
     Socialite::fake('google', pilotSocialUser());
     $customer = pilotCustomer();
     SocialAccount::create(['user_id' => $customer->id, 'provider' => 'google', 'provider_id' => 'pilot-provider-1']);

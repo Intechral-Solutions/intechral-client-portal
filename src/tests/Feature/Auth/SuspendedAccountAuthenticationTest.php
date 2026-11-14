@@ -302,7 +302,7 @@ describe('password recovery', function () {
 
 describe('SSO', function () {
     beforeEach(function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'provider-123', 'name' => 'Provider Person', 'email' => 'p@example.com']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'provider-123', 'name' => 'Provider Person', 'email' => 'p@example.com']));
     });
 
     it('refuses a suspended account with the unlinked-identity answer, and leaves its stored token alone', function () {
@@ -356,7 +356,7 @@ describe('invitation acceptance', function () {
     });
 
     it('cannot sign in or reactivate an existing suspended account through SSO acceptance', function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'new-identity', 'name' => 'Invited', 'email' => 'invited@example.com']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'new-identity', 'name' => 'Invited', 'email' => 'invited@example.com']));
         $user = User::factory()->create(['email' => 'invited@example.com']);
         suspendAccount($user);
         [$invitation] = regInvOpen('invited@example.com');

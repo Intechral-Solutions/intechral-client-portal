@@ -274,6 +274,8 @@ HTML, JSON, Inertia with the current asset version, Inertia with a stale or miss
 
 ## 7. SSO and the other entry points
 
+> **Release 1.0 (SSO completion):** SSO is deferred for customers in **`closed`** mode only. In `pilot` mode (the Release 1.0 customer mode) customer sign-in, linking and invitation acceptance are enabled, `sso.redirect` and `sso.callback` are on the pilot allowlist, and a provider is available only where its credentials are configured. The paragraphs below describe the Release 0.9 first-pilot state and remain accurate for `closed`. See [SSO completion](../product/release-1.0-sso-completion.md).
+
 - **SSO is deferred for the first pilot** and no new SSO implementation was written.
   - *Login:* a callback that resolves a customer account answers exactly as for an unlinked identity. Operators sign in as
     before. This also closes the path that signs a user in without the two-factor challenge.

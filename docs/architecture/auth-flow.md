@@ -40,6 +40,8 @@ Operator                          System                          Invitee
 
 ## OpenID SSO Flow
 
+> **Release 1.0 (SSO completion) supersedes the deferral and "not implemented" statements below.** Customer SSO is enabled in `pilot` mode and still deferred in `closed`; Google and Microsoft are both functional where configured; the provider's verified-email evidence is required, failing closed, before an invitation is accepted; a confirmed second factor is asked for after a provider sign-in (no bypass); `identity_taken` has its own message. Design, flows, configuration and the live-verification list: [Release 1.0 SSO completion](../product/release-1.0-sso-completion.md). The older text below is kept as the history of the R1-3 decisions.
+
 1. User starts Google/Microsoft authentication from login, Profile, or an invitation link.
 2. The server stores a one-time OAuth intent (`login`, `link`, or `invitation`) and its target in the session.
 3. Laravel Socialite redirects to the provider, which returns to `/auth/{provider}/callback`.
@@ -47,7 +49,7 @@ Operator                          System                          Invitee
    - Normal login authenticates only an existing `(provider, provider_id)` `SocialAccount`. Provider email is never used to find or automatically link a portal user.
    - Profile linking explicitly associates an unowned provider identity with the authenticated initiating user.
    - Invitation registration resolves the invitation **by the hash in the context**, then `OrganizationInvitations::acceptByHash()` revalidates the invitation, the issuer's authority and the provider's address against the invited one (one normalizer) under lock, and atomically creates the passwordless user, the `SocialAccount`, the `user` role and the ordinary membership.
-5. Successful SSO login and invitation registration currently use Laravel's remember-me authentication unconditionally.
+5. Successful SSO login and invitation registration use Laravel's remember-me authentication unconditionally. Since Release 1.0 an account with a confirmed second factor is sent to the two-factor challenge instead of being signed in directly, and the session identifier is regenerated first.
 
 **The invitation context** is `{intent: invitation, provider, initiatingUserId: null, invitationHash, startedAt}`:
 

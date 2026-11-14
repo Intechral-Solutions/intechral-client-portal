@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Auth\ActiveUserProvider;
+use App\Auth\Sso\MicrosoftProvider;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Project;
@@ -42,6 +43,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Socialite\Facades\Socialite;
 use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
@@ -68,6 +70,10 @@ class AppServiceProvider extends ServiceProvider
                 database: (string) config("database.connections.{$connection}.database"),
             );
         }
+
+        // Release 1.0 (SSO completion): `laravel/socialite` ships no Microsoft driver; this one validates the signed ID token and exposes the
+        // verification claim (App\Auth\Sso\MicrosoftProvider). Registering it is inert without MICROSOFT_CLIENT_ID/SECRET.
+        Socialite::extend('microsoft', fn ($app) => Socialite::buildProvider(MicrosoftProvider::class, (array) $app['config']['services.microsoft']));
 
         // Release 0.9 (H3): the `users` provider (config/auth.php) resolves active accounts only, and no notification
         // reaches a suspended user, including one queued before the suspension. docs/architecture/account-lifecycle.md.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\Sso\SsoProviders;
 use App\Exceptions\OrganizationInvitationException;
 use App\Http\Controllers\Auth\Concerns\WithholdsQueryDetails;
 use App\Http\Controllers\Controller;
@@ -52,7 +53,7 @@ class InvitationController extends Controller
             ],
             'token' => $token,
             // SSO is deferred for the first pilot (R0.9-CS1): the page offers the password form only.
-            'providersAvailable' => ! CustomerPilotGate::ssoDeferred(),
+            'providersAvailable' => ! CustomerPilotGate::ssoDeferred() && SsoProviders::anyConfigured(),
         ]);
     }
 

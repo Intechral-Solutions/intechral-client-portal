@@ -2,6 +2,7 @@
 
 namespace App\Shared\Pilot;
 
+use App\Auth\Sso\SsoProviders;
 use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Models\User;
 use App\Shared\Navigation\NavigationBuilder;
@@ -82,6 +83,11 @@ final class CustomerPilotGate
      * @var array<string, string|null>
      */
     public const PILOT_ROUTES = [
+        // Release 1.0 (SSO completion): a signed-in customer starts and finishes linking a provider here. Guests never reach the gate. Absent in
+        // closed mode, where a signed-in customer still gets 404 from this gate (the controller itself refuses sign-in and invitation while ssoDeferred()).
+        'sso.redirect' => null,
+        'sso.callback' => null,
+
         // The routes' own `can:` middleware and TicketPolicy still decide.
         'tickets.index' => null,
         'tickets.show' => null,
@@ -181,10 +187,15 @@ final class CustomerPilotGate
         return $user !== null && self::mode() !== CustomerSurfaceMode::Legacy && self::isCustomer($user);
     }
 
-    /** SSO is deferred for customers in every mode but legacy, and an invitation always creates a customer. */
+    /**
+     * Whether customer SSO (sign-in, linking and invitation acceptance, all of which concern customers) is still deferred. Release 1.0 enables
+     * it in `pilot` mode, the customer mode of the Release 1.0 Helpdesk, and in `legacy`; `closed` (the default, the narrowest surface) keeps
+     * it deferred. Enabling it here activates nothing by itself: a provider is available only where its credentials are configured
+     * ({@see SsoProviders}), and every address-based step additionally needs the provider's verified-email evidence.
+     */
     public static function ssoDeferred(): bool
     {
-        return self::mode() !== CustomerSurfaceMode::Legacy;
+        return self::mode() === CustomerSurfaceMode::Closed;
     }
 
     /** @return array<string, string|null> the allowlist for a mode (empty for legacy, which restricts nothing) */

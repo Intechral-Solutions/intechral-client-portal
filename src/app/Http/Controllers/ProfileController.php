@@ -33,14 +33,14 @@ class ProfileController extends Controller
                 'enabled' => filled($user->two_factor_secret),
                 'confirmed' => filled($user->two_factor_confirmed_at),
             ],
-            // SSO is deferred for pilot customers (R0.9-CS1): no provider is offered to connect, and one
-            // already connected is listed only so it can be disconnected.
+            // SSO is deferred for customers in closed mode (R0.9-CS1; enabled in pilot mode in Release 1.0): then no provider is offered to
+            // connect, and one already connected is listed only so it can be disconnected.
             'connectedAccounts' => collect(self::PROVIDERS)
                 ->map(fn (string $provider) => [
                     'provider' => $provider,
                     'connected' => $connectedProviders->contains($provider),
                 ])
-                ->when(CustomerPilotGate::restricts($user), fn ($accounts) => $accounts->where('connected', true))
+                ->when(CustomerPilotGate::restricts($user) && CustomerPilotGate::ssoDeferred(), fn ($accounts) => $accounts->where('connected', true))
                 ->values()
                 ->all(),
             'sessions' => $this->sessions->forUser($user, $request->session()->getId()),

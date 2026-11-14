@@ -55,7 +55,7 @@ describe('a link from the retired invitation is dead on every path', function ()
     });
 
     it('SSO initiation: no context is stored and nothing is started', function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'legacy@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'legacy@example.test']));
 
         $this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => retiredToken()]))
             ->assertRedirect(route('login'))
@@ -64,7 +64,7 @@ describe('a link from the retired invitation is dead on every path', function ()
     });
 
     it('SSO callback: neither a legacy-shaped context (plaintext token) nor a hash of a retired token resolves anything', function () {
-        Socialite::fake('google', SocialiteUser::fake(['id' => 'x', 'email' => 'legacy@example.test']));
+        Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'legacy@example.test']));
         $token = retiredToken();
 
         foreach ([

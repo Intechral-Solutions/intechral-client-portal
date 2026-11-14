@@ -29,7 +29,7 @@ beforeEach(function () {
 
 function ssoInvProvider(array $attributes = [], string $provider = 'google'): void
 {
-    Socialite::fake($provider, SocialiteUser::fake([
+    Socialite::fake($provider, SocialiteUser::fake(['email_verified' => true,
         'id' => 'provider-123',
         'name' => 'Provider Person',
         'email' => 'invited@example.test',
@@ -313,7 +313,20 @@ describe('the callback', function () {
         expect(OrganizationInvitation::find($invitation->id)->state())->toBe(OrganizationInvitation::PENDING)
             ->and(SocialAccount::count())->toBe(0)
             ->and(User::where('email', 'invited@example.test')->exists())->toBeFalse();
-    })->with(['a different address' => 'other@example.test', 'no address at all' => null, 'an empty address' => '   ', 'a look-alike' => 'invited@example.test.evil.test']);
+    })->with(['a different address' => 'other@example.test', 'a look-alike' => 'invited@example.test.evil.test']);
+
+    it('refuses an address the provider did not give or that is not an address, as unverified, before the invitation is read', function (?string $providerEmail) {
+        ssoInvProvider(['email' => $providerEmail]);
+        [$invitation] = regInvOpen('invited@example.test');
+
+        $this->withSession(['oauth_context' => ssoInvContext($invitation->token_hash)])->get(route('sso.callback', 'google'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors(['email' => 'Google did not confirm that your email address is verified, so it cannot be used to accept this invitation. Open the link from your email again and create a password instead.']);
+
+        $this->assertGuest();
+        expect(OrganizationInvitation::find($invitation->id)->state())->toBe(OrganizationInvitation::PENDING)
+            ->and(SocialAccount::count())->toBe(0);
+    })->with(['no address at all' => null, 'an empty address' => '   ', 'not an address' => 'invited']);
 
     it('turns a provider failure into the login page without a link, and consumes the context', function () {
         Socialite::fake('google', function () {
@@ -347,8 +360,8 @@ describe('the callback', function () {
     });
 });
 
-describe('SSO stays deferred for customers, as before', function () {
-    it('refuses to start the flow in closed and pilot mode, pointing back at the link the request itself carried', function (string $mode) {
+describe('SSO stays deferred for customers in closed mode, as before', function () {
+    it('refuses to start the flow in closed mode, pointing back at the link the request itself carried', function (string $mode) {
         pilotMode($mode);
         ssoInvProvider();
         [, $token] = regInvOpen();
@@ -359,7 +372,7 @@ describe('SSO stays deferred for customers, as before', function () {
             ->assertSessionMissing('oauth_context');
 
         expect(ssoInvSessionDump())->not->toContain(OrganizationInvitations::hashToken($token));
-    })->with(['closed', 'pilot']);
+    })->with(['closed']);
 
     it('refuses a callback whose context somehow names an invitation, with no link, and creates nothing', function (string $mode) {
         pilotMode($mode);
@@ -374,14 +387,14 @@ describe('SSO stays deferred for customers, as before', function () {
         $this->assertGuest();
         expect($response->headers->get('Location'))->not->toContain($token)->not->toContain($invitation->token_hash)
             ->and(regInvFootprint())->toEqual($before);
-    })->with(['closed', 'pilot']);
+    })->with(['closed']);
 
     it('offers no provider links on the registration page in those modes', function (string $mode) {
         pilotMode($mode);
         [, $token] = regInvOpen();
 
         $this->get(route('invitation.show', $token))->assertInertia(fn ($page) => $page->where('providersAvailable', false));
-    })->with(['closed', 'pilot']);
+    })->with(['closed']);
 });
 
 describe('a suspended existing account', function () {

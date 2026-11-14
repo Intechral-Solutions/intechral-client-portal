@@ -246,9 +246,6 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
         'issue organization invitation' => ['POST', "/organizations/{$o}/invitations", ['email' => 'sneaky@example.test']],
         'resend organization invitation' => ['POST', "/organizations/{$o}/invitations", ['email' => 'pilot-target@example.test']],
         'revoke organization invitation' => ['DELETE', "/organizations/{$o}/invitations/{$i}"],
-        // SSO for a signed-in customer (link intent)
-        'sso redirect' => ['GET', '/auth/google/redirect'],
-        'sso callback' => ['GET', '/auth/google/callback'],
         // The Stripe endpoint is for Stripe, not for a signed-in customer
         'stripe webhook' => ['POST', '/webhooks/stripe', ['type' => 'payment_intent.succeeded']],
     ];
@@ -292,6 +289,16 @@ it('refuses every excluded direct URL, verb and JSON request with a 404 that dis
                 expect($response->getContent())->not->toContain($needle, "{$label} leaked [{$needle}]");
             }
         }
+    }
+});
+
+it('refuses the SSO routes to a signed-in customer in closed mode, with a 404 (SSO is deferred there; pilot mode enables it)', function () {
+    $customer = pilotCustomer();
+    pilotMode('closed');
+
+    foreach (['/auth/google/redirect', '/auth/google/callback', '/auth/microsoft/redirect', '/auth/microsoft/callback'] as $uri) {
+        $this->actingAs($customer)->get($uri)->assertNotFound();
+        $this->actingAs($customer)->getJson($uri)->assertNotFound();
     }
 });
 

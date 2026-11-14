@@ -266,8 +266,8 @@ it('restricts only a customer, and never in legacy mode', function () {
     expect(CustomerPilotGate::restricts($customer))->toBeFalse();
 });
 
-it('defers SSO in closed and pilot mode and in no other', function () {
-    foreach (['closed' => true, 'pilot' => true, 'legacy' => false, 'nonsense' => true] as $mode => $deferred) {
+it('defers SSO in closed mode (and an unrecognised one) and enables it in pilot and legacy mode', function () {
+    foreach (['closed' => true, 'pilot' => false, 'legacy' => false, 'nonsense' => true] as $mode => $deferred) {
         pilotMode($mode);
         expect(CustomerPilotGate::ssoDeferred())->toBe($deferred, $mode);
     }
@@ -336,6 +336,8 @@ it('pins the reviewed allowlists: adding a customer route changes this test', fu
         'support.index', 'support.show', 'support.replies.store', 'support.attachment.download',
         // R1-5: raising a request for a managed customer's contact. Same authority; the creation transaction re-decides customer and contact.
         'support.create', 'support.store',
+        // Release 1.0 (SSO completion): a signed-in customer links a provider. Guests never reach the gate; closed mode still answers 404.
+        'sso.redirect', 'sso.callback',
         'projects.index', 'projects.show',
     ])->and(CustomerPilotGate::WORKSPACES)->toBe(['closed' => ['home'], 'pilot' => ['home', 'helpdesk', 'projects']]);
 });
@@ -355,14 +357,14 @@ it('names only routes that exist, so a rename cannot leave a dead entry silently
 
 it('allows no excluded module by name in any mode', function () {
     foreach (array_keys(CustomerPilotGate::routes(CustomerSurfaceMode::Pilot)) as $name) {
-        foreach (['billing.', 'time.', 'tasks.', 'cms.', 'operator.', 'crm.', 'organizations.', 'roles.', 'users.', 'sso.', 'webhooks.', 'invitations.', 'projects.board', 'projects.tasks.', 'projects.time.', 'projects.milestones.', 'projects.create', 'projects.store', 'projects.edit', 'projects.update', 'projects.destroy', 'projects.members.', 'projects.companies.'] as $excluded) {
+        foreach (['billing.', 'time.', 'tasks.', 'cms.', 'operator.', 'crm.', 'organizations.', 'roles.', 'users.', 'webhooks.', 'invitations.', 'projects.board', 'projects.tasks.', 'projects.time.', 'projects.milestones.', 'projects.create', 'projects.store', 'projects.edit', 'projects.update', 'projects.destroy', 'projects.members.', 'projects.companies.'] as $excluded) {
             expect(str_starts_with($name, $excluded))->toBeFalse("{$name} must not be on the customer allowlist");
         }
     }
 
-    // Closed mode adds neither the Helpdesk nor projects.
+    // Closed mode adds neither the Helpdesk nor projects, and still no SSO routes (SSO is deferred there).
     foreach (array_keys(CustomerPilotGate::routes(CustomerSurfaceMode::Closed)) as $name) {
-        expect(str_starts_with($name, 'tickets.') || str_starts_with($name, 'projects.'))->toBeFalse($name);
+        expect(str_starts_with($name, 'tickets.') || str_starts_with($name, 'projects.') || str_starts_with($name, 'sso.'))->toBeFalse($name);
     }
 });
 
