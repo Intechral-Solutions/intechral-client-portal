@@ -401,7 +401,7 @@ tests use one unique prefix per scenario and cannot detect this.
 - It asks for the password and its confirmation (hidden prompts; never on the command line or in the environment) and
   creates the account through the application's own `CreatesNewUsers` action: the same name, email and password rules as
   the invitation flow (12+ characters, mixed case, a number, a symbol, not breached). Non-interactive runs have no
-  password and fail. Two-factor authentication is **not currently enforced** for operators, and the command says so. Whether it must be is an open owner decision; the account can enable it under Profile as any user can.
+  password and fail. The new operator can sign in, but an operator without a confirmed second factor reaches only the Profile page until it enrols one (Release 1.0, [operator-mfa.md](operator-mfa.md)); the command says so.
 - It gives the new account the built-in `operator` role and nothing else. It **never elevates an existing account**: an
   email that already exists (any letter case) is refused.
 - It requires the reviewed synchronization to have run: the stored `operator` role must exist and carry `users.view` and

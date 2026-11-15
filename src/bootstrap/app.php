@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnforceCustomerPilotSurface;
+use App\Http\Middleware\EnforceOperatorMfa;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ProtectInvitationCredential;
 use App\Shared\Pilot\CustomerPilotGate;
@@ -37,6 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnforceCustomerPilotSurface::class,
             HandleInertiaRequests::class,
+            // Release 1.0: after Inertia, so its redirect is converted to a 303 for PUT/PATCH/DELETE visits (see the class).
+            EnforceOperatorMfa::class,
         ]);
 
         // Release 1.0 (R1-3B): response protections for requests that carry an invitation token in the URL (routes/web.php).
@@ -55,6 +58,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // id got binding's 404, which told a customer which ids exist. Listed after the boundary: a refused route is still
         // a plain 404 whatever version the client sent.
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: HandleInertiaRequests::class);
+
+        // Release 1.0: the operator second-factor boundary likewise refuses before binding loads a record, and runs after Inertia (listed after it).
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: EnforceOperatorMfa::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Release 0.9 (R0.9 WP3-B1): the database half of the cron wrapper's failure marker. `queue:work` REPORTS a failure to pop a job and carries on (exit 0),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DatabaseSessionManager;
+use App\Shared\Mfa\OperatorMfaGate;
 use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,8 @@ class ProfileController extends Controller
             'twoFactor' => [
                 'enabled' => filled($user->two_factor_secret),
                 'confirmed' => filled($user->two_factor_confirmed_at),
+                // Release 1.0: an operator who has not confirmed a second factor is limited to this page until they do (OperatorMfaGate).
+                'required' => OperatorMfaGate::blocks($user),
             ],
             // SSO is deferred for customers in closed mode (R0.9-CS1; enabled in pilot mode in Release 1.0): then no provider is offered to
             // connect, and one already connected is listed only so it can be disconnected.

@@ -156,3 +156,10 @@ existing session, SSO, password reset or invitation acceptance; to an unauthenti
 account that does not exist. Suspension and reactivation sign the user out everywhere. The entry-point inventory, the
 enforcement mechanism for each, and the last-active-administrator rule are in
 [Account Lifecycle](./account-lifecycle.md).
+
+## Operator second factor (Release 1.0)
+
+An account holding `portal.operator` must have a **confirmed** second factor to reach anything but the Profile and enrolment pages. Password and SSO sign-in are
+unchanged first factors; enforcement is a deny-by-default middleware at the application boundary, with no grace period and no deployed switch. A lost device and
+lost recovery codes are recovered only by the shell command `user:reset-two-factor`. Details, route coverage and owner decisions:
+[operator-mfa.md](operator-mfa.md); runbook and the two-operators-first obligation: [docs/operations/operator-mfa.md](../operations/operator-mfa.md).

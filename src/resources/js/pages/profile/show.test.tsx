@@ -57,7 +57,7 @@ import ProfilePage, { type ProfilePageProps } from './show';
 
 const baseProps: ProfilePageProps = {
     profile: { name: 'Ada Client', email: 'ada@example.com', hasPassword: true },
-    twoFactor: { enabled: false, confirmed: false },
+    twoFactor: { enabled: false, confirmed: false, required: false },
     connectedAccounts: [
         { provider: 'google', connected: true },
         { provider: 'microsoft', connected: false },
@@ -135,7 +135,12 @@ it('does not offer unsupported password or session forms to passwordless users',
 });
 
 it('shows the pending two-factor confirmation flow without exposing secrets initially', () => {
-    render(<ProfilePage {...baseProps} twoFactor={{ enabled: true, confirmed: false }} />);
+    render(
+        <ProfilePage
+            {...baseProps}
+            twoFactor={{ enabled: true, confirmed: false, required: false }}
+        />,
+    );
 
     expect(screen.getByText('Setup is not complete')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show setup details' })).toBeInTheDocument();
@@ -160,7 +165,12 @@ it('keeps recovery codes concealed until explicitly requested', async () => {
             }),
         ),
     );
-    render(<ProfilePage {...baseProps} twoFactor={{ enabled: true, confirmed: true }} />);
+    render(
+        <ProfilePage
+            {...baseProps}
+            twoFactor={{ enabled: true, confirmed: true, required: false }}
+        />,
+    );
 
     expect(screen.queryByText('recovery-one')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show recovery codes' }));
@@ -174,4 +184,39 @@ it('asks for confirmation before disconnecting a sign-in provider', async () => 
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByRole('dialog')).toHaveAccessibleName('Disconnect Google?');
     expect(router.delete).not.toHaveBeenCalled();
+});
+
+// Release 1.0: an operator without a confirmed second factor is limited to this page; the page says why and keeps the enrolment controls.
+it('explains that operator two-factor authentication is required and keeps the enrolment controls', () => {
+    render(
+        <ProfilePage
+            {...baseProps}
+            twoFactor={{ enabled: false, confirmed: false, required: true }}
+        />,
+    );
+
+    expect(screen.getByText('Two-factor authentication is required')).toBeInTheDocument();
+    expect(
+        screen.getByRole('button', { name: 'Enable two-factor authentication' }),
+    ).toBeInTheDocument();
+});
+
+it('does not show the requirement to an account that is not blocked', () => {
+    render(<ProfilePage {...baseProps} />);
+
+    expect(screen.queryByText('Two-factor authentication is required')).not.toBeInTheDocument();
+});
+
+it('tells a required operator with no local password that setup is unavailable, not that it is optional', () => {
+    render(
+        <ProfilePage
+            {...baseProps}
+            profile={{ ...baseProps.profile, hasPassword: false }}
+            twoFactor={{ enabled: false, confirmed: false, required: true }}
+        />,
+    );
+
+    expect(
+        screen.getByText(/Two-factor setup requires a local password, and this account has none/),
+    ).toBeInTheDocument();
 });

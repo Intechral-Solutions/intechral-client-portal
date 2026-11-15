@@ -42,8 +42,9 @@ class BootstrapFirstOperator extends Command
         }
 
         $this->components->info("Created the operator account {$user->email} (id {$user->id}). They can sign in now.");
-        $this->components->warn('Operator two-factor authentication is not currently enforced.');
-        $this->line('Whether it must be remains an owner decision; the account may enable it under Profile.');
+        $this->components->warn('Operator accounts must confirm a second factor before using operator features.');
+        $this->line('They can sign in now but reach only the Profile page until they enable two-factor authentication there and confirm a code.');
+        $this->line('Create a second operator and enrol both before production use (docs/operations/operator-mfa.md).');
 
         return self::SUCCESS;
     }

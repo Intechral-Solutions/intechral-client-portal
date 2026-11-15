@@ -17,7 +17,7 @@ Each row was checked against the code on `8363a6b`, not against the records.
 | 6 | `PermissionCacheEpoch::current()` first-use defect (defect record) | **Open.** Reproduced against the unfixed code | **Fixed** (4) |
 | 7 | Preload permissions before transactional ticket creation (R1-3 20.9) | Assessed | **Not needed after 6; not adopted** (4.2) |
 | 8 | ID-token `nonce` (SSO record 11) | Open, **not exploitable alone**: `state` and PKCE already bind the request; the signed token is validated for signature, issuer, audience, tenant and expiry | **Accepted residual** (7) |
-| 9 | Operator MFA enforcement | Not enforced anywhere | **Approved as a separate pre-RC1 package** (5, owner rulings) |
+| 9 | Operator MFA enforcement | Not enforced anywhere | **Approved as a separate pre-RC1 package** (5, owner rulings). **Implemented in the operator-MFA package:** [architecture](../architecture/operator-mfa.md), [runbook](../operations/operator-mfa.md) |
 | 10 | Invitation-page `Referrer-Policy`, token URLs in access logs, exception-argument redaction, client IP and trusted proxies, `innodb_snapshot_isolation`, live Google and Microsoft verification, production mail and queue | Cannot be closed in application code | **Host checklist** (6) |
 
 ## 2. SSO and authentication
