@@ -1065,25 +1065,15 @@ foreach (['role permissions', 'built-in synchronization creating a permission'] 
                 // holds, or the epoch row H created). What is asserted is that nothing deadlocked, timed out or retried, and the end state.
                 expect($run['running']['I'])->toBeTrue('the re-issue did not wait for the hook that holds the invitation or the epoch row');
 
-                // PRE-EXISTING DEFECT (not part of R1-3A; recorded in docs/product/release-1.0-defect-permission-cache-epoch-first-use.md): with the epoch
-                // row ABSENT, a transaction whose snapshot began before another transaction created the row cannot read it after its own
-                // insert-or-ignore, and PermissionCacheEpoch::current() throws. Here T is that transaction and the hook is the one that created the
-                // row. It is a RuntimeException in T alone (no lock-order problem: nothing deadlocked, timed out or retried), and it is the ONLY
-                // tolerated deviation from `ok`, for T, with the epoch row missing.
-                $known = fn (string $name, array $result) => $epoch === 'missing' && $name === 'T'
-                    && ($result['outcome'] ?? '') === 'error:RuntimeException' && ($result['detail'] ?? '') === 'The permission cache epoch could not be created.';
-
+                // The first-use defect of PermissionCacheEpoch::current() (docs/product/release-1.0-defect-permission-cache-epoch-first-use.md) is
+                // fixed: a transaction whose snapshot predates another transaction's creation of the epoch row now decides from its own snapshot
+                // (an ephemeral token) instead of throwing. EVERY worker must finish ok, with the epoch row present or missing.
                 foreach ($run['results'] as $name => $result) {
-                    if ($known($name, $result)) {
-                        expect($result['transactions'])->toBeLessThanOrEqual(1);
-
-                        continue;
-                    }
                     oicAssertNoVictim($name, $result);
                     expect($result['outcome'])->toBe('ok', "worker {$name}: ".($result['detail'] ?? ''));
                 }
 
-                expect(DB::table('tickets')->count())->toBe($known('T', $run['results']['T']) ? 0 : 1)
+                expect(DB::table('tickets')->count())->toBe(1)
                     ->and(DB::table('organization_invitations')->where('email', 'b1@oinv.test')->whereNull('revoked_at')->whereNull('accepted_at')->count())->toBe(1)
                     ->and(oicRow($old)->revoked_at)->not->toBeNull();
             } finally {

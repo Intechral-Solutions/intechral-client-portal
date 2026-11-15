@@ -305,9 +305,10 @@ describe('SSO', function () {
         Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'provider-123', 'name' => 'Provider Person', 'email' => 'p@example.com']));
     });
 
-    it('refuses a suspended account with the unlinked-identity answer, and leaves its stored token alone', function () {
+    it('refuses a suspended account with the unlinked-identity answer, and leaves its identity row alone', function () {
         $user = User::factory()->create(['password' => null]);
-        $account = SocialAccount::create(['user_id' => $user->id, 'provider' => 'google', 'provider_id' => 'provider-123', 'token' => 'stored']);
+        $account = SocialAccount::create(['user_id' => $user->id, 'provider' => 'google', 'provider_id' => 'provider-123']);
+        $before = $account->fresh()->getAttributes();
         suspendAccount($user);
 
         $context = ['intent' => 'login', 'provider' => 'google', 'initiatingUserId' => null, 'invitationHash' => null, 'startedAt' => now()->toIso8601String()];
@@ -318,7 +319,7 @@ describe('SSO', function () {
             ->assertSessionHasErrors(['email' => 'That provider account is not linked to a portal account.']);
 
         $this->assertGuest();
-        expect($account->fresh()->token)->toBe('stored');
+        expect($account->fresh()->getAttributes())->toBe($before);
     });
 
     it('still signs in the same linked account once it is reactivated', function () {

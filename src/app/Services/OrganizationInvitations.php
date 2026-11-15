@@ -433,9 +433,6 @@ final class OrganizationInvitations
                     'user_id' => $user->id,
                     'provider' => $acceptance->provider,
                     'provider_id' => $acceptance->identity['provider_id'],
-                    'token' => $acceptance->identity['token'],
-                    'refresh_token' => $acceptance->identity['refresh_token'],
-                    'token_expires_at' => $acceptance->identity['token_expires_at'],
                 ]);
             } else {
                 PasswordHistory::create(['user_id' => $user->id, 'password' => $user->password, 'created_at' => $now]);

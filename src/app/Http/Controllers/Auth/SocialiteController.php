@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Auth\Sso\ProviderIdentity;
+use App\Auth\Sso\SsoFreshness;
 use App\Auth\Sso\SsoProviders;
 use App\Exceptions\OrganizationInvitationException;
 use App\Http\Controllers\Auth\Concerns\WithholdsQueryDetails;
@@ -17,7 +18,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Fortify\Fortify;
-use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
 
@@ -98,6 +98,11 @@ class SocialiteController extends Controller
         } elseif (! SsoProviders::configured($provider)) {
             return $this->providerUnavailable($request, $provider);
         } elseif ($request->user()) {
+            // Linking adds a second, durable way into the account: it needs a RECENT authentication, not just a signed-in session.
+            if (! SsoFreshness::isFresh($request)) {
+                return $this->reauthenticationRequired($request);
+            }
+
             $context = [
                 'intent' => 'link',
                 'provider' => $provider,
@@ -158,13 +163,13 @@ class SocialiteController extends Controller
         }
 
         return match ($context['intent']) {
-            'login' => $this->login($request, $provider, $identity, $socialUser),
-            'link' => $this->link($request, $provider, $identity, $socialUser, $context['initiatingUserId']),
-            'invitation' => $this->registerViaInvitation($request, $provider, $identity, $socialUser, $context['invitationHash']),
+            'login' => $this->login($request, $provider, $identity),
+            'link' => $this->link($request, $provider, $identity, $context['initiatingUserId']),
+            'invitation' => $this->registerViaInvitation($request, $provider, $identity, $context['invitationHash']),
         };
     }
 
-    private function login(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser): RedirectResponse
+    private function login(Request $request, string $provider, ProviderIdentity $identity): RedirectResponse
     {
         $account = SocialAccount::query()
             ->where('provider', $provider)
@@ -182,12 +187,10 @@ class SocialiteController extends Controller
                 ->with('error', 'That provider account is not linked to a portal account.');
         }
 
-        $this->updateToken($account, $socialUser);
-
         return $this->signIn($request, $account->user);
     }
 
-    private function link(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser, int $initiatingUserId): RedirectResponse
+    private function link(Request $request, string $provider, ProviderIdentity $identity, int $initiatingUserId): RedirectResponse
     {
         $user = $request->user();
 
@@ -209,8 +212,6 @@ class SocialiteController extends Controller
                     ->with('error', 'That provider account is already connected elsewhere.');
             }
 
-            $this->updateToken($existing, $socialUser);
-
             return redirect()->route('profile.show')->with('status', ucfirst($provider).' account connected.');
         }
 
@@ -224,7 +225,6 @@ class SocialiteController extends Controller
             $user->socialAccounts()->create([
                 'provider' => $provider,
                 'provider_id' => $identity->subject,
-                ...$this->tokenAttributes($socialUser),
             ]);
         } catch (QueryException) {
             report(new \RuntimeException(
@@ -245,7 +245,7 @@ class SocialiteController extends Controller
      * the account, the `user` role, the linked identity and the ordinary membership atomically. A refusal writes nothing and leaves the
      * invitation as it was.
      */
-    private function registerViaInvitation(Request $request, string $provider, ProviderIdentity $identity, SocialiteUser $socialUser, string $invitationHash): RedirectResponse
+    private function registerViaInvitation(Request $request, string $provider, ProviderIdentity $identity, string $invitationHash): RedirectResponse
     {
         // Verified-email enforcement, failing closed: the provider must have asserted, in the claim it is documented to use, that it verified this
         // address (ProviderIdentity). No evidence, an ambiguous value or no address at all stops here, before the invitation is read, and writes
@@ -258,7 +258,6 @@ class SocialiteController extends Controller
             'name' => $identity->name,
             'email' => $identity->verifiedEmail,
             'provider_id' => $identity->subject,
-            ...$this->tokenAttributes($socialUser),
         ]);
 
         try {
@@ -288,13 +287,19 @@ class SocialiteController extends Controller
     {
         $request->session()->regenerate(destroy: true);
 
+        // Note that the provider authenticated this user. It becomes the fresh-authentication proof (see SsoFreshness) only when this user is
+        // actually signed in, which for a confirmed second factor is after the challenge.
+        SsoFreshness::begin($request, (int) $user->getKey());
+
         if (filled($user->two_factor_secret) && ! (Fortify::confirmsTwoFactorAuthentication() && is_null($user->two_factor_confirmed_at))) {
-            $request->session()->put(['login.id' => $user->getKey(), 'login.remember' => true]);
+            // Not remembered: a provider sign-in no longer outlives the session (pre-RC1 hardening). A person who wants a long-lived browser
+            // uses the password form, where "remember me" is a visible choice.
+            $request->session()->put(['login.id' => $user->getKey(), 'login.remember' => false]);
 
             return redirect()->route('two-factor.login');
         }
 
-        Auth::login($user, remember: true);
+        Auth::login($user, remember: false);
 
         return redirect()->intended(route('dashboard'));
     }
@@ -340,9 +345,11 @@ class SocialiteController extends Controller
         return match ($context['intent'] ?? null) {
             'login' => ($context['initiatingUserId'] ?? null) === null
                 && ($context['invitationHash'] ?? null) === null,
+            // A link started and abandoned cannot be completed long afterwards (the start required a recent authentication).
             'link' => isset($context['initiatingUserId'])
                 && is_int($context['initiatingUserId'])
-                && ($context['invitationHash'] ?? null) === null,
+                && ($context['invitationHash'] ?? null) === null
+                && $this->freshEnough($startedAt),
             'invitation' => ($context['initiatingUserId'] ?? null) === null
                 && is_string($context['invitationHash'] ?? null)
                 && preg_match('/\A[0-9a-f]{64}\z/', $context['invitationHash']) === 1
@@ -379,20 +386,26 @@ class SocialiteController extends Controller
             ->with('error', 'Authentication via '.ucfirst($provider).' failed. Please try again.');
     }
 
-    private function updateToken(SocialAccount $account, SocialiteUser $socialUser): void
+    /**
+     * Where a link start ends when the session has not authenticated recently. A password account confirms its password on the existing
+     * confirmation page (which returns to the profile, where "Connect" is chosen again: an in-page redirect chain through a provider cannot
+     * follow an Inertia form post). An account without a password has no password to confirm, so it signs in again with its provider.
+     */
+    private function reauthenticationRequired(Request $request): RedirectResponse
     {
-        $account->update($this->tokenAttributes($socialUser));
-    }
+        if (filled($request->user()->password)) {
+            $message = 'Confirm your password to connect a sign-in provider, then choose Connect again.';
 
-    /** @return array{token: ?string, refresh_token: ?string, token_expires_at: mixed} */
-    private function tokenAttributes(SocialiteUser $socialUser): array
-    {
-        $expiresIn = property_exists($socialUser, 'expiresIn') ? $socialUser->expiresIn : null;
+            // Straight to the confirmation page (the profile's own helper redirects once more and would lose the flash), returning to the profile.
+            $request->session()->put('url.intended', route('profile.show'));
 
-        return [
-            'token' => property_exists($socialUser, 'token') ? $socialUser->token : null,
-            'refresh_token' => property_exists($socialUser, 'refreshToken') ? $socialUser->refreshToken : null,
-            'token_expires_at' => $expiresIn !== null ? now()->addSeconds((int) $expiresIn) : null,
-        ];
+            return redirect()->route('password.confirm')->with('status', $message);
+        }
+
+        $message = 'For your security, sign out and sign in again with your connected provider, then choose Connect within five minutes.';
+
+        return redirect()->route('profile.show')
+            ->withErrors(['provider' => $message])
+            ->with('error', $message);
     }
 }

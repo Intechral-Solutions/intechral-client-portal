@@ -163,7 +163,7 @@ describe('throttling', function () {
         $this->get(route('invitation.show', 'not-a-token'))->assertOk();
     });
 
-    it('limits the SSO initiation only when it carries an invitation; ordinary SSO login is never limited by it', function () {
+    it('limits the invitation SSO initiation on its own budget: an ordinary login start is not counted against it, and has its own', function () {
         Socialite::fake('google', SocialiteUser::fake(['email_verified' => true, 'id' => 'x', 'email' => 'x@example.test']));
 
         for ($i = 0; $i < 30; $i++) {
@@ -172,10 +172,12 @@ describe('throttling', function () {
 
         credAssertProtected($this->get(route('sso.redirect', ['provider' => 'google', 'invitation' => 'dead']))->assertStatus(429));
 
-        // The same client address can still start an ordinary login, as many times as it likes.
-        for ($i = 0; $i < 40; $i++) {
+        // The same client address still has its whole, separate budget for an ordinary login start (SsoThrottle: 30 a minute per address).
+        for ($i = 0; $i < 30; $i++) {
             $this->get(route('sso.redirect', 'google'))->assertRedirect('https://socialite.fake/google/authorize');
         }
+
+        $this->get(route('sso.redirect', 'google'))->assertStatus(429);
     });
 
     it('keys the limiters on the client address alone: many different tokens from one address share ONE budget, and none of them is named in a cache key', function () {

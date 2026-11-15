@@ -247,7 +247,7 @@ describe('customer SSO in pilot mode', function () {
         $this->actingAs($customer)->get(route('profile.show'))->assertInertia(fn ($page) => $page
             ->where('connectedAccounts', [['provider' => 'google', 'connected' => false], ['provider' => 'microsoft', 'connected' => false]]));
 
-        $this->actingAs($customer)->get(route('sso.redirect', 'microsoft'))->assertRedirect('https://socialite.fake/microsoft/authorize');
+        $this->actingAs($customer)->withSession(['auth.password_confirmed_at' => time()])->get(route('sso.redirect', 'microsoft'))->assertRedirect('https://socialite.fake/microsoft/authorize');
         $this->actingAs($customer)->withSession(['oauth_context' => ssoCtx('link', 'microsoft', ['initiatingUserId' => $customer->id])])
             ->get(route('sso.callback', 'microsoft'))
             ->assertRedirect(route('profile.show'));
