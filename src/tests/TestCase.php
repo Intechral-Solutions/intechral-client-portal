@@ -44,6 +44,11 @@ abstract class TestCase extends BaseTestCase
         // change on either path). Session GC is framework behaviour no test here depends on, so it is
         // off for every test; the session read and write queries still count, equally, in both shapes.
         config(['session.lottery' => [0, 100]]);
+
+        // Release 1.0: operator second-factor enforcement is unconditional everywhere except under APP_ENV=testing (OperatorMfaGate::enforced()),
+        // where it is off by default so a suite about some other operator feature need not enrol an operator. tests/Feature/Auth/OperatorMfa*
+        // switch it back on, and a mutation guard there proves the switch is ignored in any other environment.
+        config(['operator_mfa.enforced' => false]);
     }
 
     /**

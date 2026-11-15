@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Shared\Mfa\OperatorMfaGate;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -46,6 +47,16 @@ class User extends Authenticatable
     public function isSuspended(): bool
     {
         return $this->disabled_at !== null;
+    }
+
+    /**
+     * Has this account COMPLETED two-factor enrolment? A stored secret AND a confirmation time: a secret whose code was never entered is an
+     * enrolment in progress and counts for nothing (the same test Fortify applies when deciding whether to challenge a sign-in). The operator
+     * boundary ({@see OperatorMfaGate}) keys on this.
+     */
+    public function hasConfirmedTwoFactor(): bool
+    {
+        return filled($this->two_factor_secret) && $this->two_factor_confirmed_at !== null;
     }
 
     /**

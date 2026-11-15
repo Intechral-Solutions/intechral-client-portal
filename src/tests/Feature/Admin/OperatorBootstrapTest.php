@@ -51,8 +51,8 @@ it('creates the first operator of a new installation, who then administers accou
 
     [$command] = bootstrapOperator();
     $command->expectsOutputToContain('Created the operator account first.operator@example.com')
-        ->expectsOutputToContain('is not currently enforced')
-        ->expectsOutputToContain('remains an owner decision')
+        ->expectsOutputToContain('must confirm a second factor')
+        ->expectsOutputToContain('docs/operations/operator-mfa.md')
         ->assertExitCode(0)->run();
 
     $user = User::where('email', 'first.operator@example.com')->sole();
@@ -61,7 +61,7 @@ it('creates the first operator of a new installation, who then administers accou
         ->and($user->getDirectPermissions())->toHaveCount(0)
         ->and($user->isSuspended())->toBeFalse()
         ->and(Hash::check(BOOTSTRAP_PASSWORD, $user->password))->toBeTrue()
-        ->and($user->two_factor_secret)->toBeNull('two-factor authentication is not enforced for operators; whether it must be is an open owner decision')
+        ->and($user->two_factor_secret)->toBeNull('the bootstrap creates no second factor; the operator enrols it themselves, and is limited to the profile until they do')
         ->and(app(AccountAdministrators::class)->ids()->all())->toBe([$user->id])
         ->and(Activity::where('description', 'bootstrapped first operator')->sole()->properties['email'])->toBe('first.operator@example.com');
 

@@ -51,6 +51,8 @@ type ProfileData = {
 type TwoFactorState = {
     enabled: boolean;
     confirmed: boolean;
+    /** An operator account that has not yet confirmed a second factor: privileged features are unavailable until it does. */
+    required: boolean;
 };
 
 type ConnectedAccount = {
@@ -723,12 +725,23 @@ function ProfilePage({ profile, twoFactor, connectedAccounts, sessions }: Profil
                     title="Two-factor authentication"
                     description="Add an authenticator app as an extra sign-in check."
                 >
+                    {twoFactor.required ? (
+                        <Alert variant="warning" className="mb-5 max-w-xl">
+                            <p className="font-medium">Two-factor authentication is required</p>
+                            <p className="mt-1">
+                                Operator accounts must confirm a second factor before using operator
+                                features. Until you confirm an authentication code below, every
+                                other page returns here.
+                            </p>
+                        </Alert>
+                    ) : null}
                     {profile.hasPassword ? (
                         <TwoFactorSection state={twoFactor} />
                     ) : (
                         <Alert className="max-w-xl">
-                            Two-factor setup changes require a local password, which is not
-                            configured for this account.
+                            {twoFactor.required
+                                ? 'Two-factor setup requires a local password, and this account has none, so it cannot be set up here. Contact the portal owner.'
+                                : 'Two-factor setup changes require a local password, which is not configured for this account.'}
                         </Alert>
                     )}
                 </SectionPanel>

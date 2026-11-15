@@ -17,6 +17,7 @@ use App\Policies\OrganizationPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
+use App\Shared\Mfa\RevokeOtherSessionsOnConfirmation;
 use App\Support\Database\MigrationProfileGuard;
 use App\Support\InvitationIssueThrottle;
 use App\Support\PartnerSupportCreateThrottle;
@@ -47,6 +48,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Socialite\Facades\Socialite;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -87,6 +89,9 @@ class AppServiceProvider extends ServiceProvider
         // Release 1.0 pre-RC1: a provider authentication that completes (directly or after the two-factor challenge) becomes the fresh-authentication
         // proof the provider-link start asks for. See SsoFreshness.
         Event::listen(Login::class, [SsoFreshness::class, 'recordLogin']);
+
+        // Release 1.0 (operator MFA): an account's other sessions end when it confirms a second factor (RevokeOtherSessionsOnConfirmation).
+        Event::listen(TwoFactorAuthenticationConfirmed::class, RevokeOtherSessionsOnConfirmation::class);
 
         // Release 0.9 (R0.9 WP3): in production a migration neither starts nor is reported complete on a database that does
         // not match the supported profile (InnoDB, UTC session, strict mode, utf8mb4). docs/architecture/database-profile.md.

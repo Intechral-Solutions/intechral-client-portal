@@ -10,6 +10,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Fortify\Fortify;
 
 /**
  * Seeds development-only test accounts.
@@ -17,8 +18,31 @@ use Illuminate\Support\Facades\Hash;
  */
 class DevSeeder extends Seeder
 {
+    /**
+     * Release 1.0: an account holding `portal.operator` must have a CONFIRMED second factor to use anything but its profile, so the seeded operator
+     * personas carry one, with this fixed DEVELOPMENT secret, and the browser suite answers the challenge with it (tests/Browser/support/totp.ts, which
+     * must hold the same value; tests/Unit/DevSeederTotpParityTest.php pins that). It protects nothing outside the seeded test database.
+     */
+    public const E2E_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+
+    /** Confirm a second factor for a seeded operator persona (idempotent: re-seeding restores it). */
+    private function confirmSecondFactor(User $user): void
+    {
+        $user->forceFill([
+            'two_factor_secret' => Fortify::currentEncrypter()->encrypt(self::E2E_TOTP_SECRET),
+            'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode(['e2e-recovery-1', 'e2e-recovery-2'])),
+            'two_factor_confirmed_at' => $user->two_factor_confirmed_at ?? now(),
+        ])->save();
+    }
+
     public function run(): void
     {
+        // Known passwords and (since Release 1.0) a published TOTP secret: never outside a disposable environment, even when invoked directly with
+        // `db:seed --class=DevSeeder` (DatabaseSeeder's own guard is bypassed that way).
+        if (! app()->environment('local', 'testing')) {
+            throw new \RuntimeException('DevSeeder seeds accounts with published credentials and runs only in the local and testing environments.');
+        }
+
         // Platform operator account
         $operator = User::firstOrCreate(
             ['email' => 'operator@intechral.test'],
@@ -29,6 +53,7 @@ class DevSeeder extends Seeder
             ]
         );
         $operator->assignRole('operator');
+        $this->confirmSecondFactor($operator);
 
         // Platform user account
         $user = User::firstOrCreate(
@@ -85,6 +110,7 @@ class DevSeeder extends Seeder
             ]
         );
         $signOut->assignRole('operator');
+        $this->confirmSecondFactor($signOut);
 
         // EPIC-017 WP1 personas for the Focused customer shell (docs/testing/e2e-browser-suite.md).
         // All three are real accounts that sign in through the login form, and all are `firstOrCreate`

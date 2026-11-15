@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Exceptions\BuiltInRoleException;
 use App\Exceptions\LastAccountAdministratorException;
+use App\Exceptions\PasswordlessOperatorException;
 use App\Models\User;
 use App\Shared\Permissions\BuiltInRoles;
+use App\Shared\Permissions\PermissionCatalogue;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
@@ -38,12 +40,13 @@ final class AccessGrants
      * @param  User|null  $actor  who made the change, recorded on the invitations it revokes (R1-3A)
      *
      * @throws LastAccountAdministratorException
+     * @throws PasswordlessOperatorException
      */
     public function syncUserRoles(User $user, array $roles, ?User $actor = null): void
     {
         $this->administrators->guard(fn () => $this->invitations->reconcileIssuers(
             [(int) $user->getKey()],
-            fn () => $user->syncRoles($roles),
+            fn () => $this->withoutNewPasswordlessOperators([(int) $user->getKey()], fn () => $user->syncRoles($roles)),
             OrganizationInvitations::SOURCE_USER_ROLES,
             $actor,
         ));
@@ -54,6 +57,7 @@ final class AccessGrants
      *
      * @throws BuiltInRoleException
      * @throws LastAccountAdministratorException
+     * @throws PasswordlessOperatorException
      */
     public function syncRolePermissions(Role $role, array $permissions, ?User $actor = null): void
     {
@@ -65,13 +69,84 @@ final class AccessGrants
         // (reconcileIssuers() documents the sequence).
         $this->administrators->guard(fn () => $this->invitations->reconcileIssuers(
             null,
-            fn () => $role->syncPermissions($permissions),
+            fn () => $this->withoutNewPasswordlessOperators($this->holderIds($role), fn () => $role->syncPermissions($permissions)),
             OrganizationInvitations::SOURCE_ROLE_PERMISSIONS,
             $actor,
             fenceCache: true,
         ));
 
         $this->forgetCachedPermissionsAfterCommit();
+    }
+
+    /**
+     * Run a grant mutation and refuse it (the caller's transaction rolls back) if it makes an account WITHOUT a local password operator-eligible
+     * (`portal.operator`) among `$userIds` who was not already. Release 1.0 operator MFA: see {@see PasswordlessOperatorException}.
+     *
+     * Only NEW eligibility is refused, so an unrelated edit of a role is never blocked by a passwordless operator that already existed. Read with SQL
+     * against the permission tables, never the permission cache, so it reflects what this transaction has just written.
+     *
+     * @template T
+     *
+     * @param  list<int>  $userIds
+     * @param  Closure(): T  $mutation
+     * @return T
+     *
+     * @throws PasswordlessOperatorException
+     */
+    private function withoutNewPasswordlessOperators(array $userIds, Closure $mutation): mixed
+    {
+        $before = $this->passwordlessOperatorIds($userIds);
+        $result = $mutation();
+
+        if (array_diff($this->passwordlessOperatorIds($userIds), $before) !== []) {
+            throw new PasswordlessOperatorException;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     * @return list<int> those of `$userIds` with no local password who hold `portal.operator`, directly or through a role
+     */
+    private function passwordlessOperatorIds(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        $names = [
+            'perm' => config('permission.table_names.permissions'),
+            'direct' => config('permission.table_names.model_has_permissions'),
+            'roles' => config('permission.table_names.model_has_roles'),
+            'role_perm' => config('permission.table_names.role_has_permissions'),
+        ];
+        $operator = fn ($query) => $query->select('id')->from($names['perm'])
+            ->where('name', PermissionCatalogue::PORTAL_OPERATOR)->where('guard_name', BuiltInRoles::GUARD);
+
+        return DB::table('users')
+            ->whereIn('id', $userIds)
+            ->where(fn ($query) => $query->whereNull('password')->orWhere('password', ''))
+            ->where(function ($query) use ($names, $operator) {
+                $query->whereExists(fn ($direct) => $direct->selectRaw('1')->from($names['direct'])
+                    ->whereColumn($names['direct'].'.model_id', 'users.id')->where($names['direct'].'.model_type', (new User)->getMorphClass())
+                    ->whereIn($names['direct'].'.permission_id', $operator))
+                    ->orWhereExists(fn ($viaRole) => $viaRole->selectRaw('1')->from($names['roles'])
+                        ->join($names['role_perm'], $names['role_perm'].'.role_id', '=', $names['roles'].'.role_id')
+                        ->whereColumn($names['roles'].'.model_id', 'users.id')->where($names['roles'].'.model_type', (new User)->getMorphClass())
+                        ->whereIn($names['role_perm'].'.permission_id', $operator));
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** @return list<int> the ids of every user holding the role */
+    private function holderIds(Role $role): array
+    {
+        return DB::table(config('permission.table_names.model_has_roles'))
+            ->where('role_id', $role->getKey())->where('model_type', (new User)->getMorphClass())
+            ->pluck('model_id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**
