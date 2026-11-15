@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Auth\ActiveUserProvider;
 use App\Auth\Sso\MicrosoftProvider;
+use App\Auth\Sso\SsoFreshness;
+use App\Auth\Sso\SsoThrottle;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Project;
@@ -24,7 +26,9 @@ use App\Support\Runtime\CronFailureMarker;
 use App\Support\Runtime\RuntimeChallenges;
 use App\Support\Runtime\RuntimeStartupGuard;
 use App\Support\TestDatabaseSafety;
+use App\Support\TicketReplyThrottle;
 use App\View\Composers\ShellComposer;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
@@ -79,6 +83,10 @@ class AppServiceProvider extends ServiceProvider
         // reaches a suspended user, including one queued before the suspension. docs/architecture/account-lifecycle.md.
         Auth::provider('active-eloquent', fn (Application $app, array $config) => new ActiveUserProvider($app['hash'], $config['model']));
         Event::listen(NotificationSending::class, SkipSuspendedRecipients::class);
+
+        // Release 1.0 pre-RC1: a provider authentication that completes (directly or after the two-factor challenge) becomes the fresh-authentication
+        // proof the provider-link start asks for. See SsoFreshness.
+        Event::listen(Login::class, [SsoFreshness::class, 'recordLogin']);
 
         // Release 0.9 (R0.9 WP3): in production a migration neither starts nor is reported complete on a database that does
         // not match the supported profile (InnoDB, UTC session, strict mode, utf8mb4). docs/architecture/database-profile.md.
@@ -160,6 +168,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for(InvitationIssueThrottle::NAME, InvitationIssueThrottle::limit(...));
         // Release 1.0 (R1-5): partner support raising a request for a contact mails a third party; limited per account, on that route only.
         RateLimiter::for(PartnerSupportCreateThrottle::NAME, PartnerSupportCreateThrottle::limit(...));
+        // Release 1.0 pre-RC1: one shared per-account allowance across the requester, operator and partner-support reply routes.
+        RateLimiter::for(TicketReplyThrottle::NAME, TicketReplyThrottle::limits(...));
+        // Release 1.0 pre-RC1: provider start and callback, per account when signed in (a link attempt) and per address for a guest.
+        RateLimiter::for(SsoThrottle::START, SsoThrottle::start(...));
+        RateLimiter::for(SsoThrottle::CALLBACK, SsoThrottle::callback(...));
         RateLimiter::for('invitation-sso', fn (Request $request) => $request->query->has('invitation')
             ? Limit::perMinute(30)->by((string) $request->ip())
             : Limit::none());

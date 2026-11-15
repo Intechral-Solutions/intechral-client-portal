@@ -40,10 +40,22 @@ final class PermissionCacheEpoch
 
     private const NAME = 'spatie.permission.epoch';
 
+    /** Marks a token that exists only for one load (see {@see current()}); a stored token never starts with it. */
+    public const EPHEMERAL_PREFIX = 'snapshot-';
+
     public function __construct(private readonly DatabaseManager $db) {}
 
     /**
      * The active epoch. Creates it on first use; concurrent first uses converge on one token (INSERT IGNORE).
+     *
+     * FIRST USE INSIDE A TRANSACTION (the defect recorded in docs/product/release-1.0-defect-permission-cache-epoch-first-use.md). When the row is
+     * absent and ANOTHER transaction creates and commits it first, this insert is ignored, but under REPEATABLE READ a transaction whose snapshot
+     * predates that commit cannot read the row. This used to throw. It now returns an EPHEMERAL token: unique to this call, never stored, never
+     * known to any other reader. The caller reads the mapping from the SAME snapshot (that is the state this decision is entitled to) and the
+     * library stores it under a key nobody will ever look up, so nothing stale can be served to anyone, and the decision is correct for the
+     * snapshot it runs in. The shared epoch is NOT read with a locking read instead (the obvious fix): that returns the other transaction's NEW
+     * token, which would file this snapshot's older mapping under the key every later reader trusts (a revocation would then survive), and under
+     * MariaDB's `innodb_snapshot_isolation` a locking read of a row the snapshot cannot see is an error (1020) in any case.
      *
      * @throws RuntimeException when the epoch can be neither read nor created
      */
@@ -56,7 +68,18 @@ final class PermissionCacheEpoch
 
         $this->table()->insertOrIgnore($this->row($this->newToken()));
 
-        return $this->read() ?? throw new RuntimeException('The permission cache epoch could not be created.');
+        $token = $this->read();
+        if ($token !== null) {
+            return $token;
+        }
+
+        // The row exists (the insert was ignored) but this snapshot cannot see it. Only a transaction can be in that state: an autocommit
+        // statement always sees every committed row, so there it is a genuine failure and stays one.
+        if ($this->connection()->transactionLevel() > 0) {
+            return self::EPHEMERAL_PREFIX.$this->newToken();
+        }
+
+        throw new RuntimeException('The permission cache epoch could not be created.');
     }
 
     /**

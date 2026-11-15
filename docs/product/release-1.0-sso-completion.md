@@ -34,7 +34,7 @@ Scope (owner package): finish the approved Google and Microsoft sign-in, the cus
 - Sign-in finds an account **only** by `(provider, subject)`. A provider that claims a portal user's address, verified or not, signs nobody in (test: `does not sign in the account whose address the provider claims`).
 - Invitation acceptance creates a **new** account for the **invited** address and only on a verified, equal address; an address that already has an account is the uniform "no longer available" answer; the row, not the provider, supplies the stored address.
 - Linking needs a signed-in session and a context bound to that user; an identity already connected elsewhere is refused.
-- Residual: linking asks no fresh password (a signed-in session is the proof). Recorded for the hardening package.
+- ~~Residual: linking asks no fresh password.~~ **Resolved in the [pre-RC1 hardening](./release-1.0-pre-rc1-security-hardening.md#21-fresh-authentication-before-linking):** starting a link needs a password confirmation or a provider sign-in within the last 5 minutes.
 
 ## 4. MFA decision (owner ruling needed only to **relax** it)
 
@@ -104,3 +104,9 @@ Verdict **SAFE AFTER TARGETED REMEDIATION**: no account-takeover, unauthorised-c
 - Whether operators must enrol a second factor.
 - An ID-token `nonce` (state and PKCE already bind the request).
 - Items 5 to 8 of the R1-3 preproduction list that are host checks (exception-argument redaction, proxy logs, the client-address assumption), and the reply throttle (release gate 6).
+
+## 12. Status of section 11 after the pre-RC1 hardening (2026-11-14)
+
+[Record](./release-1.0-pre-rc1-security-hardening.md). **Done:** fresh authentication before linking; provider tokens no longer stored and existing ones scrubbed (migration `2026_11_14_090000_scrub_social_account_provider_tokens`); remember-me no longer set by a provider sign-in; per-account throttles on the SSO start and callback (`SsoThrottle`); the reply throttle. **Accepted residual:** the ID-token `nonce`. **Owner decision pending:** operator MFA enrolment. **Host-only:** exception-argument redaction, proxy logs and the client-address assumption (checklist in the record, section 6).
+
+**Owner rulings (2026-11-14):** mandatory operator MFA is approved as a separate package before RC1; SSO remember-me remains disabled; the shared reply throttle (30 a minute, 300 an hour) is accepted. See the [hardening record](./release-1.0-pre-rc1-security-hardening.md#owner-rulings-2026-11-14-recorded-with-the-commit-and-pr-authorization).

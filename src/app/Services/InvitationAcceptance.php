@@ -12,7 +12,7 @@ namespace App\Services;
 final class InvitationAcceptance
 {
     /**
-     * @param  array{name: ?string, email: ?string, provider_id: string, token: ?string, refresh_token: ?string, token_expires_at: mixed}|null  $identity
+     * @param  array{name: ?string, email: ?string, provider_id: string}|null  $identity
      */
     private function __construct(
         public readonly string $name,
@@ -26,7 +26,7 @@ final class InvitationAcceptance
         return new self($name, $passwordHash, null, null);
     }
 
-    /** @param  array{name: ?string, email: ?string, provider_id: string, token: ?string, refresh_token: ?string, token_expires_at: mixed}  $identity */
+    /** @param  array{name: ?string, email: ?string, provider_id: string}  $identity */
     public static function withProvider(string $provider, array $identity): self
     {
         return new self((string) ($identity['name'] ?? ''), null, $provider, $identity);

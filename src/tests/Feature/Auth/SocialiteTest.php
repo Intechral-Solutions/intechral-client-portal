@@ -54,7 +54,8 @@ test('profile redirect stores link context bound to the current user', function 
     Socialite::fake('microsoft', fakeSocialUser());
     $user = User::factory()->create();
 
-    $this->actingAs($user)
+    // Linking asks for a recent authentication (SsoHardeningTest covers the refusals); here the password was just confirmed.
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()])
         ->get(route('sso.redirect', 'microsoft'))
         ->assertRedirect('https://socialite.fake/microsoft/authorize')
         ->assertSessionHas('oauth_context.intent', 'link')

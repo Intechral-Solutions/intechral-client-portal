@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\Sso\SsoThrottle;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\InvitationController;
@@ -36,6 +37,7 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TimeEntryController;
 use App\Support\InvitationIssueThrottle;
 use App\Support\PartnerSupportCreateThrottle;
+use App\Support\TicketReplyThrottle;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Route;
 
@@ -67,8 +69,8 @@ Route::middleware(['invitation.credential', 'guest'])->group(function () {
 // protections and its own limiter (a no-op without an `invitation` query, so ordinary SSO login is untouched). The callback carries only the
 // provider's code and state; the invitation lives in the session as a hash.
 Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
-    ->middleware(['invitation.credential:query', 'throttle:invitation-sso'])->name('sso.redirect');
-Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('sso.callback');
+    ->middleware(['invitation.credential:query', 'throttle:invitation-sso', 'throttle:'.SsoThrottle::START])->name('sso.redirect');
+Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])->middleware('throttle:'.SsoThrottle::CALLBACK)->name('sso.callback');
 
 // (The organization-less operator invitation, POST /invitations, was retired in R1-3B. Issuance is by organization, on the organization page.)
 
@@ -108,7 +110,7 @@ Route::middleware(['auth', 'can:tickets.view'])->group(function () {
 });
 
 // Ticket replies (authenticated users can reply to their own tickets)
-Route::middleware('auth')
+Route::middleware(['auth', 'throttle:'.TicketReplyThrottle::NAME])
     ->post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])
     ->name('tickets.replies.store');
 
@@ -121,7 +123,7 @@ Route::middleware(['auth', 'can:tickets.assign'])->prefix('operator')->name('ope
     Route::get('/tickets/{ticket}', [OperatorTicketController::class, 'show'])->name('show');
     Route::put('/tickets/{ticket}/status', [OperatorTicketController::class, 'updateStatus'])->name('status');
     Route::put('/tickets/{ticket}/assign', [OperatorTicketController::class, 'assign'])->name('assign');
-    Route::post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])->name('replies.store');
+    Route::post('/tickets/{ticket}/replies', [OperatorReplyController::class, 'store'])->middleware('throttle:'.TicketReplyThrottle::NAME)->name('replies.store');
 });
 
 // Partner support (Release 1.0, R1-4): designated partner staff read and publicly reply to their managed customers' requests. `auth` only: the authority is
@@ -133,7 +135,7 @@ Route::middleware('auth')->prefix('support/requests')->name('support.')->group(f
     Route::get('/create', [SupportRequestController::class, 'create'])->name('create');
     Route::post('/', [SupportRequestController::class, 'store'])->middleware('throttle:'.PartnerSupportCreateThrottle::NAME)->name('store');
     Route::get('/{ticket}', [SupportRequestController::class, 'show'])->name('show');
-    Route::post('/{ticket}/replies', [SupportRequestController::class, 'reply'])->name('replies.store');
+    Route::post('/{ticket}/replies', [SupportRequestController::class, 'reply'])->middleware('throttle:'.TicketReplyThrottle::NAME)->name('replies.store');
     Route::get('/{ticket}/attachments/{attachment}', [SupportRequestController::class, 'downloadAttachment'])->whereNumber('attachment')->name('attachment.download');
 });
 
