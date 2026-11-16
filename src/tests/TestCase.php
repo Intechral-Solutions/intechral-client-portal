@@ -2,9 +2,12 @@
 
 namespace Tests;
 
+use App\Models\User;
+use App\Shared\Mfa\OperatorMfaGate;
 use App\Support\TestDatabaseSafety;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Contracts\Auth\Authenticatable as UserContract;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Spatie\Permission\Models\Role;
@@ -49,6 +52,25 @@ abstract class TestCase extends BaseTestCase
         // where it is off by default so a suite about some other operator feature need not enrol an operator. tests/Feature/Auth/OperatorMfa*
         // switch it back on, and a mutation guard there proves the switch is ignored in any other environment.
         config(['operator_mfa.enforced' => false]);
+    }
+
+    /**
+     * `actingAs` sets the user without a sign-in, so no `Login` event stamps the session. A real session always carries the epoch it was opened
+     * under (StampSessionEpoch), so this stamps the current one, which is what a session opened just now would hold. A test about a STALE session
+     * stamps an older value explicitly with `withSession([OperatorMfaGate::SESSION_KEY => ...])` after calling this.
+     *
+     * Only while enforcement is ON (the MFA suites): the stamp is read only then, and writing to the session before the request starts it early,
+     * which makes flashed validation errors vanish between two requests in the same test (TicketDueDateOverrideTest, OperatorComposerControlsTest).
+     *
+     * @param  string|null  $guard
+     */
+    public function actingAs(UserContract $user, $guard = null)
+    {
+        parent::actingAs($user, $guard);
+
+        return $user instanceof User && OperatorMfaGate::enforced()
+            ? $this->withSession([OperatorMfaGate::SESSION_KEY => (string) $user->session_epoch])
+            : $this;
     }
 
     /**

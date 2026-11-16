@@ -87,16 +87,70 @@ their other sessions when the role is granted (runbook). It cannot prevent the i
 who has not enrolled is protected only by the first factor, and a password holder can enrol their own authenticator first. This is inherent to boundary
 enforcement without out-of-band bootstrap; the runbook says to enrol immediately and grant the operator role only to accounts that are about to enrol.
 
-**Known residual race (closure review F1, not closed in this package).** Revocation deletes the session rows that exist when it commits. A request that was
-already **in flight** when the owner confirmed can still leave a session behind: a request that creates a session writes a fresh row at the end of the
-request (a remember-me cookie that validated the OLD token just before the rotation; a password or SSO sign-in completing across the commit), and the gate
-reads only account state, so that session is then fully privileged without ever presenting a second factor. A request on an *existing* session cannot
-resurrect its row (its write is an UPDATE that matches nothing). The window is the length of one request around the confirmation, and it needs an attacker
-holding a pre-enrolment remember-me cookie (or racing the SSO callback) who polls until confirmation; an attacker holding the password can already enrol
-first (the accepted residual above). **Mitigation now:** the runbook has the owner sign out their other sessions again about a minute after confirming.
-**Robust fix, a recommended RC1 follow-up (owner decision):** a per-account session epoch, incremented in the same transaction as the remember-token
-rotation, stamped into the session on `Login` (which also fires for remember-me logins) and re-stamped on the confirming session, with the gate refusing an
-operator session whose stamp is stale.
+### 4.1 The session epoch (session and authentication hardening)
+
+The revocation above deletes rows **after** the confirmation has been saved. Fortify's confirm action saves `two_factor_confirmed_at` and only then dispatches
+`TwoFactorAuthenticationConfirmed`, which is what our listener hangs off. That leaves two gaps that revocation alone cannot close (closure review F1, and one
+found while closing it):
+
+1. **The gap between the save and the revocation.** For the length of a few statements the account is confirmed while an earlier, pre-enrolment operator
+   session still exists, and the gate reads only account state. A request on that session in that gap is fully privileged.
+2. **A request in flight across the confirmation.** A sign-in that loaded the user before the confirmation and completes after it (a remember-me cookie that
+   validated against the old token, a password or SSO sign-in) writes its session row after the revocation has run. Verified against the framework: a request
+   that had **already read** its session row can only UPDATE it, so a deleted row is not resurrected; a request that began **with no row** INSERTs one
+   (`DatabaseSessionHandler::write`, pinned by a test). That second kind is the one that survives.
+
+**Mechanism.** `users.session_epoch` is an opaque random token. `User::booted` rotates it **in the same UPDATE** that changes `two_factor_confirmed_at`, and
+a *new* confirmation rotates the remember-me token in that same statement. So there is no instant at which the account is confirmed while an earlier session
+still matches or an earlier remember-me cookie still validates; it is one row write, not a sequence. Every sign-in stamps the session with the epoch of
+**the user row that sign-in holds** (`StampSessionEpoch`, on `Login`, which fires for password, challenge, SSO, invitation and remember-me logins), and the
+session that confirms is re-stamped. `OperatorMfaGate::staleSession()` compares the stamp with the row's epoch for an operator-eligible account; on a
+mismatch `EnforceOperatorMfa` signs **that device** out (the remember-me token is not touched) and sends the person to sign in, which presents the factor.
+It is a sign-out, not the profile redirect: the profile's allow-list includes the endpoints that change the factor, and a stale session must reach none of them.
+
+Two details make "the epoch of the row that sign-in holds" true in practice. Both were found by the independent security review of this package and are tested:
+
+* **A password sign-in loads the user twice.** Fortify decides on a challenge from the first copy (`RedirectIfTwoFactorAuthenticatable`, after one password hash) and
+  `attempt()` loads and checks the user again (a second hash) before `login()`. A confirmation committing between the two takes a few hundred milliseconds of
+  window, not "a few statements". `EpochRecordingTwoFactorRedirect` (bound in `FortifyServiceProvider`) records the epoch the FIRST copy saw when it decided no
+  challenge was needed, and `StampSessionEpoch` stamps that, so a sign-in that straddles the confirmation carries the old epoch. It is consumed at `Login` and used only
+  for the same account; it can only be older than the object the sign-in holds, never newer.
+* **A stale user object could mint a remember-me token.** `login(..., remember: true)` writes a new token with `save()` on the object it holds when the account has none,
+  and queues a cookie carrying it. After a confirmation that write would overwrite the token the confirmation rotated, and the cookie would log the holder back in
+  through the remember-me path with the *current* epoch stamped. `ActiveUserProvider::updateRememberToken` therefore makes the write conditional on the account's
+  epoch still being the one the object loaded; when it has moved nothing is written and the queued cookie matches no stored token.
+
+What it guarantees, claim by claim (each has its own tests; the third is a **non-claim**):
+
+| Claim | Result |
+|---|---|
+| **Existing sessions are invalid on their next request.** | **Yes, atomically with the confirmation.** The epoch changes in the confirming UPDATE, so a pre-enrolment session is refused from that instant, with no revocation having run. |
+| **A stale in-flight request cannot restore a *privileged* session.** | **Yes for operator-eligible accounts.** The in-flight sign-in stamps the epoch of the row it loaded before the confirmation (for a password sign-in, the copy that decided no challenge was needed; see the two details above); the gate refuses it. The old remember-me cookie stops validating in the confirming UPDATE, and a stale object cannot mint a replacement token. |
+| **The row itself.** | **No.** A stale sign-in can still INSERT a session row. For an operator it is unprivileged (signed out on first use); for a **customer** it is an ordinary customer session, because the epoch is judged only for operator-eligible accounts. A customer who later becomes an operator is judged then, by the epoch they hold. |
+| **A privileged operation already in progress.** | **No.** The gate judges a request when it arrives. A request admitted before the rotation runs to completion, and nothing here interrupts it (pinned by a test so nobody assumes otherwise). It was not privileged at admission unless the account was already confirmed. |
+
+**Rollout.** The column is nullable with no default. An account that has never changed its factor keeps `NULL` and an unstamped session compares equal to it, so
+existing sessions and accounts are untouched. After a confirmation the account has an epoch and an unstamped session is stale. Accounts created or enrolled
+by a fresh seed carry an epoch from the start; the browser suite exercises both states.
+
+**Why not the alternatives.** *Binding the stamp to the remember-me token*: logout rotates that token, so signing out on one device would silently end an
+operator's other devices. *Deriving it from `two_factor_confirmed_at`*: closes gap 1 but not the remember-me part of gap 2, because the cookie stays valid until
+the listener rotates the token. *A session-store-level epoch for every account*: a broader change (every authenticated request, customers included) than the
+meaningful risk needs; not taken.
+
+**What remains.**
+
+* The unconfirmed-operator window is unchanged: someone holding only the first factor can enrol first (section 4, above).
+* A stale in-flight request can leave a customer-level session row (table above).
+* **An operator who disables their own factor is signed out on the next request** (the epoch rotates on disable, and only a confirmation re-stamps the session). It
+  fails closed; they sign in again (tested).
+* `enable` with `force` on an already-confirmed account replaces the secret without changing `two_factor_confirmed_at`, so the epoch does not rotate. That is
+  Fortify's behaviour and needs a freshly password-confirmed session; unchanged by this package.
+* A request on the *confirming* session that read the session before the re-stamp was written is stale and signs the owner out once; they sign in again. Nothing in the
+  frontend polls, so this is rare.
+* The explicit "sign out other browser sessions" button (`revokeOtherSessions`) is hygiene, not a boundary; it does not rotate the epoch. A session restored across
+  *that* action is a customer-level or already-confirmed-operator session the owner can sign out again. Not part of this residual.
+* `revokeAll` (suspension, reactivation) is not epoch-based either; a suspended account is stopped by the active-account provider, which is a different control.
 
 ## 5. Owner rulings and remaining obligations
 
@@ -113,9 +167,54 @@ Rulings (owner, 2026-11-15):
   and does not run this check: if the `operator` role's grant had drifted and a passwordless account held it, a sync would restore the grant. That fails
   closed, the account staying locked out and unable to enrol, so it affects availability, not security.)
 * **At least two independently accessible operators with confirmed MFA are required before production activation** (runbook).
-* **Throttling password-confirmation attempts is a pre-production hardening requirement**, not part of this PR. Until it lands: `/user/confirm-password`
-  (Fortify applies no limiter) is the step that precedes enrolment from a profile-limited session.
+* **Throttling password-confirmation attempts** was a pre-production requirement outside the operator-MFA PR. **Delivered in the session and authentication
+  hardening package**, section 6.
 
 Still open: nothing blocks this PR. Whether `users.roles.update` should additionally require a confirmed factor before granting the role was ruled
 **no**. Browser suite and seeds: operator personas of the dev seed and the E2E suite carry a confirmed factor with a fixed development secret (dev seed
 only).
+
+## 6. Password-verification throttle
+
+Three operations verify the **current password** of a signed-in session, and each is a place to test password guesses: Fortify's confirmation
+`POST /user/confirm-password` (`password.confirm.store`, the step in front of enrolment, recovery-code display and the profile's sensitive actions), Fortify's password
+change `PUT /user/password` (`user-password.update`) and our "sign out other sessions" `DELETE /profile/sessions` (`profile.sessions.destroy`). The last two are on the
+allow-list of an operator who has **not** confirmed a second factor, so a stolen profile-limited session could guess there as freely as at the confirmation. All three
+are now limited by `App\Auth\PasswordConfirmationThrottle` (limiter `password-confirmation`), applied by `App\Http\Middleware\ThrottlePasswordConfirmation`.
+
+* **One shared allowance per account: 5 a minute and 20 an hour**, spent across the three operations together (the limiter is keyed on the account, not the
+  route), so alternating between them does not multiply it. Never per address: the caller is signed in, so changing address gains a guesser nothing (the same convention as
+  `SsoThrottle`). A mistyped password costs one or two attempts.
+* **Every attempt that is allowed to run counts, including one that fails for another reason** (a weak new password on a password change); a refused attempt does not
+  count and does not extend the wait. **Nothing is validated, changed or deleted on a refused attempt**: a correct password presented while limited is refused exactly
+  like a wrong one, so the refusal tells a caller nothing about the password. A guest never reaches it (the `auth` middleware answers as before, and nothing is counted),
+  so it is not an account-existence oracle; a stale operator session is signed out by the second-factor boundary before the limiter and neither consumes nor learns
+  anything about the allowance; an unconfirmed operator is refused here and still refused everywhere else.
+* **Each operation keeps its own failure shape**, so no page changed: a browser or Inertia form is sent back with the message on the field and in the error bag where a
+  wrong password already appears for that operation (`password`; `updatePassword` / `current_password`; `destroySessions` / `password`: "Too many password attempts. Try
+  again in N seconds."), and a JSON caller gets 429 with `Retry-After` and the same field. Behaviour below the limit is unchanged.
+* **Why a web-group middleware keyed on the route name**, not `throttle:` on each route: two of the three routes belong to Fortify, a change made to them at boot would be
+  lost under `route:cache`, and one mechanism cannot drift between them. A test pins that every named route exists, so a rename in a Fortify upgrade cannot silently turn a
+  limit off.
+* **A burst can overrun the counter slightly.** The framework checks the windows and then hits them as separate steps, and the `database` session driver does not lock a
+  session, so parallel requests can all pass the check, up to the number of PHP workers. It bounds guessing; it is not an exact meter.
+
+**Accepted residual (owner ruling): a fixed-window limit can temporarily deny a legitimate password-confirmed operation.** It is not an account lockout: sign-in, the
+forgotten-password flow, SSO, the confirmation page and its status check, and sign-out are untouched, and only these three operations pause, for at most the remainder of the
+window (the response says how long). But the windows are fixed and the allowance is shared, so a holder of a session of the account can spend it at the start of each window, and
+the owner cannot enrol, disable a factor, view recovery codes, **change the password or sign out other sessions** until it clears. **Recovery procedure:**
+
+1. **Wait for the allowance.** The message and `Retry-After` give the time; the minute window clears in under a minute, and a full hourly burst clears within the hour.
+   This is the normal answer to a person who simply mistyped.
+2. **If a hostile session is suspected (the allowance keeps being spent), do not wait: end every session of the account.** Which tool does that depends on the account:
+   * **The account holds any second-factor state** (a confirmed factor, or an enrolment started and not finished): someone with shell access runs
+     `user:reset-two-factor <email>`. It clears the factor and signs the account out everywhere (every stored session and the remember-me token).
+   * **The account holds none** (for example an operator granted the role who has not begun enrolling, which is exactly the population the limiter protects):
+     `user:reset-two-factor` does nothing (it reports "no two-factor state" and changes nothing), so it does **not** end the session. Another administrator holding
+     `users.manage` **suspends and then reactivates the account** in the admin screens; both steps call `revokeAll`, which deletes every stored session and rotates the
+     remember-me token. (Direct deletion of the account's rows in the `sessions` table is the last resort, and is a database operation that needs the usual care.)
+     Suspending also permanently revokes the account's open organization invitations and any partner-support designation, and reactivating does not restore them:
+     reissue them afterwards.
+
+   After either, the owner signs in, the allowance is no longer being spent, and they change the password and enrol (or re-enrol).
+3. The forgotten-password flow alone does **not** end existing sessions in this application (it rotates the remember-me token only), so it is not a recovery on its own.

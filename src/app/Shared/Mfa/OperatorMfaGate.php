@@ -5,6 +5,7 @@ namespace App\Shared\Mfa;
 use App\Http\Middleware\EnforceOperatorMfa;
 use App\Models\User;
 use App\Shared\Pilot\CustomerPilotGate;
+use Illuminate\Contracts\Session\Session;
 
 /**
  * The Release 1.0 operator second-factor boundary (docs/architecture/operator-mfa.md).
@@ -69,6 +70,20 @@ final class OperatorMfaGate
 
     public const MESSAGE = 'Operator accounts must set up two-factor authentication before using operator features.';
 
+    /** The session key that carries the account's session epoch as it stood when this session was opened (or when it confirmed a factor). */
+    public const SESSION_KEY = 'operator_mfa.epoch';
+
+    /**
+     * Where a password sign-in records the epoch seen when it decided that no second factor was needed (`{id, epoch}`), so the `Login` stamp can use IT
+     * rather than the epoch of the second copy of the user that `attempt()` loads. See {@see EpochRecordingTwoFactorRedirect}.
+     */
+    public const PENDING_KEY = 'operator_mfa.login_epoch';
+
+    /** The machine-readable reason a JSON refusal of a stale operator session carries. */
+    public const STALE_CODE = 'operator_session_stale';
+
+    public const STALE_MESSAGE = 'Your session ended because this account\'s second factor changed. Sign in again.';
+
     public static function enforced(): bool
     {
         return ! app()->environment('testing') || config('operator_mfa.enforced', true) !== false;
@@ -84,6 +99,34 @@ final class OperatorMfaGate
             && self::enforced()
             && ! $user->hasConfirmedTwoFactor()
             && CustomerPilotGate::isOperator($user);
+    }
+
+    /**
+     * Was this session opened under an earlier second-factor state than the account's current one? Only an operator-eligible account is judged.
+     *
+     * The session carries the epoch it was stamped with at sign-in ({@see stampSession()}); the account row carries the current one, rotated in the
+     * same UPDATE as every change to the confirmation (User::booted). A mismatch means the session predates the account's present factor, however it
+     * came to exist: opened before enrolment, restored by a request that was in flight when the factor was confirmed (it stamps the epoch of the
+     * user row it loaded BEFORE the confirmation), or remembered across it. Such a session is signed out and must sign in again, presenting the factor.
+     *
+     * An account that has never changed its factor has a NULL epoch and an unstamped session compares equal to it, so nothing changes for it. The
+     * cheap string comparison is first; the permission lookup runs only on a mismatch.
+     *
+     * What this does NOT do: it judges a request when it ARRIVES. A request already past this check when the epoch rotates runs to completion.
+     */
+    public static function staleSession(?User $user, ?Session $session): bool
+    {
+        return $user !== null
+            && $session !== null
+            && ! hash_equals((string) $user->session_epoch, (string) $session->get(self::SESSION_KEY, ''))
+            && self::enforced()
+            && CustomerPilotGate::isOperator($user);
+    }
+
+    /** Record the epoch the session was opened under. Called on every sign-in and again on the session that confirms a factor. */
+    public static function stampSession(Session $session, User $user): void
+    {
+        $session->put(self::SESSION_KEY, (string) $user->session_epoch);
     }
 
     public static function allowsRoute(?string $routeName): bool

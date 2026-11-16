@@ -21,11 +21,15 @@ Do these **before** the release is activated, in this order. Nothing here is don
 If only one operator exists, create a second first (an authorized operator grants the role; `operator:bootstrap` is for a brand-new installation only).
 **Do not activate with a single operator:** one lost device is then the whole team locked out of the product, recoverable only by shell access.
 
-## After ANY enrolment on a live release
+## After enrolment on a live release
 
-Confirming a factor signs out the account's other sessions, but a request that was already in flight at that instant can leave a session behind (see the
-architecture note, section 4). So after **any** enrolment, including a newly granted operator or a customer who enrols before being promoted, the owner
-opens **Profile > Browser sessions** about a minute later and signs out the other sessions once more.
+Confirming a factor ends every earlier session of the account **at the instant of confirmation**: the account's session epoch and remember-me token change in the
+same database write, so an operator session opened before the confirmation, and a remembered browser, are refused on their next request and sign in again
+(architecture note, section 4.1). Nothing further is required of the owner after enrolling. The only thing it cannot stop is a request that was already running
+at that instant, which was not privileged when it started.
+
+The one case that needs a human is an account that **confirmed a factor before this release and is granted `portal.operator` afterwards**: it has no new
+confirmation, so its other sessions are not touched. Its owner opens **Profile > Browser sessions** and signs out the other sessions when the role is granted.
 
 ## Lost device and lost recovery codes
 
@@ -60,12 +64,16 @@ confirmed, a password holder can read the same setup secret. Consequences for ho
 * **Enrol operators immediately**, and grant the operator role only to an account that is about to enrol, ideally one that already holds a confirmed factor
   (as a customer, enrolling is optional and available). Treat "granted but not enrolled" as a short, supervised state.
 * After a **reset**, tell the person to enrol straight away. Confirming a factor signs out the account's other sessions and remembered browsers, which
-  ends a thief's session if they got in during the gap. **About a minute after confirming, open Profile > Browser sessions and sign out the other sessions
-  once more**: a request that was already in flight at the instant of confirmation can leave a session behind (architecture note, section 4). It does **not** stop someone who knows the password from enrolling first, nor undo a thief having
+  ends a thief's session if they got in during the gap. It does **not** stop someone who knows the password from enrolling first, nor undo a thief having
   read the setup secret of an enrolment the owner then finished. If compromise is suspected, the response is a password reset **and** `user:reset-two-factor`,
-  then a fresh enrolment.
+  then a fresh enrolment. (The forgotten-password flow alone does **not** end existing sessions in this application, only the remember-me token; changing the
+  password from a signed-in session, or `user:reset-two-factor`, does.)
 * When granting `portal.operator` to an account that **enrolled before this release**, have its owner open **Profile > Browser sessions** and sign out their
   other sessions: nothing ends them at the grant (new confirmations do, for every account).
-* The password-confirmation page (`/user/confirm-password`) and password change have no attempt limiter of their own (Fortify applies none; unchanged
-  from before). A thief with a profile-limited session could guess the password there. The first-factor password rules and breach check are the defence.
-  **A per-account limiter is a required pre-production hardening step** (owner ruling), tracked separately from this release package.
+* The three operations that check the current password (`/user/confirm-password`, the password change and "sign out other browser sessions") share one limit of 5 attempts a
+  minute and 20 an hour per account (architecture note, section 6). A person who hits it waits out the message's countdown; it never locks the account out of signing in. **It
+  can, however, be used to keep an owner out of those operations for the rest of the window** (someone holding a session of the account can spend the allowance each hour). If
+  that is suspected, do not wait: end every session of the account. For an account that holds any second-factor state (a confirmed factor or an enrolment in progress) run
+  `user:reset-two-factor`; for one that holds **none** that command does nothing, so have another `users.manage` administrator **suspend and then reactivate** the account (both
+  sign it out everywhere; suspension also revokes the account's open invitations and partner-support designation, which must be reissued). Then have the owner sign in, change the password and enrol afresh. The first-factor
+  password rules and breach check are the other defence.

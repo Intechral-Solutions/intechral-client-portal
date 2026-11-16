@@ -4,6 +4,7 @@ use App\Http\Middleware\EnforceCustomerPilotSurface;
 use App\Http\Middleware\EnforceOperatorMfa;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ProtectInvitationCredential;
+use App\Http\Middleware\ThrottlePasswordConfirmation;
 use App\Shared\Pilot\CustomerPilotGate;
 use App\Support\Runtime\CronFailureMarker;
 use App\Support\Runtime\RuntimeChallenges;
@@ -40,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             // Release 1.0: after Inertia, so its redirect is converted to a 303 for PUT/PATCH/DELETE visits (see the class).
             EnforceOperatorMfa::class,
+            // Release 1.0: limits password guesses at the three operations that verify the current password, by route name (two of the routes are the package's; see the class).
+            ThrottlePasswordConfirmation::class,
         ]);
 
         // Release 1.0 (R1-3B): response protections for requests that carry an invitation token in the URL (routes/web.php).

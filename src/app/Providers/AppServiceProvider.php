@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Auth\ActiveUserProvider;
+use App\Auth\PasswordConfirmationThrottle;
 use App\Auth\Sso\MicrosoftProvider;
 use App\Auth\Sso\SsoFreshness;
 use App\Auth\Sso\SsoThrottle;
@@ -18,6 +19,7 @@ use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
 use App\Shared\Mfa\RevokeOtherSessionsOnConfirmation;
+use App\Shared\Mfa\StampSessionEpoch;
 use App\Support\Database\MigrationProfileGuard;
 use App\Support\InvitationIssueThrottle;
 use App\Support\PartnerSupportCreateThrottle;
@@ -92,6 +94,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Release 1.0 (operator MFA): an account's other sessions end when it confirms a second factor (RevokeOtherSessionsOnConfirmation).
         Event::listen(TwoFactorAuthenticationConfirmed::class, RevokeOtherSessionsOnConfirmation::class);
+        // ...and the operator boundary judges a session by the account's session epoch, stamped at every sign-in and on the confirming session, so
+        // an earlier session is refused at the instant of confirmation, not when the revocation above gets to it (StampSessionEpoch).
+        Event::listen(Login::class, [StampSessionEpoch::class, 'onLogin']);
+        Event::listen(TwoFactorAuthenticationConfirmed::class, [StampSessionEpoch::class, 'onConfirmed']);
 
         // Release 0.9 (R0.9 WP3): in production a migration neither starts nor is reported complete on a database that does
         // not match the supported profile (InnoDB, UTC session, strict mode, utf8mb4). docs/architecture/database-profile.md.
@@ -176,6 +182,7 @@ class AppServiceProvider extends ServiceProvider
         // Release 1.0 pre-RC1: one shared per-account allowance across the requester, operator and partner-support reply routes.
         RateLimiter::for(TicketReplyThrottle::NAME, TicketReplyThrottle::limits(...));
         // Release 1.0 pre-RC1: provider start and callback, per account when signed in (a link attempt) and per address for a guest.
+        RateLimiter::for(PasswordConfirmationThrottle::NAME, PasswordConfirmationThrottle::limits(...));
         RateLimiter::for(SsoThrottle::START, SsoThrottle::start(...));
         RateLimiter::for(SsoThrottle::CALLBACK, SsoThrottle::callback(...));
         RateLimiter::for('invitation-sso', fn (Request $request) => $request->query->has('invitation')
