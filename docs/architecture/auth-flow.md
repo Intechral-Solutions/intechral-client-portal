@@ -163,3 +163,8 @@ An account holding `portal.operator` must have a **confirmed** second factor to 
 unchanged first factors; enforcement is a deny-by-default middleware at the application boundary, with no grace period and no deployed switch. A lost device and
 lost recovery codes are recovered only by the shell command `user:reset-two-factor`. Details, route coverage and owner decisions:
 [operator-mfa.md](operator-mfa.md); runbook and the two-operators-first obligation: [docs/operations/operator-mfa.md](../operations/operator-mfa.md).
+
+Two further controls sit on this boundary. A **per-account session epoch** (`users.session_epoch`, rotated in the same UPDATE as a change to the factor's
+confirmation, stamped on every sign-in) makes an operator session opened under an earlier factor state refuse on its next request, and removes the gap in which
+the revocation listener had not yet run ([operator-mfa.md section 4.1](operator-mfa.md)). **The three operations that verify the current password** (`POST /user/confirm-password`, `PUT /user/password`, `DELETE /profile/sessions`) share one limit of 5 a minute and 20
+an hour per account (`PasswordConfirmationThrottle`), each keeping its own failure shape ([operator-mfa.md section 6](operator-mfa.md)).

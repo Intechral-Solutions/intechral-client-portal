@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -31,6 +32,7 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'session_epoch',
     ];
 
     protected $casts = [
@@ -39,6 +41,29 @@ class User extends Authenticatable
         'two_factor_confirmed_at' => 'datetime',
         'disabled_at' => 'datetime',
     ];
+
+    /**
+     * Release 1.0 (session hardening): a change to the second factor's confirmation rotates the account's session epoch IN THE SAME UPDATE as the
+     * change, and a NEW confirmation also rotates the remember-me token in that update. One statement, so there is no instant at which the account
+     * is confirmed while an earlier session still matches the epoch or an earlier remember-me cookie still validates (Fortify saves the
+     * confirmation and only afterwards dispatches the event our listeners hang off). See {@see OperatorMfaGate::staleSession()}.
+     * Any Eloquent save that changes the column is covered: Fortify's confirm and disable actions, `user:reset-two-factor`, the seeders. A query-builder update or raw insert bypasses it (the
+     * rehearsal fixtures insert raw, but no earlier session exists for them).
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if (! $user->isDirty('two_factor_confirmed_at')) {
+                return;
+            }
+
+            $user->session_epoch = Str::random(40);
+
+            if ($user->two_factor_confirmed_at !== null) {
+                $user->setRememberToken(Str::random(60));
+            }
+        });
+    }
 
     /**
      * Release 0.9 (H3): a suspended account keeps its row, id, records and grants, but cannot sign in and is not
