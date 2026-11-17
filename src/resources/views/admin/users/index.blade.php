@@ -41,7 +41,7 @@
     <p class="mb-6 text-xs text-text-muted">An operator holds the portal.operator permission; every other account is a customer account.</p>
 
     {{-- Table --}}
-    <div class="overflow-x-auto rounded-lg border border-rule bg-surface">
+    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
         <table class="min-w-full divide-y divide-rule">
             <thead>
                 <tr class="bg-surface-sunken">

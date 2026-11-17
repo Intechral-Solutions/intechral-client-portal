@@ -25,7 +25,7 @@
         @endif
     </form>
 
-    <div class="rounded-lg border overflow-x-auto bg-surface border-rule">
+    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-rule-control">
