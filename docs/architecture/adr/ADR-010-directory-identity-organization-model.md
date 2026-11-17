@@ -91,7 +91,14 @@ Affiliation and membership are **not** merged, and `organization_members` is nev
 
 ### 7. Person-targeted invitations
 
-An organization invitation may name the Person it is for (`organization_invitations.crm_contact_id`, nullable, foreign key to `crm_contacts.id`, `ON DELETE RESTRICT`). Accepting such an invitation is **atomic**: the account, the membership and the Person–User link are committed together, or nothing is. A Person-targeted invitation is never completed without its link and is never downgraded to an ordinary invitation. An invitation that names no Person behaves exactly as R1-3 specifies. The acceptance contract is in the [DIR-0 record, section 8](../../product/release-1.0-dir-0-directory-identity-organization.md#8-dir-4-person-targeted-invitations).
+An organization invitation may be issued for a Person. The row records that durably (`organization_invitations.person_targeted`, set once) and references the Person while the Person exists (`crm_contact_id`, nullable, foreign key to `crm_contacts.id`, `ON DELETE RESTRICT`).
+
+- **Atomic acceptance.** The account, the membership and the Person–User link are committed together, or nothing is. A Person-targeted invitation is never completed without its link and is never downgraded to an ordinary invitation. An ordinary invitation behaves exactly as R1-3 specifies.
+- **Several organizations.** A Person may be invited to several organizations at once. Nothing is unique per Person: the only uniqueness rule is the existing one, one open invitation per organization and address, and supersession happens only within an organization and never changes the target silently.
+- **Email change.** Changing a Person's email permanently revokes that Person's open targeted invitations, explicitly and with an audit entry; restoring the address does not reactivate them. A reissue is a new credential, by a deliberate operator act.
+- **Deletion and history.** A Person cannot be deleted while linked or while an open targeted invitation names them. Historical invitations never prevent deletion: the deletion clears their reference to the Person, the rows keep everything else including `person_targeted`, and the activity log keeps who the Person was. No reference to a deleted Person is retained.
+
+The contracts, the supersession table and the recommended lock order are in the [DIR-0 record, section 8](../../product/release-1.0-dir-0-directory-identity-organization.md#8-dir-4-person-targeted-invitations).
 
 ### 8. Authority
 
@@ -130,9 +137,9 @@ Not required and not decided. The unified Organization experience is delivered o
 
 ## Consequences
 
-- **Benefit:** one Organization and one identity story for operators, with two additive columns' worth of schema and no change to any existing authorization rule, tenant scope or customer surface.
+- **Benefit:** one Organization and one identity story for operators, with two additive migrations (five columns) and no change to any existing authorization rule, tenant scope or customer surface.
 - **Benefit:** the invitation flow remains the only way an account is created, so "create a User from a Person" means *invite*; no direct account-creation path is added.
 - **Cost:** two tables continue to represent one concept, so each feature must state which record it reads, and the name is stored twice (kept equal by one writer).
 - **Cost:** the integrity invariant of decision 2 is enforced by services and a preflight check, not by the database.
 - **Cost:** a manual link is only as reliable as the operator who makes it; the interface must say so.
-- **Open:** whether and when to consolidate physically; the affiliation table; business classifications; whether a Person with invitation history may ever be deleted or archived (Release 1.0 refuses the deletion; see the DIR-0 record).
+- **Open:** whether and when to consolidate physically; the affiliation table; business classifications; archiving a Person instead of deleting one.

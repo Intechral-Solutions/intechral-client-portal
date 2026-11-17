@@ -17,12 +17,14 @@
 | R5 | A manual link needs an active operator holding `portal.operator`, `crm.manage` **and** `users.manage`; it is an audited assertion with a required reason, never "verified identity"; the three origins of a link stay distinguishable | ADR-010, decisions 5 and 8; section 7 |
 | R6 | Names and emails of Person and User stay independently authoritative | ADR-010, decision 3 |
 | R7 | Acceptance of a Person-targeted invitation is atomic: account, membership and link together, or nothing. Never completed silently without the link | section 8 |
-| R8 | Editing a Person's email invalidates their pending Person-targeted invitation, with a clear warning and a simple reissue | section 8 |
+| R8 | Editing a Person's email **permanently** invalidates their pending Person-targeted invitations, by an explicit revocation; restoring the original email does not reactivate them. A clear warning and a secure reissue | section 8 |
 | R9 | One coherent Organization experience over the existing two tables; **Directory is authoritative for the organization name**, propagated transactionally with an audit entry; a Directory profile that has a portal organization cannot be deleted | ADR-010, decisions 2 and 3; section 6 |
 | R10 | **System → Organization access** stays as an administrative index that links into the unified Organization experience. Profile repair is authorized, audited, idempotent and protected against duplicate creation | section 6 |
 | R11 | The company-specific contact structure is transitional. Do not encourage duplicate People; document the limitation and the path to multiple affiliations; do not build multi-affiliation management now | ADR-010, "Multiple affiliations" |
 | R12 | A link never grants authorization and never exposes Directory information. Membership, approval, support-designation and tenant-isolation guarantees are preserved | section 4 |
 | R13 | Physical consolidation of `crm_companies` and `organizations`, advanced CRM features and modal cross-record interfaces are **outside** the required scope | ADR-010, "Physical consolidation"; section 13 |
+| R14 | A Person may be invited to **several organizations**. There is no global limit of one pending Person-targeted invitation per Person; uniqueness, duplicate detection and supersession are defined per target organization, on the existing invitation rules | section 8 |
+| R15 | A historical invitation (accepted, revoked, expired or superseded) **never prevents deleting a Person**. Invitation and audit history is preserved without keeping a live reference to a Person who no longer exists | section 8 |
 
 Everything else in this record is the design that implements those rulings; where it goes beyond a ruling it says **Recommendation**.
 
@@ -181,7 +183,7 @@ The security-reviewed controllers, their panel-building rules ("built only for a
 | **Create a Person from a User** | Refused if the user is already linked. The form is prefilled from the account (name, email as initial values only) and the operator may choose an Organization or none. The page lists People with the same email first, as candidates to link **instead of** creating a duplicate. Creates the Person already linked, origin "created from account". Offered for any account, including an operator's, only as this explicit act |
 | **Link** | Both records exist and both are unlinked. A required reason (free text, bounded). Origin "manual". Refused while the Person has a pending Person-targeted invitation (DIR-4). Membership and affiliation are **not** consulted |
 | **Unlink** | A required reason. Clears the three columns. Changes nothing else |
-| **Delete a Person** (existing act, guarded) | Refused while the Person is linked; the operator unlinks first |
+| **Delete a Person** (existing act, guarded) | Refused while the Person is linked; the operator unlinks first. DIR-4 adds the invitation rules (section 8) |
 
 **Verification of a manual link.** The operator starts from either record and searches for the counterpart. Accounts whose address equals the Person's (decided by the database, the collation being case-insensitive) are listed first and labelled "Same email: suggestion only". A confirmation page shows both records side by side (names, emails, the account's status, roles and memberships, the Person's Organization) and marks every difference. The operator enters the reason and confirms. The link is displayed afterwards as "Linked by *operator* on *date*", never as verified.
 
@@ -213,23 +215,46 @@ The security-reviewed controllers, their panel-building rules ("built only for a
 
 **Depends on:** DIR-3 and DIR-2.
 
-**Schema (one additive migration).** `organization_invitations.crm_contact_id` (nullable, indexed, foreign key to `crm_contacts.id`, `ON DELETE RESTRICT`), added to the foreign-key manifest. No backfill: every existing invitation stays ordinary.
+**Schema (one additive migration).** On `organization_invitations`:
+
+- `person_targeted` (boolean, `NOT NULL`, default `0`): set once at issue and never changed. It is the durable fact "this invitation was issued for a Person". It survives the deletion of that Person, and it is what makes a targeted row that has lost its Person fail closed instead of looking ordinary.
+- `crm_contact_id` (nullable, indexed, foreign key to `crm_contacts.id`, `ON DELETE RESTRICT`, added to the foreign-key manifest): the **live** reference to the Person. It is set at issue and cleared only when the Person is deleted (below).
+
+No backfill: every existing invitation is ordinary (`person_targeted = 0`, no reference).
+
+*Why `RESTRICT` and not `SET NULL`.* The repository uses `SET NULL` for optional context whose loss changes nothing (`crm_contacts.crm_company_id`, `tickets.assignee_id`) and `RESTRICT` where a silent loss would change meaning (every existing foreign key of `organization_invitations`, and the user references of business records since Release 0.9). Losing the Person of an **open** invitation changes what its acceptance must do, so the database refuses it; the service clears the reference deliberately, and only on historical rows. A cascade would also take invitation-row locks after the Person row, against the lock order below.
 
 **Issue.** `OrganizationInvitations::issue` accepts an optional Person. From the Person page, "Invite to portal" is offered when the Person has an email address and is not linked. The operator confirms the **organization**: any Organization with portal access that is not disabled, defaulting to the Person's own when it qualifies (a Person with no Organization can be invited; ADR-010, "Multiple affiliations", rule 2). Authority is `manageMembership`, unchanged, with the existing issuance throttle. Under the existing locks, and then the Person row:
 
 - the Person exists, is unlinked, and its email (through the one normalizer) is the address being invited;
 - no account has the address (the existing refusal; the operator is pointed to Link, since the person already has an account);
-- **at most one pending Person-targeted invitation per Person:** any other pending one for that Person, in any organization, is revoked as superseded. A Resend keeps the Person reference.
+- the open invitation already holding this organization's slot for the address, if any, is compatible (next paragraph).
 
 The invitation row is authoritative for the address from then on. The generic Invitations card on the organization page keeps issuing ordinary invitations.
 
-**Acceptance contract.** For an invitation with no Person, nothing changes: the R1-3 path, for password and for SSO, with no Person row read. For a Person-targeted invitation, after every existing check passes and **before anything is written**, the Person row is locked and three conditions are required:
+**Several organizations, duplicates and supersession (R14).** The existing rule is the only uniqueness rule: **at most one open invitation per (organization, address)**, the slot of R1-3 (`organization_id`, `live_email`). Nothing is unique per Person.
+
+- **Across organizations: independent.** A Person may hold open targeted invitations to several organizations at once. Each is its own row and its own credential, issued, resent, revoked and expired on its own. Issuing for one organization never touches another organization's invitation.
+- **Within one organization: supersession, and the target never changes silently.** Issuing for an (organization, address) whose slot is held by an open invitation supersedes that invitation, as today, with these additions:
+
+  | Open holder | New issue | Result |
+  |---|---|---|
+  | targeted at Person P | targeted at P (a reissue from the Person) | superseded; the successor is targeted at P |
+  | targeted at Person P | names no Person (Resend, or the generic card with the same address) | superseded; **the successor inherits P**, after P is re-validated under the lock. A targeted invitation is never downgraded |
+  | ordinary | targeted at Person P | superseded; the successor is targeted at P (an explicit operator act that adds the target) |
+  | targeted at Person P | targeted at a different Person Q | **refused**, nothing changes: two People claim one address in one organization, which the operator must resolve (they are probably one person recorded twice) |
+
+- **Duplicate detection (presentation).** The Person page lists that Person's invitations by organization and state. Inviting to an organization where one is already open is offered as "Resend", not as a second invitation. When another Person has the same address, the issue form says so before the operator confirms.
+- **After one of several is accepted.** The first acceptance creates the account and the link. The Person's open invitations to other organizations can no longer be accepted, by the existing rule (the address has an account) and by the contract below (the Person is linked): each is refused like any dead link. They are **not** revoked inside the acceptance transaction (that would put other organizations' invitation rows into the most sensitive transaction of the release). The Person page and each organization's card show them as "Cannot be accepted: this person now has an account" with two actions: **Add as member** (the existing-account path, `OrganizationMembership::add`) and **Revoke**. Whether to revoke them explicitly at acceptance instead is a question for the design review (section 12).
+
+**Acceptance contract.** For an ordinary invitation (`person_targeted = 0`), nothing changes: the R1-3 path, for password and for SSO, with no Person row read. For a Person-targeted invitation, after every existing check passes (which includes "not revoked") and **before anything is written**, the Person row is locked and four conditions are required:
 
 | Condition under the lock | If false |
 |---|---|
+| The row still names its Person (`crm_contact_id` is set) | refuse: a targeted invitation without its Person is never completed as an ordinary one |
 | The Person still exists | refuse |
 | The Person is not linked to any account | refuse |
-| The Person's email still equals the invited address (R8) | refuse |
+| The Person's email still equals the invited address | refuse. This is a backstop: an email change has already revoked the invitation (below), and the comparison catches a write that bypassed the service |
 
 When they hold, one transaction creates the account, the membership and the link (origin "invitation", `user_linked_by` the issuer), and consumes the invitation. If any step fails, nothing is committed.
 
@@ -248,25 +273,75 @@ flowchart TD
 
 | Cause | Prevented at the source | At acceptance | Operator's recovery |
 |---|---|---|---|
-| Person deleted | Deleting a Person that any invitation references is refused (and the foreign key refuses a raw delete) | refused | revoke or let expire; the Person remains |
+| Person deleted | Deleting a Person is refused while an **open** targeted invitation names them; the foreign key refuses a raw delete | refused | revoke the open invitation, then delete; or keep the Person |
 | Person linked to another account meanwhile | Link and create-from-user are refused while a Person-targeted invitation is pending; issue is refused for a linked Person | refused | unlink, or revoke the invitation |
-| Person's email edited after issue | Not prevented: the edit is allowed. The edit form warns when a pending invitation exists | refused: the invited mailbox is no longer the Person's | "Reissue to the new address" on the Person page, which supersedes the old invitation |
+| Person's email edited after issue | The edit **permanently revokes** every open targeted invitation of that Person, in the same transaction, after an explicit confirmation (below) | refused: the invitation is revoked | "Reissue to the new address", per organization, on the Person page |
+| The Person accepted another organization's invitation first | Not prevented: a Person may be invited to several organizations | refused: the address has an account and the Person is linked | "Add as member" for that organization; revoke the dead invitation |
 | Person's Organization changed or removed | Not a conflict (affiliation is not identity) | proceeds | none |
 | The address already has an account | existing R1-3 refusal | refused, as today | Link the existing account |
 | Two acceptances at once | existing single-use rule | one wins | none |
 
-A refused recipient sees the same uniform page as any dead link, so nothing about the Person is disclosed; no account exists afterwards. The Person page and the invitation card show the operator the state (Pending, No longer valid: email changed, Accepted, Revoked, Expired) and the action that recovers. A Person-targeted invitation is never converted to an ordinary one.
+A refused recipient sees the same uniform page as any dead link, so nothing about the Person is disclosed; no account exists afterwards. The Person page and the invitation card show the operator the state (Pending; Accepted; Revoked, with its reason, including "the person's email changed"; Expired; Cannot be accepted: this person now has an account) and the action that recovers. A Person-targeted invitation is never converted to an ordinary one.
 
-**Recommended lock order (S9).** Issue: acting user row (shared) → organization row → invitation rows it supersedes → Person row → insert. Accept: issuer's user row (shared) → organization row → invitation row → Person row → inserts and the link update. Person delete and Person edit lock the Person row only. This extends the R1-3 global order at its end and adds no lock before an existing one. It is to be confirmed, with the R1-3 section 6.2.3 argument, by the design review below.
+**Person email change (R8): an explicit, permanent revocation.** Changing a Person's email address (compared through the one normalizer, so a change of letter case alone is not a change; clearing the address is one) while that Person has open targeted invitations:
 
-**Other changes.** `e2e:cleanup-invitees` learns the new reference (it otherwise refuses every linked invitee), removing the link and the test Person it created and nothing else. `organizations:preflight` reports Person-targeted invitations by state and fails on an accepted one whose Person is not linked to the accepting account.
+1. **Warning and confirmation.** The edit form lists the open invitations by organization and says that saving a different address permanently cancels them. The change is accepted only with an explicit confirmation, as the exceptional approval revocation is (MO-2A1).
+2. **Authority.** Revoking an invitation needs `manageMembership`. An editor who does not hold it cannot change the email of a Person with an open targeted invitation; their other edits are unaffected.
+3. **One transaction** revokes every open targeted invitation of that Person, in every organization, and writes the new address. Each row gets `revoked_at`, `revoked_by` (the editor) and a new reason, `person_email_changed`, with an audit entry on its organization, and the Person edit is audited too.
+4. **Permanent.** A revoked invitation is terminal by the existing rules: nothing reopens it. **Restoring the original address does not reactivate it**; the token stays dead.
+5. **Secure reissue.** "Reissue to the new address" on the Person page is an ordinary targeted issue: a deliberate operator act per organization, with the usual authority, throttle and validation, producing a **new** credential for the new address. Nothing is reissued automatically, so an address change alone never mails a credential anywhere.
+
+The revocation follows the pattern of the existing authority-loss hooks, not of the operator's Revoke: it writes the revocation columns and **does not write the slot** (R1-3 rule R1), so it needs no organization lock. The revoked row keeps its slot for the *old* address until the next issue for that organization and address clears it, exactly as a hook-revoked row does today.
+
+**Person deletion and invitation history (R15).**
+
+| The Person has | Deleting the Person |
+|---|---|
+| a linked account | refused; unlink first (DIR-3) |
+| an **open** targeted invitation (pending and unexpired), in any organization | refused; revoke it first. The operator is told which organizations |
+| only **historical** invitations (accepted, revoked, expired, superseded) | **allowed** |
+| no invitation | allowed, as today |
+
+On an allowed deletion, in one transaction, every historical invitation that references the Person has its `crm_contact_id` cleared and the Person is deleted, with one audit entry that lists the invitation ids. What is preserved, and where:
+
+- **On the invitation row:** everything it held before (organization, address, issuer, dates, acceptance and the accepting account, revocation and its reason) and `person_targeted`, so the row still says it was issued for a Person.
+- **In the activity log:** the entries written when a targeted invitation was issued, accepted or revoked record the Person's id and name at that time. They are immutable history, not a reference, and are unaffected by the deletion.
+- **Not kept:** a live reference from an invitation to a Person who no longer exists. The association lasts exactly as long as the Person does.
+
+An accepted invitation never blocks: its Person is linked, so the operator unlinks first; the account keeps its own "joined by invitation" provenance (`accepted_user_id`), which the deletion does not touch. An expired invitation is historical from the moment it expires; no clean-up job is needed for the Person to become deletable.
+
+**Recommended lock order (S9), for the independent design review.** The R1-3 global order is extended by one position: … → organization rows → invitation rows (ascending id) → **the Person row** → the rest. Two rules follow: *a transaction that needs both an invitation row and a Person row takes the invitation rows first*, and *a transaction that holds a Person row waits for no user, organization or invitation row afterwards*.
+
+| Transaction | Sequence |
+|---|---|
+| Issue, targeted | acting user's row (shared, first) → organization row → slot-holder row → Person row (validate) → insert |
+| Accept, targeted | issuer's row (shared, first) → organization row → invitation row → Person row (the four conditions) → inserts and the link |
+| Person email change that revokes | acting user's row (shared, first, because `revoked_by` references it; rule R3) → the Person's open targeted invitations, nominated by a plain read and locked by primary key, ascending, **with no organization lock** → Person row → re-read under the locks → revocation and the Person update |
+| Person delete | the Person's invitation rows, nominated by a plain read and locked by primary key, ascending → Person row → re-read under the locks → clear the references, delete |
+| Link, unlink, create from a User (DIR-3) | user rows (shared, ascending) → Person row; "has an open targeted invitation" is read after the Person lock |
+
+Because a targeted issue must hold the Person row before it inserts, no new targeted invitation can appear for a Person whose row is held. A Person email change or delete that finds, under its locks, an open invitation it did not lock (one issued between its plain read and its locks) releases everything and starts again, a bounded number of times, as `CrmService::deleteCompany` does.
+
+**What the design review must establish, with two real connections on MariaDB, each pair in both orders:**
+
+- that clearing `crm_contact_id`, and writing the revocation columns without the slot, takes no lock on an organization row (the mechanism R1-3 section 6.2.3 found for `live_email`), given the new index;
+- accept against Person email change; accept against Person delete; accept against manual link;
+- issue against Person email change; issue against Person delete; issue against issue for one address in one organization (the four rows of the supersession table);
+- accept in one organization against issue, and against accept, in another organization for the same Person;
+- Person email change, and Person delete, against the existing hooks that hold invitation rows (suspension of the issuer, a role or permission change, `roles:sync`);
+- that the ordinary path's statement stream is unchanged.
+
+**Other changes.** `e2e:cleanup-invitees` learns the new reference (it otherwise refuses every linked invitee), removing the link and the test Person it created and nothing else. `organizations:preflight` reports Person-targeted invitations by state, ids and counts only, and **fails** on damage: an open row marked `person_targeted` with no Person reference, and a row that references a Person without the mark.
 
 **Acceptance.**
 
 - **Ordinary path unchanged:** the existing invitation suites pass untouched, and a query-log test pins that an ordinary acceptance reads and locks no `crm_contacts` row.
 - Every row of the table above, for the password path and the SSO path; after each refusal no user, membership, social account or link row exists.
-- Two real connections, each pair in both orders: accept against Person delete, accept against manual link, accept against Person email edit, issue against issue for one Person, accept against revoke.
-- One pending Person-targeted invitation per Person; Resend keeps the Person.
+- **Several organizations:** one Person holds open invitations to two organizations; each is resent and revoked without affecting the other; accepting one leaves the other unacceptable, shown as such, and "Add as member" then gives the same account the second membership.
+- **Supersession:** each row of the supersession table, including the refused two-People case; Resend and the generic card never drop the Person.
+- **Email change:** the confirmation is required; every open targeted invitation of the Person is revoked with the reason and audited, in every organization; an editor without `manageMembership` is refused the email change only; **restoring the original address leaves the old link dead**; the reissue is a new credential to the new address; a case-only change revokes nothing.
+- **Deletion:** refused with an open invitation and when linked; allowed with only historical invitations, after which each such row has no Person reference, still has `person_targeted`, and its organization's history and the accepting account's provenance are unchanged; a raw delete of a referenced Person is refused by the database.
+- The two-connection pairs listed under the lock order, each in both orders.
 - S3 for the new account: nothing of the Person is visible to it.
 - A browser journey reading its mail from Mailpit (section 9, steps 3 to 8), and the negative path of step 12.
 
@@ -287,8 +362,9 @@ Run on a fresh install in `pilot` mode, as a browser journey and by hand at acce
 9. The customer submits a service request; it is attributed to the Organization.
 10. The operator finds the request in the queue under that Organization and opens the Organization from it.
 11. As the customer: no page, prop or mail carries Person data, and every Directory and System URL answers 404.
-12. Negative path: with a second Person, change the email after issuing. The mailed link shows the uniform unavailable page, no account exists, and "Reissue to the new address" produces a working invitation.
-13. Managed variant: designate a partner, link the Organization to it, and confirm both pages and both lists show the relationship while the partner's members gain nothing until a support designation is granted.
+12. Negative path: with a second Person, change the email after issuing, confirming the warning. The invitation shows as revoked ("the person's email changed"), the mailed link shows the uniform unavailable page and no account exists. Restoring the original address leaves that link dead. "Reissue to the new address" produces a working invitation.
+13. Several organizations: invite a third Person to two Organizations. Accepting the first creates the account and the link; the second invitation shows "Cannot be accepted: this person now has an account", and "Add as member" gives the same account its second membership. The third Person, whose invitations are now all historical, can be deleted after unlinking, and both Organizations' invitation histories are intact.
+14. Managed variant: designate a partner, link the Organization to it, and confirm both pages and both lists show the relationship while the partner's members gain nothing until a support designation is granted.
 
 ## 10. Release 1.0 gates and review gates
 
@@ -297,7 +373,7 @@ DIR-1 to DIR-4 are **prerequisites of Release 1.0**. They add to the gates in th
 | Gate | When |
 |---|---|
 | Owner authorization of each package, individually | before its first line of code |
-| Independent design review of the DIR-3 and DIR-4 contracts and lock order (sections 7 and 8) | before DIR-3 code |
+| Independent design review of the DIR-3 and DIR-4 contracts and lock order (sections 7 and 8), including the Person email-change revocation, the Person deletion sequence and the several-organizations cases | before DIR-3 code |
 | Independent security review of DIR-3, and of DIR-4 | before each is committed |
 | Hosted CI (full Pest and the browser suites) green on each pull request | before merge |
 | Section 9 scenario passes on the release candidate | before R1-8 acceptance closes |
@@ -319,10 +395,12 @@ The question for the coordinator is whether Release 1.0 needs an operator on-beh
 ## 12. Limitations, risks and open items
 
 - **One Organization per Person** until the affiliation table exists (ADR-010). A person who works with two Organizations is one Person affiliated with one of them; a second Person record for the same human cannot be linked to the same account, and no workflow asks for one.
-- **A Person that an invitation references cannot be deleted** in Release 1.0 (the foreign key is `RESTRICT` so that a pending invitation can never lose its target). A Person who was invited and never accepted therefore stays in the Directory. Archival or deletion with de-referencing is a later decision.
+- **Invitations to other organizations are not revoked when one is accepted.** They are dead by the existing rule and shown as such, with "Add as member" and "Revoke" (section 8). They stay in the Pending state until revoked or expired, and one could in principle become acceptable again within its seven days if the account's address were changed and the Person unlinked. Revoking them inside the acceptance transaction would remove that, at the cost of locking other organizations' invitation rows there. **Recommendation:** leave acceptance as specified; the design review decides.
+- **An invitation revoked by an email change keeps its slot for the old address** until the next issue for that organization and address clears it, as hook-revoked invitations already do (R1-3 rule R1). It is not open and cannot be accepted.
+- **A Person cannot be deleted while an open targeted invitation names them**; the operator revokes it first. Deletion does not revoke on the operator's behalf.
 - **A manual link is an assertion.** A wrong one grants nothing but misleads; unlinking and the audit trail are the remedy.
 - **An account holder can change their own email without re-verification** (existing behaviour, outside these packages). It is why an equal address is only ever a suggestion.
-- **The lock order of sections 7 and 8 is a recommendation** until the independent design review confirms it against the R1-3 revocation hooks.
+- **The lock order of sections 7 and 8 is a recommendation** until the independent design review confirms it against the R1-3 revocation hooks. The two sequences that take invitation rows without an organization lock (the Person email change and the Person delete) are the ones that most need its attention.
 - **Custom-role operators.** MO-1A and MO-2A1 describe the organization pages as unreachable for an operator who holds the capabilities without the `operator` role name. The scopes have tested `portal.operator` since R1-1 (`0bae7e2`), so that limit is believed obsolete; it was not re-tested here, and DIR-2 should prove the behaviour either way.
 - **Unused permissions stay assignable** (DIR-1 only labels them). Removing them is catalogue work with a `roles:sync` step and is not in scope.
 
