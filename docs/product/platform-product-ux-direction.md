@@ -201,6 +201,8 @@ The current "CRM" model (companies, contacts, organizations, and customers-as-us
 
 No database redesign is decided here. Current implementation, target model, and migration work are distinguished in [Information Architecture → Core concepts](./information-architecture.md#core-concepts).
 
+**Decided since (2026-11-17, [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md)).** The workspace keeps the name Directory and serves Intechral's external relationships; it gains CRM capabilities incrementally and is not an internal personnel system, so operators need no Person record. Person and User are independent records with an optional, explicit one-to-one link. An Organization is one concept presented over the existing directory and tenancy records, with portal access as a state of it; the two tables are not consolidated. A Person's affiliation with an Organization, an account's membership of one, and one Organization managing another are three different relationships, and only membership carries authority. Relationship classifications (customer, partner, prospect, vendor and the rest) remain the target and are not part of Release 1.0.
+
 ## Finance direction
 
 **Finance** is the locked top-level name for the business/commercial workspace.
