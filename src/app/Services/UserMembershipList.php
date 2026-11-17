@@ -2,20 +2,22 @@
 
 namespace App\Services;
 
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * The organization memberships of accounts, for System → Users and the user page (Release 1.0, DIR-1). A READ model: it never writes (the
  * only writers of `organization_members` are the membership, support-grant and promotion services), takes no lock, and reads the tables
  * directly rather than `$user->organizations`, whose tenant scope would drop rows for a viewer that is not operator-eligible.
  *
- * It carries MEMBERSHIP facts only: the organization's name and state, the member's role, the approval state and the support designation.
- * It deliberately carries no managing-relationship fact (which organization manages which, a partner flag): those are built only for an
- * actor who passes `manageRelationships` ({@see OrganizationListFacts::relationships()}, DIR-0 invariant S7). The support designation is
- * therefore reported as designated or not, and never as "in effect", because whether it is in effect depends on the organization being a
- * partner. It also carries no Directory fact (no Person, profile or note: DIR-0 invariant S3).
+ * It carries MEMBERSHIP facts only: the organization's name and state, the member's role and the approval state. It deliberately carries no
+ * managing-relationship fact (which organization manages which, a partner flag: DIR-0 invariant S7). The partner-support designation is
+ * membership ADMINISTRATION data and is read only for a viewer who passes `manageMembership` ({@see forUser()}), never selected for anyone
+ * else, and reported as designated or not, never as "in effect" (which depends on the organization being a partner). It also carries no
+ * Directory fact (no Person, profile or note: DIR-0 invariant S3).
  *
  * Both entry points are bounded: one query for a page of accounts, one for a single account.
  */
@@ -67,16 +69,25 @@ final class UserMembershipList
     }
 
     /**
-     * Every membership of one account with the states the user page words: approval, support designation and whether the organization is
-     * disabled. An approval is "in effect" exactly when {@see UserMembershipList::inEffect()} says so, the same rule the organization page
-     * applies to its member rows (an approved administrator that is active and not an operator).
+     * Every membership of one account with the states the user page words: approval and whether the organization is disabled, and, ONLY
+     * for a viewer who passes `manageMembership`, the partner-support designation. An approval is "in effect" exactly when
+     * {@see UserMembershipList::inEffect()} says so, the same rule the organization page applies to its member rows (an approved
+     * administrator that is active and not an operator).
+     *
+     * The designation is membership-administration data (the organization page shows it only to an actor who may manage membership), and a
+     * designation exists only on a member of a partner, so it would tell a plain `users.view` viewer which organizations are partners
+     * (a managing-relationship fact, DIR-0 invariant S7). It is therefore not selected at all for any other viewer: the columns are not
+     * in the query and `support` is null on every row, so there is nothing for the view to hide. A null `support` therefore means "not designated" OR "not
+     * authorized to know": a caller must never render it as an assertion that no support applies, only render a designation when one is present. The check is here, not only in the
+     * controller, so a new caller cannot forget it.
      *
      * @return Collection<int, object>
      */
-    public static function forUser(User $user): Collection
+    public static function forUser(User $user, User $viewer): Collection
     {
         $operator = OrganizationAuthority::isOperator((int) $user->getKey());
         $suspended = $user->isSuspended();
+        $withSupport = Gate::forUser($viewer)->allows('manageMembership', Organization::class);
 
         return DB::table('organization_members as m')
             ->join('organizations as o', 'o.id', '=', 'm.organization_id')
@@ -84,9 +95,10 @@ final class UserMembershipList
             ->orderBy('o.name')->orderBy('o.id')
             ->get([
                 'o.id as organization_id', 'o.name', 'o.disabled_at as organization_disabled_at', 'm.role',
-                'm.admin_approved_at', 'm.admin_approved_by', 'm.support_granted_at', 'm.support_granted_by',
+                'm.admin_approved_at', 'm.admin_approved_by',
+                ...($withSupport ? ['m.support_granted_at', 'm.support_granted_by'] : []),
             ])
-            ->map(function (object $row) use ($operator, $suspended): object {
+            ->map(function (object $row) use ($operator, $suspended, $withSupport): object {
                 $record = OrganizationAuthority::approvalRecord($row->admin_approved_at, $row->admin_approved_by);
 
                 $row->organization_disabled = $row->organization_disabled_at !== null;
@@ -97,7 +109,7 @@ final class UserMembershipList
                     $record !== OrganizationAuthority::APPROVAL_NONE => self::IGNORED,
                     default => null,
                 };
-                $row->support = match (true) {
+                $row->support = ! $withSupport ? null : match (true) {
                     $row->support_granted_at !== null && $row->support_granted_by !== null => self::SUPPORT_DESIGNATED,
                     $row->support_granted_at !== null || $row->support_granted_by !== null => self::SUPPORT_INCOMPLETE,
                     default => null,

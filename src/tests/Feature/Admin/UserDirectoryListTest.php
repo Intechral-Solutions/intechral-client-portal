@@ -12,6 +12,7 @@
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\UserMembershipList;
 use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
@@ -263,6 +264,74 @@ it('lists an account\'s memberships with role, approval and support designation,
     // Read-only: the section offers no control of its own.
     $section = explode('Recent Activity', explode('id="user-memberships-heading"', $page->getContent())[1])[0];
     expect($section)->not->toContain('<form')->not->toContain('<button')->not->toContain('<input');
+});
+
+/** A subject with two memberships carrying a complete and a half-written support designation, plus an ordinary approved administrator. */
+function dir1SubjectWithSupport(User $approver): User
+{
+    $partner = Organization::factory()->create(['name' => 'Support Partner Org']);
+    $half = Organization::factory()->create(['name' => 'Half Support Org']);
+    $plain = Organization::factory()->create(['name' => 'Ordinary Org']);
+    $subject = dir1Customer('Support Subject');
+
+    dir1Membership($subject, $partner, 'admin', ['admin_approved_at' => now(), 'admin_approved_by' => $approver->id, 'support_granted_at' => now(), 'support_granted_by' => $approver->id]);
+    dir1Membership($subject, $half, 'member', ['support_granted_at' => now()]);
+    dir1Membership($subject, $plain, 'member');
+
+    return $subject;
+}
+
+it('shows the support designation only to a viewer who passes manageMembership, and never reads it for anyone else', function (string $viewerKind, bool $sees) {
+    $subject = dir1SubjectWithSupport($this->admin);
+
+    $viewer = match ($viewerKind) {
+        // users.view and nothing that grants organization administration.
+        'users.view only' => dir1CustomRoleOperator('Plain Viewer', ['users.view']),
+        'users.view and crm.manage' => dir1CustomRoleOperator('Directory Viewer', ['users.view', 'crm.manage']),
+        'users.view and portal.operator' => dir1CustomRoleOperator('Eligible Viewer', ['users.view', 'portal.operator']),
+        'custom operator' => dir1CustomRoleOperator('Custom Operator', ['users.view', 'portal.operator', 'crm.manage']),
+        'built-in operator' => $this->admin,
+    };
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $page = $this->actingAs($viewer)->get(route('users.show', $subject))->assertOk();
+    $membershipQueries = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql) => str_contains($sql, 'admin_approved_at') && str_contains($sql, 'organization_members'));
+    DB::disableQueryLog();
+
+    // General membership information is visible to every users.view viewer.
+    $page->assertSee('Support Partner Org')->assertSee('Half Support Org')->assertSee('Ordinary Org')
+        ->assertSee('Approved administrator');
+
+    expect($membershipQueries)->toHaveCount(1);
+
+    if ($sees) {
+        $page->assertSee('Designated for partner support')->assertSee('Incomplete support record');
+        expect($membershipQueries->first())->toContain('support_granted_at');
+    } else {
+        $page->assertDontSee('Designated for partner support')->assertDontSee('Incomplete support record')->assertDontSee('partner support');
+        // Not fetched and hidden: the designation columns are not in the query at all.
+        expect($membershipQueries->first())->not->toContain('support_granted');
+    }
+})->with([
+    'users.view only' => ['users.view only', false],
+    'users.view and crm.manage' => ['users.view and crm.manage', false],
+    'users.view and portal.operator' => ['users.view and portal.operator', false],
+    'custom operator' => ['custom operator', true],
+    'built-in operator' => ['built-in operator', true],
+]);
+
+it('refuses the designation in the read model itself, for a suspended operator and a customer as well', function () {
+    $subject = dir1SubjectWithSupport($this->admin);
+    $suspended = User::factory()->create(['disabled_at' => now()])->assignRole('operator');
+    $customer = dir1Customer('Curious Viewer');
+
+    $supports = fn (User $viewer) => UserMembershipList::forUser($subject, $viewer)->pluck('support')->filter()->values()->all();
+
+    expect($supports($this->admin))->toEqualCanonicalizing(['designated', 'incomplete'])
+        ->and($supports($suspended))->toBe([])
+        ->and($supports($customer))->toBe([])
+        ->and($supports(dir1CustomRoleOperator('Lone Viewer', ['users.view'])))->toBe([]);
 });
 
 it('words an approval that is not in effect, and a suspended account, without changing either', function () {

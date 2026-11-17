@@ -59,7 +59,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function show(User $user)
+    public function show(Request $request, User $user)
     {
         $user->load('roles', 'organizationInvitation.organization', 'organizationInvitation.inviter', 'socialAccounts');
         $allRoles = Role::orderBy('name')->get();
@@ -70,7 +70,8 @@ class UserController extends Controller
             ->latest()
             ->take(20)
             ->get();
-        $memberships = UserMembershipList::forUser($user);
+        // The partner-support designation is selected only for a viewer who may manage membership (see UserMembershipList::forUser).
+        $memberships = UserMembershipList::forUser($user, $request->user());
 
         return view('admin.users.show', compact('user', 'allRoles', 'activity', 'memberships'));
     }

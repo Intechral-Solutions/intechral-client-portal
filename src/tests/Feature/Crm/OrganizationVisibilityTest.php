@@ -341,3 +341,25 @@ it('counts only organizations with enabled portal access in the dashboard "With 
     $this->actingAs($this->operator)->get(route('dashboard'))
         ->assertInertia(fn (AssertableInertia $page) => $page->where('crmSummary.orgs', 1));
 });
+
+it('wraps each expanded administration list in a named, focusable, horizontally scrollable region with the focus ring', function () {
+    foreach ([
+        [route('crm.companies.index'), 'Organizations list'],
+        [route('organizations.index'), 'Organizations with portal access'],
+        [route('users.index'), 'Users list'],
+    ] as [$url, $name]) {
+        $html = $this->actingAs($this->operator)->get($url)->assertOk()->getContent();
+
+        $dom = new DOMDocument;
+        @$dom->loadHTML($html);
+        $region = (new DOMXPath($dom))->query('//div[@role="region"][@aria-label="'.$name.'"]');
+
+        expect($region->length)->toBe(1, $name);
+        $classes = preg_split('/\s+/', $region->item(0)->getAttribute('class'));
+
+        // Focusable (a keyboard user can reach and scroll it), scrolls inside itself, and carries the shared focus ring.
+        expect($region->item(0)->getAttribute('tabindex'))->toBe('0')
+            ->and($classes)->toContain('overflow-x-auto', 'focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-focus')
+            ->and($classes)->not->toContain('overflow-hidden');
+    }
+});

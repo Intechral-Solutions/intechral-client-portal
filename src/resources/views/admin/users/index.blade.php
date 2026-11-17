@@ -41,7 +41,9 @@
     <p class="mb-6 text-xs text-text-muted">An operator holds the portal.operator permission; every other account is a customer account.</p>
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
+    {{-- A horizontally scrollable region (DIR-1): the table is wider than a phone, so the card scrolls inside itself, never the page.
+         It is a named, focusable region so a keyboard user can reach and scroll it, with the shared Direction D focus ring. --}}
+    <div role="region" tabindex="0" aria-label="Users list" class="overflow-x-auto rounded-lg border border-rule bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         <table class="min-w-full divide-y divide-rule">
             <thead>
                 <tr class="bg-surface-sunken">
