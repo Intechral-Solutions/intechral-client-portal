@@ -11,8 +11,9 @@ namespace App\Shared\Permissions;
  * views and the React sources for every name below and fails the moment something starts checking one. When a later release gives a
  * permission a use, remove it here in the same change.
  *
- * The ShellPresentationResolver::PRESENTATION_NEUTRAL entries marked "never checked" for `tickets.admin`, `time.manage` and
- * `settings.manage` are deliberately NOT annotated here: they are outside the DIR-0 inventory and this package does not widen it.
+ * The shell presentation resolver's list of neutral capabilities also calls `tickets.admin`, `time.manage` and
+ * `settings.manage` "never checked". They are deliberately NOT annotated here: they are outside the DIR-0 inventory and this package
+ * does not widen it.
  */
 final class UnusedPermissions
 {

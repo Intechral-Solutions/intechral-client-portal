@@ -59,7 +59,6 @@ final class UserMembershipList
             ->get(['m.user_id', 'o.id as organization_id', 'o.name', 'o.disabled_at as organization_disabled_at', 'm.role'])
             ->map(function (object $row): object {
                 $row->user_id = (int) $row->user_id;
-                $row->organization_id = (int) $row->organization_id;
                 $row->organization_disabled = $row->organization_disabled_at !== null;
 
                 return $row;
@@ -90,7 +89,6 @@ final class UserMembershipList
             ->map(function (object $row) use ($operator, $suspended): object {
                 $record = OrganizationAuthority::approvalRecord($row->admin_approved_at, $row->admin_approved_by);
 
-                $row->organization_id = (int) $row->organization_id;
                 $row->organization_disabled = $row->organization_disabled_at !== null;
                 $row->approval = match (true) {
                     $row->role === 'admin' && $record === OrganizationAuthority::APPROVAL_COMPLETE => self::inEffect($suspended, $operator) ? self::APPROVED : self::APPROVED_NOT_IN_EFFECT,

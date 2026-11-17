@@ -4,12 +4,12 @@
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-    <div class="mb-8 flex items-center justify-between">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold text-text">Organizations</h1>
             <p class="mt-1 text-sm text-text-secondary">Organizations in the Directory. Portal access is enabled per Organization.</p>
         </div>
-        <x-ui.button :href="route('crm.companies.create')">+ New Organization</x-ui.button>
+        <x-ui.button :href="route('crm.companies.create')" class="shrink-0">+ New Organization</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -25,7 +25,7 @@
         @endif
     </form>
 
-    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
+    <div class="rounded-lg border overflow-x-auto bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-rule-control">
@@ -61,7 +61,7 @@
                             @else
                             <x-ui.status tone="success">Enabled</x-ui.status>
                             @endif
-                            <x-ui.link :href="route('organizations.show', $company->organization_id)" class="text-xs font-medium">Manage<span class="sr-only"> portal access for {{ $company->name }}</span></x-ui.link>
+                            <x-ui.link :href="route('organizations.show', $company->organization_id)" class="text-xs font-medium" aria-label="Manage portal access for {{ $company->name }}">Manage</x-ui.link>
                         </span>
                         @else
                         <x-ui.status glyph="dashed">Not enabled</x-ui.status>

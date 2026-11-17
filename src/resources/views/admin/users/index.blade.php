@@ -20,7 +20,7 @@
     @php($filtered = $search !== '' || $type !== null || $status !== null)
     <form method="GET" action="{{ route('users.index') }}" class="mb-2">
         <div class="flex flex-wrap gap-2">
-            <x-ui.input type="search" name="search" :value="$search" aria-label="Search by name or email"
+            <x-ui.input type="search" name="search" :value="$search"
                         placeholder="Search by name or email&hellip;" class="w-full max-w-sm" />
             <x-ui.select name="type" aria-label="Account type">
                 <option value="">All account types</option>
@@ -32,7 +32,7 @@
                 <option value="active" @selected($status === 'active')>Active</option>
                 <option value="suspended" @selected($status === 'suspended')>Suspended</option>
             </x-ui.select>
-            <x-ui.button type="submit" variant="secondary">Filter</x-ui.button>
+            <x-ui.button type="submit" variant="secondary">Search</x-ui.button>
             @if ($filtered)
             <x-ui.button :href="route('users.index')" variant="secondary">Clear</x-ui.button>
             @endif
@@ -41,7 +41,7 @@
     <p class="mb-6 text-xs text-text-muted">An operator holds the portal.operator permission; every other account is a customer account.</p>
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-lg border border-rule bg-surface">
+    <div class="overflow-x-auto rounded-lg border border-rule bg-surface">
         <table class="min-w-full divide-y divide-rule">
             <thead>
                 <tr class="bg-surface-sunken">

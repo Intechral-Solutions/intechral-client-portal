@@ -3,12 +3,12 @@
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-    <div class="mb-8 flex items-center justify-between">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold text-text">People</h1>
             <p class="mt-1 text-sm text-text-secondary">People in the Directory.</p>
         </div>
-        <x-ui.button :href="route('crm.contacts.create')">+ New Person</x-ui.button>
+        <x-ui.button :href="route('crm.contacts.create')" class="shrink-0">+ New Person</x-ui.button>
     </div>
 
     @if (session('success'))

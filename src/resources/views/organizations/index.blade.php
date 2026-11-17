@@ -4,19 +4,19 @@
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-    <div class="mb-8 flex items-center justify-between">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold text-text">Organization access</h1>
             <p class="mt-1 text-sm text-text-secondary">Organizations with portal access enabled: their members, invitations and administration.</p>
         </div>
-        <x-ui.button :href="route('crm.companies.index')" variant="secondary">View Organizations</x-ui.button>
+        <x-ui.button :href="route('crm.companies.index')" variant="secondary" class="shrink-0">View Organizations</x-ui.button>
     </div>
 
     @if (session('success'))
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    <div class="rounded-lg border overflow-hidden bg-surface border-rule">
+    <div class="rounded-lg border overflow-x-auto bg-surface border-rule">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-rule-control">
@@ -58,7 +58,7 @@
                     <td class="px-4 py-3 text-right text-text-secondary">{{ $fact !== null && $fact['isPartner'] ? $fact['manages'] : '—' }}</td>
                     @endif
                     <td class="px-4 py-3 text-right">
-                        <x-ui.link variant="quiet" :href="route('organizations.show', $org)" class="text-xs">Manage<span class="sr-only"> {{ $org->name }}</span></x-ui.link>
+                        <x-ui.link variant="quiet" :href="route('organizations.show', $org)" class="text-xs" aria-label="Manage {{ $org->name }}">Manage</x-ui.link>
                     </td>
                 </tr>
                 @empty

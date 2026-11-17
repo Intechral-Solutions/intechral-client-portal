@@ -107,10 +107,10 @@ test('System → Users filters by account type and status, shows memberships, an
     await expect(heading(page, 'Users')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Organizations' })).toBeVisible();
 
-    await page.getByRole('searchbox', { name: 'Search by name or email' }).fill(ACCOUNT);
+    await page.getByRole('searchbox', { name: 'Search by name or email…' }).fill(ACCOUNT);
     await page.getByLabel('Account type').selectOption('customer');
     await page.getByLabel('Account status').selectOption('active');
-    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
 
     await expect(page).toHaveURL(/search=E2E\+Customer&type=customer&status=active/);
     const row = page.getByRole('row').filter({ hasText: 'e2e-customer@intechral.test' });
@@ -120,7 +120,7 @@ test('System → Users filters by account type and status, shows memberships, an
 
     // An operator filter excludes that customer, whatever the search matches.
     await page.getByLabel('Account type').selectOption('operator');
-    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page).toHaveURL(/type=operator/);
     await expect(
         page.getByRole('row').filter({ hasText: 'e2e-customer@intechral.test' }),
@@ -132,9 +132,9 @@ test('System → Users filters by account type and status, shows memberships, an
 
     // From the user's membership column, the organization is one click away.
     await page
-        .getByRole('searchbox', { name: 'Search by name or email' })
+        .getByRole('searchbox', { name: 'Search by name or email…' })
         .fill('e2e-customer@intechral.test');
-    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
     await page
         .getByRole('row')
         .filter({ hasText: 'e2e-customer@intechral.test' })
