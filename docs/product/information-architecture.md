@@ -1,6 +1,8 @@
 # Information Architecture
 
-**Status:** Canonical target IA (adopted 2026-09-24). Screen-level detail is intentionally left to design and implementation epics.
+**Status:** Canonical target IA (adopted 2026-09-24; **amended 2026-11-17** for the owner rulings on Directory, identity and Organization, [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md)). Screen-level detail is intentionally left to design and implementation epics.
+
+> **Amendment note (2026-11-17).** The Target and Open text of **User, Person, Organization, Relationship, Customer/Partner classification and System**, the navigation tables, the Person and Organization rows of the relationship map and the Directory rows of the terminology table were revised to the approved model, and their **Current** text was re-verified against `main` at `e0faac0`. The approved target is **not implemented**: Release 1.0 packages DIR-1 to DIR-4 build it ([DIR-0 record](./release-1.0-dir-0-directory-identity-organization.md)). The other sections keep their 2026-09-24 text; some of their "Current" statements predate later work (for example the Tasks tabs, and the Helpdesk, Finance and CMS navigation labels) and are superseded, for navigation, by [Current navigation](#top-level-navigation) below.
 **Companion documents:** [Platform Product & UX Direction](./platform-product-ux-direction.md) · [Product Roadmap](./product-roadmap.md)
 
 This document defines the target navigation, workspace boundaries, and conceptual domain model. For every concept it separates:
@@ -38,11 +40,13 @@ Nothing here is a database design. Where the target model differs from the schem
 | **Time** | Personal time, timers, allocation, reports | `time.log`; reports on `time.view_all` |
 | **Directory** | People, Organizations, Relationships | Directory capability (today `crm.manage`) |
 | **Finance** | Billing, invoices, retainers, rates, budgets | `billing.view` (own) / `billing.manage` (central) |
-| **System** | Users, roles, pages/configuration, settings, integrations | Any administrative capability (`users.view`, `roles.view`, `settings.*`, `cms.edit` for configuration pages) |
+| **System** | Users, roles, organization access, pages/configuration, settings, integrations | Any administrative capability (`users.view`, `roles.view`, `settings.*`, `cms.edit` for configuration pages; `crm.manage` for Organization access) |
 
 **Capability-driven visibility.** A workspace appears only when the user holds a capability that gives it at least one useful surface. No user is forced to see every item. Workspaces with a single permitted surface may link straight to it. The server-side `NavigationBuilder` (Current) remains the single source of navigation truth for both renderers; its output shape will change to express workspaces and sub-navigation.
 
-**Current navigation** (for contrast): a flat primary list — Tickets, Projects, Tasks, Time, Billing, CRM, Pages — plus a "Manage" group — Ticket Queue, Time Reports, Organizations, CMS Pages, Users, Roles. There is no Home item; the dashboard is reached through the brand link.
+**Current navigation** (verified 2026-11-17): the workspace model above is implemented (EPIC-013). `NavigationBuilder` offers Home, Projects, Tasks, Helpdesk, Time, Directory, Finance and System, plus a transitional Resources workspace for published pages, each filtered by capability; customers get the reduced set the customer-surface mode allows. Two things differ from the target. **Directory** shows three entries whose labels do not match their pages: "People" (the CRM contacts pages, titled "Contacts"), "Organizations" (the CRM companies pages, titled "Companies") and "Portal access" (the `organizations` pages, titled "Organizations"). **System** shows Users, Roles and Pages, and has no Organization access entry. DIR-1 and DIR-2 bring both to the target ([Navigation placement](#navigation-placement)).
+
+*Historical (2026-09-24, before EPIC-013):* a flat primary list (Tickets, Projects, Tasks, Time, Billing, CRM, Pages) plus a "Manage" group (Ticket Queue, Time Reports, Organizations, CMS Pages, Users, Roles), with no Home item.
 
 The capability names in the table above are the closest existing permissions, used to show intent. Final capability names are **Open** and belong with the shell epic; renaming permissions is not implied.
 
@@ -73,31 +77,34 @@ The capability names in the table above are the closest existing permissions, us
 
 ### User
 
-- **Current:** `users` table; authentication via Fortify (local credentials, 2FA) and Socialite SSO (Google, Microsoft); invitation-only onboarding; Spatie roles (`operator` with all permissions, `user` for clients, plus custom roles); membership in `organizations` via `organization_members` (admin/member). Customers are Users. Ticket authorization is capability-based (`tickets.assign` identifies operator Ticket work; no role name is checked, EPIC-010D); a few tenancy scopes still test the `operator` role name.
-- **Target:** a User is an **account identity** that can log in. It links to exactly one Person. Authorization is capability-based; role names are groupings of capabilities, not checks in code.
-- **Open:** User ↔ Person linkage mechanics; whether invitations target a Person; retiring the remaining hard-coded role-name checks in the tenancy scopes (a Directory or shell-epic task).
+- **Current:** `users` table; authentication via Fortify (local credentials, 2FA) and Socialite SSO (Google, Microsoft); invitation-only onboarding; Spatie roles (`operator` with all permissions, `user` for clients, plus custom roles); membership in `organizations` via `organization_members` (admin/member). Customers are Users. Authorization is capability-based: `tickets.assign` identifies operator Ticket work (EPIC-010D), and the tenancy scopes test the `portal.operator` capability (R1-1, 2026-11-09), so no role name is checked. An account is created only by the first-operator bootstrap command or by accepting an organization invitation (R1-3); there is no direct "create user". No User is connected to a Directory record.
+- **Target:** a User is an **account identity** that can log in. It **may** be linked to at most one Person, and it needs none (operators in particular are not required to have a Directory record). System → Users lists every authenticated account with its organization memberships. Account security, roles and access are managed only there. Authorization is capability-based; role names are groupings of capabilities, not checks in code.
+- **Decided (2026-11-17, [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md)):** the linkage is optional, one-to-one and explicit; invitations may target a Person; a link grants no access and exposes no Directory information. **Open:** nothing for Release 1.0.
 
 ### Person
 
 - **Current:** no Person entity. Human records exist in two unconnected places: `users` (people who log in) and `crm_contacts` (first/last name, email, phone, job title, optional CRM company). There is no link between a contact and a user.
-- **Target:** a **Person** is a human directory record that may or may not have a User account. Many People never log in. A Person can relate to several Organizations.
-- **Open:** whether Person evolves from `crm_contacts`, is introduced alongside it, or both are consolidated; de-duplication of existing contacts and users.
+- **Target:** a **Person** is a human directory record that may or may not have a User account, and may or may not be affiliated with an Organization. Many People never log in. A Person can relate to several Organizations.
+- **Decided (2026-11-17, [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md)):** Person is the `crm_contacts` record (it is not introduced alongside it). A Person and a User are linked only by an explicit act: accepting an invitation issued from the Person, creating the Person from the User, or an audited operator link. An equal email address may suggest a candidate and never establishes identity; nothing is de-duplicated or merged automatically. Names and emails of the two records are not synchronized.
+- **Transitional (Release 1.0):** a Person has at most one Organization (`crm_contacts.crm_company_id`). This is an implementation constraint, not the model; the path to several affiliations is recorded in ADR-010.
+- **Open:** the affiliation table and the merging of duplicate People (after Release 1.0).
 
 ### Organization
 
-- **Current:** two overlapping concepts. `crm_companies` is the directory-style record ("Company" in CRM) with an optional `organization_id`. `organizations` is the tenancy/membership record (owner, members with admin/member role), created by "promoting" a CRM company. Tenant scoping keys on `crm_companies.organization_id` and `organization_members` ([ADR-005](../architecture/adr/ADR-005-organization-multitenancy.md)).
+- **Current:** two overlapping concepts. `crm_companies` is the directory-style record ("Company" in CRM) with an optional `organization_id`. `organizations` is the tenancy/membership record (owner, members with admin/member role), created by "promoting" a CRM company. Tenant scoping keys on `crm_companies.organization_id` and `organization_members` ([ADR-005](../architecture/adr/ADR-005-organization-multitenancy.md)). The two are a pair of at most one of each (a unique key since MO-1A). Since Release 1.0 work began, Ticket attribution, memberships, invitations, administrator approval, support designations, the managing relationship and the disabled state all sit on `organizations`; the profile fields and the contacts sit on `crm_companies`. The name is stored on both and can diverge; the two records have separate pages and separate lists.
 - **Target:** a single conceptual **Organization** (company, nonprofit, group, agency, etc.). People relate to Organizations. Whether an Organization has portal access/tenancy is a property or capability, not a separate entity type.
-- **Open:** consolidating `crm_companies` and `organizations`; how tenant scoping is expressed afterwards. Tenant-isolation guarantees (EPIC-010B) must be preserved through any migration.
+- **Decided (2026-11-17, [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md)):** operators see **one Organization** (one name, one page, one list) presented over the existing pair; portal access is a state of it (not enabled, enabled, disabled); Directory is authoritative for the name; a portal organization always has a Directory profile. The two tables are **not** consolidated for Release 1.0.
+- **Open:** whether and when to consolidate `crm_companies` and `organizations` physically, and how tenant scoping is expressed afterwards. Tenant-isolation guarantees (EPIC-010B) must be preserved through any migration.
 
 ### Relationship
 
-- **Current:** no explicit Relationship. Relationships are implied by: a CRM company existing, organization membership, `project_company` links (visibility metadata only, EPIC-011E D2), `projects.client_id`, `invoices.client_id → users`, and the `user` role being "intended for clients".
+- **Current:** no explicit Relationship. Relationships are implied by: a CRM company existing, organization membership, `project_company` links (visibility metadata only, EPIC-011E D2), `projects.client_id`, `invoices.client_id → users`, and the `user` role being "intended for clients". One explicit relationship between directory entities exists since MO-1A: an organization may be **managed by** a designated partner organization. It is administrative structure and grants no access by itself.
 - **Target:** a **Relationship** records the business/operational relationship between Intechral and a Person or Organization, carrying one or more classifications, a status, and (Future) dates, owners, and notes. Relationships between directory entities (e.g. a partner's client) are possible later.
-- **Open:** cardinality (one Relationship with many classifications vs one per classification); whether Person–Organization affiliation is itself modelled as a Relationship or a separate affiliation record (recommended: separate affiliation, keep Relationship for Intechral's business relationship).
+- **Open:** cardinality (one Relationship with many classifications vs one per classification); the storage of Person–Organization affiliations once a Person can have several. **Decided (2026-11-17, ADR-010):** affiliation (Person and Organization), membership (User and Organization) and management (Organization and Organization) are three separate relationships; only membership carries authority, and affiliation is never recorded in the membership table. Relationship stays the name for Intechral's business relationship.
 
 ### Customer/Partner classification
 
-- **Current:** "customer" is implicit (a User with the `user` role, or a CRM company). "Partner" does not exist.
+- **Current:** "customer" is implicit (a User with the `user` role, or a CRM company). "Partner" exists only as an **administrative designation** of an organization that may manage customer organizations (`organizations.can_manage_customers`, MO-1A); it is not a relationship classification, and no classification is modelled.
 - **Target:** customer, partner, prospect, vendor, subcontractor, referral partner, and others are **classifications of a Relationship**, applicable to People and/or Organizations. They drive views ("Customers" is a filtered Directory view), defaults, and possibly capabilities; they are never entity types.
 - **Open:** the initial classification list and whether it is fixed or configurable.
 
@@ -170,9 +177,10 @@ The capability names in the table above are the closest existing permissions, us
 
 ### System
 
-- **Current:** Users (index/show) and Roles (index/create/edit) under "Manage"; `settings.view` / `settings.manage` permissions exist in the catalogue.
-- **Target:** **System** workspace: Users, Roles, Pages/configuration, Settings, Integrations (Future), audit/system controls where appropriate.
-- **Open:** which settings exist; whether invitations are managed from System → Users or from Directory → People (Person without a User → invite).
+- **Current:** the System workspace holds Users (index/show, suspension, platform roles), Roles (index/create/edit) and Pages; `settings.view` / `settings.manage` permissions exist in the catalogue. The Users list shows every account but no membership. Organization membership, invitations, approval and support designations are administered on the organization page, reached today through Directory → "Portal access".
+- **Target:** **System** workspace: Users, Roles, **Organization access** (an administrative index of the organizations that have portal access, linking into the Organization page; not a second editor), Pages/configuration, Settings, Integrations (Future), audit/system controls where appropriate.
+- **Decided (2026-11-17, ADR-010):** invitations are issued from an Organization's Portal access section or from a Person (Directory → People), never from System → Users. Person and User keep separate management pages with cross-links.
+- **Open:** which settings exist.
 
 ### Approval / Review
 
@@ -192,8 +200,10 @@ Conceptual map. The **Current** column states what exists in the database today;
 
 | Relationship | Target meaning | Current |
 |--------------|----------------|---------|
-| Person ↔ User | A User is the login identity of exactly one Person; most People have no User | No Person; Users and CRM contacts are unconnected |
-| Person ↔ Organization | Many-to-many affiliation (employee, contractor, board member…) | `crm_contacts.crm_company_id` (one company); `organization_members` for Users |
+| Person ↔ User | Optional, explicit, one-to-one link (ADR-010): most People have no User, and a User needs no Person. The link grants nothing | No link: Users and CRM contacts are unconnected (DIR-3 adds it) |
+| Person ↔ Organization | Many-to-many **affiliation** (employee, contractor, board member…); a Person may have none | `crm_contacts.crm_company_id` (at most one company; transitional) |
+| User ↔ Organization | **Membership**: portal participation, the only one of these relationships that carries authority | `organization_members` (role, administrator approval, support designation) |
+| Organization ↔ Organization | **Management**: a partner and its managed customers; administrative structure, no access by itself | `organizations.managed_by_organization_id`, `can_manage_customers` (MO-1A) |
 | Person/Organization ↔ Relationship | Intechral's business relationship with the entity, carrying classifications | None explicit |
 | Relationship ↔ Billing Account | A commercial relationship may have one or more Billing Accounts | None |
 | Project ↔ Person/Organization | Stakeholders with roles (sponsor, approver, contact); client organization | `project_members` (Users); `project_company` (metadata only); `projects.client_id` |
@@ -220,12 +230,13 @@ Conceptual map. The **Current** column states what exists in the database today;
 
 | Current term (UI or code) | Target conceptual term | Target navigation home | Notes |
 |---------------------------|------------------------|------------------------|-------|
-| CRM | Directory | **Directory** | Locked |
-| Company (`crm_companies`) | Organization | Directory → Organizations | Consolidation with `organizations` is Open |
-| Organization (`organizations`, "Manage → Organizations") | Organization (portal access/tenancy as a property) | Directory → Organizations; access management possibly System | Open |
-| Contact (`crm_contacts`) | Person | Directory → People | |
+| CRM | Directory | **Directory** | Locked; reconfirmed by the owner 2026-11-17 |
+| Company (`crm_companies`) | Organization (its Directory profile) | Directory → Organizations | One Organization presented over both records (ADR-010); physical consolidation is Open and not required |
+| Organization (`organizations`, today Directory → "Portal access") | Organization (portal access as a state and a section of it) | Directory → Organizations, Portal access section; index at System → Organization access | Decided 2026-11-17 |
+| "Promote to Org" | Enable portal access | on the Organization page | |
+| Contact (`crm_contacts`) | Person | Directory → People | The glossary DIR-1 applies is in the [DIR-0 record](./release-1.0-dir-0-directory-identity-organization.md#3-terminology) |
 | Customer / client (implicit; `client_id`; `user` role) | Relationship classification "customer" | Directory → Relationships / customer view | Not an entity type |
-| Partner | Relationship classification "partner" | Directory → Relationships | New |
+| Partner | Relationship classification "partner" | Directory → Relationships | New. Distinct from today's administrative partner designation (an organization that manages customers), which keeps the word in the interface for Release 1.0 |
 | Client (as invoice recipient) | Billing / Commercial Account (Future) | Finance | "Customer" ≠ "entity we invoice" |
 | Tickets / Ticket Queue | Helpdesk → Tickets (Service Request as first intended classification) | **Helpdesk** | Customer-facing labels may use "Requests", "Help" or "Support" as appropriate; classification is not an implemented field |
 | Billing | Finance → Billing / Invoices | **Finance** | Locked |
@@ -241,9 +252,9 @@ Only the placement is defined; screens that do not exist yet are not specified.
 
 ### Directory
 
-- **People** — Person records, with or without User accounts
-- **Organizations** — organizational records
-- **Relationships / relationship views** — e.g. Customers, Partners, Prospects, Vendors as filtered views over Relationships (Provisional presentation)
+- **People** — Person records, with or without User accounts, with or without an Organization
+- **Organizations** — one record per Organization: its profile, its People and its portal access (membership, invitations, approval, support designations, managing relationship). The one place an Organization is edited
+- **Relationships / relationship views** — e.g. Customers, Partners, Prospects, Vendors as filtered views over Relationships (Provisional presentation; Future, not Release 1.0)
 
 ### Helpdesk
 
@@ -262,8 +273,9 @@ Only the placement is defined; screens that do not exist yet are not specified.
 
 ### System
 
-- **Users**
+- **Users** — every authenticated account, with its organization memberships
 - **Roles**
+- **Organization access** — administrative index of organizations with portal access; links into Directory → Organizations
 - **Pages / configuration**
 - **Settings**
 - **Integrations** (Future)

@@ -4,6 +4,7 @@
 its closure review returned **SAFE TO COMMIT**. Submitted as a pull request; **not merged, not deployed**. Release 0.9 staging is
 unchanged. This record covers MO-1A only; MO-2, MO-3 and MO-4 are not started. The Release 1.0 deployment gates below remain open.
 *Annotation 2026-11-10: the rollback and data-preservation gates in this record were retired by the 2026-11-09 owner ruling (see the [R1-0 ruling](./release-1.0-notes.md#data-deployment-and-recovery-ruling-r1-0)); they are kept as history.*
+*Annotation 2026-11-17: the pair model chosen here ("Option C") is **kept**. By the owner ruling of 2026-11-17 it is now presented to operators as one Organization, and Person records with an optional link to a User become Release 1.0 work, so "No Directory consolidation, no Person records" below describes MO-1A's own scope, not the release ([ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md), [DIR-0 record](./release-1.0-dir-0-directory-identity-organization.md)). Two further statements below are out of date: the tenant scopes have tested the `portal.operator` capability, not the `operator` role name, since R1-1 (`0bae7e2`, 2026-11-09), so the "Custom-role operators" limit and the deferred "retiring the `hasRole('operator')` scope checks" describe the code as it was; and DIR-2 widens the company delete guard to every company that has an organization.*
 
 ## Decision
 
