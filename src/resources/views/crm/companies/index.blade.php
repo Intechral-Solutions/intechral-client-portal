@@ -1,14 +1,15 @@
-@extends('layouts.app', ['title' => 'Companies'])
+@use('App\Services\OrganizationListFacts')
+@extends('layouts.app', ['title' => 'Organizations'])
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold text-text">Companies</h1>
-            <p class="mt-1 text-sm text-text-secondary">CRM company records.</p>
+            <h1 class="text-2xl font-semibold text-text">Organizations</h1>
+            <p class="mt-1 text-sm text-text-secondary">Organizations in the Directory. Portal access is enabled per Organization.</p>
         </div>
-        <x-ui.button :href="route('crm.companies.create')">+ New Company</x-ui.button>
+        <x-ui.button :href="route('crm.companies.create')">+ New Organization</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -31,7 +32,11 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Website</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Phone</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-text-muted">Org</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Portal access</th>
+                    @if ($relationships !== null)
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Managed by</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">Manages</th>
+                    @endif
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
@@ -47,20 +52,34 @@
                         {{ $company->website ? parse_url($company->website, PHP_URL_HOST) : '—' }}
                     </td>
                     <td class="px-4 py-3 text-text-secondary">{{ $company->phone ?? '—' }}</td>
-                    <td class="px-4 py-3 text-center">
+                    <td class="px-4 py-3">
                         @if ($company->isPromoted())
-                        <x-ui.link :href="route('organizations.show', $company->organization)" class="text-xs font-medium">Org ↗</x-ui.link>
+                        @php($state = $portalStatus[$company->organization_id] ?? null)
+                        <span class="inline-flex items-center gap-2">
+                            @if ($state === OrganizationListFacts::DISABLED)
+                            <x-ui.status tone="warning">Disabled</x-ui.status>
+                            @else
+                            <x-ui.status tone="success">Enabled</x-ui.status>
+                            @endif
+                            <x-ui.link :href="route('organizations.show', $company->organization_id)" class="text-xs font-medium">Manage<span class="sr-only"> portal access for {{ $company->name }}</span></x-ui.link>
+                        </span>
                         @else
-                        <span class="text-xs text-text-muted">—</span>
+                        <x-ui.status glyph="dashed">Not enabled</x-ui.status>
                         @endif
                     </td>
+                    @if ($relationships !== null)
+                    {{-- Built only for an actor who may manage relationships (DIR-0 S7): $relationships is null otherwise and this never renders. --}}
+                    @php($fact = $company->isPromoted() ? ($relationships[$company->organization_id] ?? null) : null)
+                    <td class="px-4 py-3 text-text-secondary">{{ $fact['managedBy']['name'] ?? '—' }}</td>
+                    <td class="px-4 py-3 text-right text-text-secondary">{{ $fact !== null && $fact['isPartner'] ? $fact['manages'] : '—' }}</td>
+                    @endif
                     <td class="px-4 py-3 text-right">
                         <x-ui.link variant="quiet" :href="route('crm.companies.edit', $company)" class="text-xs">Edit</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No companies found.</td>
+                    <td colspan="{{ $relationships !== null ? 7 : 5 }}" class="px-4 py-12 text-center text-sm text-text-muted">No organizations found.</td>
                 </tr>
                 @endforelse
             </tbody>

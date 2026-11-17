@@ -102,7 +102,7 @@ export function CreateProjectPage({ companies, abilities, memberCandidates }: Cr
                     </Section>
 
                     {companies.length > 0 ? (
-                        <Section title="Linked companies">
+                        <Section title="Linked organizations">
                             <CompanySelector
                                 idPrefix="create"
                                 companies={companies}

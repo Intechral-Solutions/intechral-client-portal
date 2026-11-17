@@ -5,7 +5,7 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <x-ui.link variant="quiet" :href="route('crm.companies.index')" class="text-sm">&larr; Companies</x-ui.link>
+            <x-ui.link variant="quiet" :href="route('crm.companies.index')" class="text-sm">&larr; Organizations</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold text-text">{{ $company->name }}</h1>
             @if ($company->website)
             <x-ui.link :href="$company->website" target="_blank" rel="noopener" class="mt-0.5 text-sm">
@@ -18,12 +18,12 @@
             <form method="POST" action="{{ route('crm.companies.promote', $company) }}">
                 @csrf
                 <x-ui.button type="submit" variant="secondary"
-                             onclick="return confirm('Promote {{ addslashes($company->name) }} to an Organization?')">
-                    Promote to Org
+                             onclick="return confirm('Enable portal access for {{ addslashes($company->name) }}?')">
+                    Enable portal access
                 </x-ui.button>
             </form>
             @else
-            <x-ui.button :href="route('organizations.show', $company->organization)" variant="secondary">View Organization ↗</x-ui.button>
+            <x-ui.button :href="route('organizations.show', $company->organization)" variant="secondary">View portal access ↗</x-ui.button>
             @endif
             <x-ui.button :href="route('crm.companies.edit', $company)" variant="secondary">Edit</x-ui.button>
         </div>
@@ -51,8 +51,8 @@
         {{-- Contacts --}}
         <div class="lg:col-span-2 rounded-lg border overflow-hidden bg-surface border-rule">
             <div class="flex items-center justify-between px-5 py-4 border-b border-rule">
-                <h2 class="text-sm font-semibold text-text">Contacts</h2>
-                <x-ui.link :href="route('crm.contacts.create', ['company_id' => $company->id])" class="text-xs font-medium">+ Add Contact</x-ui.link>
+                <h2 class="text-sm font-semibold text-text">People</h2>
+                <x-ui.link :href="route('crm.contacts.create', ['company_id' => $company->id])" class="text-xs font-medium">+ Add Person</x-ui.link>
             </div>
             <table class="w-full text-sm">
                 <tbody class="divide-y divide-rule">
@@ -69,7 +69,7 @@
                         <td class="px-5 py-3 text-xs text-text-secondary">{{ $contact->email ?? '' }}</td>
                     </tr>
                     @empty
-                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No contacts yet.</td></tr>
+                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No people yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

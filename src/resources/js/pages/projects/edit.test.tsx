@@ -107,11 +107,13 @@ it('saves the details on their own: one PUT to projects.update in the updateProj
 it('saves the linked companies on their own, including an empty selection', async () => {
     const user = userEvent.setup();
     render(<EditProjectPage {...managerProps} />);
-    const companiesSection = section('Linked companies');
+    const companiesSection = section('Linked organizations');
 
     expect(within(companiesSection).getByRole('checkbox', { name: 'Acme Co' })).toBeChecked();
     await user.click(within(companiesSection).getByRole('checkbox', { name: 'Globex' }));
-    await user.click(within(companiesSection).getByRole('button', { name: 'Update companies' }));
+    await user.click(
+        within(companiesSection).getByRole('button', { name: 'Update organizations' }),
+    );
     expect(submitted()[0]).toMatchObject({
         method: 'put',
         url: '/projects/7/companies',
@@ -121,14 +123,16 @@ it('saves the linked companies on their own, including an empty selection', asyn
 
     await user.click(within(companiesSection).getByRole('checkbox', { name: 'Acme Co' }));
     await user.click(within(companiesSection).getByRole('checkbox', { name: 'Globex' }));
-    await user.click(within(companiesSection).getByRole('button', { name: 'Update companies' }));
+    await user.click(
+        within(companiesSection).getByRole('button', { name: 'Update organizations' }),
+    );
     expect(submitted()[1]!.data).toEqual({ companies: [] });
 });
 
 it('hides the companies section when the actor has no companies to link', () => {
     render(<EditProjectPage {...managerProps} companies={[]} linkedCompanyIds={[]} />);
 
-    expect(screen.queryByRole('heading', { name: 'Linked companies' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Linked organizations' })).not.toBeInTheDocument();
 });
 
 it('uses a distinct error bag and a distinct endpoint for every independent form', async () => {
@@ -139,7 +143,9 @@ it('uses a distinct error bag and a distinct endpoint for every independent form
         within(section('Project details')).getByRole('button', { name: 'Save changes' }),
     );
     await user.click(
-        within(section('Linked companies')).getByRole('button', { name: 'Update companies' }),
+        within(section('Linked organizations')).getByRole('button', {
+            name: 'Update organizations',
+        }),
     );
     await user.click(within(section('Members')).getByRole('button', { name: 'Update members' }));
     await user.click(screen.getByRole('button', { name: 'Delete project' }));
@@ -155,21 +161,21 @@ it('uses a distinct error bag and a distinct endpoint for every independent form
 it('shows each error only in the form it belongs to', () => {
     setFormErrors({
         name: 'The name field is required.',
-        companies: 'The companies field must be present.',
+        companies: 'The linked organizations field must be present.',
         'members.0.user_id': 'The selected member is invalid.',
     });
     render(<EditProjectPage {...adminProps} />);
 
     const details = section('Project details');
-    const companiesSection = section('Linked companies');
+    const companiesSection = section('Linked organizations');
     const membersSection = section('Members');
 
     expect(within(details).getByText('The name field is required.')).toBeInTheDocument();
-    expect(within(details).queryByText(/companies field/)).not.toBeInTheDocument();
+    expect(within(details).queryByText(/linked organizations field/)).not.toBeInTheDocument();
     expect(within(details).queryByText(/selected member/)).not.toBeInTheDocument();
 
     expect(
-        within(companiesSection).getByText('The companies field must be present.'),
+        within(companiesSection).getByText('The linked organizations field must be present.'),
     ).toBeInTheDocument();
     expect(within(companiesSection).queryByText(/name field/)).not.toBeInTheDocument();
 
@@ -197,9 +203,13 @@ it('keeps in-progress edits in other sections when one section is saved', async 
 
     await user.clear(screen.getByLabelText(/Project name/));
     await user.type(screen.getByLabelText(/Project name/), 'Half-typed rename');
-    await user.click(within(section('Linked companies')).getByRole('checkbox', { name: 'Globex' }));
     await user.click(
-        within(section('Linked companies')).getByRole('button', { name: 'Update companies' }),
+        within(section('Linked organizations')).getByRole('checkbox', { name: 'Globex' }),
+    );
+    await user.click(
+        within(section('Linked organizations')).getByRole('button', {
+            name: 'Update organizations',
+        }),
     );
 
     expect(screen.getByLabelText(/Project name/)).toHaveValue('Half-typed rename');

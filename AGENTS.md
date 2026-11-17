@@ -15,6 +15,15 @@ Durable rules for coding agents working in this repository. The design contract 
 User-facing text says **service request** (full name) or **request** (short form), and **Helpdesk** for the workspace; it never says "ticket". `Ticket` stays the technical name of the model,
 tables, routes, permissions and APIs. Glossary and rules: [`docs/product/release-1.0-r1-7-service-request-terminology.md`](docs/product/release-1.0-r1-7-service-request-terminology.md).
 
+Likewise for the **Directory** (DIR-1; glossary in [`docs/product/release-1.0-dir-0-directory-identity-organization.md`](docs/product/release-1.0-dir-0-directory-identity-organization.md#3-terminology)).
+Operator-visible text says **Directory** for the workspace, **Person** / **People** for a Directory record of a human, and **Organization**
+for the one concept that spans the Directory profile and the portal organization. It says **Enable portal access** (never "Promote"),
+**Portal access** for the state and section, **Organization access** for the System index, and **Linked organizations** on projects. It never
+says "Company", "CRM", "Org" or "Contact" for a Directory record. `CrmContact`, `CrmCompany`, `crm_*` tables, `crm.*` routes, `crm.manage` and
+`Organization` stay the technical names. **"Contact" keeps its Helpdesk meaning**: the customer contact a partner raises a service request for
+is always a User, and that wording is unchanged. A detail page may use the record's own name as its title, but the navigation item and the
+section it opens must still agree.
+
 ## Design system (React)
 
 - **Shared primitives own their visual styling.** Callers of `components/ui/*` add layout (margin, width, flex/grid placement),

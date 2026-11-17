@@ -5,7 +5,7 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <x-ui.link variant="quiet" :href="route('crm.contacts.index')" class="text-sm">&larr; Contacts</x-ui.link>
+            <x-ui.link variant="quiet" :href="route('crm.contacts.index')" class="text-sm">&larr; People</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold text-text">{{ $contact->fullName() }}</h1>
             @if ($contact->job_title)
             <p class="text-sm mt-0.5 text-text-secondary">{{ $contact->job_title }}</p>
@@ -21,7 +21,7 @@
     <div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
         @if ($contact->company)
         <div>
-            <p class="text-xs font-medium mb-0.5 text-text-muted">Company</p>
+            <p class="text-xs font-medium mb-0.5 text-text-muted">Organization</p>
             <x-ui.link :href="route('crm.companies.show', $contact->company)" class="text-sm font-medium">
                 {{ $contact->company->name }}
             </x-ui.link>

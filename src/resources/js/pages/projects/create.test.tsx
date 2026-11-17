@@ -193,15 +193,15 @@ it('focuses the first invalid member row when only members failed', async () => 
     expect(screen.getByLabelText('Member 1')).toHaveFocus();
 });
 
-it('says a company link is informational and hides the section when there are no companies', () => {
+it('says an organization link is informational and hides the section when there are no organizations', () => {
     const { unmount } = render(<CreateProjectPage {...managerProps} />);
-    expect(screen.getByRole('group', { name: 'Linked companies' })).toHaveAccessibleDescription(
-        /does not grant that company's organization members access/,
+    expect(screen.getByRole('group', { name: 'Linked organizations' })).toHaveAccessibleDescription(
+        /does not grant that organization's members access/,
     );
     unmount();
 
     render(<CreateProjectPage companies={[]} abilities={{ editMembers: false }} />);
-    expect(screen.queryByRole('group', { name: 'Linked companies' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Linked organizations' })).not.toBeInTheDocument();
 });
 
 it('disables the submit button while the request is in flight', () => {
@@ -237,7 +237,7 @@ it('is a Direction D form page: the forms reading measure, one h1 and stacked se
     ]);
     expect(
         screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Project details', 'Linked companies', 'Members']);
+    ).toEqual(['Project details', 'Linked organizations', 'Members']);
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 });
 

@@ -60,7 +60,7 @@ it('refuses a browser deletion of a company projects still reference, and keeps 
         ->from(route('crm.companies.edit', $company))
         ->delete(route('crm.companies.destroy', $company))
         ->assertRedirect(route('crm.companies.edit', $company))
-        ->assertSessionHasErrors(['company' => 'Cannot delete "Linked Co": 2 project(s) still refer to it. Remove the company from those projects first.']);
+        ->assertSessionHasErrors(['company' => 'Cannot delete "Linked Co": 2 project(s) still refer to it. Remove the organization from those projects first.']);
 
     expect(companyWorld($company))->toBe($world)
         ->and(CrmCompany::find($company->id))->not->toBeNull();
@@ -85,7 +85,7 @@ it('answers a JSON caller with 409 and the same message', function () {
     $this->actingAs($this->operator)
         ->deleteJson(route('crm.companies.destroy', $company))
         ->assertStatus(409)
-        ->assertJson(['message' => 'Cannot delete "Linked Co": 1 project(s) still refer to it. Remove the company from those projects first.']);
+        ->assertJson(['message' => 'Cannot delete "Linked Co": 1 project(s) still refer to it. Remove the organization from those projects first.']);
 
     expect(companyWorld($company))->toBe($world);
 });
@@ -124,7 +124,7 @@ it('keeps the existing contract for an unlinked company: it is deleted, its cont
 
     $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
         ->assertRedirect(route('crm.companies.index'))
-        ->assertSessionHas('success', 'Company deleted.');
+        ->assertSessionHas('success', 'Organization deleted.');
 
     expect(CrmCompany::find($company->id))->toBeNull()
         ->and($contact->fresh()->crm_company_id)->toBeNull()

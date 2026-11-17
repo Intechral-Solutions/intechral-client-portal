@@ -1,6 +1,6 @@
 # Release 1.0: DIR-0 Directory, identity and Organization coherence (architecture resolution and work-package specifications)
 
-**Status:** **design approved by the owner (2026-11-17); documentation only.** Nothing described here as DIR-1 to DIR-4 is implemented, and none of those packages is authorized to start: each needs its own explicit owner authorization. Written against `main` at `e0faac0` (PR #70; the tree is identical to the audited revision `94ae904`). No application code, migration, test, permission, seeder or environment was changed by DIR-0. Release 0.9 staging is untouched.
+**Status:** **design approved by the owner (2026-11-17); documentation only.** DIR-1 is since authorized and implemented in its own pull request (see [DIR-1 as built](#dir-1-as-built)); nothing described here as DIR-2 to DIR-4 is implemented, and none of those packages is authorized to start: each needs its own explicit owner authorization. Written against `main` at `e0faac0` (PR #70; the tree is identical to the audited revision `94ae904`). No application code, migration, test, permission, seeder or environment was changed by DIR-0. Release 0.9 staging is untouched.
 
 **What this record is.** The model is decided in [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md) and is not repeated here. This record holds what an implementer needs: the ruling register, the verified current state, the terminology, the four work packages with their contracts, invariants, tests and review gates, the end-to-end acceptance scenario and the release gates.
 
@@ -125,6 +125,17 @@ DIR-2 and DIR-3 are independent of each other and may proceed in parallel. DIR-4
 - S2 holds for every touched route; the Blade theme guard inventory and the label assertions in Pest, Vitest and the browser suites are updated in the same pull request.
 
 **Review:** standard code review. **Risks:** label assertions spread over three test suites; a missed string. **Rollback:** revert the pull request.
+
+### DIR-1 as built
+
+DIR-1 was implemented as specified above, as presentation and read queries only (no migration, route, permission, role or configuration change; no `roles:sync`). The points a reader of the specification should know:
+
+- **Operator classification.** The Users filter classifies an account as an operator by the `portal.operator` capability, directly or through any role (`User::scopeOperatorEligible`, the same test as `CustomerPilotGate::isOperator`), never by a role named `operator`. Every other account is a **customer** by the product's own boundary, including an internal account whose roles lack the capability (for example a custom role that grants `users.manage` and `crm.manage` but not `portal.operator`): the customer-pilot gate already treats it as a customer on every operator route. The list says so beside the filter.
+- **Support designation on the user page** is reported as designated or not, never as "in effect": whether it is in effect depends on the organization being a partner, which is a managing-relationship fact (S7) that a `users.view` viewer is not entitled to.
+- **Managing-relationship facts** ("Managed by", "Manages N") are built by `OrganizationListFacts::relationships`, which authorizes `manageRelationships` itself and returns null otherwise, so no relationship column is read for another actor.
+- **Role editor.** The permissions marked "Not used in this release" are exactly the inventory in section 2 (`UnusedPermissions`), each verified against the source by a test that fails if code starts checking one. `tickets.admin`, `time.manage` and `settings.manage` are also "never checked" according to `ShellPresentationResolver`; they are outside the DIR-0 inventory and are **not** annotated by DIR-1 (an owner decision whether to add them).
+- **Wording beyond the glossary table.** Operator-facing validation and refusal messages that said "company" or "CRM company" now say "organization" and "Directory profile" (the term section 3 reserves for the missing-profile case). `organizations:preflight` and its console output are unchanged (DIR-2 changes the preflight). The membership refusal that says "promote, demote or remove" refers to a role change, not to enabling portal access, and is unchanged.
+- **Not in DIR-1, as specified:** the Organization detail header and its relationship badges, the stronger delete rule, the profile repair and every Person–User behaviour.
 
 ## 6. DIR-2: unified Organization experience
 

@@ -1,7 +1,7 @@
 {{-- Shared form fields for create / edit --}}
 
 <div class="space-y-2">
-    <x-ui.label for="name" required>Company Name</x-ui.label>
+    <x-ui.label for="name" required>Organization name</x-ui.label>
     <x-ui.input type="text" name="name" :value="old('name', $company->name ?? '')" required class="w-full" />
     <x-ui.field-error for="name" />
 </div>

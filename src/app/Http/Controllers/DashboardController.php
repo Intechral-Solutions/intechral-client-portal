@@ -89,7 +89,8 @@ class DashboardController extends Controller
             $crmStats = [
                 'companies' => CrmCompany::count(),
                 'contacts' => CrmContact::count(),
-                'orgs' => Organization::count(),
+                // Organizations whose portal access is enabled: the tile is labelled "With portal access", and a disabled one has none.
+                'orgs' => Organization::whereNull('disabled_at')->count(),
             ];
         }
 

@@ -45,7 +45,8 @@
         <fieldset @disabled($isBuiltIn) class="min-w-0 border-0 p-0">
         <div id="permissions-group" role="group" aria-labelledby="permissions-heading"
              @if ($errors->has('permissions') || $errors->has('permissions.*')) aria-describedby="permissions-group-error" @endif>
-            <p id="permissions-heading" class="text-sm font-medium mb-3 text-text">Permissions</p>
+            <p id="permissions-heading" class="text-sm font-medium mb-1 text-text">Permissions</p>
+            <p class="mb-3 text-xs text-text-muted">A permission marked &ldquo;{{ \App\Shared\Permissions\UnusedPermissions::LABEL }}&rdquo; is kept in the catalogue and can still be assigned, but no feature checks it yet, so assigning it changes nothing.</p>
             @foreach ($grouped as $module => $permissions)
             <div class="mb-6">
                 <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
@@ -53,11 +54,7 @@
                 </p>
                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     @foreach ($permissions as $permission)
-                    @php $checked = in_array($permission, old('permissions', $assigned)); @endphp
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:bg-surface-hover border-rule">
-                        <x-ui.checkbox name="permissions[]" value="{{ $permission }}" :checked="$checked" />
-                        <span class="text-text">{{ Str::after($permission, '.') }}</span>
-                    </label>
+                    @include('admin.roles._permission', ['permission' => $permission, 'checked' => in_array($permission, old('permissions', $assigned))])
                     @endforeach
                 </div>
             </div>

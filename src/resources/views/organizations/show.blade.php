@@ -5,12 +5,12 @@
 
     <div class="mb-8 flex items-start justify-between">
         <div>
-            <x-ui.link variant="quiet" :href="route('organizations.index')" class="text-sm">&larr; Organizations</x-ui.link>
+            <x-ui.link variant="quiet" :href="route('organizations.index')" class="text-sm">&larr; Organization access</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold text-text">{{ $organization->name }}</h1>
             <p class="mt-0.5 text-xs font-mono text-text-muted">{{ $organization->slug }}</p>
         </div>
         @if ($organization->company)
-        <x-ui.button :href="route('crm.companies.show', $organization->company)" variant="secondary">View CRM Record</x-ui.button>
+        <x-ui.button :href="route('crm.companies.show', $organization->company)" variant="secondary">View Directory profile</x-ui.button>
         @endif
     </div>
 
@@ -29,8 +29,8 @@
         <div class="rounded-lg border p-5 space-y-3 bg-surface border-rule">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Details</h2>
             <div>
-                <p class="text-xs text-text-muted">Owner</p>
-                <p class="text-sm font-medium text-text">{{ $organization->owner->name }}</p>
+                <p class="text-xs text-text-muted">Portal access enabled by</p>
+                <p class="text-sm font-medium text-text">{{ $organization->owner?->name ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs text-text-muted">Members</p>
@@ -84,7 +84,13 @@
                     @php($lastApproved = $member->counts && $approvedCount === 1)
                     <tr>
                         <td class="px-5 py-3 align-top">
-                            <p class="font-medium text-text">{{ $member->name }}</p>
+                            <p class="font-medium text-text">
+                                @can('users.view')
+                                <x-ui.link variant="row" :href="route('users.show', $member->id)">{{ $member->name }}</x-ui.link>
+                                @else
+                                {{ $member->name }}
+                                @endcan
+                            </p>
                             <p class="text-xs text-text-muted">{{ $member->email }}</p>
                             @if ($member->operator)
                             <p class="mt-1 text-xs text-text-muted">Operator account: acts with platform authority, not through this membership.</p>
@@ -202,7 +208,13 @@
                     @forelse ($organization->members as $member)
                     <tr>
                         <td class="px-5 py-3">
-                            <p class="font-medium text-text">{{ $member->name }}</p>
+                            <p class="font-medium text-text">
+                                @can('users.view')
+                                <x-ui.link variant="row" :href="route('users.show', $member->id)">{{ $member->name }}</x-ui.link>
+                                @else
+                                {{ $member->name }}
+                                @endcan
+                            </p>
                             <p class="text-xs text-text-muted">{{ $member->email }}</p>
                         </td>
                         <td class="px-5 py-3">
@@ -221,7 +233,7 @@
             <div class="border-t px-5 py-4 border-rule">
                 <form method="POST" action="{{ route('organizations.members.store', $organization) }}" class="flex gap-2">
                     @csrf
-                    <x-ui.select name="user_id" aria-label="Person to add" class="min-w-0 flex-1">
+                    <x-ui.select name="user_id" aria-label="Account to add" class="min-w-0 flex-1">
                         @foreach ($availableUsers as $user)
                         <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
                         @endforeach

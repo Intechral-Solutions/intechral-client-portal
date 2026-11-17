@@ -443,8 +443,8 @@ test.describe('Directory', () => {
 
         for (const { theme, viewport } of MODES) {
             let tokens = await visit(page, '/crm/contacts', theme, viewport);
-            await expectInk(inMain(page).getByRole('link', { name: '+ New Contact' }), tokens);
-            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Contact' }), viewport);
+            await expectInk(inMain(page).getByRole('link', { name: '+ New Person' }), tokens);
+            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Person' }), viewport);
             await expect(inMain(page).getByRole('textbox', { name: 'Search by name or email…' })).toBeVisible();
             await expectSecondary(inMain(page).getByRole('button', { name: 'Search', exact: true }), tokens);
             await expectControlContract(page, tokens);
@@ -458,8 +458,8 @@ test.describe('Directory', () => {
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/crm/companies', theme, viewport);
-            await expectInk(inMain(page).getByRole('link', { name: '+ New Company' }), tokens);
-            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Company' }), viewport);
+            await expectInk(inMain(page).getByRole('link', { name: '+ New Organization' }), tokens);
+            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Organization' }), viewport);
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/crm/companies/create', theme, viewport);
@@ -470,7 +470,7 @@ test.describe('Directory', () => {
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/organizations', theme, viewport);
-            await expectSecondary(inMain(page).getByRole('link', { name: 'View Companies' }), tokens);
+            await expectSecondary(inMain(page).getByRole('link', { name: 'View Organizations' }), tokens);
             expect(await hasHorizontalOverflow(page)).toBe(false);
         }
     });

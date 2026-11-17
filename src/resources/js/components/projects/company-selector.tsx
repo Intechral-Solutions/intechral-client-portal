@@ -11,7 +11,7 @@ type CompanySelectorProps = {
 };
 
 /**
- * Company checkboxes with the informational copy. Native checkboxes: labelled, keyboard and
+ * Organization checkboxes with the informational copy. Native checkboxes: labelled, keyboard and
  * screen-reader friendly with no extra machinery. The link is metadata (EPIC-011E D2).
  */
 export function CompanySelector({
@@ -26,10 +26,10 @@ export function CompanySelector({
 
     return (
         <fieldset className="space-y-3" aria-describedby={error ? `${hintId} ${errorId}` : hintId}>
-            <legend className="sr-only">Linked companies</legend>
+            <legend className="sr-only">Linked organizations</legend>
             <p id={hintId} className="text-sm text-text-secondary">
-                Linking a company records the client relationship. It does not grant that
-                company&apos;s organization members access to the project; only project members (and
+                Linking an organization records the client relationship. It does not grant that
+                organization&apos;s members access to the project; only project members (and
                 administrators) can open it.
             </p>
             <div className="space-y-2">

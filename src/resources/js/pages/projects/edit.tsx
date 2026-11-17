@@ -110,7 +110,7 @@ function CompaniesSection({
     }
 
     return (
-        <Section title="Linked companies">
+        <Section title="Linked organizations">
             <form onSubmit={submit} className="space-y-4">
                 <CompanySelector
                     idPrefix="edit"
@@ -124,7 +124,7 @@ function CompaniesSection({
                 />
                 <div className="flex justify-end">
                     <Button type="submit" disabled={form.processing}>
-                        {form.processing ? 'Saving...' : 'Update companies'}
+                        {form.processing ? 'Saving...' : 'Update organizations'}
                     </Button>
                 </div>
             </form>

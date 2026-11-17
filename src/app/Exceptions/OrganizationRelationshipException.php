@@ -69,14 +69,14 @@ final class OrganizationRelationshipException extends RuntimeException
 
     public static function companyPairing(string $organization, int $companies): self
     {
-        $state = $companies === 0 ? 'has no CRM company' : "is linked to {$companies} CRM companies";
+        $state = $companies === 0 ? 'has no Directory profile' : "is linked to {$companies} Directory profiles";
 
-        return new self("\"{$organization}\" {$state}; a managed relationship needs exactly one. Resolve it in the CRM first.", self::COMPANY_PAIRING);
+        return new self("\"{$organization}\" {$state}; a managed relationship needs exactly one. Resolve it in the Directory first.", self::COMPANY_PAIRING);
     }
 
     public static function companyInRelationship(string $company, string $organization): self
     {
-        return new self("Cannot delete \"{$company}\": its organization \"{$organization}\" is designated as a partner or is managed by another organization. Remove the relationship first.", self::COMPANY_IN_RELATIONSHIP, 'company');
+        return new self("Cannot delete \"{$company}\": the organization \"{$organization}\" with portal access is designated as a partner or is managed by another organization. Remove the relationship first.", self::COMPANY_IN_RELATIONSHIP, 'company');
     }
 
     public function render(Request $request): JsonResponse|RedirectResponse

@@ -1,3 +1,4 @@
+@use('App\Services\UserMembershipList')
 @extends('layouts.app', ['title' => $user->name])
 
 @section('content')
@@ -89,6 +90,63 @@
                     </div>
                     @endif
                 </dl>
+            </section>
+
+            {{-- Memberships (DIR-1): read-only. What the account belongs to, as the membership services recorded it. Nothing here grants or
+                 changes access; the organization page is where membership is administered, so the name links there only for a viewer who
+                 may open it (crm.manage). Membership facts only: no Directory person, profile or note appears on this page. --}}
+            <section aria-labelledby="user-memberships-heading" class="rounded-lg border border-rule bg-surface">
+                <div class="border-b border-rule px-6 py-4">
+                    <h2 id="user-memberships-heading" class="text-base font-semibold text-text">Memberships</h2>
+                    <p class="mt-1 text-xs text-text-muted">The organizations this account is a member of. Membership is administered on the organization.</p>
+                </div>
+                @if ($memberships->isEmpty())
+                <p class="px-6 py-6 text-sm text-text-secondary">This account is not a member of any organization.</p>
+                @else
+                <ul class="divide-y divide-rule">
+                    @foreach ($memberships as $membership)
+                    <li class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 px-6 py-4 text-sm">
+                        <div class="min-w-0">
+                            <p class="font-medium text-text">
+                                @can('crm.manage')
+                                <x-ui.link variant="row" :href="route('organizations.show', $membership->organization_id)">{{ $membership->name }}</x-ui.link>
+                                @else
+                                {{ $membership->name }}
+                                @endcan
+                            </p>
+                            @if ($membership->organization_disabled)
+                            <p class="mt-1 text-xs text-text-muted">This organization is disabled.</p>
+                            @endif
+                            @if ($user->isSuspended())
+                            <p class="mt-1 text-xs text-text-muted">This account is suspended; the membership is kept.</p>
+                            @endif
+                        </div>
+                        <div class="text-right">
+                            <x-ui.tag>{{ ucfirst($membership->role) }}</x-ui.tag>
+                            @if ($membership->approval === UserMembershipList::APPROVED)
+                            <p class="mt-2 text-xs text-text">Approved administrator</p>
+                            @elseif ($membership->approval === UserMembershipList::APPROVED_NOT_IN_EFFECT)
+                            <p class="mt-2 text-xs text-text">Approved, not in effect</p>
+                            <p class="text-xs text-text-muted">The account is suspended or an operator.</p>
+                            @elseif ($membership->approval === UserMembershipList::NOT_APPROVED)
+                            <p class="mt-2 text-xs text-text-muted">Administrator not approved: holds no delegated authority.</p>
+                            @elseif ($membership->approval === UserMembershipList::INCOMPLETE)
+                            <p class="mt-2 text-xs text-text">Incomplete approval record</p>
+                            <p class="text-xs text-text-muted">It does not count as an approval.</p>
+                            @elseif ($membership->approval === UserMembershipList::IGNORED)
+                            <p class="mt-2 text-xs text-text-muted">Has an approval record but is not an administrator; it is ignored.</p>
+                            @endif
+                            @if ($membership->support === UserMembershipList::SUPPORT_DESIGNATED)
+                            <p class="mt-2 text-xs text-text">Designated for partner support</p>
+                            @elseif ($membership->support === UserMembershipList::SUPPORT_INCOMPLETE)
+                            <p class="mt-2 text-xs text-text">Incomplete support record</p>
+                            <p class="text-xs text-text-muted">It grants nothing.</p>
+                            @endif
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+                @endif
             </section>
 
             {{-- Activity log --}}

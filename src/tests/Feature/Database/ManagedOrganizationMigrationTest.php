@@ -329,7 +329,7 @@ describe('MO-1A unique company link', function () {
             }
 
             expect($refusal?->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING)
-                ->and($refusal->getMessage())->toContain('is linked to 2 CRM companies')
+                ->and($refusal->getMessage())->toContain('is linked to 2 Directory profiles')
                 ->and(fn () => $service->designatePartner($ambiguous, $owner))->toThrow(OrganizationRelationshipException::class);
 
             $report = app(OrganizationPreflight::class)->report();

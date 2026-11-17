@@ -16,7 +16,7 @@ class CompanyHasProjectsException extends RuntimeException
     public function __construct(public readonly string $company, public readonly int $projects)
     {
         parent::__construct("Cannot delete \"{$company}\": ".($projects > 0 ? "{$projects} project(s) still refer" : 'projects still refer')
-            .' to it. Remove the company from those projects first.');
+            .' to it. Remove the organization from those projects first.');
     }
 
     /** A conflict: HTTP 409 for a JSON caller, and the admin forms' convention (back, with the error) for a browser. */

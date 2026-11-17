@@ -39,6 +39,7 @@ function guardRoot(): string
 function guardTargetInventory(): array
 {
     return [
+        'admin/roles/_permission.blade.php',
         'admin/roles/create.blade.php',
         'admin/roles/edit.blade.php',
         'admin/roles/index.blade.php',
@@ -492,7 +493,7 @@ it('keeps the Level B target inventory exact, and says what to do when a view is
 
     expect($message)->toBe('')
         ->and($inventory)->toBe($discovered)
-        ->and(count($inventory))->toBe(60);
+        ->and(count($inventory))->toBe(61);
 });
 
 it('draws the inventory only from the §17.2 roots, and lists every file once', function () {
@@ -597,9 +598,9 @@ it('Level B: the Focused shell partials carry the same Direction D rules as the 
     }
 
     expect(implode("\n", $violations))->toBe('')
-        // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship; 60 after R1-3C: organizations/_invitations).
+        // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship; 60 after R1-3C: organizations/_invitations; 61 after DIR-1: admin/roles/_permission).
         ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
-        ->and(count(guardTargetInventory()))->toBe(60);
+        ->and(count(guardTargetInventory()))->toBe(61);
 });
 
 it('keeps every allowlist entry reasoned and still needed', function () {

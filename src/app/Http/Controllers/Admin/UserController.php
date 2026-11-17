@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AccessGrants;
 use App\Services\AccountLifecycleService;
+use App\Services\UserMembershipList;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
@@ -19,17 +20,43 @@ class UserController extends Controller
         private readonly AccountLifecycleService $lifecycle,
     ) {}
 
+    /** The account-type and status filters the list accepts; anything else is ignored, never an error. */
+    public const TYPES = ['operator', 'customer'];
+
+    public const STATUSES = ['active', 'suspended'];
+
     public function index(Request $request)
     {
+        // A repeated or array-shaped parameter (`?search[]=x`) is ignored like an unknown filter value, never a type error.
+        $search = is_string($request->query('search')) ? trim($request->query('search')) : '';
+        $type = in_array($request->query('type'), self::TYPES, true) ? $request->query('type') : null;
+        $status = in_array($request->query('status'), self::STATUSES, true) ? $request->query('status') : null;
+
         $users = User::with('roles')
-            ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', "%{$request->search}%")
-                ->orWhere('email', 'like', "%{$request->search}%")
-            )
+            // The name/email alternatives are ONE grouped predicate: a bare `where(name) or where(email)` would let the email branch
+            // escape every filter added after it (an operator filter would list customers whose email matched).
+            ->when($search !== '', fn ($q) => $q->where(fn ($match) => $match
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")))
+            ->when($type !== null, fn ($q) => $q->operatorEligible($type === 'operator'))
+            ->when($status !== null, fn ($q) => $status === 'suspended'
+                ? $q->whereNotNull('disabled_at')
+                : $q->active())
             ->orderBy('name')
+            ->orderBy('id')
             ->paginate(25)
             ->withQueryString();
 
-        return view('admin.users.index', compact('users'));
+        // One query for the page's memberships, never one per row.
+        $memberships = UserMembershipList::forUsers($users->getCollection()->pluck('id')->all());
+
+        return view('admin.users.index', [
+            'users' => $users,
+            'memberships' => $memberships,
+            'search' => $search,
+            'type' => $type,
+            'status' => $status,
+        ]);
     }
 
     public function show(User $user)
@@ -43,8 +70,9 @@ class UserController extends Controller
             ->latest()
             ->take(20)
             ->get();
+        $memberships = UserMembershipList::forUser($user);
 
-        return view('admin.users.show', compact('user', 'allRoles', 'activity'));
+        return view('admin.users.show', compact('user', 'allRoles', 'activity', 'memberships'));
     }
 
     public function updateRoles(Request $request, User $user)
