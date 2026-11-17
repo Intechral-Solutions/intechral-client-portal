@@ -414,7 +414,7 @@ it('shows an operator the relationship, offers only valid actions, and shows a s
     $plainPage->assertSee('Not managed by a partner.')->assertSee('Designate as partner')->assertSee('Link to partner');
 
     $brokenPage = $this->actingAs($this->operator)->get(route('organizations.show', $broken))->assertOk();
-    $brokenPage->assertSee('linked to 0 CRM companies')->assertDontSee('Designate as partner')->assertDontSee('Link to partner');
+    $brokenPage->assertSee('linked to 0 Directory profiles')->assertDontSee('Designate as partner')->assertDontSee('Link to partner');
 
     // A customer who holds crm.manage and belongs to the customer organization can open their own organization's page,
     // and must learn nothing about any other organization from the relationship.
@@ -480,7 +480,7 @@ it('still offers Unlink for a managed organization whose company is gone, and th
     DB::table('crm_companies')->where('organization_id', $customer->id)->update(['organization_id' => null]);
 
     $page = $this->actingAs($this->operator)->get(route('organizations.show', $customer->id))->assertOk();
-    $page->assertSee('linked to 0 CRM companies')->assertSee('Unlink from partner')
+    $page->assertSee('linked to 0 Directory profiles')->assertSee('Unlink from partner')
         ->assertDontSee('Link to partner')->assertDontSee('Reassign');
 
     // Creating a relationship still needs the pair: the broken organization cannot be linked anywhere new.

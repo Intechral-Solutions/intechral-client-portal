@@ -320,9 +320,10 @@ final class NavigationBuilder
     }
 
     /**
-     * `crm_companies` (a directory record) and `organizations` (a tenancy record) are two different
-     * tables with two different meanings, so Directory shows both as distinct entries. Collapsing
-     * them is a data migration owned by the Directory epic.
+     * Directory offers People and Organizations (DIR-1, ADR-010). An Organization is ONE concept that today lives in two tables
+     * (`crm_companies`, the Directory profile, and `organizations`, the portal tenancy record); the model is unified in what the
+     * operator sees, not by consolidating the tables. The administrative index of portal organizations is therefore not a third
+     * Directory entry: it is System → Organization access ({@see self::system()}).
      *
      * @return array<string, mixed>|null
      */
@@ -336,7 +337,7 @@ final class NavigationBuilder
             key: 'directory',
             label: 'Directory',
             icon: 'contact',
-            patterns: ['crm.*', 'organizations.*'],
+            patterns: ['crm.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, [
                 $this->item('directory.people', 'People', route('crm.contacts.index'), 'document', [
@@ -350,10 +351,6 @@ final class NavigationBuilder
                     'crm.companies.show',
                     'crm.companies.create',
                     'crm.companies.edit',
-                ]),
-                $this->item('directory.portal-access', 'Portal access', route('organizations.index'), 'document', [
-                    'organizations.index',
-                    'organizations.show',
                 ]),
             ])],
         );
@@ -419,6 +416,17 @@ final class NavigationBuilder
             ]);
         }
 
+        // Release 1.0 (DIR-1): the administrative index of portal organizations, under the same `crm.manage` gate the route has always
+        // had. `organizations.show` (and the organization administration actions that return to it) stays inside this item until DIR-2
+        // unifies the Organization page under Directory. An actor holding `crm.manage` and nothing else in System still reaches it,
+        // because this workspace appears whenever any one of its views survives.
+        if ($user->can('crm.manage')) {
+            $views[] = $this->item('system.organization-access', 'Organization access', route('organizations.index'), 'document', [
+                'organizations.index',
+                'organizations.show',
+            ]);
+        }
+
         if ($user->can('cms.edit')) {
             $views[] = $this->item('system.pages', 'Pages', route('operator.cms.index'), 'document', [
                 'operator.cms.index',
@@ -435,7 +443,7 @@ final class NavigationBuilder
             key: 'system',
             label: 'System',
             icon: 'settings',
-            patterns: ['users.*', 'roles.*', 'operator.cms.*'],
+            patterns: ['users.*', 'roles.*', 'organizations.*', 'operator.cms.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, $views)],
         );

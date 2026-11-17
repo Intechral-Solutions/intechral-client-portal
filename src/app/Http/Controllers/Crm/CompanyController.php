@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Crm;
 use App\Http\Controllers\Controller;
 use App\Models\CrmCompany;
 use App\Services\CrmService;
+use App\Services\OrganizationListFacts;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,15 +16,23 @@ class CompanyController extends Controller
 
     public function index(Request $request): View
     {
-        $search = $request->get('search');
+        // An array-shaped parameter (`?search[]=x`) is no search, never an "Array to string" error.
+        $search = is_string($request->query('search')) ? $request->query('search') : null;
 
-        $companies = CrmCompany::with('organization')
+        $companies = CrmCompany::query()
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
+            ->orderBy('id')
             ->paginate(25)
             ->withQueryString();
 
-        return view('crm.companies.index', compact('companies', 'search'));
+        // Release 1.0 (DIR-1): the portal-access state of every row, and "Managed by" / "Manages N" only for an actor who may manage
+        // relationships. The relationship facts are not read for anyone else (null), so nothing is merely hidden in the view (DIR-0 S7).
+        $organizationIds = $companies->getCollection()->pluck('organization_id')->all();
+        $portalStatus = OrganizationListFacts::portalStatus($organizationIds);
+        $relationships = OrganizationListFacts::relationships($request->user(), $organizationIds);
+
+        return view('crm.companies.index', compact('companies', 'search', 'portalStatus', 'relationships'));
     }
 
     public function create(): View
@@ -44,7 +53,7 @@ class CompanyController extends Controller
         $company = $this->service->createCompany($request->user(), $data);
 
         return redirect()->route('crm.companies.show', $company)
-            ->with('success', 'Company created.');
+            ->with('success', 'Organization created.');
     }
 
     public function show(CrmCompany $company): View
@@ -72,7 +81,7 @@ class CompanyController extends Controller
         $this->service->updateCompany($company, $data);
 
         return redirect()->route('crm.companies.show', $company)
-            ->with('success', 'Company updated.');
+            ->with('success', 'Organization updated.');
     }
 
     public function destroy(CrmCompany $company): RedirectResponse
@@ -80,7 +89,7 @@ class CompanyController extends Controller
         $this->service->deleteCompany($company);
 
         return redirect()->route('crm.companies.index')
-            ->with('success', 'Company deleted.');
+            ->with('success', 'Organization deleted.');
     }
 
     public function promote(Request $request, CrmCompany $company): RedirectResponse
@@ -88,6 +97,6 @@ class CompanyController extends Controller
         $org = $this->service->promoteToOrganization($company, $request->user());
 
         return redirect()->route('organizations.show', $org)
-            ->with('success', "\"{$company->name}\" has been promoted to an organization.");
+            ->with('success', "Portal access is enabled for \"{$company->name}\".");
     }
 }

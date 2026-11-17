@@ -443,34 +443,34 @@ test.describe('Directory', () => {
 
         for (const { theme, viewport } of MODES) {
             let tokens = await visit(page, '/crm/contacts', theme, viewport);
-            await expectInk(inMain(page).getByRole('link', { name: '+ New Contact' }), tokens);
-            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Contact' }), viewport);
+            await expectInk(inMain(page).getByRole('link', { name: '+ New Person' }), tokens);
+            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Person' }), viewport);
             await expect(inMain(page).getByRole('textbox', { name: 'Search by name or email…' })).toBeVisible();
             await expectSecondary(inMain(page).getByRole('button', { name: 'Search', exact: true }), tokens);
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/crm/contacts/create', theme, viewport);
-            for (const name of ['First Name', 'Last Name', 'Company', 'Email', 'Phone', 'Job Title', 'Notes']) {
+            for (const name of ['First Name', 'Last Name', 'Organization', 'Email', 'Phone', 'Job Title', 'Notes']) {
                 await expect(inMain(page).getByLabel(name)).toBeVisible();
             }
-            await expectInk(inMain(page).getByRole('button', { name: 'Create Contact' }), tokens);
+            await expectInk(inMain(page).getByRole('button', { name: 'Create Person' }), tokens);
             await expectSecondary(inMain(page).getByRole('link', { name: 'Cancel' }), tokens);
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/crm/companies', theme, viewport);
-            await expectInk(inMain(page).getByRole('link', { name: '+ New Company' }), tokens);
-            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Company' }), viewport);
+            await expectInk(inMain(page).getByRole('link', { name: '+ New Organization' }), tokens);
+            await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Organization' }), viewport);
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/crm/companies/create', theme, viewport);
-            for (const name of ['Company Name', 'Website', 'Phone', 'Address', 'Notes']) {
+            for (const name of ['Organization name', 'Website', 'Phone', 'Address', 'Notes']) {
                 await expect(inMain(page).getByLabel(name)).toBeVisible();
             }
-            await expectInk(inMain(page).getByRole('button', { name: 'Create Company' }), tokens);
+            await expectInk(inMain(page).getByRole('button', { name: 'Create Organization' }), tokens);
             await expectControlContract(page, tokens);
 
             tokens = await visit(page, '/organizations', theme, viewport);
-            await expectSecondary(inMain(page).getByRole('link', { name: 'View Companies' }), tokens);
+            await expectSecondary(inMain(page).getByRole('link', { name: 'View Organizations' }), tokens);
             expect(await hasHorizontalOverflow(page)).toBe(false);
         }
     });
@@ -487,9 +487,9 @@ test.describe('Directory', () => {
             const tokens = await visit(page, `${companyPath}/edit`, theme, viewport);
 
             await expectInk(inMain(page).getByRole('button', { name: 'Save Changes' }), tokens);
-            await expectDangerTrigger(inMain(page).getByRole('button', { name: 'Delete Company' }), tokens);
+            await expectDangerTrigger(inMain(page).getByRole('button', { name: 'Delete Organization' }), tokens);
             // The danger-zone container takes the danger border from the theme utility.
-            const zone = page.locator('div.border-danger').filter({ hasText: 'Delete Company' });
+            const zone = page.locator('div.border-danger').filter({ hasText: 'Delete Organization' });
             expect(await style(zone, 'border-top-color')).toBe(tokens.danger);
             await expectControlContract(page, tokens);
         }
@@ -501,7 +501,7 @@ test.describe('Directory', () => {
             confirmation = `${dialog.type()}: ${dialog.message()}`;
             await dialog.dismiss();
         });
-        await inMain(page).getByRole('button', { name: 'Delete Company' }).click();
+        await inMain(page).getByRole('button', { name: 'Delete Organization' }).click();
         expect(confirmation).toBe('confirm: Delete E2E WP1 Company? This cannot be undone.');
         await expect(page).toHaveURL(new RegExp(`${companyPath}/edit$`));
         expect((await page.request.get(companyPath)).status()).toBe(200);
@@ -520,7 +520,7 @@ test.describe('Directory', () => {
         const tokens = await visit(page, `${pathOf(location)}/edit`, 'dark', S);
 
         await expect(inMain(page).getByLabel('First Name')).toHaveValue('E2E');
-        await expectDangerTrigger(inMain(page).getByRole('button', { name: 'Delete Contact' }), tokens);
+        await expectDangerTrigger(inMain(page).getByRole('button', { name: 'Delete Person' }), tokens);
         await expectControlContract(page, tokens);
     });
 });

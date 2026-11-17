@@ -323,7 +323,7 @@ it('never leaks an operator or administrative destination to a user-role actor',
         }
 
         foreach (['system', 'system.users', 'system.roles', 'system.pages', 'directory',
-            'directory.people', 'directory.organizations', 'directory.portal-access',
+            'directory.people', 'directory.organizations', 'system.organization-access',
             'helpdesk.queue', 'helpdesk.reports', 'time.reports', 'finance.invoices'] as $forbidden) {
             expect($keys)->not->toContain($forbidden);
         }
@@ -416,6 +416,11 @@ it('emits System with only the sections each administrative capability permits',
     'cms.edit only' => [['cms.edit'], ['system.pages']],
     'users.view and cms.edit' => [['users.view', 'cms.edit'], ['system.users', 'system.pages']],
     'all three' => [['users.view', 'roles.view', 'cms.edit'], ['system.users', 'system.roles', 'system.pages']],
+    // DIR-1: Organization access is a System entry under the same crm.manage gate the route has always had. crm.manage alone is enough
+    // to reach it, so an actor with no other System capability still finds it.
+    'crm.manage only' => [['crm.manage'], ['system.organization-access']],
+    'users.view and crm.manage' => [['users.view', 'crm.manage'], ['system.users', 'system.organization-access']],
+    'all four' => [['users.view', 'roles.view', 'crm.manage', 'cms.edit'], ['system.users', 'system.roles', 'system.organization-access', 'system.pages']],
 ]);
 
 it('omits a workspace entirely rather than emitting it empty', function () {
@@ -537,7 +542,8 @@ it('marks exactly one workspace and at most one contextual item active', functio
     'time reports' => ['operator.time.index', [], 'time', 'time.reports'],
     'crm contacts' => ['crm.contacts.index', [], 'directory', 'directory.people'],
     'crm companies' => ['crm.companies.index', [], 'directory', 'directory.organizations'],
-    'organizations' => ['organizations.index', [], 'directory', 'directory.portal-access'],
+    // DIR-1: the portal-organization index is System → Organization access, no longer a Directory entry.
+    'organization access' => ['organizations.index', [], 'system', 'system.organization-access'],
     'operator invoices' => ['billing.invoices.index', [], 'finance', 'finance.invoices'],
     'admin users' => ['users.index', [], 'system', 'system.users'],
     'admin roles' => ['roles.index', [], 'system', 'system.roles'],
@@ -746,4 +752,89 @@ it('keeps every pre-WP3 destination reachable in the canonical model', function 
             expect($hrefs)->toContain(route($route));
         }
     }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DIR-1: Directory offers People and Organizations; Organization access lives in System
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('offers exactly People and Organizations in Directory, with no Portal access entry', function () {
+    $directory = workspaces(navigationFor(actor('operator'), 'dashboard'))['directory'];
+    $items = contextItems($directory);
+
+    expect(array_column($items, 'label'))->toBe(['People', 'Organizations'])
+        ->and(array_keys($items))->toBe(['directory.people', 'directory.organizations'])
+        ->and($items['directory.people']['href'])->toBe(route('crm.contacts.index'))
+        ->and($items['directory.organizations']['href'])->toBe(route('crm.companies.index'))
+        ->and($directory['href'])->toBe(route('crm.contacts.index'))
+        ->and(navigationValuesDeep($directory, 'label'))->not->toContain('Portal access')
+        ->and(navigationValuesDeep($directory, 'href'))->not->toContain(route('organizations.index'));
+});
+
+it('shows System Organization access to an actor with crm.manage, opening the existing index', function () {
+    $system = workspaces(navigationFor(actor('user', ['crm.manage']), 'dashboard'))['system'];
+    $item = contextItems($system)['system.organization-access'];
+
+    expect($item['label'])->toBe('Organization access')
+        ->and($item['href'])->toBe(route('organizations.index'))
+        ->and($item['visit'])->toBe('document')
+        // crm.manage alone: the workspace default is that surviving entry, never a filtered-out one.
+        ->and($system['href'])->toBe(route('organizations.index'));
+});
+
+it('keeps the organization detail and its administration inside System → Organization access until DIR-2', function () {
+    $navigation = navigationFor(actor('operator'), 'organizations.show', ['organization' => 1]);
+
+    expect($navigation['currentWorkspace'])->toBe('system')
+        ->and(navigationActiveKeysDeep($navigation))->toBe(['system', 'system.organization-access']);
+
+    // Every organization action route returns to the same workspace; none falls back to Directory.
+    foreach (['organizations.members.store', 'organizations.invitations.store'] as $route) {
+        expect(navigationFor(actor('operator'), $route, ['organization' => 1])['currentWorkspace'])->toBe('system');
+    }
+
+    foreach (['organizations.disable', 'organizations.partner.designate'] as $route) {
+        expect(navigationFor(actor('operator'), $route, ['organizationId' => 1])['currentWorkspace'])->toBe('system');
+    }
+});
+
+it('keeps Directory active, and not System, on every Directory route', function () {
+    $actor = actor('operator');
+
+    foreach ([
+        ['crm.contacts.index', [], 'directory.people'],
+        ['crm.contacts.show', ['contact' => 1], 'directory.people'],
+        ['crm.companies.index', [], 'directory.organizations'],
+        ['crm.companies.show', ['company' => 1], 'directory.organizations'],
+        ['crm.companies.edit', ['company' => 1], 'directory.organizations'],
+    ] as [$route, $parameters, $item]) {
+        $navigation = navigationFor($actor, $route, $parameters);
+
+        expect($navigation['currentWorkspace'])->toBe('directory')
+            ->and(navigationActiveKeysDeep($navigation))->toBe(['directory', $item]);
+    }
+});
+
+it('keeps every previously authorized destination reachable for a narrowly assigned actor, and gives a customer nothing new', function () {
+    // Directory without crm.manage does not exist, and System without any of its capabilities does not either.
+    foreach ([['users.view'], ['roles.view'], ['cms.edit'], ['crm.manage']] as $permissions) {
+        $subject = actor('user', $permissions);
+        $hrefs = navigationValuesDeep(navigationFor($subject, 'dashboard'), 'href');
+
+        expect(in_array(route('organizations.index'), $hrefs, true))->toBe($permissions === ['crm.manage'])
+            ->and(in_array(route('users.index'), $hrefs, true))->toBe($permissions === ['users.view'])
+            ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($permissions === ['crm.manage']);
+    }
+
+    $customer = navigationFor(actor('user'), 'dashboard');
+
+    expect(array_keys(workspaces($customer)))->not->toContain('directory', 'system')
+        ->and(navigationValuesDeep($customer, 'href'))->not->toContain(route('organizations.index'), route('crm.contacts.index'), route('crm.companies.index'));
+});
+
+it('removes the stale comment that said the two Organization entries could only be unified by a database consolidation', function () {
+    $source = file_get_contents(app_path('Shared/Navigation/NavigationBuilder.php'));
+
+    expect($source)->not->toContain('Collapsing')
+        ->and($source)->not->toContain('data migration owned by the Directory epic');
 });

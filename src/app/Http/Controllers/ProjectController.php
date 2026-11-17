@@ -110,7 +110,7 @@ class ProjectController extends Controller
             ...$this->memberRules(),
             'companies' => 'nullable|array',
             'companies.*' => [new AccessibleCrmCompany],
-        ]);
+        ], [], ['companies' => 'linked organizations', 'companies.*' => 'organization']);
 
         // One service-owned transaction: the project, its board, the creator, the extra members and
         // the company links all persist together or not at all (EPIC-015 INV-P10).
@@ -218,12 +218,12 @@ class ProjectController extends Controller
         $data = $request->validate([
             'companies' => 'present|array',
             'companies.*' => [new AccessibleCrmCompany],
-        ]);
+        ], [], ['companies' => 'linked organizations', 'companies.*' => 'organization']);
 
         $project->companies()->sync($data['companies']);
 
         return redirect()->route('projects.edit', $project)
-            ->with('success', 'Companies updated.');
+            ->with('success', 'Linked organizations updated.');
     }
 
     // ── Private ──────────────────────────────────────────────

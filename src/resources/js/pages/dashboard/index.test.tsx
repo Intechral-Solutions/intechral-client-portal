@@ -206,7 +206,11 @@ describe('Home', () => {
 
         // Relabelled to match the IA; the prop keeps its `crmSummary` key (§21.2).
         expect(screen.getByRole('heading', { name: 'Directory' })).toBeVisible();
-        expect(screen.getByText('Companies').nextSibling).toHaveTextContent('4');
+        expect(screen.getByText('Organizations').nextSibling).toHaveTextContent('4');
+        expect(screen.getByText('People').nextSibling).toHaveTextContent('9');
+        expect(screen.getByText('With portal access').nextSibling).toHaveTextContent('2');
+        expect(screen.queryByText('Companies')).not.toBeInTheDocument();
+        expect(screen.queryByText('Contacts')).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Open Directory' })).not.toHaveAttribute(
             'data-inertia',
         );

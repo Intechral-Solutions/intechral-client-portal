@@ -6,22 +6,32 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\OrganizationInvitationList;
+use App\Services\OrganizationListFacts;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
 use App\Services\PartnerSupportGrants;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class OrganizationController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $organizations = Organization::with(['owner', 'company'])
             ->withCount('members')
             ->orderBy('name')
+            ->orderBy('id')
             ->paginate(25);
 
-        return view('organizations.index', compact('organizations'));
+        $ids = $organizations->getCollection()->pluck('id')->all();
+
+        // Release 1.0 (DIR-1): portal state for every row, and "Managed by" / "Manages N" ONLY for an actor who may manage relationships. The
+        // relationship facts are not read at all for anyone else (null), so there is nothing to hide in the view (DIR-0 invariant S7).
+        $portalStatus = OrganizationListFacts::portalStatus($ids);
+        $relationships = OrganizationListFacts::relationships($request->user(), $ids);
+
+        return view('organizations.index', compact('organizations', 'portalStatus', 'relationships'));
     }
 
     public function show(Organization $organization): View

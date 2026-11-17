@@ -17,7 +17,8 @@ class ContactController extends Controller
 
     public function index(Request $request): View
     {
-        $search = $request->get('search');
+        // An array-shaped parameter (`?search[]=x`) is no search, never an "Array to string" error.
+        $search = is_string($request->query('search')) ? $request->query('search') : null;
 
         $contacts = CrmContact::with('company')
             ->when($search, fn ($q) => $q->where(function ($q) use ($search) {
@@ -51,12 +52,12 @@ class ContactController extends Controller
             'phone' => 'nullable|string|max:30',
             'job_title' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:5000',
-        ]);
+        ], [], ['crm_company_id' => 'organization']);
 
         $contact = $this->service->createContact($request->user(), $data);
 
         return redirect()->route('crm.contacts.show', $contact)
-            ->with('success', 'Contact created.');
+            ->with('success', 'Person created.');
     }
 
     public function show(CrmContact $contact): View
@@ -83,12 +84,12 @@ class ContactController extends Controller
             'phone' => 'nullable|string|max:30',
             'job_title' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:5000',
-        ]);
+        ], [], ['crm_company_id' => 'organization']);
 
         $this->service->updateContact($contact, $data);
 
         return redirect()->route('crm.contacts.show', $contact)
-            ->with('success', 'Contact updated.');
+            ->with('success', 'Person updated.');
     }
 
     public function destroy(CrmContact $contact): RedirectResponse
@@ -96,6 +97,6 @@ class ContactController extends Controller
         $this->service->deleteContact($contact);
 
         return redirect()->route('crm.contacts.index')
-            ->with('success', 'Contact deleted.');
+            ->with('success', 'Person deleted.');
     }
 }

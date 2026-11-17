@@ -1,14 +1,14 @@
-@extends('layouts.app', ['title' => 'Contacts'])
+@extends('layouts.app', ['title' => 'People'])
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-    <div class="mb-8 flex items-center justify-between">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold text-text">Contacts</h1>
-            <p class="mt-1 text-sm text-text-secondary">CRM contact records.</p>
+            <h1 class="text-2xl font-semibold text-text">People</h1>
+            <p class="mt-1 text-sm text-text-secondary">People in the Directory.</p>
         </div>
-        <x-ui.button :href="route('crm.contacts.create')">+ New Contact</x-ui.button>
+        <x-ui.button :href="route('crm.contacts.create')" class="shrink-0">+ New Person</x-ui.button>
     </div>
 
     @if (session('success'))
@@ -29,7 +29,7 @@
             <thead>
                 <tr class="border-b border-rule-control">
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Company</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Organization</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Email</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Phone</th>
                     <th class="px-4 py-3"></th>
@@ -62,7 +62,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No contacts found.</td>
+                    <td colspan="5" class="px-4 py-12 text-center text-sm text-text-muted">No people found.</td>
                 </tr>
                 @endforelse
             </tbody>

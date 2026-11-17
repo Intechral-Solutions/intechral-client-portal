@@ -163,9 +163,9 @@ it('associates the CRM, CMS and System form labels with their fields, keeping th
     $role = uiPage($this, 'operator', route('roles.create'));
 
     expect(uiNames($contact, '//form[@action]//input[@type="text" or @type="email"] | //form//select | //form//textarea'))
-        ->toBe(['First Name *', 'Last Name *', 'Company', 'Email', 'Phone', 'Job Title', 'Notes'])
+        ->toBe(['First Name *', 'Last Name *', 'Organization', 'Email', 'Phone', 'Job Title', 'Notes'])
         ->and(uiNames($company, '//form//input[not(@type="hidden")] | //form//textarea'))
-        ->toBe(['Company Name *', 'Website', 'Phone', 'Address', 'Notes'])
+        ->toBe(['Organization name *', 'Website', 'Phone', 'Address', 'Notes'])
         ->and(uiNames($cms, '//form//input[not(@type="hidden")] | //form//textarea'))
         ->toBe(['Title *', 'Slug (leave blank to auto-generate)', 'Content (HTML)'])
         ->and(uiNames($role, '//input[@name="name"]'))->toBe(['Role name *']);
@@ -199,7 +199,7 @@ it('names the organization member controls and the user-role group', function ()
     $show = $this->actingAs($operator)->get(route('users.show', $user))->assertOk()->getContent();
     $xpath = uiDom($show);
 
-    expect(uiNames($org, '//select[@name="user_id"]'))->toBe(['Person to add'])
+    expect(uiNames($org, '//select[@name="user_id"]'))->toBe(['Account to add'])
         ->and(uiNames($org, '//select[@name="role"]'))->toBe(['Organization role'])
         ->and(uiOne($xpath, '//*[@id="user-roles-group"]')->getAttribute('role'))->toBe('group')
         ->and(uiOne($xpath, '//*[@id="user-roles-group"]')->getAttribute('aria-labelledby'))->toBe('user-roles-heading')

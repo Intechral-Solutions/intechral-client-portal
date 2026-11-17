@@ -14,9 +14,9 @@
 </div>
 
 <div class="space-y-2">
-    <x-ui.label for="crm_company_id">Company</x-ui.label>
+    <x-ui.label for="crm_company_id">Organization</x-ui.label>
     <x-ui.select name="crm_company_id" class="w-full">
-        <option value="">No company</option>
+        <option value="">No organization</option>
         @foreach ($companies as $company)
         <option value="{{ $company->id }}"
                 @selected(old('crm_company_id', $contact->crm_company_id ?? $companyId ?? '') == $company->id)>

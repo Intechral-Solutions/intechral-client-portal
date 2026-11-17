@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Shared\Mfa\OperatorMfaGate;
+use App\Shared\Permissions\PermissionCatalogue;
+use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -93,6 +95,45 @@ class User extends Authenticatable
     public function scopeActive(Builder $query): void
     {
         $query->whereNull($query->qualifyColumn('disabled_at'));
+    }
+
+    /**
+     * Accounts that hold `portal.operator` (operator ELIGIBILITY), directly or through any role, or, with `$eligible = false`, the accounts that
+     * do not. This is the one test the product applies to "operator" ({@see CustomerPilotGate::isOperator()}), asked of the
+     * tables as a query so a list can filter on it. It is deliberately NOT a check for a role named `operator`: a custom role that carries the
+     * capability is an operator, and an account whose only role is the built-in `operator` but which does not hold the capability is not.
+     * Everything that is not an operator by this test is a customer by the product's own boundary (the customer-pilot gate refuses it every
+     * operator route), including an internal account whose roles lack the capability.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeOperatorEligible(Builder $query, bool $eligible = true): void
+    {
+        $tables = config('permission.table_names');
+        $modelKey = config('permission.column_names.model_morph_key');
+        $morphClass = $this->getMorphClass();
+        $guard = (string) config('auth.defaults.guard');
+        $capability = PermissionCatalogue::PORTAL_OPERATOR;
+        $users = $query->qualifyColumn('id');
+
+        $holds = fn (Builder $group) => $group
+            ->whereExists(fn ($direct) => $direct->selectRaw('1')
+                ->from($tables['model_has_permissions'].' as mhp')
+                ->join($tables['permissions'].' as p', 'p.id', '=', 'mhp.permission_id')
+                ->whereColumn("mhp.{$modelKey}", $users)
+                ->where('mhp.model_type', $morphClass)
+                ->where('p.name', $capability)
+                ->where('p.guard_name', $guard))
+            ->orWhereExists(fn ($viaRole) => $viaRole->selectRaw('1')
+                ->from($tables['model_has_roles'].' as mhr')
+                ->join($tables['role_has_permissions'].' as rhp', 'rhp.role_id', '=', 'mhr.role_id')
+                ->join($tables['permissions'].' as p', 'p.id', '=', 'rhp.permission_id')
+                ->whereColumn("mhr.{$modelKey}", $users)
+                ->where('mhr.model_type', $morphClass)
+                ->where('p.name', $capability)
+                ->where('p.guard_name', $guard));
+
+        $eligible ? $query->where($holds) : $query->whereNot($holds);
     }
 
     /**

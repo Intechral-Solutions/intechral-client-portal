@@ -44,7 +44,7 @@
         </form>
         <x-ui.field-error for="customer_id" />
         @else
-        <p class="text-xs text-text-muted">No organization is available to link: a customer must not be a partner or already managed, and must have exactly one CRM company.</p>
+        <p class="text-xs text-text-muted">No organization is available to link: a customer must not be a partner or already managed, and must have exactly one Directory profile.</p>
         @endif
 
         <div class="border-t pt-3 border-rule">
@@ -74,7 +74,7 @@
 
         @if ($relationship['companies'] !== 1)
         <p class="text-xs text-text-muted">
-            This organization is linked to {{ $relationship['companies'] }} CRM {{ \Illuminate\Support\Str::plural('company', $relationship['companies']) }}. A managed relationship needs exactly one, so none can be set until that is resolved in the CRM.
+            This organization is linked to {{ $relationship['companies'] }} Directory {{ \Illuminate\Support\Str::plural('profile', $relationship['companies']) }}. A managed relationship needs exactly one, so none can be set until that is resolved in the Directory.
         </p>
         @else
             @if ($relationship['candidatePartners']->isNotEmpty())

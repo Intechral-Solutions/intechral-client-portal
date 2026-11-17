@@ -223,9 +223,9 @@ function DashboardPage({ metrics, recentTickets, quickActions, crmSummary }: Das
                 >
                     <dl className="flex flex-wrap gap-x-8 gap-y-3">
                         {[
-                            { label: 'Companies', value: crmSummary.companies },
-                            { label: 'Contacts', value: crmSummary.contacts },
-                            { label: 'Organizations', value: crmSummary.orgs },
+                            { label: 'Organizations', value: crmSummary.companies },
+                            { label: 'People', value: crmSummary.contacts },
+                            { label: 'With portal access', value: crmSummary.orgs },
                         ].map((figure) => (
                             <div key={figure.label}>
                                 <dt className="text-xs tracking-wide text-text-muted uppercase">

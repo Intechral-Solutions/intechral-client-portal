@@ -27,7 +27,7 @@ it('is a labelled group of native checkboxes that toggle independently', async (
     const user = userEvent.setup();
     render(<Harness initial={[2]} />);
 
-    expect(screen.getByRole('group', { name: 'Linked companies' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Linked organizations' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Acme Co' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Globex' })).toBeChecked();
 
@@ -38,21 +38,19 @@ it('is a labelled group of native checkboxes that toggle independently', async (
     expect(screen.getByRole('checkbox', { name: 'Globex' })).not.toBeChecked();
 });
 
-it('says a company link is informational and grants no access', () => {
+it('says an organization link is informational and grants no access', () => {
     render(<Harness />);
 
-    const group = screen.getByRole('group', { name: 'Linked companies' });
-    expect(group).toHaveAccessibleDescription(
-        /does not grant that company's organization members access/,
-    );
+    const group = screen.getByRole('group', { name: 'Linked organizations' });
+    expect(group).toHaveAccessibleDescription(/does not grant that organization's members access/);
     expect(group).not.toHaveAccessibleDescription(/visibility/i);
 });
 
 it('shows a validation error and ties it to the group', () => {
-    render(<Harness error="The selected company is invalid." />);
+    render(<Harness error="The selected organization is invalid." />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('The selected company is invalid.');
-    expect(screen.getByRole('group', { name: 'Linked companies' })).toHaveAccessibleDescription(
-        /The selected company is invalid\./,
+    expect(screen.getByRole('alert')).toHaveTextContent('The selected organization is invalid.');
+    expect(screen.getByRole('group', { name: 'Linked organizations' })).toHaveAccessibleDescription(
+        /The selected organization is invalid\./,
     );
 });
