@@ -159,6 +159,8 @@ When a CRM company is promoted to an **Organization**, membership adds a tenant-
 
 ### Two-Layer Authorization Model
 
+> **Annotation 2026-11-18 (ORG-0).** The two-layer description below is the as-built model and is accurate: `organization_members.role` and administrator approval authorize nothing today, and the `org.admin`, `org.invite`, `org.manage_roles` and `*.view_org` permissions it alludes to are checked by no code. The future Organization-roles direction is a **separate four-layer contract** ([ADR-011 §9](./adr/ADR-011-organization-consolidation-and-lifecycle.md#9-future-organization-roles-contract-future), nothing built in Release 1.0): global platform authority; centrally managed delegation envelopes or templates; Organization-scoped role definitions; membership-specific assignments, decided for a (User, Organization) pair by one resolver. The unused global `org.*` permissions are **not** to be activated, Spatie `teams` stay off ([ADR-003 Amendment 1](./adr/ADR-003-spatie-permission.md#amendment-1-org-0-2026-11-18-spatie-teams-stay-off-and-organization-roles-are-not-spatie-roles)), and a global permission never acquires Organization scope by reuse.
+
 ```
 Platform layer (Spatie)              Organization membership pivot
 ───────────────────────              ─────────────────────────────
@@ -208,7 +210,7 @@ The built-in `user` role no longer receives the `*.view_org` permissions (R1-1);
 
 ### Authorization Check Order
 
-1. Is the user an `operator`? → Full access everywhere.
+1. Is the user an `operator`? → Full access everywhere. *(Annotation 2026-11-18: stale wording. "Operator" is the explicit `portal.operator` eligibility, not a role named `operator` (R1-1), and it bypasses the **tenant scopes** and the customer route allowlist rather than every policy: the policies decide per ability, for example `TicketPolicy` and `OrganizationPolicy` require specific capabilities such as `tickets.assign`, `crm.manage` and `manageMembership`. A Disabled or Not enabled Organization is a further state each decision reads from the table (ADR-011 §3 and §5), never through the Gate inside a locked transaction.)*
 2. Does the user have the required **platform** permission? → Check passes or fails.
 3. For tenant-scoped data, is the record reachable through one of the user's memberships? → Visible or hidden/404.
 4. Apply the model policy or ownership rule for the requested action.

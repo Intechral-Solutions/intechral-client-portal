@@ -2,7 +2,7 @@
 
 **Date:** 2024-03-24
 **Status:** Accepted
-**Amended:** 2026-06-30 by EPIC-010B to match the implemented schema; 2026-11-10 by R1-2 (Ticket attribution), see [Amendment 2](#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope)
+**Amended:** 2026-06-30 by EPIC-010B to match the implemented schema; 2026-11-10 by R1-2 (Ticket attribution), see [Amendment 2](#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope); 2026-11-18 by ORG-0 ([ADR-011](./ADR-011-organization-consolidation-and-lifecycle.md)), see [Amendment 3](#amendment-3-org-0-2026-11-18-one-organization-table-a-portal-state-and-operator-only-people)
 
 ## Context
 
@@ -83,3 +83,16 @@ The text above is the historical decision and is kept. Where it says a model "mu
 - Existing Tickets cannot be attributed (no provable organization). The migration refuses a populated `tickets` table and lists counts only; disposable environments are rebuilt. There is no backfill and none is invented.
 
 Design record: [Release 1.0: R1-2 Ticket organization attribution](../../product/release-1.0-r1-2-ticket-attribution.md).
+
+## Amendment 3 (ORG-0, 2026-11-18): one Organization table, a portal state, and operator-only People
+
+The text above, including Amendment 2, is the historical decision and is kept. [ADR-011](./ADR-011-organization-consolidation-and-lifecycle.md) consolidates the Organization into one table. **This is the approved target; it is not implemented.** Until ORG-2 merges, `crm_companies.organization_id` is still the tenant key of the Directory profile and the contact scope still runs through the company, as described above.
+
+**What changes in the target (ORG-1 and ORG-2).**
+- **`crm_companies.organization_id` is no longer a tenant key**, because `crm_companies` is retired. `organizations` is the canonical Organization and carries the profile (website, phone, address, internal notes), a **Classification**, and an explicit **portal state**: Not enabled (`portal_enabled_at` NULL), Enabled, Disabled (`disabled_at`). Tenancy is still the `organization_members` pivot; the membership-based scope on `Organization` is unchanged, and a Directory-only Organization is invisible to every non-operator because it has no members.
+- **People become operator-only.** The scope that makes a Person visible through its company's tenant (`OrganizationThroughCompanyScope`) is replaced by an operator-only scope, because an affiliation must never decide access (ADR-010 decision 6). A Person's affiliation (`organization_id`) is descriptive.
+- **The portal state is read at every locked decision site**, from the table and never through the Gate, so a row's existence never confers capability; a Disabled Organization refuses new invitations, acceptance, memberships, elevation, approval, grants and relationships while preserving historical requester access. `OrganizationScope` loses its only consumer.
+- **The customer response allowlists stay**: a customer or partner presentation emits an Organization's `id` and name only. Internal profile notes and Person details must not leak; a recursive leakage test is required (ORG-2).
+- **Attribution is still not access** (Amendment 2): `tickets.organization_id` and the owner-only Ticket visibility are unchanged.
+
+**The "organization-level roles" in the Context are a future contract**, not a Release 1.0 feature. The earlier Context line ("Define organization-level roles that scope permissions within the org's data") is carried by the four-layer contract of [ADR-011 §9](./ADR-011-organization-consolidation-and-lifecycle.md#9-future-organization-roles-contract-future): a separate catalogue, central role templates with fixed, configurable and nondelegable capabilities, Organization-owned role definitions, and membership assignments, decided by one resolver for a (User, Organization) pair. As built, `organization_members.role` and administrator approval authorize nothing.

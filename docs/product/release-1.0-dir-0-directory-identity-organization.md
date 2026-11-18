@@ -2,6 +2,19 @@
 
 **Status:** **design approved by the owner (2026-11-17); documentation only.** DIR-1 is since authorized and implemented in its own pull request (see [DIR-1 as built](#dir-1-as-built)); nothing described here as DIR-2 to DIR-4 is implemented, and none of those packages is authorized to start: each needs its own explicit owner authorization. Written against `main` at `e0faac0` (PR #70; the tree is identical to the audited revision `94ae904`). No application code, migration, test, permission, seeder or environment was changed by DIR-0. Release 0.9 staging is untouched.
 
+> **Amendment 2026-11-18 (ORG-0): Organization consolidation. Read first.** The owner approved consolidating `crm_companies` into `organizations` ([ADR-011](../architecture/adr/ADR-011-organization-consolidation-and-lifecycle.md); specifications in the [ORG-0 record](./release-1.0-org-0-organization-consolidation.md)). This record is kept as history and its text is not rewritten. **What it changes here (the target; nothing is implemented):**
+>
+> | Part of this record | Status |
+> |---|---|
+> | Rulings **R9** (one experience over two tables, Directory authoritative for the name, profile cannot be lost), **R10** (profile repair) and **R13** (physical consolidation outside scope) | **Superseded.** One Organization table, one name; no repair, no name propagation. R10's System → Organization access stays, as a filtered list of ever-enabled Organizations ([ORG-0, section 1](./release-1.0-org-0-organization-consolidation.md#1-owner-rulings-and-decision-register)) |
+> | **Section 6, DIR-2** | **Superseded by ORG-1 (portal-state enforcement), ORG-2 (physical consolidation) and ORG-3 (unified experience).** DIR-2 is **not** an active specification and is not to be implemented. Its name synchronization, delete guard and profile repair are never built |
+> | **Section 4** package sequence and the invariants **S5, S6, S10** | Sequence replaced by the ORG sequence (ORG-0 record, section 4). S5, S6 and S10 are restated there. S1 to S4, S7 to S9 stand, with S3 widened to Organization profile fields and S9 extended |
+> | **Sections 7 and 8**, DIR-3 and DIR-4 | **Contracts kept.** Dependencies revised (DIR-3 follows ORG-2; DIR-4 follows DIR-3 and ORG-3). DIR-4's lock table and issue rule are amended: see the amendment under section 8 |
+> | **Sections 9, 10, 12, 13** | Scenario, gates, limitations and "not in these packages" are updated by the ORG-0 record (sections 8 and 9). Physical consolidation is no longer "not in these packages" |
+> | **Section 2** (verified current state at `e0faac0`) | Stays as the historical current state. For the as-built state at `010d4e0` see ORG-0 record, section 2 |
+> | **Section 3** terminology | Stands until ORG-2; "Directory profile" and the "missing-profile notice" disappear with the pair; Classification terminology is in the ORG-0 record, section 3 |
+> | **Section 11** (operator raise-on-behalf) | Unchanged and still open |
+
 **What this record is.** The model is decided in [ADR-010](../architecture/adr/ADR-010-directory-identity-organization-model.md) and is not repeated here. This record holds what an implementer needs: the ruling register, the verified current state, the terminology, the four work packages with their contracts, invariants, tests and review gates, the end-to-end acceptance scenario and the release gates.
 
 **One-sentence goal.** Before Release 1.0, an operator onboards an external Organization and its People through one coherent Directory experience, and a Person who is invited to the portal becomes one identity (a Person linked to a User), without any new access being granted to anyone.
@@ -18,11 +31,11 @@
 | R6 | Names and emails of Person and User stay independently authoritative | ADR-010, decision 3 |
 | R7 | Acceptance of a Person-targeted invitation is atomic: account, membership and link together, or nothing. Never completed silently without the link | section 8 |
 | R8 | Editing a Person's email **permanently** invalidates their pending Person-targeted invitations, by an explicit revocation; restoring the original email does not reactivate them. A clear warning and a secure reissue | section 8 |
-| R9 | One coherent Organization experience over the existing two tables; **Directory is authoritative for the organization name**, propagated transactionally with an audit entry; a Directory profile that has a portal organization cannot be deleted | ADR-010, decisions 2 and 3; section 6 |
-| R10 | **System → Organization access** stays as an administrative index that links into the unified Organization experience. Profile repair is authorized, audited, idempotent and protected against duplicate creation | section 6 |
+| R9 | *(Superseded 2026-11-18 by [ADR-011](../architecture/adr/ADR-011-organization-consolidation-and-lifecycle.md): one table, one name.)* One coherent Organization experience over the existing two tables; **Directory is authoritative for the organization name**, propagated transactionally with an audit entry; a Directory profile that has a portal organization cannot be deleted | ADR-010, decisions 2 and 3; section 6 |
+| R10 | *(Partly superseded 2026-11-18: the index stays, as a filtered list of ever-enabled Organizations; profile repair is not built because the pair is retired.)* **System → Organization access** stays as an administrative index that links into the unified Organization experience. Profile repair is authorized, audited, idempotent and protected against duplicate creation | section 6 |
 | R11 | The company-specific contact structure is transitional. Do not encourage duplicate People; document the limitation and the path to multiple affiliations; do not build multi-affiliation management now | ADR-010, "Multiple affiliations" |
 | R12 | A link never grants authorization and never exposes Directory information. Membership, approval, support-designation and tenant-isolation guarantees are preserved | section 4 |
-| R13 | Physical consolidation of `crm_companies` and `organizations`, advanced CRM features and modal cross-record interfaces are **outside** the required scope | ADR-010, "Physical consolidation"; section 13 |
+| R13 | *(Superseded 2026-11-18: physical consolidation is now in scope as ORG-2.)* Physical consolidation of `crm_companies` and `organizations`, advanced CRM features and modal cross-record interfaces are **outside** the required scope | ADR-010, "Physical consolidation"; section 13 |
 | R14 | A Person may be invited to **several organizations**. There is no global limit of one pending Person-targeted invitation per Person; uniqueness, duplicate detection and supersession are defined per target organization, on the existing invitation rules | section 8 |
 | R15 | A historical invitation (accepted, revoked, expired or superseded) **never prevents deleting a Person**. Invitation and audit history is preserved without keeping a live reference to a Person who no longer exists | section 8 |
 
@@ -71,6 +84,8 @@ DIR-1 applies this glossary to every operator-visible string and adds the rule t
 Operator-visible text does not say "Company", "CRM", "Promote" or "Org", and does not call a Directory record a "Contact". "Contact" keeps its R1-5 meaning in partner support (the customer contact a request is raised for, who is always a User).
 
 ## 4. Package sequence and shared invariants
+
+> **Superseded 2026-11-18 (ORG-0).** The sequence below, with DIR-2, is replaced by ORG-1, ORG-2 and ORG-3 followed by DIR-3 and DIR-4 ([ORG-0 record, section 4](./release-1.0-org-0-organization-consolidation.md#4-package-sequence-and-shared-invariants)). S5, S6 and S10 are restated there. The text is kept as history.
 
 ```mermaid
 flowchart LR
@@ -140,6 +155,8 @@ DIR-1 was implemented as specified above, as presentation and read queries only 
 
 ## 6. DIR-2: unified Organization experience
 
+> **SUPERSEDED 2026-11-18 (ORG-0). Not an active specification; do not implement.** The owner approved one canonical `organizations` table, so DIR-2's name synchronization (integrity change 1), stronger delete guard (2), profile repair (3), profile-repair preflight failure (4) and paired seeder (5) are never built. The unified experience is **ORG-3**, the portal-state fence is **ORG-1**, and the physical consolidation is **ORG-2** ([ADR-011](../architecture/adr/ADR-011-organization-consolidation-and-lifecycle.md); [ORG-0 record, section 7](./release-1.0-org-0-organization-consolidation.md#7-work-packages-prerequisites-acceptance-and-gates)). The text below is kept as the historical design.
+
 **Purpose.** One Organization to the operator: one name, one page, one list, one place to administer it, over the existing two tables.
 
 **Depends on:** DIR-1. **Schema:** none.
@@ -184,7 +201,7 @@ The security-reviewed controllers, their panel-building rules ("built only for a
 
 **Purpose.** The optional one-to-one association, the three explicit ways to create it short of an invitation, and the cross-links between the two management pages.
 
-**Depends on:** DIR-0 (independent of DIR-2).
+**Depends on:** DIR-0 (independent of DIR-2). *Amended 2026-11-18: depends on **ORG-2** (not on ORG-3), and can proceed in parallel with ORG-3. Its preflight comparison of a linked Person's Organization against memberships becomes a direct Organization id comparison. The contract is otherwise unchanged ([ORG-0 record, DIR-3](./release-1.0-org-0-organization-consolidation.md#dir-3-personuser-link)).*
 
 **Schema (one additive migration, re-runnable in the style of its siblings).** On `crm_contacts`: `user_id` (nullable, **unique**, foreign key to `users.id`, `ON DELETE RESTRICT`), `user_linked_at` (nullable datetime), `user_linked_by` (nullable, foreign key to `users.id`, `ON DELETE RESTRICT`). No backfill. A link exists when `user_id` is set; a row with `user_id` and incomplete provenance is damage that the preflight fails on. The two foreign keys are added to `database/profile/foreign-keys.json`.
 
@@ -225,7 +242,7 @@ The security-reviewed controllers, their panel-building rules ("built only for a
 
 **Purpose.** "Invite to portal" from a Person, and the atomic acceptance that makes the invited account that Person's account.
 
-**Depends on:** DIR-3 and DIR-2.
+**Depends on:** DIR-3 and DIR-2. *Amended 2026-11-18: depends on DIR-3 and **ORG-3** (the Organization experience that replaces DIR-2).*
 
 **Schema (one additive migration).** On `organization_invitations`:
 
@@ -322,6 +339,8 @@ On an allowed deletion, in one transaction, every historical invitation that ref
 
 An accepted invitation never blocks: its Person is linked, so the operator unlinks first; the account keeps its own "joined by invitation" provenance (`accepted_user_id`), which the deletion does not touch. An expired invitation is historical from the moment it expires; no clean-up job is needed for the Person to become deletable.
 
+> **Amendment 2026-11-18 (ORG-0): the lock table below is amended by consolidation.** After ORG-2, Persons point at the Organization row (`crm_contacts.organization_id`), so a Person write that sets or changes the affiliation takes InnoDB's shared **foreign-key parent lock on the Organization row**, which sits *before* the Person row in the global order. The rule added: **a Person write that sets or changes an affiliation takes the Organization row (shared) first, before any invitation or Person row, and never holds a Person row while waiting for an Organization.** Concretely, "Person email change" below, when it also changes the affiliation, becomes `actor S → org S → invitations X → Person X` (or the affiliation change is split into its own transaction); the revocation-only email change stands as written (no Organization lock). The targeted issue and acceptance also **read the portal state** and refuse a Disabled Organization (the "any Organization with portal access that is not disabled" rule of the Issue paragraph above was not enforced by the code as built; ORG-1 enforces it). The Person × acceptance and disable × Person pairs are DIR-4's two-connection tests ([ORG-0 record, sections 6 and 6.1](./release-1.0-org-0-organization-consolidation.md#6-lock-acquisition-matrix)).
+
 **Recommended lock order (S9), for the independent design review.** The R1-3 global order is extended by one position: … → organization rows → invitation rows (ascending id) → **the Person row** → the rest. Two rules follow: *a transaction that needs both an invitation row and a Person row takes the invitation rows first*, and *a transaction that holds a Person row waits for no user, organization or invitation row afterwards*.
 
 | Transaction | Sequence |
@@ -361,6 +380,8 @@ Because a targeted issue must hold the Person row before it inserts, no new targ
 
 ## 9. End-to-end acceptance scenario
 
+> **Amended 2026-11-18 (ORG-0).** Steps 1 and 2 happen on one page, and two steps are added: **15**, a Directory-only Organization is inert (no invitation, member, relationship, grant or request can be created for it by any route); **16**, disabling an Organization with an outstanding invitation revokes it permanently, re-enabling does not revive it, and the requester keeps access to their existing request ([ORG-0 record, section 8](./release-1.0-org-0-organization-consolidation.md#8-release-acceptance-and-gates)).
+
 Run on a fresh install in `pilot` mode, as a browser journey and by hand at acceptance.
 
 1. An operator creates an Organization in Directory → Organizations. Its status reads "Not enabled".
@@ -379,6 +400,8 @@ Run on a fresh install in `pilot` mode, as a browser journey and by hand at acce
 14. Managed variant: designate a partner, link the Organization to it, and confirm both pages and both lists show the relationship while the partner's members gain nothing until a support designation is granted.
 
 ## 10. Release 1.0 gates and review gates
+
+> **Amended 2026-11-18 (ORG-0).** Read "DIR-2" as ORG-1 to ORG-3. Added gates: the independent review of the [ORG-0 record](./release-1.0-org-0-organization-consolidation.md) before ORG-1 code; the independent security review of ORG-1 before commit; a focused review of ORG-2; two-connection MariaDB proofs in ORG-1, ORG-2 and DIR-4 ([ORG-0 record, section 8](./release-1.0-org-0-organization-consolidation.md#8-release-acceptance-and-gates)). The DIR-3 and DIR-4 gates stand.
 
 DIR-1 to DIR-4 are **prerequisites of Release 1.0**. They add to the gates in the [release notes](./release-1.0-notes.md#gates-before-release-10-is-deployed-to-a-customer-facing-environment); they replace none.
 
@@ -406,6 +429,8 @@ The question for the coordinator is whether Release 1.0 needs an operator on-beh
 
 ## 12. Limitations, risks and open items
 
+> **Amended 2026-11-18 (ORG-0).** The "one Organization per Person" limitation stands. "DIR-2 should prove the custom-role operator behaviour" moves to ORG-1 and ORG-2. The lock-order recommendation is extended by the Organization-first rule above. Open items of ORG-0 are in the [ORG-0 record, section 9](./release-1.0-org-0-organization-consolidation.md#9-open-items-and-deferred-documentation).
+
 - **One Organization per Person** until the affiliation table exists (ADR-010). A person who works with two Organizations is one Person affiliated with one of them; a second Person record for the same human cannot be linked to the same account, and no workflow asks for one.
 - **Invitations to other organizations are not revoked when one is accepted.** They are dead by the existing rule and shown as such, with "Add as member" and "Revoke" (section 8). They stay in the Pending state until revoked or expired, and one could in principle become acceptable again within its seven days if the account's address were changed and the Person unlinked. Revoking them inside the acceptance transaction would remove that, at the cost of locking other organizations' invitation rows there. **Recommendation:** leave acceptance as specified; the design review decides.
 - **An invitation revoked by an email change keeps its slot for the old address** until the next issue for that organization and address clears it, as hook-revoked invitations already do (R1-3 rule R1). It is not open and cannot be accepted.
@@ -417,5 +442,7 @@ The question for the coordinator is whether Release 1.0 needs an operator on-beh
 - **Unused permissions stay assignable** (DIR-1 only labels them). Removing them is catalogue work with a `roles:sync` step and is not in scope.
 
 ## 13. Not in these packages
+
+> **Amended 2026-11-18 (ORG-0).** **Physical consolidation of `crm_companies` and `organizations` is no longer excluded**: it is ORG-2. A minimal built-in Organization Classification ships in Release 1.0 (ORG-2 and ORG-3). Still excluded: an affiliation table and People merging; relationship classifications of People and Organizations (prospect, partner and others) and relationship views; a merged People-and-members roster; modal or embedded cross-record management; customer-side delegation (MO-2B) and partner-managed organizations (MO-3); inviting an existing account; non-User requesters; a Billing Account; the operator React conversion; any customer-facing Directory surface; extensible attributes, Organization roles and staged Organization administration (all future).
 
 Physical consolidation of `crm_companies` and `organizations`; an affiliation table and People merging; business classifications (customer, partner, prospect, vendor) and relationship views; a merged People-and-members roster; modal or embedded cross-record management; customer-side delegation (MO-2B) and partner-managed organizations (MO-3); inviting an existing account; non-User requesters; a Billing Account; the operator React conversion of the Directory and System pages; any customer-facing Directory surface.
