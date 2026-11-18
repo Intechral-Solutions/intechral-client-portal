@@ -29,7 +29,7 @@
 | D3 | Forward migrations only; no existing migration file edited; the ORG-2 migration refuses a populated `crm_companies` before the first destructive DDL | Approved | §12 |
 | D4 | Refactor forward from `010d4e0`; no revert or reset of DIR-0 or DIR-1 | Approved | §1, §12 |
 | D5 | Disabled-state behaviour. **Replaced by ruling A and A2** | Approved (as A, A2) | §3, §4 |
-| D6 | Enablement needs `manageMembership` in the controller **and** the service, a table-based check under the lock, and an audit entry | Approved | §2 |
+| D6 | Initial enablement needs `manageMembership`; disabling and re-enabling an existing portal Organization retain `manageRelationships` (R1-4): separate operations, separate abilities. Each is checked in the controller **and** the service, with a table-based check under the lock and an audit entry | Approved | §2 |
 | D7 | People are visible to operators only; the through-company tenant scope is retired | Approved by assessment and review; **to be confirmed** by the ORG-0 review (the 2026-11-18 instruction did not restate it) | §7 |
 | D8 | One optional affiliation column per Person in Release 1.0, re-pointed to `organizations.id`; the affiliation table is later | Approved | §7 |
 | D9 | Organization phone, website and address stay native columns | Approved | §8 |
@@ -83,7 +83,7 @@ Foreign keys (`database/profile/foreign-keys.json`): `crm_contacts.crm_company_i
 
 ## 3. Terminology (contract for the implementing packages)
 
-`AGENTS.md` is **not** changed by ORG-0: its terminology rules describe the as-built pair and stay correct until ORG-2 retires `crm_companies`. The rules below take effect with the package that changes the behaviour, and `AGENTS.md` is amended with **ORG-3** (the unified experience), unless an earlier package reviewer needs an earlier clarification.
+`AGENTS.md` is **not** changed by ORG-0: its terminology rules describe the as-built pair and stay correct until ORG-2 retires `crm_companies`. The rules below take effect with the package that changes the behaviour. **ORG-2 updates the `AGENTS.md` technical naming and contracts** (the paragraph that defines Organization as spanning two records, and its list of technical names) when `crm_companies` and its technical references are retired. **ORG-3 updates any remaining user-facing terminology** as its interface changes require.
 
 | User-facing term | Means | Technical name |
 |---|---|---|
@@ -141,7 +141,7 @@ ORG-3 and DIR-3 are independent of each other and can proceed in parallel once O
 | SF-2 | Medium (existing) | Add, promote, approve, designate and assign read no `disabled_at` | Same state read under the existing locks; the allowed acts stay allowed | ORG-1 |
 | SF-3 | High if missed | The Directory-only fence: required at every site of ADR-011 §5. Today a Directory-only row (`disabled_at` NULL) would pass every existing check | The predicate at every site, read from the table | ORG-1 |
 | SF-4 | Medium | Lifecycle integrity: CHECK pairing (C5); initial enablement refuses a Disabled row and never clears `disabled_at` (C6); disable and re-enable refuse a Not enabled row with a clear message before a CHECK fires | Service refusals plus CHECKs | ORG-1 |
-| SF-5 | Low | `promoteToOrganization` has no service authorization and no audit entry (over HTTP the pilot gate effectively requires `portal.operator` with `crm.manage` in `pilot` and `closed` modes; legacy mode has no such gate: C1) | `manageMembership` in controller and service; table-based check under the lock; audit entry with the same timestamp as `portal_enabled_at` | ORG-1 |
+| SF-5 | Low | `promoteToOrganization` has no service authorization and no audit entry (over HTTP the pilot gate effectively requires `portal.operator` with `crm.manage` in `pilot` and `closed` modes; legacy mode has no such gate: C1) | `manageMembership` in controller and service for initial enablement (disable and re-enable keep `manageRelationships`, which they already check); table-based check under the lock; audit entry with the same timestamp as `portal_enabled_at` | ORG-1 |
 | SF-6 | Medium | Profile fields (including `notes`) sit on a row members can load; `Ticket::organization` loads the whole row; only presenter allowlists keep them out of responses | Recursive leakage test over customer pages, partner pages, shared props and mail; optional `$hidden = ['notes']` | ORG-2 |
 | SF-7 | Medium | Readers that assume "a row exists, so portal access exists": `OrganizationListFacts::portalStatus`, the dashboard organization count, both candidate lists, `organizationsWithoutApprovedAdministrator` in the preflight (C7) | Filter to `portal_enabled_at IS NOT NULL` | ORG-1 (count, preflight), ORG-2/3 (status, lists) |
 | C4 | High (ORG-2) | Deleting a Directory-only row locks the Organization and, through SET NULL, the affiliated Person rows; a Person affiliation write locks the Person then share-locks the Organization through its foreign key: a real cycle | Organization row first; two-connection delete × Person affiliation test | ORG-2 |
@@ -221,15 +221,16 @@ Every row is tested through the route **and** through the service, with no row w
 | Member add, promote, approve | org X → membership X → FK-S on users | Enabled, not Disabled | V (sequence); P (state read) |
 | Demote, remove, revoke approval | org X → membership X | any | V |
 | Support grant | users S (actor, member) ascending → org X → membership X | Enabled, not Disabled | V (sequence); P (portal-state read; Disabled already refused) |
+| **Partner-support create or reply** (`PartnerSupportAccess::refusal`, inside the creation or reply transaction) | users S (the actor and the nominated contact; only an existing id is locked) ascending → org rows S (customer and partner, one statement) ascending → partner membership S (then the contact's customer membership S) | Enabled, not Disabled, both rows; the existing authority conditions stay (actor active and not an operator, partner designation, relationship, complete support grant, eligible contact) and tenant isolation is unchanged | V (sequence); P (portal-state read on both organization rows, ORG-1, beside the existing `disabled_at` reads; the drift test with `ServiceRequestAccess` stays meaningful) |
 | Partner designation, customer assignment or link | org rows X ascending | Enabled, not Disabled, both rows | V (sequence); P (state read; replaces the one-company check) |
 | Remove designation, unlink | org rows X ascending | any | V |
-| **Disable, with transactional invitation revocation** | **actor user S first** → org X → open invitation rows X ascending → revoke | Enabled | **P**; today's disable locks the org row `FOR UPDATE` only (V) |
+| **Disable, with transactional invitation revocation** | **actor user S first** → org X → *then* nominate the open invitations → lock them X in ascending key order → revalidate under lock → revoke (contract: [6.2](#62-disable-time-invitation-revocation-transaction-contract)) | Enabled | **P**; today's disable locks the org row `FOR UPDATE` only (V) |
 | Re-enable | org X | Disabled | V (lock); P (state refusal) |
 | **Portal enablement** (initial; target, ORG-2) | actor S → org X → state write (FK-S on actor through `portal_enabled_by`) → the operator's admin membership | Not enabled | **P**; today's promotion locks the Directory profile row and inserts the Organization (V), with no actor lock |
 | Profile or Classification edit (ORG-2) | org X as the only lock, short transaction | any | **P** |
 | **Organization delete** (ORG-2) | org X, re-read under the lock → SET NULL on affiliated Person rows → RESTRICT checks (project links, dependants) | Not enabled only | **P**; today's company delete is a two-attempt, two-table choreography (V) that disappears |
 | **Person write that sets an affiliation** (ORG-2) | **org S first** → Person X | not fenced (an affiliation decides no access) | **P**; today it takes FK-S on the profile row, outside the invitation order (V) |
-| **Project–Organization association write** (ORG-2) | org rows S ascending → link insert | not fenced | **P**, recommended and not required; the alternative is to make the link write the only statement of its transaction (today the FK points at the profile row) |
+| **Project–Organization association write** (ORG-2) | org rows S ascending → link insert | not fenced | **P**, *recommended, not required*, and it needs implementation verification on real connections; the alternative is to make the link write the only statement of its transaction (today the FK points at the profile row) |
 | Ticket creation | org S → membership S (R1-2) | Enabled, not Disabled | V (sequence); P (state read, beside the existing `disabled_at` read) |
 | **DIR-4 Person-targeted issue** | actor S → org X → slot holder X → Person X (validate) → insert | Enabled, not Disabled | P (DIR-0 section 8, with the state read) |
 | **DIR-4 Person-targeted acceptance** | issuer S → org X → invitation X → Person X (four conditions) → account, membership, link | Enabled, not Disabled | P (DIR-0 section 8, with the state read) |
@@ -238,7 +239,7 @@ Every row is tested through the route **and** through the service, with no row w
 | DIR-4 Person delete | the Person's invitation rows (ascending) → Person X → re-read → clear references, delete | n/a | P (DIR-0 section 8) |
 | DIR-3 link, unlink, create from a User | user rows S ascending → Person X | n/a | P (DIR-0 section 7); unchanged by consolidation |
 
-**Why "actor first" on disable.** Disabling writes `revoked_by`, a foreign key to the actor. A suspension of that same actor holds their user row exclusively while it waits for the invitation rows. If disable took the actor row late, through the foreign key, the two would deadlock. Taking it first is R1-3 rule R3.
+**Why "actor first" on disable.** Disabling writes `revoked_by`, a foreign key to the actor. A suspension of that same actor holds their user row exclusively while it waits for the invitation rows. If disable took the actor row late, through the foreign key, the two would deadlock. Taking it first follows the actor-first pattern of R1-3 (rule R3). The other R1-3 rules are not carried over wholesale: see section 6.2.
 
 **The new parent-lock hazard.** After ORG-2, People and project links reference the Organization row. A Person write holds the Person row and waits for FK-S on the Organization; a Person-targeted acceptance holds the Organization exclusively and waits for the Person row. Neither can proceed. The rule: **organization row first, shared, before any invitation or Person row.** The repository already documents the equivalent behaviour for `project_company` (`CrmService`).
 
@@ -253,6 +254,21 @@ All run on real MariaDB 11.4 connections, not mocks, as R1-3 did.
 | **ORG-1** | Disable against accept, issue, add, promote, approve, grant, and designate/assign. Disable against the issuer's suspension, against a role or permission change (`reconcileIssuers`), and against an operator revoking the same invitation. A **query-log pin** that an ordinary acceptance takes the same locks in the same order as before. (Enable × issue and enable × add are **not** here: in ORG-1 promotion creates the row already Enabled, so no Not enabled → Enabled step exists until ORG-2: C2) |
 | **ORG-2** | Initial enablement against issue, against add, against delete. Delete against Person affiliation (C4) and against project link. Disable and re-enable against profile or Classification edit |
 | **DIR-4** | Person affiliation against a Person-targeted acceptance (C3: an ordinary acceptance never locks a Person row, so this pair exists only in DIR-4). Disable against Person email change and against Person delete (both touch open targeted invitations). Every pair already listed in DIR-0 section 8 |
+
+### 6.2 Disable-time invitation revocation: transaction contract
+
+Ruling A2 requires disabling an Organization to permanently revoke its outstanding live invitations in the same transaction. The contract below is **proposed** (P) and is reasoned, not yet proved on real connections; it is the shape ORG-1 must prove. It is a specific contract, not a blanket application of the R1-3 rules.
+
+1. **Lock the acting operator's user row first** (shared). `revoked_by` is a foreign key to the actor, so InnoDB would otherwise take the actor row late, and a suspension of that actor (user X, then waiting on invitation rows) would deadlock with it.
+2. **Lock the Organization row** (exclusive) **before selecting any pending invitation**, and read the portal state from that locked row (Enabled, not already Disabled).
+3. **Nominate the open invitations, then lock them in deterministic ascending-key order.** Nomination is a plain read; the rows are then locked by primary key, ascending, as the other invitation writers do.
+4. **Revalidate each invitation's state under the lock, at one consistent instant** (not against a snapshot taken before the locks): an invitation that an operator revoked, an acceptance that committed, or a hook that revoked it in the meantime is found as such and left alone; an invitation issued between the nomination and the locks is either locked and revoked or the transaction restarts a bounded number of times, never skipped.
+5. **Permanently revoke** each still-open invitation with the reason `organization_disabled`, `revoked_at` and `revoked_by` (the actor), preserving the historical row, and write the audit provenance (actor, time, Organization, invitation ids) in the same transaction.
+6. **Never reactivate.** A previously revoked invitation (by any reason) is terminal and is never reopened by disable, by re-enable, or by any later issue; re-enabling revives nothing.
+7. **No Gate, no permission-cache loading** inside this locked transaction. Authority is established before it begins (the controller) and re-checked inside it **from the tables** (the table-based predicate), never through a Gate or policy call, because a first permission-cache load inside such a transaction can close a lock cycle (R1-3, 6.2.3).
+8. **Slot handling is a design decision requiring consistency with the existing invitation invariants** (R1-3 invariant I5, the `live_email` uniqueness slot): either the revocation leaves the slot as the authority-loss hooks do (the next issue for that Organization and address releases a non-open holder), or it clears the slot under the Organization lock as the operator revoke does. ORG-1's design chooses one, and a test proves that issuing a new invitation for the same address after re-enable succeeds in both the "slot left" and "slot cleared" histories, and that the unique backstop is never hit.
+
+**What carries over from R1-3 and what does not.** Rule R3 (the actor row first) carries over, because the same foreign-key reason applies. Rule R1 (the hooks never write the slot, so they take no Organization lock) was designed for the authority-loss hooks, which run without the Organization lock; disable **holds** the Organization lock and may choose either slot behaviour (item 8). Rule R4 (advance the permission-cache epoch before a hook locks) applies to mutations of global permissions and roles; **disable mutates neither**, so no cache-epoch step is added. The disable against the issuer's suspension, against `reconcileIssuers` and against an operator revoke are the two-connection pairs of section 6.1.
 
 ## 7. Work packages: prerequisites, acceptance and gates
 
@@ -269,8 +285,8 @@ Each package is one pull request, authorized individually before its first line 
 1. One migration, forward and re-runnable: `portal_enabled_at` added and `owner_id` replaced by nullable `portal_enabled_by` (foreign key to `users`, RESTRICT), backfilled for every existing row (`created_at`, `owner_id`); the pairing CHECK and the state CHECKs of ADR-011 §2; `organization_members.organization_id` CASCADE → RESTRICT; the foreign-key manifest updated. Its `down()` refuses while any `portal_enabled_by` is NULL.
 2. The portal-state predicate (one small value type) read at every site listed in ADR-011 §5, from the locked row, never through the Gate, plus the source-scanning test over readers of `organizations`.
 3. Ruling A applied: the matrix of section 5.2.
-4. Ruling A2: disable revokes every outstanding live invitation in its transaction (reason `organization_disabled`, audit provenance, history kept), the notification's send-time check drops a revoked row and a Disabled Organization, acceptance revalidates state under the row lock, re-enable revives nothing, and the lock order is actor-first. The design decides whether the revocation clears the uniqueness slot (it holds the Organization lock, so it may) and follows R1-3 rules R1, R3 and R4.
-5. Initial enablement (still the existing promotion path in ORG-1) gains `manageMembership` in the controller and the service, a table-based check under the lock and an audit entry with the same timestamp as `portal_enabled_at`. Disable and re-enable become distinct from it, with the state refusals of section 5.2.
+4. Ruling A2: disable revokes every outstanding live invitation in its transaction (reason `organization_disabled`, audit provenance, history kept), the notification's send-time check drops a revoked row and a Disabled Organization, acceptance revalidates state under the row lock, re-enable revives nothing, and the lock order is actor-first. The transaction follows the contract of section 6.2; whether the revocation clears the uniqueness slot is a design decision that must stay consistent with the existing invitation invariants (section 6.2).
+5. Initial enablement (still the existing promotion path in ORG-1) gains `manageMembership` in the controller and the service, a table-based check under the lock and an audit entry with the same timestamp as `portal_enabled_at`. Disable and re-enable are distinct from it and **retain `manageRelationships`** (R1-4); the two abilities are separate policy abilities that must not be collapsed even though they reduce to the same capabilities today. The state refusals of section 5.2 apply.
 6. `organizations:preflight` fails on a Directory-only row that has any member, invitation, ticket or relationship, and its administrator-approval check and the dashboard count filter to portal-enabled rows.
 7. Factories and `DevSeeder` default to Enabled; a Directory-only factory state exists for the fence tests only.
 
@@ -297,6 +313,17 @@ Each package is one pull request, authorized individually before its first line 
 
 1. One forward migration, piecewise and re-runnable in the style of `2026_11_06_120000`. It **refuses a populated `crm_companies` before the first destructive DDL statement**, adds the profile columns (`website`, `phone`, `address`, `notes`, `created_by`, `classification`), re-points `crm_contacts.crm_company_id` to `organization_id` (foreign key to `organizations`, SET NULL) and the project link table to an Organization key (RESTRICT, same composite key), and drops `crm_companies`. The design states the backfill of `created_by` for existing Organizations (the recorded enabling operator is the natural source) and the generation of `slug` for Directory-only rows (NOT NULL, unique). `down()` is schema-only and refuses on data.
 2. An **Organization directory service** replacing the `CrmService` company methods: create (Directory-only), update the profile, change the Classification, delete (never-enabled only, with explicit dependency handling), and initial enablement as a state transition on an existing row. Each is authorized in the controller and again in the service, runs in one transaction under the row lock of section 6 and writes its audit entry. The operator's automatic `admin` membership on enablement stays (Q3).
+   **Authorization of the directory service (explicit).**
+
+   | Act | Authority | Notes |
+   |---|---|---|
+   | Create a Directory Organization | an **active operator** (holds `portal.operator`) with **`crm.manage`** | |
+   | Edit the profile | same | allowed in every portal state |
+   | Change the Classification | same | allowed in every portal state; same authority as a profile edit |
+   | Delete (never-enabled only) | same | the design may require a stricter ability for deletion, never a weaker one |
+   | Initial enablement | `manageMembership` | separate ability (ADR-011 §2); disable and re-enable keep `manageRelationships` |
+
+   **Service-layer protection.** Correctness must not rely on an HTTP route middleware or the customer-pilot gate. Each service method authorizes its actor itself, inside its transaction: the account is read as **active** (`users.disabled_at` NULL) from the table, and operator eligibility (`portal.operator`) and `crm.manage` are established by the table-based authority check, not through a cache-dependent Gate call inside a locked transaction. As built, the `crm.*` routes are guarded by `can:crm.manage` and the pilot gate only (legacy mode has no such gate), and `CrmService` performs no check. Tests exercise each service method directly with a customer, a suspended operator, and an operator lacking `crm.manage`, with no route involved, and expect a refusal and no row written.
 3. `OrganizationRelationships` loses the one-company rule and keeps the portal-state requirement (candidate lists included). People become operator-only (operator-only scope replaces `OrganizationThroughCompanyScope`). Projects, tasks, the project filter and the dashboard are re-pointed to Organizations.
 4. `IntegritySnapshot` made schema-conditional; `organizations:preflight` rewritten; `DevSeeder` sets the portal state of its Organizations; the historical-migration tests handled (section 5.4).
 5. The existing pages keep working on their existing routes, now reading one table. The unified experience is ORG-3.
@@ -328,7 +355,7 @@ Each package is one pull request, authorized individually before its first line 
 2. **System → Organization access** remains, filtered to Organizations that have ever been portal-enabled (Enabled and Disabled), linking into the canonical detail. Never a second editor, service or security path.
 3. The **Classification selector**: built-in values only, any value to any value, in all three portal states, same authority as a profile edit (proposed; confirmed in the package design).
 4. **Route and navigation constraints (Recommendation, confirmed by the package design):** keep `organizations.show` as the canonical detail URL, because every security-reviewed portal-access action already redirects there; move `organizations.show` from the System item to Directory → Organizations in `NavigationBuilder`; narrow the System `organizations.*` pattern to `organizations.index`; retire `crm.companies.*` (a fresh install has no saved links). Preserve the existing tested portal-administration routes where practical.
-5. `AGENTS.md` terminology amended as section 3 says; the DIR-1 vocabulary and navigation tests updated.
+5. Any remaining user-facing terminology in `AGENTS.md` that the interface change requires is amended as section 3 says (the technical naming and contracts were updated by ORG-2); the DIR-1 vocabulary and navigation tests are updated.
 
 **Acceptance.**
 
@@ -383,7 +410,7 @@ No package changes the customer surface, the permission catalogue or a built-in 
 3. **Q6** development databases with hand-made companies: per-environment owner authorization before ORG-2 runs.
 4. **Q8** removal of the unused `org.*` and `*.view_org` permissions: separate later work with a `roles:sync` step.
 5. **D7** (People operator-only): confirm in the ORG-0 review.
-6. **Classification details:** the user-facing label of `general` (proposed "General"); the authority for a change (proposed: same as a profile edit); the storage contract (`VARCHAR(32) NOT NULL DEFAULT 'general'`, with or without a CHECK), subject to implementation verification.
+6. **Classification details:** the user-facing label of `general` (proposed "General"); the Classification authority is specified in ORG-2 (same as a profile edit) and confirmed by that design; the storage contract (`VARCHAR(32) NOT NULL DEFAULT 'general'`, with or without a CHECK), subject to implementation verification.
 7. **ORG-1 design details:** whether the disable's revocation clears the uniqueness slot; the exact reason text shown to operators.
 8. **ORG-2 design details:** the `created_by` backfill for existing Organizations; the dependency handling of delete (refuse or remove project links); whether to take the project-link write under an Organization lock (recommended, not required); an optional retry on a duplicate slug; optional `$hidden = ['notes']` and an optional database CHECK on classification.
 9. **Outside the ORG scope:** the `users.manage` role-assignment ceiling, to be closed before any delegated role administration.
@@ -403,7 +430,7 @@ No package changes the customer surface, the permission catalogue or a built-in 
 | Document | Changes with |
 |---|---|
 | `docs/architecture/database-schema.md` (table shapes; the sentence that an `organization_roles` table is planned, which should then point at ADR-011 §9) | ORG-1 and ORG-2 |
-| `AGENTS.md` (the terminology paragraph that defines Organization as spanning two records, and its list of technical names) | ORG-3 |
+| `AGENTS.md` (the terminology paragraph that defines Organization as spanning two records, and its list of technical names) | ORG-2 (technical naming and contracts); ORG-3 (any remaining user-facing terminology) |
 | `docs/testing/migration-rehearsal.md` (one sentence on the schema-conditional integrity check) | ORG-2 |
 | Code comments that restate the pair model (`NavigationBuilder`, `PermissionCatalogue`) | the code that carries them |
 | `docs/architecture/database-profile.md`, `runtime-preflight.md`, `docs/operations/backup-and-recovery.md` | no change expected |
