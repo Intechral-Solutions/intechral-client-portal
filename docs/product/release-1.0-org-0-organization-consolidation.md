@@ -221,7 +221,7 @@ Every row is tested through the route **and** through the service, with no row w
 | Member add, promote, approve | org X → membership X → FK-S on users | Enabled, not Disabled | V (sequence); P (state read) |
 | Demote, remove, revoke approval | org X → membership X | any | V |
 | Support grant | users S (actor, member) ascending → org X → membership X | Enabled, not Disabled | V (sequence); P (portal-state read; Disabled already refused) |
-| **Partner-support create or reply** (`PartnerSupportAccess::refusal`, inside the creation or reply transaction) | users S (the actor and the nominated contact; only an existing id is locked) ascending → org rows S (customer and partner, one statement) ascending → partner membership S (then the contact's customer membership S) | Enabled, not Disabled, both rows; the existing authority conditions stay (actor active and not an operator, partner designation, relationship, complete support grant, eligible contact) and tenant isolation is unchanged | V (sequence); P (portal-state read on both organization rows, ORG-1, beside the existing `disabled_at` reads; the drift test with `ServiceRequestAccess` stays meaningful) |
+| **Partner-support create or reply** (`PartnerSupportAccess::refusal`, inside the creation or reply transaction) | users S (the actor and the nominated contact; only an existing id is locked) ascending → org rows S (customer and partner, one statement) ascending → partner membership S (then the contact's customer membership S) | Enabled, not Disabled, both rows; the existing authority conditions stay (actor active and not an operator, partner designation, relationship, complete support grant, eligible contact) and tenant isolation is unchanged | V (sequence); P (portal-state read on both organization rows, ORG-1, beside the existing `disabled_at` reads; the `PartnerSupportAccess` drift test (its unlocked and locked reads) stays meaningful; both reads gain the predicate) |
 | Partner designation, customer assignment or link | org rows X ascending | Enabled, not Disabled, both rows | V (sequence); P (state read; replaces the one-company check) |
 | Remove designation, unlink | org rows X ascending | any | V |
 | **Disable, with transactional invitation revocation** | **actor user S first** → org X → *then* nominate the open invitations → lock them X in ascending key order → revalidate under lock → revoke (contract: [6.2](#62-disable-time-invitation-revocation-transaction-contract)) | Enabled | **P**; today's disable locks the org row `FOR UPDATE` only (V) |
@@ -262,7 +262,7 @@ Ruling A2 requires disabling an Organization to permanently revoke its outstandi
 1. **Lock the acting operator's user row first** (shared). `revoked_by` is a foreign key to the actor, so InnoDB would otherwise take the actor row late, and a suspension of that actor (user X, then waiting on invitation rows) would deadlock with it.
 2. **Lock the Organization row** (exclusive) **before selecting any pending invitation**, and read the portal state from that locked row (Enabled, not already Disabled).
 3. **Nominate the open invitations, then lock them in deterministic ascending-key order.** Nomination is a plain read; the rows are then locked by primary key, ascending, as the other invitation writers do.
-4. **Revalidate each invitation's state under the lock, at one consistent instant** (not against a snapshot taken before the locks): an invitation that an operator revoked, an acceptance that committed, or a hook that revoked it in the meantime is found as such and left alone; an invitation issued between the nomination and the locks is either locked and revoked or the transaction restarts a bounded number of times, never skipped.
+4. **Revalidate each invitation's state under the lock, at one consistent instant** (not against a snapshot taken before the locks): an invitation that an operator revoked, an acceptance that committed, or a hook that revoked it in the meantime is found as such and left alone; no new invitation can be issued between the nomination and the invitation-row locks, because the disabling transaction already holds the Organization row lock that invitation issuance also requires; the revalidation under lock stays required for the rows nominated, and any open row found at that point is locked and revoked, never skipped.
 5. **Permanently revoke** each still-open invitation with the reason `organization_disabled`, `revoked_at` and `revoked_by` (the actor), preserving the historical row, and write the audit provenance (actor, time, Organization, invitation ids) in the same transaction.
 6. **Never reactivate.** A previously revoked invitation (by any reason) is terminal and is never reopened by disable, by re-enable, or by any later issue; re-enabling revives nothing.
 7. **No Gate, no permission-cache loading** inside this locked transaction. Authority is established before it begins (the controller) and re-checked inside it **from the tables** (the table-based predicate), never through a Gate or policy call, because a first permission-cache load inside such a transaction can close a lock cycle (R1-3, 6.2.3).
@@ -329,6 +329,7 @@ Each package is one pull request, authorized individually before its first line 
 5. The existing pages keep working on their existing routes, now reading one table. The unified experience is ORG-3.
 6. **Classification** storage, enum and service operation only: no selector. The value is never selected on a customer or partner path.
 7. The foreign-key manifest regenerated; the migration is **not** added to the rehearsal candidates.
+8. `AGENTS.md` technical naming and contracts updated (section 3).
 
 **Acceptance.**
 
@@ -340,6 +341,7 @@ Each package is one pull request, authorized individually before its first line 
 - Deleting a Not enabled Organization works with its dependencies handled as stated; deleting an enabled-once Organization is refused by the service and by the database.
 - A4 and A5 (below) exercised by tests, since ORG-2 rewrites those rules.
 - The rehearsal and backup unit suites pass with no pin changed; the ORG-1 control suites pass again with fixture changes only.
+- `AGENTS.md` technical naming and contracts no longer describe `crm_companies` or the two-record Organization (scope item 8).
 
 **Review gates.** Focused independent review of the migration, the services and the lock order before commit, and the independent security review of the leakage and tenant-isolation results. Hosted CI green before merge. **Rollback:** revert the pull request. Data entered into profile columns after the change would be lost, which is acceptable only while no production record exists (R1-0).
 
