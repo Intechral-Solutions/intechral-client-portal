@@ -63,6 +63,8 @@ refused there with a 422 on `body` ("Ask Intechral or the requester to reopen it
 
 ## 5. Grants, disabling and immediate revocation
 
+> **Annotation 2026-11-18 (ORG-0), target changes; nothing implemented** ([ADR-011 §3 and §4](../architecture/adr/ADR-011-organization-consolidation-and-lifecycle.md#3-behaviour-of-a-disabled-organization-approved-final-owner-ruling)). As built, `disabled_at` is read only by request filing, partner support and support grants. The owner ruled that a **Disabled Organization also refuses** new invitations, invitation acceptance, new memberships, privilege elevation and administrator approval, new partner designations and managed relationships (ORG-1), and that **disabling permanently revokes its outstanding live invitations** in the same transaction (reason `organization_disabled`; re-enabling never revives them). Unchanged: removals, demotions, revocations (approval, grant, invitation, relationship) and ordinary profile and non-privileged settings maintenance stay allowed, and "a requester's access to and replies on their own existing tickets are unchanged: disabling is not a requester lockout" stays true and is tested deliberately. No organization-wide historical Ticket visibility is introduced. Lock order and tests: [ORG-0 record, sections 5.2, 6 and 6.1](./release-1.0-org-0-organization-consolidation.md#6-lock-acquisition-matrix).
+
 **Authority to grant/revoke:** `OrganizationPolicy::manageMembership` (portal.operator **and** crm.manage), checked in the controller and again in the service, like `OrganizationMembership`. No new
 Spatie permission, so there is nothing for `roles:sync` to apply. `App\Services\PartnerSupportGrants`:
 
