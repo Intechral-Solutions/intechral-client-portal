@@ -28,7 +28,7 @@ function provenanceAcceptedBy(User $user, Organization $organization, User $issu
 
 it('shows the organization and the inviter for an account created by an organization invitation', function () {
     $issuer = regInvIssuer(['name' => 'Ivy Issuer']);
-    $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $issuer->id]);
+    $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $issuer->id]);
     $user = User::factory()->create(['email' => 'joined@example.test']);
     provenanceAcceptedBy($user, $organization, $issuer);
 
@@ -44,7 +44,7 @@ it('shows the organization and the inviter for an account created by an organiza
 
 it('neither names nor links the organization to a viewer the organization tenant scope hides it from', function () {
     $issuer = regInvIssuer(['name' => 'Ivy Issuer']);
-    $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $issuer->id]);
+    $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $issuer->id]);
     $user = User::factory()->create();
     provenanceAcceptedBy($user, $organization, $issuer);
     $viewer = User::factory()->create();
@@ -60,7 +60,7 @@ it('neither names nor links the organization to a viewer the organization tenant
 
 it('escapes an organization or inviter name that contains markup', function () {
     $issuer = regInvIssuer(['name' => '<b>Evil</b> Issuer']);
-    $organization = Organization::factory()->create(['name' => '<script>alert(1)</script> Org', 'owner_id' => $issuer->id]);
+    $organization = Organization::factory()->create(['name' => '<script>alert(1)</script> Org', 'portal_enabled_by' => $issuer->id]);
     $user = User::factory()->create();
     provenanceAcceptedBy($user, $organization, $issuer);
 
@@ -91,12 +91,12 @@ it('shows no invitation provenance for an account that was never invited', funct
 
 it('resolves the relation through accepted_user_id, one way, and is empty for an unaccepted invitation of the same address', function () {
     $issuer = regInvIssuer();
-    $organization = Organization::factory()->create(['owner_id' => $issuer->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $issuer->id]);
     $user = User::factory()->create(['email' => 'same@example.test']);
     $accepted = provenanceAcceptedBy($user, $organization, $issuer);
 
     // An open invitation that names the same address in another organization is not provenance.
-    $other = Organization::factory()->create(['owner_id' => $issuer->id]);
+    $other = Organization::factory()->create(['portal_enabled_by' => $issuer->id]);
     OrganizationInvitation::factory()->forAddress('same@example.test')->state(['organization_id' => $other->id, 'invited_by' => $issuer->id])->create();
 
     expect($user->organizationInvitation->is($accepted))->toBeTrue()

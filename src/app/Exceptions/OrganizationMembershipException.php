@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Support\Organizations\PortalState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,9 +36,21 @@ final class OrganizationMembershipException extends RuntimeException
     /** An explicit revocation would leave none; it is refused unless the operator confirmed that intent. */
     public const LAST_APPROVAL_UNCONFIRMED = 'last_approval_unconfirmed';
 
+    /** Add, promote or approve against an Organization that is not Enabled (Release 1.0, ORG-1): never enabled, or Disabled. */
+    public const PORTAL_NOT_ENABLED = 'portal_not_enabled';
+
+    public const PORTAL_DISABLED = 'portal_disabled';
+
     private function __construct(string $message, public readonly string $reason)
     {
         parent::__construct($message);
+    }
+
+    public static function portalRefused(string $organization, PortalState $state): self
+    {
+        return $state->isDisabled()
+            ? new self("\"{$organization}\" is disabled. Members cannot be added, promoted or approved until it is re-enabled; removing, demoting and revoking an approval stay possible.", self::PORTAL_DISABLED)
+            : new self("\"{$organization}\" has no portal access. Members cannot be added, promoted or approved until portal access is enabled.", self::PORTAL_NOT_ENABLED);
     }
 
     public static function alreadyMember(string $user, string $organization): self

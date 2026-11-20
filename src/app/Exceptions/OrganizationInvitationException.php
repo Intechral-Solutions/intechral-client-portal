@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Support\Organizations\PortalState;
 use RuntimeException;
 
 /**
@@ -27,6 +28,9 @@ final class OrganizationInvitationException extends RuntimeException
     /** Acceptance by identity provider: the provider's address is not the invited one. */
     public const EMAIL_MISMATCH = 'email_mismatch';
 
+    /** Issuance: the Organization is not Enabled (Release 1.0, ORG-1): never enabled, or Disabled. Operator-only message; the cause is in `detail`. */
+    public const PORTAL_REFUSED = 'portal_refused';
+
     /** Revocation: no such invitation in this organization (a cross-organization id is not found, never "forbidden"). */
     public const NOT_FOUND = 'not_found';
 
@@ -43,6 +47,15 @@ final class OrganizationInvitationException extends RuntimeException
     public static function concurrentIssue(): self
     {
         return new self('Another invitation for this address was issued at the same moment. Check the invitations list and try again.', self::CONCURRENT_ISSUE);
+    }
+
+    public static function portalRefused(string $organization, PortalState $state): self
+    {
+        $message = $state->isDisabled()
+            ? "\"{$organization}\" is disabled, so it cannot be invited into. Re-enable it first; invitations that were pending when it was disabled were revoked and stay revoked."
+            : "\"{$organization}\" has no portal access, so it cannot be invited into. Enable portal access first.";
+
+        return new self($message, self::PORTAL_REFUSED, $state->value);
     }
 
     public static function unavailable(string $detail): self

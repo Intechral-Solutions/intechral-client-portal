@@ -18,7 +18,7 @@ class OrganizationController extends Controller
 {
     public function index(Request $request): View
     {
-        $organizations = Organization::with(['owner', 'company'])
+        $organizations = Organization::with(['portalEnabledBy', 'company'])
             ->withCount('members')
             ->orderBy('name')
             ->orderBy('id')
@@ -36,7 +36,7 @@ class OrganizationController extends Controller
 
     public function show(Organization $organization): View
     {
-        $organization->load(['owner', 'company', 'members']);
+        $organization->load(['portalEnabledBy', 'company', 'members']);
 
         // Release 1.0 (MO-2A1): membership administration is operator-only, so the candidate list (every active account that is not
         // yet a member) and the approval details are built only for an actor who may manage membership. Anyone else who can open

@@ -30,7 +30,7 @@ beforeEach(function () {
 function dir1Pair(string $name, ?User $enabledBy = null): Organization
 {
     $owner = $enabledBy ?? User::factory()->create(['name' => 'Enabler of '.$name]);
-    $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $owner->id]);
+    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
     CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
     return $organization;
@@ -260,7 +260,7 @@ it('describes the stored owner as the operator who enabled portal access, and ch
         DB::table('organization_members')->get()->all(),
         DB::table('activity_log')->count(),
     ])->toEqual($before)
-        ->and($organization->fresh()->owner_id)->toBe($this->operator->id);
+        ->and($organization->fresh()->portal_enabled_by)->toBe($this->operator->id);
 });
 
 // ── The Directory deletion warning ────────────────────────────────────────────

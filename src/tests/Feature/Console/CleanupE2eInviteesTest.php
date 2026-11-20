@@ -35,8 +35,8 @@ require_once __DIR__.'/../Auth/InvitationTestHelpers.php';
 beforeEach(function () {
     $this->seedRolesAndPermissions();
     $this->operator = regInvIssuer();
-    $this->suite = Organization::factory()->create(['slug' => CleanupE2eInvitees::ORGANIZATION_SLUGS[0], 'name' => 'E2E Invitations Org', 'owner_id' => $this->operator->id]);
-    $this->other = Organization::factory()->create(['slug' => 'acme-real-customer', 'name' => 'Acme', 'owner_id' => $this->operator->id]);
+    $this->suite = Organization::factory()->create(['slug' => CleanupE2eInvitees::ORGANIZATION_SLUGS[0], 'name' => 'E2E Invitations Org', 'portal_enabled_by' => $this->operator->id]);
+    $this->other = Organization::factory()->create(['slug' => 'acme-real-customer', 'name' => 'Acme', 'portal_enabled_by' => $this->operator->id]);
 });
 
 /** @return PendingCommand */

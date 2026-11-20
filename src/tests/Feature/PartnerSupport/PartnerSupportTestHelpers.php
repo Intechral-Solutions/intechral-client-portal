@@ -22,7 +22,7 @@ require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 function psPaired(string $name): Organization
 {
     $owner = User::factory()->create();
-    $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $owner->id]);
+    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
     CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
     return $organization;

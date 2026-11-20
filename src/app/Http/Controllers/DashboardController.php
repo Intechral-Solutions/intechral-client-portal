@@ -14,6 +14,7 @@ use App\Shared\Pilot\CustomerPilotGate;
 use App\Shared\Pilot\CustomerSurfaceMode;
 use App\Shared\Shell\ShellPresentation;
 use App\Shared\Shell\ShellPresentationResolver;
+use App\Support\Organizations\PortalState;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -89,8 +90,9 @@ class DashboardController extends Controller
             $crmStats = [
                 'companies' => CrmCompany::count(),
                 'contacts' => CrmContact::count(),
-                // Organizations whose portal access is enabled: the tile is labelled "With portal access", and a disabled one has none.
-                'orgs' => Organization::whereNull('disabled_at')->count(),
+                // Organizations whose portal access is enabled: the tile is labelled "With portal access", and a disabled one has none. ORG-1: nor has one
+                // that was never enabled (a Directory-only row must not count as portal access just because it exists).
+                'orgs' => PortalState::whereEnabled(Organization::query(), 'organizations')->count(),
             ];
         }
 

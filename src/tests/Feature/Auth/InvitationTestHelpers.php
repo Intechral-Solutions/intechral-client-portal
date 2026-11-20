@@ -32,7 +32,7 @@ function regInvIssuer(array $attributes = []): User
 function regInvOpen(string $email = 'invited@example.test', ?Organization $organization = null, ?User $issuer = null, array $state = []): array
 {
     $issuer ??= regInvIssuer();
-    $organization ??= Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $issuer->id]);
+    $organization ??= Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $issuer->id]);
     $token = Str::random(64);
 
     $invitation = OrganizationInvitation::factory()

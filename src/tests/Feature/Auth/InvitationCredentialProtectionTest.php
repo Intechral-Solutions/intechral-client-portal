@@ -225,7 +225,7 @@ describe('where the credential may and may not be', function () {
 
     it('keeps the token and the hash out of the activity log and the application log through issue, view, accept and refusals', function () {
         $operator = regInvIssuer();
-        $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
         Notification::fake();
 
         $invitation = app(OrganizationInvitations::class)->issue($organization, 'invited@example.test', $operator);

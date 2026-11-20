@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Exceptions\OrganizationRelationshipException;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Organizations\PortalState;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -34,6 +36,13 @@ use Illuminate\Support\Facades\Gate;
  * safe only because every mutation first passes {@see OrganizationPolicy} (portal.operator AND crm.manage); the read helpers
  * below must be called only for an actor who has passed it.
  *
+ * PORTAL STATE (Release 1.0, ORG-1; ADR-011 sections 2, 3 and 5). Designating a partner and linking or reassigning a customer GIVE a relationship, so BOTH
+ * ends must be Enabled ({@see PortalState}), read from the rows already locked above: no extra lock and no Gate call. Removing a designation and
+ * unlinking take one away and ask nothing of the state. Disable and re-enable are the lifecycle transitions themselves: each is authorized (Gate,
+ * outside the transaction) AND re-decided from the tables under the locks, takes the actor's row first, and refuses an invalid transition with a
+ * controlled error before any CHECK could fire. Disabling also permanently revokes the Organization's open invitations in the same transaction
+ * ({@see disable()}).
+ *
  * Every change is recorded in the activity log, in the same transaction, with the actor and the previous and new values.
  */
 final class OrganizationRelationships
@@ -54,7 +63,10 @@ final class OrganizationRelationships
 
     private const ATTEMPTS = 3;
 
-    public function __construct(private readonly PartnerSupportGrants $supportGrants) {}
+    public function __construct(
+        private readonly PartnerSupportGrants $supportGrants,
+        private readonly OrganizationInvitations $invitations,
+    ) {}
 
     // ── Mutations ─────────────────────────────────────────
 
@@ -65,6 +77,8 @@ final class OrganizationRelationships
 
         return DB::transaction(function () use ($organization, $actor): bool {
             $row = $this->lock([$organization->getKey()])[$organization->getKey()];
+
+            $this->requireEnabled($row);
 
             if ($row->can_manage_customers) {
                 return false;
@@ -126,35 +140,78 @@ final class OrganizationRelationships
      * request ({@see ServiceRequestAccess}) and ends partner support access to its tickets, and to those of its customers when it is a partner
      * ({@see PartnerSupportAccess}). It does not remove members, change a role, delete a record or lock a requester out of their own existing tickets.
      * Returns false when it already was disabled (its original time is kept).
+     *
+     * ORG-1 (ruling A2): disabling permanently REVOKES every open invitation of the Organization, in this transaction
+     * ({@see OrganizationInvitations::revokeOpenForDisable()}), and audits them. The sequence is the ORG-0 record's section 6.2:
+     *
+     *   Gate `manageRelationships` (before the transaction)  ->  actor user row (S)  ->  organization row (X)  ->  the actor's authority again, from the
+     *   TABLES  ->  portal state from the locked row  ->  write `disabled_at`  ->  nominate and lock the open invitations (X, ascending)  ->  revalidate
+     *   and revoke  ->  audit
+     *
+     * The actor's row is first because `revoked_by` is a foreign key to it and a suspension of that actor holds it exclusively while it waits for
+     * invitation rows: taking it late, through the foreign key, would close a cycle. Nothing here loads the permission cache or calls a Gate inside the
+     * locks. Disable mutates no role or permission, so no cache-epoch step is added (R4 does not apply).
+     *
+     * @throws AuthorizationException the actor is not a relationship manager (from the tables, under the lock)
+     * @throws OrganizationRelationshipException the Organization has never had portal access
      */
     public function disable(Organization $organization, User $actor): bool
     {
         $this->authorize($actor);
 
         return DB::transaction(function () use ($organization, $actor): bool {
+            $this->lockActor($actor);
             $row = $this->lockRaw($organization->getKey());
+            $this->requireRelationshipManager($actor);
 
-            if ($row->disabled_at !== null) {
+            $state = PortalState::of($row);
+
+            if ($state->isNotEnabled()) {
+                throw OrganizationRelationshipException::neverEnabled($row->name);
+            }
+
+            if ($state->isDisabled()) {
                 return false;
             }
 
-            $now = now();
-            $this->write($organization, ['disabled_at' => $now]);
-            $this->audit($actor, $organization, self::DISABLED, ['old' => ['disabled' => false], 'new' => ['disabled' => true]]);
+            // Every lock first (the invitation rows), then the writes: the Organization's own `disabled_at` is written after the sweep has locked
+            // what it will revoke, so no lock is ever taken after a write of this transaction.
+            $revoked = $this->invitations->revokeOpenForDisable((int) $row->id, $actor);
+            $this->write($organization, ['disabled_at' => now()]);
+            $this->audit($actor, $organization, self::DISABLED, [
+                'old' => ['disabled' => false],
+                'new' => ['disabled' => true],
+                'revoked_invitation_ids' => $revoked,
+            ]);
 
             return true;
         }, self::ATTEMPTS);
     }
 
-    /** Re-enable a disabled organization. Returns false when it was not disabled. Re-grants nothing: only designations that still exist apply again. */
+    /**
+     * Re-enable a disabled organization. Returns false when it was not disabled. Re-grants nothing: only designations that still exist apply again, and an
+     * invitation that was revoked when it was disabled stays revoked (a new invitation is a new credential). It is NOT initial enablement: an Organization that
+     * has never had portal access is refused with a controlled error, and the two acts keep separate abilities (ADR-011 section 2).
+     *
+     * @throws AuthorizationException the actor is not a relationship manager (from the tables, under the lock)
+     * @throws OrganizationRelationshipException the Organization has never had portal access
+     */
     public function enable(Organization $organization, User $actor): bool
     {
         $this->authorize($actor);
 
         return DB::transaction(function () use ($organization, $actor): bool {
+            $this->lockActor($actor);
             $row = $this->lockRaw($organization->getKey());
+            $this->requireRelationshipManager($actor);
 
-            if ($row->disabled_at === null) {
+            $state = PortalState::of($row);
+
+            if ($state->isNotEnabled()) {
+                throw OrganizationRelationshipException::neverEnabled($row->name);
+            }
+
+            if (! $state->isDisabled()) {
                 return false;
             }
 
@@ -184,6 +241,10 @@ final class OrganizationRelationships
             if ($customerRow->id === $partnerRow->id) {
                 throw OrganizationRelationshipException::self($customerRow->name);
             }
+
+            // ORG-1: both ends Enabled. Reassigning is a link like any other (it gives the new partner a customer), so it needs both too.
+            $this->requireEnabled($customerRow);
+            $this->requireEnabled($partnerRow);
 
             if (! $partnerRow->can_manage_customers || $partnerRow->managed_by_organization_id !== null) {
                 throw OrganizationRelationshipException::notPartner($partnerRow->name);
@@ -260,10 +321,10 @@ final class OrganizationRelationships
     /** Organizations that could be linked to this partner now: not partners, not managed, one company, not itself. */
     public static function eligibleCustomers(Organization $partner): Collection
     {
-        return Organization::withoutGlobalScopes()
+        return PortalState::whereEnabled(Organization::withoutGlobalScopes()
             ->where('can_manage_customers', false)
             ->whereNull('managed_by_organization_id')
-            ->whereKeyNot($partner->getKey())
+            ->whereKeyNot($partner->getKey()))
             ->whereIn('id', self::singleCompanyOrganizations())
             ->orderBy('name')->orderBy('id')
             ->get(['id', 'name']);
@@ -272,9 +333,9 @@ final class OrganizationRelationships
     /** Partners this organization could be linked to now (the server still decides): not itself, one company. */
     public static function eligiblePartners(Organization $customer): Collection
     {
-        return Organization::withoutGlobalScopes()
+        return PortalState::whereEnabled(Organization::withoutGlobalScopes()
             ->where('can_manage_customers', true)
-            ->whereKeyNot($customer->getKey())
+            ->whereKeyNot($customer->getKey()))
             ->whereIn('id', self::singleCompanyOrganizations())
             ->orderBy('name')->orderBy('id')
             ->get(['id', 'name']);
@@ -339,13 +400,37 @@ final class OrganizationRelationships
         }
     }
 
-    /** The organization row, exclusively locked, with `disabled_at` as it is now. */
+    /** The organization row, exclusively locked, with its name and its portal-state columns as they are now. */
     private function lockRaw(int $id): object
     {
-        $row = DB::table('organizations')->where('id', $id)->lockForUpdate()->first(['id', 'disabled_at']);
+        $row = DB::table('organizations')->where('id', $id)->lockForUpdate()->first(['id', 'name', ...PortalState::columns()]);
         abort_if($row === null, 404);
 
         return $row;
+    }
+
+    /** The acting operator's user row, shared: the FIRST statement of a lifecycle transaction (`revoked_by` is a foreign key to it; a suspension holds it exclusively). */
+    private function lockActor(User $actor): void
+    {
+        DB::table('users')->where('id', $actor->getKey())->sharedLock()->value('id');
+    }
+
+    /** The Gate answered before the transaction; under the locks the answer comes from the tables (never stale, never a cache load). */
+    private function requireRelationshipManager(User $actor): void
+    {
+        if (! OrganizationAuthority::isRelationshipManager((int) $actor->getKey())) {
+            throw new AuthorizationException;
+        }
+    }
+
+    /** ORG-1: a relationship act that gives something needs an Enabled Organization, read from a row this transaction has locked. */
+    private function requireEnabled(object $row): void
+    {
+        $state = PortalState::of($row);
+
+        if (! $state->isEnabled()) {
+            throw OrganizationRelationshipException::portalRefused((string) $row->name, $state);
+        }
     }
 
     /** @param  array<string, mixed>  $changes */

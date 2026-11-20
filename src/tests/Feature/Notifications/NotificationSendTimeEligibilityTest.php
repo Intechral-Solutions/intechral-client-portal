@@ -135,7 +135,7 @@ function wp1Operator(): User
 function wp1Issue(string $email = 'new.person@example.com', ?User $operator = null, ?Organization $organization = null): array
 {
     $operator ??= wp1Operator();
-    $organization ??= Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization ??= Organization::factory()->create(['portal_enabled_by' => $operator->id]);
 
     return [app(OrganizationInvitations::class)->issue($organization, $email, $operator), $operator, $organization];
 }

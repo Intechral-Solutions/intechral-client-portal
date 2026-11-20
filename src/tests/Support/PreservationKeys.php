@@ -28,6 +28,21 @@ final class PreservationKeys
     ];
 
     /**
+     * The same 13 keys as they stand in the LIVE schema (Release 1.0, ORG-1): `organizations.owner_id` was renamed `portal_enabled_by` by the portal-state
+     * migration, and the foreign key kept its original constraint name. {@see USER_KEYS} stays the historical H1 inventory (the pinned M2 migration and the
+     * rehearsal harness, whose databases never run the ORG-1 migration, still know the column as `owner_id`).
+     *
+     * @return list<array{0: string, 1: string, 2: string}>
+     */
+    public static function liveUserKeys(): array
+    {
+        return array_map(
+            fn (array $key) => $key[1] === 'owner_id' && $key[0] === 'organizations' ? ['organizations', 'portal_enabled_by', $key[2]] : $key,
+            self::USER_KEYS
+        );
+    }
+
+    /**
      * Every foreign key that points at `users` or `crm_companies`, as "table.column -> parent" => "DELETE/UPDATE (constraint)".
      *
      * @return array<string, string>

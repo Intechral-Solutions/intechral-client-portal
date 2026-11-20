@@ -78,7 +78,7 @@ it('is not granted by anything but the designation: role, approval, partner rela
     $other = pilotCustomer();
     psJoin($other, $w['partner'], 'admin');
     DB::table('organization_members')->where('user_id', $other->id)->update(['admin_approved_at' => now(), 'admin_approved_by' => $w['operator']->id]);
-    $w['partner']->forceFill(['owner_id' => $other->id])->saveQuietly();
+    $w['partner']->forceFill(['portal_enabled_by' => $other->id])->saveQuietly();
 
     // An APPROVED ADMINISTRATOR OWNER of the partner with no designation has nothing.
     expect(psReadings($w, $other))->toBe([false, false, false]);

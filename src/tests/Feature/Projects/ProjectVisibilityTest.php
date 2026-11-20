@@ -21,7 +21,7 @@ beforeEach(function () {
     $this->seedRolesAndPermissions();
     $this->owner = makeUser('operator');
     $this->orgUser = makeUser('user', ['name' => 'Org User']); // role user: projects.view_org + tasks.view_org
-    $this->org = Organization::factory()->create(['owner_id' => $this->owner->id]);
+    $this->org = Organization::factory()->create(['portal_enabled_by' => $this->owner->id]);
     $this->org->members()->attach($this->orgUser, ['role' => 'member']);
     $this->company = CrmCompany::factory()->create(['created_by' => $this->owner->id, 'organization_id' => $this->org->id]);
 

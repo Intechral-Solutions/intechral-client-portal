@@ -77,7 +77,7 @@ function propsFixture(?User $owner = null): array
     $coworker = ticketUser('operator', ['name' => 'Coworker-Time-SENTINEL']);
     // R1-2B (owner decision E4): the ticket's organization NAME is sent to its requester, so it is no longer a sentinel; its id still never is
     // (see 'sends the organization name, never an id' below).
-    $organization = Organization::factory()->create(['name' => 'Acme Ltd', 'owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['name' => 'Acme Ltd', 'portal_enabled_by' => $operator->id]);
     $ticket = ticketFor($owner, [
         'status' => 'pending_user', 'assignee_id' => $assignee->id, 'organization_id' => $organization->id,
         'title' => 'Printer offline', 'description' => 'It prints nothing.', 'priority' => 'high',
@@ -337,10 +337,10 @@ it('still refuses a direct reply POST to a closed ticket with 422 on body (the p
 it('sends the create page its exact props: the actor\'s own organizations by id and name, and no company data', function () {
     $operator = ticketUser('operator');
     $member = ticketUser();
-    $organization = Organization::factory()->create(['name' => 'Zed Holdings', 'owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['name' => 'Zed Holdings', 'portal_enabled_by' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
     // MO-1A: one company per organization (unique key), so a multi-company member belongs to two organizations.
-    $second = Organization::factory()->create(['name' => 'Acme Ltd', 'owner_id' => $operator->id]);
+    $second = Organization::factory()->create(['name' => 'Acme Ltd', 'portal_enabled_by' => $operator->id]);
     $second->members()->attach($member, ['role' => 'member']);
     CrmCompany::factory()->create(['name' => 'Zed Co', 'created_by' => $operator->id, 'organization_id' => $organization->id]);
     CrmCompany::factory()->create(['name' => 'Acme Co', 'created_by' => $operator->id, 'organization_id' => $second->id]);

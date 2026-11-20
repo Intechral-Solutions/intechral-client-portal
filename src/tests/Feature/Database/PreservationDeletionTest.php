@@ -46,7 +46,7 @@ function recordsOwnedThroughEachKey(): array
         'task_comments.user_id' => fn (User $u) => ['task_comments', TaskComment::factory()->create(['user_id' => $u->id, 'task_id' => Task::factory()->standalone()->create()->id])->id],
         'tasks.created_by' => fn (User $u) => ['tasks', Task::factory()->standalone()->create(['created_by' => $u->id])->id],
         'projects.created_by' => fn (User $u) => ['projects', Project::factory()->create(['created_by' => $u->id])->id],
-        'organizations.owner_id' => fn (User $u) => ['organizations', Organization::factory()->create(['owner_id' => $u->id])->id],
+        'organizations.portal_enabled_by' => fn (User $u) => ['organizations', Organization::factory()->create(['portal_enabled_by' => $u->id])->id],
         'crm_companies.created_by' => fn (User $u) => ['crm_companies', CrmCompany::factory()->create(['created_by' => $u->id])->id],
         'crm_contacts.created_by' => fn (User $u) => ['crm_contacts', CrmContact::factory()->create(['created_by' => $u->id])->id],
         'cms_pages.created_by' => fn (User $u) => ['cms_pages', CmsPage::factory()->create(['created_by' => $u->id])->id],
@@ -73,7 +73,7 @@ it('refuses to delete a user referenced by a durable business record, and loses 
 it('still deletes a user who owns no durable record, and removes only their credential and membership children', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create(['created_by' => $owner->id]);
-    $organization = Organization::factory()->create(['owner_id' => $owner->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $owner->id]);
     $user = User::factory()->create();
 
     $now = now();

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Support\Helpdesk\TicketAttribution;
+use App\Support\Organizations\PortalState;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +28,8 @@ use LogicException;
  * that organization's membership decides), and a stale nomination can only produce a refusal or a request to choose.
  *
  * R1-4: an organization that has been DISABLED (`organizations.disabled_at`) is refused like one that does not exist: no new request can be filed for
- * it. Nothing else about filing changes; a requester's existing tickets are untouched.
+ * it. Nothing else about filing changes; a requester's existing tickets are untouched. ORG-1: the same refusal for an Organization that has never had
+ * portal access ({@see PortalState}); the state is read from the row the shared lock below returns, as a second line beside `disabled_at`.
  *
  * Every read is on the tables directly, unscoped: no global scope, cache or earlier Eloquent relation may decide it.
  *
@@ -66,10 +68,10 @@ final class ServiceRequestAccess
         $organizationId = $requestedOrganizationId ?? $this->soleOrganization($actor);
 
         // 1. The organization row, shared lock: a removal holds it exclusively, so it is either finished (and seen below) or must wait.
-        $organization = DB::table('organizations')->where('id', $organizationId)->sharedLock()->first(['id', 'disabled_at']);
+        $organization = DB::table('organizations')->where('id', $organizationId)->sharedLock()->first(['id', ...PortalState::columns()]);
 
-        // R1-4: a DISABLED organization is not available for a new request, with the same answer as one that does not exist.
-        if ($organization === null || $organization->disabled_at !== null) {
+        // R1-4: a DISABLED organization is not available for a new request, with the same answer as one that does not exist. ORG-1: so is one that is not Enabled.
+        if ($organization === null || ! PortalState::of($organization)->isEnabled()) {
             throw $this->refusal($requestedOrganizationId === null ? self::NOT_LINKED : self::NOT_AVAILABLE);
         }
 
@@ -141,10 +143,9 @@ final class ServiceRequestAccess
      */
     public function eligibleOrganizations(User $actor): array
     {
-        return DB::table('organization_members')
+        return PortalState::whereEnabled(DB::table('organization_members')
             ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')
-            ->where('organization_members.user_id', $actor->getKey())
-            ->whereNull('organizations.disabled_at')
+            ->where('organization_members.user_id', $actor->getKey()))
             ->orderBy('organizations.name')->orderBy('organizations.id')
             ->get(['organizations.id', 'organizations.name'])
             ->map(fn (object $row) => ['id' => (int) $row->id, 'name' => (string) $row->name])
@@ -167,10 +168,9 @@ final class ServiceRequestAccess
      */
     private function soleOrganization(User $actor): int
     {
-        $organizations = DB::table('organization_members')
+        $organizations = PortalState::whereEnabled(DB::table('organization_members')
             ->join('organizations', 'organizations.id', '=', 'organization_members.organization_id')
-            ->whereNull('organizations.disabled_at')
-            ->where('organization_members.user_id', $actor->getKey())
+            ->where('organization_members.user_id', $actor->getKey()))
             ->orderBy('organization_members.organization_id')->pluck('organization_members.organization_id');
 
         return match ($organizations->count()) {

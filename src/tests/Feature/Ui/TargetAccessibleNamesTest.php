@@ -191,7 +191,7 @@ it('keeps wrapped checkboxes named by their own label and groups them with role 
 
 it('names the organization member controls and the user-role group', function () {
     $operator = User::factory()->create()->assignRole('operator');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     User::factory()->create();
     $org = $this->actingAs($operator)->get(route('organizations.show', $organization))->assertOk()->getContent();
 

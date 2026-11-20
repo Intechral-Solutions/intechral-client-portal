@@ -84,7 +84,7 @@ function tkRaceFixture(): array
     $requester->givePermissionTo('tickets.create');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $org = Organization::factory()->create(['name' => 'Ticket Race', 'owner_id' => $actor->id]);
+    $org = Organization::factory()->create(['name' => 'Ticket Race', 'portal_enabled_by' => $actor->id]);
     tkRaceJoin($org, $requester);
 
     DB::connection('tk_race_b')->statement('SET SESSION innodb_lock_wait_timeout = 1');
@@ -261,7 +261,7 @@ it('T3. a removal still in flight makes creation wait and write nothing; once it
 
 it('T4. two creations by a multi-membership user run side by side (shared locks) and each keeps the organization it named', function () {
     $f = tkRaceFixture();
-    $other = Organization::factory()->create(['name' => 'Ticket Race Two', 'owner_id' => $f['actor']->id]);
+    $other = Organization::factory()->create(['name' => 'Ticket Race Two', 'portal_enabled_by' => $f['actor']->id]);
     tkRaceJoin($other, $f['requester']);
 
     try {

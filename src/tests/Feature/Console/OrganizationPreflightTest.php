@@ -39,9 +39,9 @@ it('reports what the later packages will meet: admin rows, operator-held rows, m
     $customer = User::factory()->create(['email' => 'cust@example.test'])->assignRole('user');
     $suspended = User::factory()->create(['email' => 'gone@example.test', 'disabled_at' => now()])->assignRole('user');
 
-    $acme = Organization::factory()->create(['name' => 'Acme', 'owner_id' => $operator->id]);
-    $globex = Organization::factory()->create(['name' => 'Globex', 'owner_id' => $operator->id]);
-    $orphan = Organization::factory()->create(['name' => 'No Company', 'owner_id' => $operator->id]);
+    $acme = Organization::factory()->create(['name' => 'Acme', 'portal_enabled_by' => $operator->id]);
+    $globex = Organization::factory()->create(['name' => 'Globex', 'portal_enabled_by' => $operator->id]);
+    $orphan = Organization::factory()->create(['name' => 'No Company', 'portal_enabled_by' => $operator->id]);
     $acmeCompany = CrmCompany::factory()->create(['organization_id' => $acme->id, 'created_by' => $operator->id]);
     CrmCompany::factory()->create(['organization_id' => $globex->id, 'created_by' => $operator->id]);
     CrmCompany::factory()->create(['organization_id' => null, 'created_by' => $operator->id]);
@@ -88,7 +88,7 @@ it('counts relationships and fails on a state the service can never produce', fu
     Gate::before(fn () => true);
     $operator = User::factory()->create()->assignRole('operator');
     $make = function (string $name) use ($operator): Organization {
-        $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $operator->id]);
+        $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $operator->id]);
         CrmCompany::factory()->create(['organization_id' => $organization->id, 'created_by' => $operator->id]);
 
         return $organization;
@@ -125,9 +125,9 @@ it('inventories administrator approval by ids only: unapproved, approved, suspen
     $stale = User::factory()->create(['email' => 'stale@example.test'])->assignRole('user');
     $broken = User::factory()->create(['email' => 'broken@example.test'])->assignRole('user');
 
-    $acme = Organization::factory()->create(['name' => 'Acme', 'owner_id' => $operator->id]);
-    $globex = Organization::factory()->create(['name' => 'Globex', 'owner_id' => $operator->id]);
-    $empty = Organization::factory()->create(['name' => 'Empty', 'owner_id' => $operator->id]);
+    $acme = Organization::factory()->create(['name' => 'Acme', 'portal_enabled_by' => $operator->id]);
+    $globex = Organization::factory()->create(['name' => 'Globex', 'portal_enabled_by' => $operator->id]);
+    $empty = Organization::factory()->create(['name' => 'Empty', 'portal_enabled_by' => $operator->id]);
 
     // ONE instant for every timestamp of every fixture row: the changed-after-approval check compares updated_at with
     // admin_approved_at, and two now() calls straddling a second boundary would flake it.
@@ -183,7 +183,7 @@ it('inventories administrator approval by ids only: unapproved, approved, suspen
 it('passes cleanly with historical administrators that simply are not approved yet, and says so', function () {
     $operator = User::factory()->create()->assignRole('operator');
     $customer = User::factory()->create()->assignRole('user');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach($customer, ['role' => 'admin']);
 
     $report = app(OrganizationPreflight::class)->report();
@@ -209,7 +209,7 @@ function integrityRow(Organization $organization, User $user, string $role, ?Car
 it('fails on a member row that carries an approval, and on nothing else: the damage an older release leaves after a demotion', function () {
     $operator = User::factory()->create()->assignRole('operator');
     $customer = User::factory()->create()->assignRole('user');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $at = now()->startOfSecond();
     integrityRow($organization, $customer, 'member', $at, $operator);
 
@@ -229,7 +229,7 @@ it('fails on a half-written approval record in either direction, and such a row 
     $operator = User::factory()->create()->assignRole('operator');
     $timeOnly = User::factory()->create()->assignRole('user');
     $approverOnly = User::factory()->create()->assignRole('user');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $at = now()->startOfSecond();
     integrityRow($organization, $timeOnly, 'admin', $at, null);
     integrityRow($organization, $approverOnly, 'admin', null, $operator, $at);
@@ -254,7 +254,7 @@ it('fails on an approved administrator row changed after its approval, as diagno
     $revived = User::factory()->create()->assignRole('user');
     $same = User::factory()->create()->assignRole('user');
     $earlier = User::factory()->create()->assignRole('user');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $at = now()->startOfSecond();
 
     integrityRow($organization, $revived, 'admin', $at, $operator, $at->copy()->addSecond());   // older code re-promoted it
@@ -292,8 +292,8 @@ function preflightInvitation(Organization $organization, User $issuer, string $e
 it('reports the invitation counts by derived state, ids only, and passes on data the service could have written', function () {
     $operator = User::factory()->create();
     $operator->givePermissionTo(['portal.operator', 'crm.manage']);
-    $acme = Organization::factory()->create(['owner_id' => $operator->id]);
-    $globex = Organization::factory()->create(['owner_id' => $operator->id]);
+    $acme = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
+    $globex = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $member = User::factory()->create();
 
     $openA = preflightInvitation($acme, $operator, 'a@example.test');
@@ -326,7 +326,7 @@ it('warns, without failing, about an open invitation that cannot be accepted: th
     $operator->givePermissionTo(['portal.operator', 'crm.manage']);
     $lapsed = User::factory()->create();
     $lapsed->givePermissionTo(['portal.operator', 'crm.manage']);
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $taken = preflightInvitation($organization, $operator, 'taken@example.test');
     User::factory()->create(['email' => 'Taken@Example.test']);
     $orphan = preflightInvitation($organization, $lapsed, 'orphan@example.test');
@@ -348,7 +348,7 @@ it('fails on an invitation row the service can never write, naming the rule and 
     $operator = User::factory()->create();
     $operator->givePermissionTo(['portal.operator', 'crm.manage']);
     $member = User::factory()->create();
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $id = preflightInvitation($organization, $operator, 'x@example.test', array_map(fn ($value) => match ($value) {
         '@member' => $member->id, '@operator' => $operator->id, '@now' => now(), default => $value
     }, $state));
@@ -376,7 +376,7 @@ it('fails on an invitation row the service can never write, naming the rule and 
 it('warns about a revocation code it does not know, and reads the row as revoked', function () {
     $operator = User::factory()->create();
     $operator->givePermissionTo(['portal.operator', 'crm.manage']);
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $id = preflightInvitation($organization, $operator, 'x@example.test', ['live_email' => null, 'revoked_at' => now(), 'revoked_reason' => 'something_new']);
 
     $report = app(OrganizationPreflight::class)->report();
@@ -388,7 +388,7 @@ it('warns about a revocation code it does not know, and reads the row as revoked
 it('reads no lock and writes nothing while it counts invitations', function () {
     $operator = User::factory()->create();
     $operator->givePermissionTo(['portal.operator', 'crm.manage']);
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     preflightInvitation($organization, $operator, 'x@example.test');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $before = DB::table('organization_invitations')->get()->toJson();

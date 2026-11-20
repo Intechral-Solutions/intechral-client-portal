@@ -124,7 +124,7 @@ describe('notifications', function () {
 
     it('leaves notifications routed to an address alone (the invitation is not a user notification)', function () {
         Notification::fake();
-        $organization = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
         $this->operator->givePermissionTo(['portal.operator', 'crm.manage']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -231,7 +231,7 @@ describe('project membership', function () {
 
 describe('organization membership', function () {
     it('offers and accepts only active users as new members', function () {
-        $organization = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
         $active = makeUser('user', ['name' => 'Active Person']);
         $suspended = makeUser('user', ['name' => 'Suspended Person', 'disabled_at' => now()]);
 

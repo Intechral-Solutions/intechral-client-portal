@@ -118,7 +118,7 @@ function uiTargetPages(): array
         },
         'organizations.show' => function ($t) {
             $operator = uiActor('operator');
-            $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+            $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
             $organization->members()->attach(uiActor('user')->id, ['role' => 'member']);
 
             return [uiGet($t, $operator, route('organizations.show', $organization)), 2];
@@ -229,7 +229,7 @@ function uiFailedForms(): array
         'operator.cms.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('operator.cms.create'), 'post', route('operator.cms.store'), ['title' => '']),
         'organizations.show add member' => function ($t) {
             $operator = uiActor('operator');
-            $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+            $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
             uiActor('user');
 
             return uiFailedSubmission($t, $operator, route('organizations.show', $organization), 'post', route('organizations.members.store', $organization), ['user_id' => '', 'role' => 'nonsense']);

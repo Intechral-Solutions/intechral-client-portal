@@ -51,7 +51,7 @@
                         <x-ui.status tone="success">Enabled</x-ui.status>
                         @endif
                     </td>
-                    <td class="px-4 py-3 text-text-secondary">{{ $org->owner?->name ?? '—' }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $org->portalEnabledBy?->name ?? '—' }}</td>
                     <td class="px-4 py-3 text-right text-text-secondary">{{ $org->members_count }}</td>
                     @if ($relationships !== null)
                     {{-- Built only for an actor who may manage relationships (DIR-0 S7): $relationships is null otherwise and this never renders. --}}

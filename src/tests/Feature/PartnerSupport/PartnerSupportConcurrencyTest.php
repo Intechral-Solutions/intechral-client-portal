@@ -75,7 +75,7 @@ function psRaceFixture(): array
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $make = function (string $name) use ($actor): Organization {
-        $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $actor->id]);
+        $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $actor->id]);
         CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $actor->id]);
 
         return $organization;
@@ -104,14 +104,14 @@ function psRaceFixture(): array
 function psRaceCleanup(array $f): void
 {
     $users = [$f['staff']->id, $f['requester']->id, $f['actor']->id];
-    $organizations = DB::table('organizations')->where('owner_id', $f['actor']->id)->pluck('id')->all();
+    $organizations = DB::table('organizations')->where('portal_enabled_by', $f['actor']->id)->pluck('id')->all();
 
     DB::table('activity_log')->where('subject_type', Organization::class)->whereIn('subject_id', $organizations)->delete();
     DB::table('activity_log')->whereIn('causer_id', $users)->delete();
     DB::table('organizations')->whereIn('id', $organizations)->update(['managed_by_organization_id' => null]);
     DB::table('crm_companies')->where('created_by', $f['actor']->id)->delete();
     DB::table('organization_members')->whereIn('organization_id', $organizations)->delete();
-    DB::table('organizations')->whereIn('id', $organizations)->update(['owner_id' => $f['actor']->id]);
+    DB::table('organizations')->whereIn('id', $organizations)->update(['portal_enabled_by' => $f['actor']->id]);
     CommittedUsers::delete($users);
     DB::table('organizations')->whereIn('id', $organizations)->delete();
     DB::table('model_has_permissions')->whereIn('model_id', [$f['actor']->id, $f['requester']->id])->where('model_type', User::class)->delete();

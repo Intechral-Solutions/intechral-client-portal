@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\PartnerSupportException;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Organizations\PortalState;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -51,18 +52,25 @@ final class PartnerSupportGrants
             $account = $users->get((int) $member->getKey());
             abort_if($account === null, 404);
 
-            $org = DB::table('organizations')->where('id', $partner->getKey())->lockForUpdate()->first(['id', 'name', 'can_manage_customers', 'disabled_at']);
+            $org = DB::table('organizations')->where('id', $partner->getKey())->lockForUpdate()->first(['id', 'name', 'can_manage_customers', ...PortalState::columns()]);
             abort_if($org === null, 404);
 
             $membership = DB::table('organization_members')
                 ->where('organization_id', $org->id)->where('user_id', $account->id)
                 ->lockForUpdate()->first();
 
+            // ORG-1: the state of the row just locked, first. A grant is new portal authority, so only an Enabled partner may give one.
+            $state = PortalState::of($org);
+
+            if ($state->isNotEnabled()) {
+                throw PartnerSupportException::portalNotEnabled($org->name);
+            }
+
             if (! $org->can_manage_customers) {
                 throw PartnerSupportException::notPartner($org->name);
             }
 
-            if ($org->disabled_at !== null) {
+            if ($state->isDisabled()) {
                 throw PartnerSupportException::organizationDisabled($org->name);
             }
 

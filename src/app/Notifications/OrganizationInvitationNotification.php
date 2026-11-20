@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Services\OrganizationAuthority;
 use App\Services\OrganizationInvitations;
 use App\Support\Mail\MailText;
+use App\Support\Organizations\PortalState;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +29,8 @@ use Illuminate\Support\Facades\DB;
  *    is the guarantee; the service also dispatches after its own transaction has returned.
  *  - SEND-TIME ELIGIBILITY. The mail is queued, so by the time the worker runs it the invitation may have been superseded, revoked, accepted
  *    or expired, its address may now belong to an account, or its issuer may have lost authority. {@see shouldSend()} re-reads every fact from
- *    the tables and mails the link only while it is still the live one. Ineligible (including "no such row") returns false and the mail is
+ *    the tables and mails the link only while it is still the live one. ORG-1: that includes the Organization being Enabled ({@see PortalState}); an
+ *    invitation revoked when its Organization was disabled is already dropped by `revoked_at`, and this is the independent second line. Ineligible (including "no such row") returns false and the mail is
  *    dropped, not failed. A database error is NOT caught: it propagates, the attempt fails and the queue retries, so a transient outage never
  *    silently swallows a valid invitation.
  *
@@ -60,6 +62,7 @@ final class OrganizationInvitationNotification extends Notification implements S
             && Carbon::parse($row->expires_at)->isFuture()
             && hash_equals((string) $row->token_hash, OrganizationInvitations::hashToken($this->token))
             && $row->organization_name !== null
+            && PortalState::of($row)->isEnabled()
             && ! DB::table('users')->where('email', $row->email)->exists()
             && OrganizationAuthority::isMembershipManager((int) $row->invited_by);
     }
@@ -88,6 +91,6 @@ final class OrganizationInvitationNotification extends Notification implements S
             ->leftJoin('organizations as o', 'o.id', '=', 'i.organization_id')
             ->leftJoin('users as u', 'u.id', '=', 'i.invited_by')
             ->where('i.id', $this->invitationId)
-            ->first(['i.*', 'o.name as organization_name', 'u.name as inviter_name']);
+            ->first(['i.*', 'o.name as organization_name', 'u.name as inviter_name', 'o.portal_enabled_at', 'o.disabled_at']);
     }
 }

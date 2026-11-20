@@ -19,8 +19,8 @@ it('shows a member only companies contacts and organizations from their organiza
     $member = User::factory()->create();
     $member->assignRole('user');
 
-    $orgA = Organization::factory()->create(['owner_id' => $operator->id, 'name' => 'Org A']);
-    $orgB = Organization::factory()->create(['owner_id' => $operator->id, 'name' => 'Org B']);
+    $orgA = Organization::factory()->create(['portal_enabled_by' => $operator->id, 'name' => 'Org A']);
+    $orgB = Organization::factory()->create(['portal_enabled_by' => $operator->id, 'name' => 'Org B']);
     $orgA->members()->attach($member, ['role' => 'member']);
 
     $companyA = CrmCompany::factory()->create([
@@ -55,7 +55,7 @@ it('returns an empty tenant view for a user without organization memberships', f
     $user = User::factory()->create();
     $user->assignRole('user');
 
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $company = CrmCompany::factory()->create([
         'created_by' => $operator->id,
         'organization_id' => $organization->id,
@@ -78,7 +78,7 @@ it('shows records from every organization joined by a multi-organization user', 
     $member = User::factory()->create();
     $member->assignRole('user');
 
-    $organizations = Organization::factory()->count(2)->create(['owner_id' => $operator->id]);
+    $organizations = Organization::factory()->count(2)->create(['portal_enabled_by' => $operator->id]);
     foreach ($organizations as $organization) {
         $organization->members()->attach($member, ['role' => 'member']);
     }
@@ -103,7 +103,7 @@ it('retains cross-tenant and unassigned record visibility for operators', functi
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $organizations = Organization::factory()->count(2)->create(['owner_id' => $operator->id]);
+    $organizations = Organization::factory()->count(2)->create(['portal_enabled_by' => $operator->id]);
     foreach ($organizations as $organization) {
         $company = CrmCompany::factory()->create([
             'created_by' => $operator->id,
@@ -132,8 +132,8 @@ it('scopes CRM route model binding and list results for privileged non-operators
     $member->assignRole('user');
     $member->givePermissionTo('crm.manage');
 
-    $orgA = Organization::factory()->create(['owner_id' => $operator->id]);
-    $orgB = Organization::factory()->create(['owner_id' => $operator->id]);
+    $orgA = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
+    $orgB = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $orgA->members()->attach($member, ['role' => 'admin']);
 
     $companyA = CrmCompany::factory()->create([
@@ -166,8 +166,8 @@ it('prevents organization member management across tenant boundaries', function 
     $manager->givePermissionTo('crm.manage');
     $newMember = User::factory()->create();
 
-    $orgA = Organization::factory()->create(['owner_id' => $operator->id]);
-    $orgB = Organization::factory()->create(['owner_id' => $operator->id]);
+    $orgA = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
+    $orgB = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $orgA->members()->attach($manager, ['role' => 'admin']);
 
     $this->actingAs($manager)
@@ -199,8 +199,8 @@ it('rejects cross-tenant company identifiers during contact ticket and project w
     $member->givePermissionTo('crm.manage');
     $member->givePermissionTo('projects.manage');
 
-    $orgA = Organization::factory()->create(['owner_id' => $operator->id]);
-    $orgB = Organization::factory()->create(['owner_id' => $operator->id]);
+    $orgA = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
+    $orgB = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $orgA->members()->attach($member, ['role' => 'member']);
     $companyB = CrmCompany::factory()->create([
         'created_by' => $operator->id,

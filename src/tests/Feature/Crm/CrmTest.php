@@ -206,7 +206,7 @@ it('adds a member to an organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $user = User::factory()->create();
     $user->assignRole('user');
 
@@ -222,7 +222,7 @@ it('removes a member from an organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $user = User::factory()->create();
 
     $org->members()->attach($user->id, ['role' => 'member']);
@@ -236,7 +236,7 @@ it('updates a member role', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $user = User::factory()->create();
 
     $org->members()->attach($user->id, ['role' => 'member']);
@@ -253,7 +253,7 @@ it('returns 404 removing a user who is not a member', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $org = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $user = User::factory()->create();
 
     $this->actingAs($operator)->delete(route('organizations.members.destroy', [$org, $user]))->assertNotFound();
