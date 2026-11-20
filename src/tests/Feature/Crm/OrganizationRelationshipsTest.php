@@ -34,7 +34,7 @@ beforeEach(function () {
 function pairedOrganization(string $name): Organization
 {
     $owner = User::factory()->create();
-    $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $owner->id]);
+    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
     CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
     return $organization;
@@ -634,5 +634,5 @@ it('promotion picks a slug no other tenant holds, even for an actor the membersh
 // ── Existing contracts the work must not move ────────────────────────────────
 
 it('leaves the organization fields the application can mass-assign unchanged', function () {
-    expect((new Organization)->getFillable())->toBe(['name', 'slug', 'owner_id']);
+    expect((new Organization)->getFillable())->toBe(['name', 'slug']);
 });

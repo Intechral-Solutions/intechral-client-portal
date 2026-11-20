@@ -58,7 +58,7 @@ beforeEach(function () {
     });
 
     $this->operator = opInvOperator();
-    $this->org = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $this->operator->id]);
+    $this->org = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $this->operator->id]);
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ describe('the Invitations card', function () {
         // One address, invited by two organizations: A first (lower id), B afterwards (higher id). If "newest row of the address" were
         // computed across organizations, A's row would look superseded by B's and lose its Resend. Each organization's card is about its
         // own invitations, so each shows Resend on its own row.
-        $other = Organization::factory()->create(['name' => 'Beta Partners', 'owner_id' => $this->operator->id]);
+        $other = Organization::factory()->create(['name' => 'Beta Partners', 'portal_enabled_by' => $this->operator->id]);
         [$inA] = regInvOpen('shared@example.test', $this->org, $this->operator);
         [$inB] = regInvOpen('shared@example.test', $other, $this->operator);
 

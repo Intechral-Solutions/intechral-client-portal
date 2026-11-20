@@ -18,6 +18,13 @@ const M1 = '2026_10_12_000001_add_disabled_at_to_users_table';
 const M2 = '2026_10_12_000002_restrict_user_business_record_deletes';
 const M3 = '2026_10_12_000003_restrict_company_project_association_deletes';
 
+/*
+ * Release 1.0 (ORG-1): the portal-state migration renamed `organizations.owner_id` to `portal_enabled_by`. M2 is a pinned, unedited migration whose approved
+ * inventory names the column `owner_id`, so its tests must run it against the schema it was written for: the M2 tests roll the ORG-1 migration back first
+ * (its down() is schema-only and, with no Directory-only Organization, safe) and forward again afterwards. No assertion in this file is changed.
+ */
+const ORG1 = '2026_11_19_090000_add_organization_portal_state';
+
 function preservationMigration(string $name): object
 {
     return require database_path("migrations/{$name}.php");
@@ -56,13 +63,20 @@ function h1Rules(string $rule): array
     return $expected;
 }
 
-/** Whatever a test did, leave the schema migrated forward. */
+/**
+ * Whatever a test did, leave the schema migrated forward. M2 needs the schema it was written for (ORG-1 rolled back, see above), and the file-level
+ * afterEach below applies ORG-1 again once the test, including whatever it asserts after this call, is finished.
+ */
 function restoreForward(): void
 {
+    preservationMigration(ORG1)->down();
+
     foreach ([M1, M2, M3] as $name) {
         preservationMigration($name)->up();
     }
 }
+
+afterEach(fn () => preservationMigration(ORG1)->up());
 
 describe('M1: users.disabled_at', function () {
     it('rolls back to no column and forward to a nullable timestamp, and a repeat is harmless', function () {
@@ -100,6 +114,8 @@ describe('M1: users.disabled_at', function () {
 });
 
 describe('M2: the 13 user business-record keys', function () {
+    beforeEach(fn () => preservationMigration(ORG1)->down());
+
     it('rolls back to CASCADE and forward to RESTRICT, under the original names, and a repeat is harmless', function () {
         $migration = preservationMigration(M2);
 

@@ -23,6 +23,14 @@ class OrganizationPreflightCommand extends Command
         }
 
         $this->line("Organizations: {$report['organizations']}   CRM companies: {$report['companies']}   Companies without an organization: {$report['companiesWithoutOrganization']}");
+
+        if ($report['portalState'] === null) {
+            $this->line('Portal state: not migrated yet (the ORG-1 columns do not exist).');
+        } else {
+            $s = $report['portalState'];
+            $this->line(sprintf('Portal state: %d enabled, %d disabled, %d not enabled (Directory-only)', $s['enabled'], $s['disabled'], $s['notEnabled']));
+        }
+
         $tickets = $report['ticketAttribution'];
 
         if ($tickets['attributed']) {

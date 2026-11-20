@@ -52,7 +52,7 @@ function memCustomOperator(array $permissions = ['portal.operator', 'crm.manage'
 
 function memOrg(string $name = 'Acme'): Organization
 {
-    return Organization::factory()->create(['name' => $name, 'owner_id' => User::factory()->create()->id]);
+    return Organization::factory()->create(['name' => $name, 'portal_enabled_by' => User::factory()->create()->id]);
 }
 
 /** Fixture rows are written directly, as the historical data and the previous release's code write them. */
@@ -191,7 +191,7 @@ it('treats the Spatie catalogue, the owner and the managing partner as irrelevan
     $privileged = memCustomer();
     $privileged->givePermissionTo(['org.admin', 'org.invite', 'org.manage_roles', 'users.admin', 'crm.manage']);
     memAttach($organization, $privileged, 'admin');
-    $owner = User::find($organization->owner_id);
+    $owner = User::find($organization->portal_enabled_by);
     memAttach($organization, $owner, 'member');
     $partnerAdmin = memCustomer();
     memAttach($partner, $partnerAdmin, 'admin', $this->operator);
@@ -413,7 +413,7 @@ it('lets only an actor holding BOTH portal.operator and crm.manage change member
     $approvedAdminHere = memCustomer();
     $approvedAdminHere->givePermissionTo('crm.manage');
     memAttach($organization, $approvedAdminHere, 'admin', $this->operator);
-    $owner = User::find($organization->owner_id)->givePermissionTo('crm.manage');
+    $owner = User::find($organization->portal_enabled_by)->givePermissionTo('crm.manage');
     memAttach($organization, $owner, 'member');
     $partnerAdmin = memCustomer();
     $partnerAdmin->givePermissionTo('crm.manage');

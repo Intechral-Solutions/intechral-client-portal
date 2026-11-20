@@ -67,7 +67,7 @@ function memRaceFixture(): array
     $a = User::factory()->create();
     $b = User::factory()->create();
     $member = User::factory()->create();
-    $org = Organization::factory()->create(['name' => 'Membership Race', 'owner_id' => $actor->id]);
+    $org = Organization::factory()->create(['name' => 'Membership Race', 'portal_enabled_by' => $actor->id]);
 
     foreach ([[$a, 'admin', true], [$b, 'admin', true], [$member, 'member', false]] as [$user, $role, $approved]) {
         DB::table('organization_members')->insert([

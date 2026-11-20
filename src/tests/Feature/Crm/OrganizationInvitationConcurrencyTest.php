@@ -222,8 +222,8 @@ function oicFixture(): array
     $r2 = $make('r2');
     $r2->assignRole($role);
 
-    $org = Organization::factory()->create(['name' => 'Race Org', 'owner_id' => $admin->id]);
-    $org2 = Organization::factory()->create(['name' => 'Race Org Two', 'owner_id' => $admin->id]);
+    $org = Organization::factory()->create(['name' => 'Race Org', 'portal_enabled_by' => $admin->id]);
+    $org2 = Organization::factory()->create(['name' => 'Race Org Two', 'portal_enabled_by' => $admin->id]);
 
     // A customer (may raise Tickets) and an organization administrator candidate, both members of the organization: the targets of the
     // suspension races against membership and Ticket work.

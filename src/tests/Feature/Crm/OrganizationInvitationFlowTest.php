@@ -66,7 +66,7 @@ beforeEach(function () {
     });
 
     $this->operator = oinvOperator();
-    $this->org = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $this->operator->id]);
+    $this->org = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $this->operator->id]);
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ describe('issue', function () {
     });
 
     it('allows the same address in two organizations, independently', function () {
-        $other = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $other = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
 
         oinv()->issue($this->org, 'both@example.test', $this->operator);
         oinv()->issue($other, 'both@example.test', $this->operator);
@@ -306,7 +306,7 @@ describe('revoke', function () {
     });
 
     it('does not find another organization\'s invitation, and refuses a customer', function () {
-        $other = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $other = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
         [$foreign] = oinvRow($other, $this->operator);
 
         expect(oinvRefusal(fn () => oinv()->revoke($this->org, $foreign->id, $this->operator))?->reason)->toBe(OrganizationInvitationException::NOT_FOUND);
@@ -647,7 +647,7 @@ describe('the uniqueness slot', function () {
     });
 
     it('(b) lets any number of released rows coexist, (c) the same address in two organizations, (d) a new holder once the slot is cleared', function () {
-        $other = Organization::factory()->create(['owner_id' => $this->operator->id]);
+        $other = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
         $base = ['organization_id' => $this->org->id, 'invited_by' => $this->operator->id];
 
         foreach (range(1, 4) as $_) {
@@ -1032,7 +1032,7 @@ describe('the notification', function () {
     });
 
     it('names the organization and the inviter with user-authored text literal, links the invitation page and states the lifetime from the constant', function () {
-        $org = Organization::factory()->create(['name' => 'Evil *Corp* <b>x</b>', 'owner_id' => $this->operator->id]);
+        $org = Organization::factory()->create(['name' => 'Evil *Corp* <b>x</b>', 'portal_enabled_by' => $this->operator->id]);
         $inviter = oinvOperator(['name' => '[Mallory](http://evil.test)']);
         $invitation = oinv()->issue($org, 'mailbody@example.test', $inviter);
         $token = $this->sent[0]['token'];

@@ -7,6 +7,7 @@ use App\Exceptions\OrganizationMembershipException;
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\OrganizationPolicy;
+use App\Support\Organizations\PortalState;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -41,6 +42,11 @@ use LogicException;
  * Suspending an account is never blocked by this (offboarding must stay possible); the check reads the user's state as of the
  * transaction's first read, so a suspension committed at that very moment is the one race it does not close (an operator
  * recovers by approving another administrator).
+ *
+ * PORTAL STATE (Release 1.0, ORG-1; ADR-011 sections 3 and 5). Add, promote and approve take portal authority AWAY from nobody and GIVE it, so
+ * they need the Organization to be Enabled ({@see PortalState}), read from the row `transact()` has just locked: no extra lock and no Gate call.
+ * A Not enabled or Disabled Organization refuses them with {@see OrganizationMembershipException::portalRefused()}, before anything is read or
+ * written. Demote, remove and revoke-approval ask nothing of the state: they take authority away, and cleanup must stay possible while Disabled.
  *
  * Every change is recorded in the activity log in the same transaction, with the actor and the previous and new values.
  *
@@ -89,6 +95,7 @@ final class OrganizationMembership
         }
 
         $this->transact($organization, function (object $org) use ($user, $role, $actor, $organization): void {
+            $this->requireEnabled($org);
             $account = $this->account($user);
 
             if ($account->disabled_at !== null) {
@@ -130,6 +137,7 @@ final class OrganizationMembership
         $clearedApproval = false;
 
         return $this->transact($organization, function (object $org) use ($user, $actor, $organization, &$clearedApproval): bool {
+            $this->requireEnabled($org);
             $account = $this->account($user);
             $membership = $this->requireMembership($org, $account);
 
@@ -211,6 +219,7 @@ final class OrganizationMembership
         $this->authorize($actor);
 
         return $this->transact($organization, function (object $org) use ($user, $actor, $organization): bool {
+            $this->requireEnabled($org);
             $account = $this->account($user);
             $membership = $this->requireMembership($org, $account);
 
@@ -332,9 +341,17 @@ final class OrganizationMembership
             throw OrganizationInvitationException::unavailable('not_open');
         }
 
-        $org = DB::table('organizations')->where('id', $invitation->organization_id)->lockForUpdate()->first(['id', 'name'])
+        $org = DB::table('organizations')->where('id', $invitation->organization_id)->lockForUpdate()->first(['id', 'name', ...PortalState::columns()])
             ?? throw OrganizationInvitationException::unavailable('organization_missing');
         $org->id = (int) $org->id;
+
+        // ORG-1: acceptance's own check, again, on the row re-read under the lock (the seam trusts nothing the orchestrator decided). The row is the one
+        // the orchestrator already holds exclusively, so this takes no new lock.
+        $state = PortalState::of($org);
+
+        if (! $state->isEnabled()) {
+            throw OrganizationInvitationException::unavailable($state->isDisabled() ? 'organization_disabled' : 'portal_not_enabled');
+        }
 
         if (! OrganizationAuthority::isMembershipManager((int) $invitation->invited_by)) {
             throw OrganizationInvitationException::unavailable('issuer_unauthorized');
@@ -427,7 +444,7 @@ final class OrganizationMembership
     private function transact(Organization $organization, Closure $work): mixed
     {
         return DB::transaction(function () use ($organization, $work) {
-            $org = DB::table('organizations')->where('id', $organization->getKey())->lockForUpdate()->first(['id', 'name']);
+            $org = DB::table('organizations')->where('id', $organization->getKey())->lockForUpdate()->first(['id', 'name', ...PortalState::columns()]);
 
             abort_if($org === null, 404);
             $org->id = (int) $org->id;
@@ -448,6 +465,16 @@ final class OrganizationMembership
 
         if ($before && OrganizationAuthority::approvedAdminIds($org->id)->isEmpty()) {
             throw OrganizationMembershipException::lastApprovedAdmin($org->name);
+        }
+    }
+
+    /** ORG-1: add, promote and approve need an Enabled Organization, read from the row the transaction has locked. @throws OrganizationMembershipException */
+    private function requireEnabled(object $org): void
+    {
+        $state = PortalState::of($org);
+
+        if (! $state->isEnabled()) {
+            throw OrganizationMembershipException::portalRefused((string) $org->name, $state);
         }
     }
 

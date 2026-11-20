@@ -261,7 +261,7 @@ function pilotExcludedFixture(): array
     $page = CmsPage::factory()->create(['title' => 'PILOT-SECRET page', 'slug' => 'pilot-secret-page', 'status' => 'published', 'published_at' => now()]);
 
     // R1-3C: an organization the customer belongs to, with one open invitation of it (the target of the refused operator routes).
-    $organization = Organization::factory()->create(['owner_id' => $fx['operator']->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $fx['operator']->id]);
     $organization->members()->attach($customer->id, ['role' => 'member']);
     $fx['organization'] = $organization;
     $fx['invitation'] = OrganizationInvitation::factory()->forAddress('pilot-target@example.test')

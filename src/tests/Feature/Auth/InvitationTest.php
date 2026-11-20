@@ -167,7 +167,7 @@ describe('every dead link is the one invalid page', function () {
 describe('password acceptance', function () {
     it('atomically creates the account, the user role, an ordinary unapproved member and an accepted invitation', function () {
         $issuer = regInvIssuer(['name' => 'Ivy Issuer']);
-        $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $issuer->id]);
+        $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $issuer->id]);
         [$invitation, $token] = regInvOpen('invited@example.test', $organization, $issuer);
 
         $this->post(route('invitation.register', $token), regInvForm(['name' => 'New Person']))->assertRedirect(route('dashboard'));
@@ -198,8 +198,8 @@ describe('password acceptance', function () {
 
     it('takes the address, the organization and the role from the invitation, never from the request', function () {
         $issuer = regInvIssuer();
-        $acme = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $issuer->id]);
-        $other = Organization::factory()->create(['name' => 'Other Org', 'owner_id' => $issuer->id]);
+        $acme = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $issuer->id]);
+        $other = Organization::factory()->create(['name' => 'Other Org', 'portal_enabled_by' => $issuer->id]);
         [, $token] = regInvOpen('invited@example.test', $acme, $issuer);
 
         $this->post(route('invitation.register', $token), regInvForm([
@@ -308,7 +308,7 @@ describe('password acceptance', function () {
 describe('the invitation mail reaches this handler', function () {
     it('mails a link that the registration page and the registration POST resolve', function () {
         $operator = regInvIssuer();
-        $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'owner_id' => $operator->id]);
+        $organization = Organization::factory()->create(['name' => 'Acme Holdings', 'portal_enabled_by' => $operator->id]);
 
         app(OrganizationInvitations::class)->issue($organization, 'Mailed.Person@Example.Test', $operator);
 

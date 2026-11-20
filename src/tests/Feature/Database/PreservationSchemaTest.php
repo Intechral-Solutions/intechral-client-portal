@@ -28,8 +28,9 @@ it('restricts delete on each of the 13 business-record foreign keys to users, un
         ->and($key->parent_column)->toBe('id')
         ->and($key->d)->toBe('RESTRICT')
         ->and($key->u)->toBe('RESTRICT')
-        ->and($key->nullable)->toBe('NO');
-})->with(PreservationKeys::USER_KEYS);
+        // ORG-1: a Directory-only Organization has no enabling operator, so portal_enabled_by (the former owner_id) is the one nullable key here.
+        ->and($key->nullable)->toBe($table === 'organizations' && $column === 'portal_enabled_by' ? 'YES' : 'NO');
+})->with(PreservationKeys::liveUserKeys());
 
 it('restricts delete on project_company.crm_company_id (H2), under its original name, and keeps ON UPDATE', function () {
     $keys = PreservationKeys::toUsersAndCompanies();
@@ -40,7 +41,7 @@ it('restricts delete on project_company.crm_company_id (H2), under its original 
 
 it('changes exactly those 14 foreign keys and no other reference to users or companies', function () {
     $restricted = [];
-    foreach (PreservationKeys::USER_KEYS as [$table, $column, $constraint]) {
+    foreach (PreservationKeys::liveUserKeys() as [$table, $column, $constraint]) {
         $restricted["{$table}.{$column} -> users"] = "RESTRICT/RESTRICT ({$constraint})";
     }
     $restricted['project_company.crm_company_id -> crm_companies'] = 'RESTRICT/RESTRICT (project_company_crm_company_id_foreign)';

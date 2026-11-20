@@ -30,7 +30,7 @@
             <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Details</h2>
             <div>
                 <p class="text-xs text-text-muted">Portal access enabled by</p>
-                <p class="text-sm font-medium text-text">{{ $organization->owner?->name ?? '—' }}</p>
+                <p class="text-sm font-medium text-text">{{ $organization->portalEnabledBy?->name ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs text-text-muted">Members</p>

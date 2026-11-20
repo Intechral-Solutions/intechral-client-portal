@@ -49,7 +49,7 @@ function oaCommittedMembers(): array
     $owner = User::factory()->create();
     $legacyAdmin = User::factory()->create();
     $member = User::factory()->create();
-    $organization = Organization::factory()->create(['owner_id' => $owner->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $owner->id]);
     DB::table('organization_members')->insert([
         ['organization_id' => $organization->id, 'user_id' => $legacyAdmin->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now()],
         ['organization_id' => $organization->id, 'user_id' => $member->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()],

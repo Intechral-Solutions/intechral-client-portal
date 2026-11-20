@@ -67,7 +67,7 @@ function orgRaceFixture(): array
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $make = function (string $name) use ($actor): Organization {
-        $organization = Organization::factory()->create(['name' => $name, 'owner_id' => $actor->id]);
+        $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $actor->id]);
         CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $actor->id]);
 
         return $organization;
@@ -92,7 +92,7 @@ function orgRaceFixture(): array
 function orgRaceCleanup(array $fixture): void
 {
     $actor = $fixture['actor'];
-    $organizations = DB::table('organizations')->where('owner_id', $actor->id)->pluck('id')->all();
+    $organizations = DB::table('organizations')->where('portal_enabled_by', $actor->id)->pluck('id')->all();
 
     DB::table('activity_log')->where('subject_type', Organization::class)->whereIn('subject_id', $organizations)->delete();
     DB::table('activity_log')->where('causer_id', $actor->id)->delete();

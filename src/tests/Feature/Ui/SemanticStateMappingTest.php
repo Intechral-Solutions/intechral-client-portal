@@ -431,7 +431,7 @@ it('draws the Built-in tag in the role edit heading', function () {
 
 it('draws an organization member role as a tag, so admin is a kind and not a warning', function () {
     $operator = semActor('operator');
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach(semActor('user')->id, ['role' => 'admin']);
     $organization->members()->attach(semActor('user')->id, ['role' => 'member']);
 

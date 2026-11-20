@@ -58,10 +58,15 @@ final class CommittedUsers
             ['crm_contacts', 'created_by'],
             ['crm_companies', 'created_by'],
             ['cms_pages', 'created_by'],
-            ['organizations', 'owner_id'],    // members cascade
+            ['organizations', 'portal_enabled_by'],    // members are RESTRICT since ORG-1: they are deleted first, below
         ];
 
         foreach ($owned as [$table, $column]) {
+            // ORG-1: `organization_members.organization_id` is RESTRICT, so the members of an Organization go before the Organization does.
+            if ($table === 'organizations') {
+                DB::table('organization_members')->whereIn('organization_id', DB::table('organizations')->whereIn($column, $ids)->select('id'))->delete();
+            }
+
             DB::table($table)->whereIn($column, $ids)->delete();
         }
 

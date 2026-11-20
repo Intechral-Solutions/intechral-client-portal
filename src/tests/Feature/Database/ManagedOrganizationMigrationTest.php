@@ -23,10 +23,26 @@ use Tests\Support\CommittedUsers;
 
 const MO_RELATIONSHIP = '2026_11_06_120000_add_organization_management_relationship';
 const MO_UNIQUE = '2026_11_06_120100_unique_company_organization_link';
+const MO_ORG1 = '2026_11_19_090000_add_organization_portal_state';
 
 function moMigration(string $name): object
 {
     return require database_path("migrations/{$name}.php");
+}
+
+/*
+ * Release 1.0 (ORG-1): the portal-state migration's CHECKs name can_manage_customers and managed_by_organization_id, so MO-1A cannot be rolled back on the
+ * live schema. The tests that roll MO-1A back therefore roll ORG-1 back first and apply it again when they finish (the arrangement PreservationMigrationsTest
+ * uses for M2); the schema the rest of the suite sees is unchanged. ORG-1's own migration is proven in OrganizationPortalStateMigrationTest.
+ */
+function moWithoutPortalState(): void
+{
+    moMigration(MO_ORG1)->down();
+}
+
+function moWithPortalState(): void
+{
+    moMigration(MO_ORG1)->up();
 }
 
 /** Whatever a test did, leave the schema migrated forward. */
@@ -34,12 +50,13 @@ function moRestoreForward(): void
 {
     moMigration(MO_RELATIONSHIP)->up();
     moMigration(MO_UNIQUE)->up();
+    moWithPortalState();
 }
 
 function moChecks(): array
 {
     return array_map(fn ($row) => $row->constraint_name, DB::select(
-        "select constraint_name from information_schema.table_constraints where constraint_schema = database() and table_name = 'organizations' and constraint_type = 'CHECK' order by constraint_name"
+        "select constraint_name from information_schema.table_constraints where constraint_schema = database() and table_name = 'organizations' and constraint_type = 'CHECK' and constraint_name = 'organizations_partner_not_managed_check' order by constraint_name"
     ));
 }
 
@@ -130,6 +147,7 @@ describe('MO-1A relationship columns', function () {
 
     it('rolls back and forward, and a repeat is harmless', function () {
         $migration = moMigration(MO_RELATIONSHIP);
+        moWithoutPortalState();
 
         try {
             $migration->down();
@@ -176,13 +194,15 @@ describe('MO-1A relationship columns', function () {
         $ids = [];
 
         try {
+            moWithoutPortalState();   // the rows below carry the column ORG-1 later renames: owner_id
             $migration->down();
             // What the first run left if it stopped right after creating the column (DDL commits as it goes).
             DB::statement('alter table organizations add column managed_by_organization_id bigint unsigned null');
 
             // DDL ended the test's transaction: these rows are committed and removed by hand below.
-            $partner = Organization::factory()->create(['owner_id' => $owner->id]);
-            $customer = Organization::factory()->create(['owner_id' => $owner->id]);
+            $stamp = ['created_at' => now(), 'updated_at' => now()];
+            $partner = (object) ['id' => DB::table('organizations')->insertGetId(['name' => 'MO Partner', 'slug' => 'mo-partner-'.$owner->id, 'owner_id' => $owner->id] + $stamp)];
+            $customer = (object) ['id' => DB::table('organizations')->insertGetId(['name' => 'MO Customer', 'slug' => 'mo-customer-'.$owner->id, 'owner_id' => $owner->id] + $stamp)];
             $ids = [$partner->id, $customer->id];
             DB::table('organizations')->where('id', $customer->id)->update(['managed_by_organization_id' => $partner->id]);
 
@@ -198,9 +218,10 @@ describe('MO-1A relationship columns', function () {
             if (Schema::hasColumn('organizations', 'managed_by_organization_id')) {
                 DB::table('organizations')->whereIn('id', $ids)->update(['managed_by_organization_id' => null]);
             }
+            moRestoreForward();   // ORG-1 forward again: it backfills these two rows, and CommittedUsers deletes them through the renamed column
+            DB::table('organizations')->whereIn('id', $ids)->update(['managed_by_organization_id' => null]);
             DB::table('organizations')->whereIn('id', $ids)->delete();
             CommittedUsers::delete([$owner->id]);
-            moRestoreForward();
         }
     });
 
@@ -222,6 +243,7 @@ describe('MO-1A relationship columns', function () {
 
     it('stops rather than overwrite a differently-shaped column of the same name', function () {
         $migration = moMigration(MO_RELATIONSHIP);
+        moWithoutPortalState();
 
         try {
             $migration->down();
@@ -300,10 +322,10 @@ describe('MO-1A unique company link', function () {
         $created = ['users' => [$owner->id], 'organizations' => []];
 
         try {
-            $ambiguous = Organization::factory()->create(['name' => 'Ambiguous', 'owner_id' => $owner->id]);
+            $ambiguous = Organization::factory()->create(['name' => 'Ambiguous', 'portal_enabled_by' => $owner->id]);
             $first = CrmCompany::factory()->create(['organization_id' => $ambiguous->id, 'created_by' => $owner->id]);
             $second = CrmCompany::factory()->create(['organization_id' => $ambiguous->id, 'created_by' => $owner->id]);
-            $partner = Organization::factory()->create(['name' => 'Clean Partner', 'owner_id' => $owner->id]);
+            $partner = Organization::factory()->create(['name' => 'Clean Partner', 'portal_enabled_by' => $owner->id]);
             CrmCompany::factory()->create(['organization_id' => $partner->id, 'created_by' => $owner->id]);
             $created['organizations'] = [$ambiguous->id, $partner->id];
 

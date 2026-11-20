@@ -8,12 +8,18 @@ use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Organizations\PortalState;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class CrmService
 {
+    /** Audit event of initial enablement (subject: the new Organization). */
+    public const PORTAL_ENABLED = 'organization portal access enabled';
+
     // ── Companies ─────────────────────────────────────────
 
     public function createCompany(User $creator, array $data): CrmCompany
@@ -157,35 +163,82 @@ class CrmService
     // ── Organizations ─────────────────────────────────────
 
     /**
-     * Promote a CRM company to an Organization.
-     * Idempotent — returns the existing org if already promoted.
+     * Initial enablement of portal access: promote a CRM company to an Organization (Release 1.0; ORG-1 hardens it, ADR-011 section 2). It stays the
+     * existing Company-promotion path in ORG-1; the Directory-only state transition is ORG-2.
      *
-     * Release 1.0 (MO-1A): one transaction under a lock on the company row, so two operators promoting the same company at the
-     * same moment cannot each create an organization (one would be left orphaned): the second waits, finds the link and
-     * returns the first's organization. The organization is read unscoped, so the answer never depends on who asks.
+     * AUTHORITY is `manageMembership` (ADR-011: initial enablement is membership authority; disable and re-enable are `manageRelationships`, and the two are
+     * separate abilities that must not be collapsed): the Gate is asked HERE, before the transaction, and again from the TABLES under the locks
+     * ({@see OrganizationAuthority::isMembershipManager()}), so a call made with an explicit actor (a job, tinker) is held to it exactly like the route, and
+     * a suspension that committed first is seen. The route's `can:crm.manage` is only the first gate.
+     *
+     * One transaction. Lock order: the actor's user row (shared; `portal_enabled_by` and the admin membership both reference it) -> the company row
+     * (exclusive, the existing serialization point) -> the new Organization row is INSERTED already Enabled. No Gate and no permission-cache load happens after
+     * the first lock. The Organization is created with `portal_enabled_at` = `created_at` = one instant, the enabling operator is recorded in
+     * `portal_enabled_by` (provenance, never authority), and the audit entry carries that same instant.
+     *
+     * Idempotent for an already-promoted company whose Organization is Enabled: returns it, writes nothing (two operators promoting at the same moment, or a
+     * stale model). An already-promoted company whose Organization is DISABLED is refused with a controlled error: enabling never clears `disabled_at`, which only
+     * Re-enable does. A company linked to an Organization that is Not enabled is refused too (nothing creates one in ORG-1). The already-promoted branch reads the
+     * Organization WITHOUT locking it, as before: it writes nothing, and CrmService::deleteCompany locks Organization then company, so locking the other way round
+     * here would close a cycle.
+     *
+     * Release 1.0 (MO-1A): one transaction under a lock on the company row, so two operators promoting the same company at the same moment cannot each create an
+     * organization (one would be left orphaned): the second waits, finds the link and returns the first's organization. The organization is read unscoped, so the
+     * answer never depends on who asks.
+     *
+     * @throws AuthorizationException the actor may not enable portal access
+     * @throws OrganizationRelationshipException the company's Organization is Disabled (or not Enabled)
      */
-    public function promoteToOrganization(CrmCompany $company, User $owner): Organization
+    public function promoteToOrganization(CrmCompany $company, User $actor): Organization
     {
-        return DB::transaction(function () use ($company, $owner): Organization {
+        Gate::forUser($actor)->authorize('manageMembership', Organization::class);
+
+        return DB::transaction(function () use ($company, $actor): Organization {
+            DB::table('users')->where('id', $actor->getKey())->sharedLock()->value('id');
             $locked = CrmCompany::withoutGlobalScopes()->lockForUpdate()->findOrFail($company->getKey());
 
-            if ($locked->organization_id !== null) {
-                $company->forceFill(['organization_id' => $locked->organization_id])->syncOriginal();
-
-                return Organization::withoutGlobalScopes()->findOrFail($locked->organization_id);
+            if (! OrganizationAuthority::isMembershipManager((int) $actor->getKey())) {
+                throw new AuthorizationException;
             }
 
-            $org = Organization::create([
+            if ($locked->organization_id !== null) {
+                $existing = Organization::withoutGlobalScopes()->findOrFail($locked->organization_id);
+                $state = PortalState::of($existing);
+
+                if (! $state->isEnabled()) {
+                    throw OrganizationRelationshipException::enablementRefused($existing->name, $state);
+                }
+
+                $company->forceFill(['organization_id' => $locked->organization_id])->syncOriginal();
+
+                return $existing;
+            }
+
+            $now = now();
+            $org = Organization::withoutGlobalScopes()->forceCreate([
                 'name' => $locked->name,
                 'slug' => $this->uniqueSlug($locked->name),
-                'owner_id' => $owner->id,
+                'portal_enabled_at' => $now,
+                'portal_enabled_by' => $actor->id,
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
 
             $locked->update(['organization_id' => $org->id]);
             $company->forceFill(['organization_id' => $org->id, 'updated_at' => $locked->updated_at])->syncOriginal();
 
-            // Add the owner as an admin member
-            $org->members()->attach($owner->id, ['role' => 'admin']);
+            // Add the enabling operator as an admin member (Q3: unchanged until the operator raise-on-behalf question is ruled on).
+            $org->members()->attach($actor->id, ['role' => 'admin']);
+
+            // The audit entry shares the enablement instant: `created_at` of the entry is `portal_enabled_at`.
+            activity()->causedBy($actor)->performedOn($org)
+                ->withProperties([
+                    'old' => ['portal_state' => PortalState::NotEnabled->value],
+                    'new' => ['portal_state' => PortalState::Enabled->value, 'portal_enabled_at' => $now->toIso8601String(), 'portal_enabled_by' => $actor->id],
+                    'crm_company_id' => $locked->id,
+                ])
+                ->createdAt($now)
+                ->log(self::PORTAL_ENABLED);
 
             return $org;
         });

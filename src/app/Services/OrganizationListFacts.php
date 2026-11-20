@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Organizations\PortalState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -30,7 +31,8 @@ final class OrganizationListFacts
 
     /**
      * Whether each portal organization is enabled or disabled, keyed by organization id. An id with no row is absent from the result (the
-     * caller treats that as "not enabled", which for a Directory profile with no portal organization is exactly right).
+     * caller treats that as "not enabled", which for a Directory profile with no portal organization is exactly right). ORG-1: so is an
+     * Organization row that has never had portal access ({@see PortalState::NotEnabled}): a row existing is not portal access.
      *
      * @param  list<int|null>  $organizationIds
      * @return array<int, string>
@@ -45,8 +47,12 @@ final class OrganizationListFacts
 
         $status = [];
 
-        foreach (DB::table('organizations')->whereIn('id', $ids)->get(['id', 'disabled_at']) as $row) {
-            $status[(int) $row->id] = $row->disabled_at === null ? self::ENABLED : self::DISABLED;
+        foreach (DB::table('organizations')->whereIn('id', $ids)->get(['id', ...PortalState::columns()]) as $row) {
+            $state = PortalState::of($row);
+
+            if (! $state->isNotEnabled()) {
+                $status[(int) $row->id] = $state->isEnabled() ? self::ENABLED : self::DISABLED;
+            }
         }
 
         return $status;

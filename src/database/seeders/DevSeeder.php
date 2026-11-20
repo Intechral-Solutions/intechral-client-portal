@@ -281,7 +281,7 @@ class DevSeeder extends Seeder
      */
     private function organization(string $slug, string $name, User $owner, array $members): Organization
     {
-        $organization = Organization::withoutGlobalScopes()->firstOrCreate(['slug' => $slug], ['name' => $name, 'owner_id' => $owner->id]);
+        $organization = Organization::withoutGlobalScopes()->firstOrCreate(['slug' => $slug], ['name' => $name, 'portal_enabled_by' => $owner->id, 'portal_enabled_at' => now()]);
 
         foreach ($members as $member) {
             DB::table('organization_members')->insertOrIgnore([

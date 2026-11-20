@@ -153,6 +153,29 @@ final class OrganizationAuthority
     }
 
     /**
+     * Release 1.0 (ORG-1): the same question for the OTHER ability, {@see OrganizationPolicy::manageRelationships}: whether the account is, RIGHT NOW and
+     * from the TABLES ALONE, someone that ability would admit. Disabling and re-enabling an Organization decide here, inside their locked
+     * transaction, for the reason {@see isMembershipManager()} gives.
+     *
+     * A SEPARATE method on purpose (ADR-011 section 2): the two abilities reduce to the same two capabilities today, and a later release may let them
+     * differ (initial enablement is membership authority, disable and re-enable are relationship authority). Collapsing them into one predicate would
+     * make that a silent change. They share one query, and a parameterized drift test keeps each equal to its policy ability.
+     */
+    public static function isRelationshipManager(int $userId): bool
+    {
+        return in_array($userId, self::relationshipManagerIds([$userId]), true);
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     * @return list<int>
+     */
+    public static function relationshipManagerIds(array $userIds): array
+    {
+        return self::activeOperatorsWithDirectory($userIds);
+    }
+
+    /**
      * The subset of the given accounts for which {@see isMembershipManager()} is true, ascending: one table query, the set version of
      * the predicate (the revocation hooks compare it before and after a mutation).
      *
@@ -160,6 +183,17 @@ final class OrganizationAuthority
      * @return list<int>
      */
     public static function membershipManagerIds(array $userIds): array
+    {
+        return self::activeOperatorsWithDirectory($userIds);
+    }
+
+    /**
+     * The one query behind both operator abilities: active, `portal.operator` and `crm.manage`, each directly or through any role.
+     *
+     * @param  list<int>  $userIds
+     * @return list<int>
+     */
+    private static function activeOperatorsWithDirectory(array $userIds): array
     {
         $ids = array_values(array_unique(array_map('intval', $userIds)));
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\OrganizationAuthority;
 use App\Shared\Scopes\OrganizationMembershipScope;
+use App\Support\Organizations\PortalState;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,6 @@ class Organization extends Model
     protected $fillable = [
         'name',
         'slug',
-        'owner_id',
     ];
 
     /**
@@ -25,6 +25,10 @@ class Organization extends Model
      * only through App\Services\OrganizationRelationships, which enforces the relationship rules under lock and audits the
      * change. There is deliberately no Eloquent relation for them either: a relation would run through the tenant scope and
      * silently undercount for an account the scope filters, and no query that decides an integrity rule may do that.
+     *
+     * The same holds for the PORTAL STATE (Release 1.0, ORG-1): `portal_enabled_at`, `portal_enabled_by` and `disabled_at` are not
+     * fillable either. They change only through CrmService::promoteToOrganization (initial enablement) and OrganizationRelationships
+     * (disable, re-enable), each authorized, locked and audited. Fixtures set them explicitly (a factory is unguarded).
      */
     protected $casts = [
         'can_manage_customers' => 'boolean',
@@ -37,9 +41,10 @@ class Organization extends Model
 
     // ── Relationships ──────────────────────────────────────
 
-    public function owner(): BelongsTo
+    /** The operator who enabled portal access. PROVENANCE ONLY: it is not an authority input anywhere (ADR-011 section 2). Null for a never-enabled Organization. */
+    public function portalEnabledBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(User::class, 'portal_enabled_by');
     }
 
     public function members(): BelongsToMany
@@ -55,6 +60,12 @@ class Organization extends Model
     }
 
     // ── Helpers ────────────────────────────────────────────
+
+    /** Not enabled, Enabled or Disabled, from this row's own columns. Needs both to be loaded (an explicit column list that omits them throws). */
+    public function portalState(): PortalState
+    {
+        return PortalState::of($this);
+    }
 
     public function hasMember(User $user): bool
     {

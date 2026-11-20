@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Support\Organizations\PortalState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,9 +33,40 @@ final class OrganizationRelationshipException extends RuntimeException
 
     public const COMPANY_IN_RELATIONSHIP = 'company_in_relationship';
 
+    /** Release 1.0 (ORG-1): the portal-state lifecycle. Every one is a refusal made BEFORE the database could be asked to violate a CHECK. */
+    public const PORTAL_NOT_ENABLED = 'portal_not_enabled';
+
+    public const PORTAL_DISABLED = 'portal_disabled';
+
+    public const ENABLEMENT_REFUSED = 'enablement_refused';
+
     private function __construct(string $message, public readonly string $reason, public readonly string $field = 'relationship')
     {
         parent::__construct($message);
+    }
+
+    /** A relationship act (designate, link, reassign) against an Organization that is not Enabled. Removing one is never refused. */
+    public static function portalRefused(string $organization, PortalState $state): self
+    {
+        return $state->isDisabled()
+            ? new self("\"{$organization}\" is disabled. Re-enable it before designating it or linking it; removing a partner designation or a link stays possible.", self::PORTAL_DISABLED)
+            : new self("\"{$organization}\" has no portal access, so it cannot be designated as a partner or linked. Enable portal access first.", self::PORTAL_NOT_ENABLED);
+    }
+
+    /** Disable or re-enable asked of an Organization that has never had portal access: it has no portal state to change. */
+    public static function neverEnabled(string $organization): self
+    {
+        return new self("\"{$organization}\" has never had portal access, so it cannot be disabled or re-enabled. Enable portal access first.", self::PORTAL_NOT_ENABLED);
+    }
+
+    /** Initial enablement of an Organization that is Disabled: enabling never clears a disabled state (re-enable is a separate act), and never starts from a row that is not the one it created. */
+    public static function enablementRefused(string $organization, PortalState $state): self
+    {
+        $message = $state->isDisabled()
+            ? "\"{$organization}\" already has portal access and it is disabled. Enabling portal access never clears that; use Re-enable on the organization page."
+            : "\"{$organization}\" cannot have portal access enabled from here.";
+
+        return new self($message, self::ENABLEMENT_REFUSED, 'company');
     }
 
     public static function self(string $organization): self

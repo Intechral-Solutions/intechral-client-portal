@@ -45,10 +45,10 @@ function errorsSeenBy(string $bag, string $url): array
 /** A company the given non-operator can see: CrmCompany is scoped to the viewer's organizations. */
 function companyVisibleTo(User $viewer, string $name, array $attributes = []): CrmCompany
 {
-    $org = Organization::factory()->create(['owner_id' => makeUser('operator')->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => makeUser('operator')->id]);
     $org->members()->attach($viewer->id, ['role' => 'member']);
 
-    return CrmCompany::factory()->create([...$attributes, 'name' => $name, 'organization_id' => $org->id, 'created_by' => $org->owner_id]);
+    return CrmCompany::factory()->create([...$attributes, 'name' => $name, 'organization_id' => $org->id, 'created_by' => $org->portal_enabled_by]);
 }
 
 beforeEach(function () {
@@ -202,7 +202,7 @@ it('lists only policy-visible projects and orders newest first with a stable tie
 
 it('does not list a project that is only linked to the viewer\'s company', function () {
     $orgUser = makeUser('user');
-    $org = Organization::factory()->create(['owner_id' => $this->admin->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $this->admin->id]);
     $org->members()->attach($orgUser, ['role' => 'member']);
     $company = CrmCompany::factory()->create(['created_by' => $this->admin->id, 'organization_id' => $org->id]);
     $this->project->companies()->attach($company);

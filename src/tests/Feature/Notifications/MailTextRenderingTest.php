@@ -232,7 +232,7 @@ describe('OrganizationInvitationNotification', function () {
             // Both names are user-authored (an operator typed the organization's, the inviter chose their own). The mail is sent only for a LIVE
             // invitation of an authorized issuer, so the fixture is one.
             $inviter = ticketUser('operator', ['name' => $text]);
-            $organization = Organization::factory()->create(['name' => mb_substr($text, 0, 255), 'owner_id' => $inviter->id]);
+            $organization = Organization::factory()->create(['name' => mb_substr($text, 0, 255), 'portal_enabled_by' => $inviter->id]);
             $token = Str::random(64);
             $invitation = OrganizationInvitation::factory()->withToken($token)->forAddress('new.person@desk.invalid')
                 ->state(['organization_id' => $organization->id, 'invited_by' => $inviter->id])->create();

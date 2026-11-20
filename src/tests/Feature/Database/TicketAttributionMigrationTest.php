@@ -67,7 +67,7 @@ it('refuses a populated tickets table before touching the schema, names counts a
         $a = User::factory()->create(['name' => 'Alice Private', 'email' => 'alice.private@example.test']);
         $b = User::factory()->create(['name' => 'Bob Private', 'email' => 'bob.private@example.test']);
         $users = [$a->id, $b->id];
-        $organization = Organization::factory()->create(['owner_id' => $a->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $a->id]);
         DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $a->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
 
         $tickets[] = taLegacyTicket($a, 'TK-AAAAA-AAAAA', 'open');
@@ -154,7 +154,7 @@ it('finishes a run that stopped between its two statements, even though attribut
         // The application has been running since: it writes attributed tickets (that is what the columns are for).
         $user = User::factory()->create();
         $users = [$user->id];
-        $organization = Organization::factory()->create(['owner_id' => $user->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $user->id]);
         $tickets[] = DB::table('tickets')->insertGetId([
             'ticket_number' => 'TK-EEEEE-EEEEE', 'user_id' => $user->id, 'organization_id' => $organization->id, 'submitted_by_id' => $user->id,
             'title' => 'Created after the first statement', 'description' => 'x', 'category' => 'General', 'priority' => 'low', 'status' => 'open',
@@ -223,7 +223,7 @@ it('refuses to drop a company_id that still carries a value, rather than destroy
         DB::statement(TA_ATTRIBUTION_STATEMENT);
         $user = User::factory()->create();
         $users = [$user->id];
-        $organization = Organization::factory()->create(['owner_id' => $user->id]);
+        $organization = Organization::factory()->create(['portal_enabled_by' => $user->id]);
         $company = DB::table('crm_companies')->insertGetId(['name' => 'Hand-linked Co', 'created_by' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
         $tickets[] = DB::table('tickets')->insertGetId([
             'ticket_number' => 'TK-GGGGG-GGGGG', 'user_id' => $user->id, 'organization_id' => $organization->id, 'submitted_by_id' => $user->id, 'company_id' => $company,

@@ -25,6 +25,8 @@ final class PartnerSupportException extends RuntimeException
 
     public const ORGANIZATION_DISABLED = 'organization_disabled';
 
+    public const PORTAL_NOT_ENABLED = 'portal_not_enabled';
+
     private function __construct(string $message, public readonly string $reason)
     {
         parent::__construct($message);
@@ -48,6 +50,11 @@ final class PartnerSupportException extends RuntimeException
     public static function operatorAccount(string $user): self
     {
         return new self("{$user} is an operator. Operators work from the operator surface and are never given partner support access.", self::OPERATOR_ACCOUNT);
+    }
+
+    public static function portalNotEnabled(string $organization): self
+    {
+        return new self("\"{$organization}\" has no portal access, so its members cannot be given support access.", self::PORTAL_NOT_ENABLED);
     }
 
     public static function organizationDisabled(string $organization): self

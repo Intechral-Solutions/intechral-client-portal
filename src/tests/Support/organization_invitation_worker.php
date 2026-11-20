@@ -21,11 +21,15 @@
  *        suspend {target, actor} | reactivate {target, actor} | sync_user_roles {target, roles, actor}
  *        sync_role_permissions {role, permissions, actor} | sync_builtin_roles {fingerprint}
  *        add_member {organization, user, role, actor} | approve_member {organization, user, actor} | create_ticket {user, organization}
+ *   ORG-1 (portal state): disable {organization, actor} | enable {organization, actor} | promote_member {organization, user, actor}
+ *        grant_support {organization, user, actor} | designate {organization, actor} | assign_customer {customer, partner, actor}
  */
 
 use App\Exceptions\LastAccountAdministratorException;
 use App\Exceptions\OrganizationInvitationException;
 use App\Exceptions\OrganizationMembershipException;
+use App\Exceptions\OrganizationRelationshipException;
+use App\Exceptions\PartnerSupportException;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AccessGrants;
@@ -34,6 +38,8 @@ use App\Services\BuiltInRoleSynchronizer;
 use App\Services\InvitationAcceptance;
 use App\Services\OrganizationInvitations;
 use App\Services\OrganizationMembership;
+use App\Services\OrganizationRelationships;
+use App\Services\PartnerSupportGrants;
 use App\Services\TicketService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Console\Kernel;
@@ -153,6 +159,33 @@ try {
             User::findOrFail($operation['user']),
             User::findOrFail($operation['actor']),
         )],
+        'disable' => ['disabled' => $app->make(OrganizationRelationships::class)->disable(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+        )],
+        'enable' => ['enabled' => $app->make(OrganizationRelationships::class)->enable(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+        )],
+        'promote_member' => ['promoted' => $app->make(OrganizationMembership::class)->promote(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['user']),
+            User::findOrFail($operation['actor']),
+        )],
+        'grant_support' => ['granted' => $app->make(PartnerSupportGrants::class)->grant(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['user']),
+            User::findOrFail($operation['actor']),
+        )],
+        'designate' => ['designated' => $app->make(OrganizationRelationships::class)->designatePartner(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+        )],
+        'assign_customer' => ['assigned' => $app->make(OrganizationRelationships::class)->assignCustomer(
+            Organization::withoutGlobalScopes()->findOrFail($operation['customer']),
+            Organization::withoutGlobalScopes()->findOrFail($operation['partner']),
+            User::findOrFail($operation['actor']),
+        )],
         'create_ticket' => ['ticket' => $app->make(TicketService::class)->create(
             User::findOrFail($operation['user']),
             ['title' => 'Race ticket', 'description' => 'Created by the concurrency worker.', 'category' => 'General', 'priority' => 'low'],
@@ -166,6 +199,12 @@ try {
     $detail = $e->detail;
 } catch (OrganizationMembershipException $e) {
     $outcome = 'membership:'.$e->reason;
+    $detail = $e->getMessage();
+} catch (OrganizationRelationshipException $e) {
+    $outcome = 'relationship:'.$e->reason;
+    $detail = $e->getMessage();
+} catch (PartnerSupportException $e) {
+    $outcome = 'support:'.$e->reason;
     $detail = $e->getMessage();
 } catch (AuthorizationException) {
     $outcome = 'unauthorized';

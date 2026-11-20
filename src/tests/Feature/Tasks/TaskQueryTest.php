@@ -336,7 +336,7 @@ it('filters by assignee, or by no assignee', function () {
 
 it('narrows by organization through the project\'s company link, never matching a standalone task', function () {
     $operator = $this->actors['operator'];
-    $org = Organization::factory()->create(['owner_id' => $operator->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $org->id]);
     $this->world['projects']['p1']->companies()->attach($company);
 

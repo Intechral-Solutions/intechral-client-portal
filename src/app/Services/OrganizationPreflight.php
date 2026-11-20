@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Organizations\PortalState;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +17,12 @@ use Illuminate\Support\Facades\Schema;
  * link stops the UNIQUE migration; a relationship that breaks a rule). `warnings` are facts a person must decide about
  * (existing organization admin rows, which MO-2 would turn from inert into authority; operator-held rows; users in several
  * organizations; tickets and their organization attribution).
+ *
+ * PORTAL STATE (Release 1.0, ORG-1). `portalState` re-verifies, from the rows, what the database CHECKs state and `database:verify` does not pin (it pins
+ * foreign keys, not CHECK constraints), and the Directory-only invariant S11 that no database constraint can state across tables: an Organization that
+ * has never had portal access ({@see PortalState::NotEnabled}) has no member, invitation, ticket, partner designation or managing relationship. A
+ * violation is a FAILURE. The administrator-approval check counts only Organizations that have had portal access, so a Directory-only row neither
+ * counts as having portal access nor floods the report.
  */
 final class OrganizationPreflight
 {
@@ -81,6 +88,7 @@ final class OrganizationPreflight
         $adminApproval = $this->adminApproval($failures, $warnings, $operators);
         $invitations = $this->invitations($failures, $warnings);
         $partnerSupport = $this->partnerSupport($failures, $warnings, $operators);
+        $portalState = $this->portalState($failures);
 
         return [
             'duplicateLinks' => $duplicates,
@@ -96,6 +104,7 @@ final class OrganizationPreflight
             'adminApproval' => $adminApproval,
             'invitations' => $invitations,
             'partnerSupport' => $partnerSupport,
+            'portalState' => $portalState,
             'failures' => $failures,
             'warnings' => $warnings,
         ];
@@ -225,7 +234,10 @@ final class OrganizationPreflight
             // release (which cannot write either column) touched it: for instance a demote then re-promote that revived the approval.
             // The reverse proves nothing: an untouched or deliberately restored row looks clean.
             'changedAfterApproval' => $of(fn ($row) => $row->at !== null && $row->updated !== null && Carbon::parse($row->updated)->gt(Carbon::parse($row->at))),
-            'organizationsWithoutApprovedAdministrator' => DB::table('organizations')->orderBy('id')->pluck('id')
+            // ORG-1: only Organizations that have had portal access. A Directory-only row has no portal to administer.
+            'organizationsWithoutApprovedAdministrator' => DB::table('organizations')
+                ->when(Schema::hasColumn('organizations', 'portal_enabled_at'), fn ($query) => $query->whereNotNull('portal_enabled_at'))
+                ->orderBy('id')->pluck('id')
                 ->map(fn ($id) => (int) $id)->reject(fn (int $id) => $organizationsWithCounted->contains($id))->values()->all(),
             'multiOrganizationAdministrators' => $rows->filter($isAdmin)->groupBy('uid')->filter(fn ($group) => $group->count() > 1)
                 ->map(fn ($group, $uid) => ['user_id' => (int) $uid, 'organizations' => $group->count()])->values()->all(),
@@ -408,6 +420,51 @@ final class OrganizationPreflight
         }
 
         return $report;
+    }
+
+    /**
+     * The portal-state section (ORG-1), or null before the migration. IDS AND COUNTS ONLY. Failures are rows the services and the CHECKs never allow: a
+     * half provenance pair, a state column set on a never-enabled Organization, and a Directory-only Organization that has portal data (S11).
+     *
+     * @param  list<string>  $failures
+     * @return array<string, mixed>|null
+     */
+    private function portalState(array &$failures): ?array
+    {
+        if (! Schema::hasColumn('organizations', 'portal_enabled_at') || ! Schema::hasColumn('organizations', 'portal_enabled_by')) {
+            return null;
+        }
+
+        $violations = [
+            // The CHECKs, restated as reads (the database enforces them; a copy restored from an older engine or edited by hand may not).
+            'provenancePairBroken' => $this->ids('select id from organizations where (portal_enabled_at is null) <> (portal_enabled_by is null)'),
+            'disabledWithoutPortal' => $this->ids('select id from organizations where disabled_at is not null and portal_enabled_at is null'),
+            'partnerWithoutPortal' => $this->ids('select id from organizations where can_manage_customers = 1 and portal_enabled_at is null'),
+            'managedWithoutPortal' => $this->ids('select id from organizations where managed_by_organization_id is not null and portal_enabled_at is null'),
+            // S11: a Directory-only Organization is inert. No member, invitation, ticket, designation or relationship, ever.
+            'directoryOnlyWithMembers' => $this->ids('select o.id from organizations o where o.portal_enabled_at is null and exists (select 1 from organization_members m where m.organization_id = o.id)'),
+            'directoryOnlyWithInvitations' => Schema::hasTable('organization_invitations')
+                ? $this->ids('select o.id from organizations o where o.portal_enabled_at is null and exists (select 1 from organization_invitations i where i.organization_id = o.id)') : [],
+            'directoryOnlyWithTickets' => Schema::hasColumn('tickets', 'organization_id')
+                ? $this->ids('select o.id from organizations o where o.portal_enabled_at is null and exists (select 1 from tickets t where t.organization_id = o.id)') : [],
+            'directoryOnlyPartners' => $this->ids('select id from organizations where portal_enabled_at is null and can_manage_customers = 1'),
+            'directoryOnlyWithRelationships' => $this->ids('select o.id from organizations o where o.portal_enabled_at is null and (o.managed_by_organization_id is not null or exists (select 1 from organizations c where c.managed_by_organization_id = o.id))'),
+        ];
+
+        foreach ($violations as $rule => $ids) {
+            if ($ids !== []) {
+                $failures[] = "Portal-state rule broken ({$rule}): organization(s) ".implode(', ', $ids).'. The application never writes such a row; investigate how it happened. Nothing was changed.';
+            }
+        }
+
+        $states = DB::table('organizations')->get(PortalState::columns())->countBy(fn (object $row) => PortalState::of($row)->value);
+
+        return [
+            'notEnabled' => (int) ($states[PortalState::NotEnabled->value] ?? 0),
+            'enabled' => (int) ($states[PortalState::Enabled->value] ?? 0),
+            'disabled' => (int) ($states[PortalState::Disabled->value] ?? 0),
+            'violations' => $violations,
+        ];
     }
 
     /** @return list<int> */

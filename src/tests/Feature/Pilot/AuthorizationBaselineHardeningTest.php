@@ -241,8 +241,8 @@ describe('a customer with an explicit billing or time grant', function () {
 describe('organization scopes follow portal.operator, not a role name', function () {
     beforeEach(function () {
         $admin = pilotOperator();
-        $this->mine = Organization::factory()->create(['owner_id' => $admin->id]);
-        $this->theirs = Organization::factory()->create(['owner_id' => $admin->id]);
+        $this->mine = Organization::factory()->create(['portal_enabled_by' => $admin->id]);
+        $this->theirs = Organization::factory()->create(['portal_enabled_by' => $admin->id]);
         $this->myCompany = CrmCompany::factory()->create(['created_by' => $admin->id, 'organization_id' => $this->mine->id]);
         $this->theirCompany = CrmCompany::factory()->create(['created_by' => $admin->id, 'organization_id' => $this->theirs->id]);
         $this->myContact = CrmContact::factory()->create(['crm_company_id' => $this->myCompany->id, 'created_by' => $admin->id]);

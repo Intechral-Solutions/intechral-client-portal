@@ -10,6 +10,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Notifications\OrganizationInvitationNotification;
 use App\Support\Database\DuplicateKey;
+use App\Support\Organizations\PortalState;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -57,6 +58,12 @@ use Spatie\Permission\PermissionRegistrar;
  * transaction decides. Issuance keeps the Gate (`manageMembership`), the existing approved boundary for a signed-in operator, and
  * re-checks the tables under lock.
  *
+ * PORTAL STATE (Release 1.0, ORG-1; ADR-011 sections 3 to 5). An Organization is invited into, and an invitation is accepted, only while it is
+ * Enabled ({@see PortalState}): never enabled, or Disabled, refuses issuance and every acceptance read. The state is read from the Organization
+ * row each transaction ALREADY locks (`lockOrganization`, the acceptance lock), so the fence adds no lock and no Gate call. Revocation asks for no
+ * state: it is how authority is taken away, and stays possible whatever the state. Disabling an Organization permanently revokes every open
+ * invitation in its own transaction ({@see revokeOpenForDisable()}); re-enabling revives nothing.
+ *
  * THE TOKEN. Only `hash('sha256', $token)` is stored. The plaintext exists in the queued, encrypted, after-commit mail and in the link.
  */
 final class OrganizationInvitations
@@ -75,12 +82,16 @@ final class OrganizationInvitations
 
     public const REASON_ISSUER_REINSTATED = 'issuer_reinstated';
 
+    /** Release 1.0 (ORG-1, ruling A2): the Organization was disabled. Terminal, like every revocation: re-enabling never reopens the row. */
+    public const REASON_ORGANIZATION_DISABLED = 'organization_disabled';
+
     public const REASONS = [
         self::REASON_OPERATOR,
         self::REASON_SUPERSEDED,
         self::REASON_ISSUER_SUSPENDED,
         self::REASON_ISSUER_AUTHORITY_LOST,
         self::REASON_ISSUER_REINSTATED,
+        self::REASON_ORGANIZATION_DISABLED,
     ];
 
     // Audit events (subject: the organization). Never the token or its hash.
@@ -100,6 +111,8 @@ final class OrganizationInvitations
     public const SOURCE_ROLE_PERMISSIONS = 'role permissions changed';
 
     public const SOURCE_ROLES_SYNC = 'roles:sync';
+
+    public const SOURCE_ORGANIZATION_DISABLED = 'organization disabled';
 
     // Duplicate-key names (the violated key decides what a duplicate means).
     public const KEY_USER_EMAIL = 'users_email_unique';
@@ -189,6 +202,9 @@ final class OrganizationInvitations
             if (! OrganizationAuthority::isMembershipManager($actor->getKey())) {
                 throw new AuthorizationException;
             }
+
+            // ORG-1: the state of the row just locked. Refused before anything is read about the address or written.
+            $this->requireEnabled($org);
 
             if (DB::table('users')->where('email', $address)->exists()) {
                 throw OrganizationInvitationException::accountExists();
@@ -300,9 +316,11 @@ final class OrganizationInvitations
             return null;
         }
 
-        $invitation = OrganizationInvitation::query()
+        // ORG-1: a link into an Organization that is not Enabled is a dead link, indistinguishable from any other (a plain read that decides nothing;
+        // acceptance re-reads the state under the Organization lock).
+        $invitation = PortalState::whereEnabled(OrganizationInvitation::query()
             ->join('organizations', 'organizations.id', '=', 'organization_invitations.organization_id')
-            ->where('organization_invitations.token_hash', self::hashToken($token))
+            ->where('organization_invitations.token_hash', self::hashToken($token)))
             ->first(['organization_invitations.*', 'organizations.name as organization_name']);
 
         if ($invitation === null || ! $invitation->isOpen() || $invitation->live_email !== $invitation->email) {
@@ -399,6 +417,11 @@ final class OrganizationInvitations
         if ($invitation->live_email === null || $invitation->live_email !== $invitation->email) {
             throw OrganizationInvitationException::unavailable('slot_lost');
         }
+
+        // ORG-1: the Organization must be Enabled, read from the row locked in step 1. Disabling already revoked every open invitation; this is the
+        // independent guarantee, so a row the revocation could not have seen (or an Organization that was never enabled) is still refused. Nothing
+        // has been written yet: a refused acceptance leaves no user, membership, social account or invitation change.
+        $this->requireEnabledForAcceptance($organization);
 
         // 3. The issuer must still be a membership manager, from the tables.
         if (! OrganizationAuthority::isMembershipManager($issuerId)) {
@@ -647,7 +670,111 @@ final class OrganizationInvitations
         return $revoked;
     }
 
+    // ── Disable-time revocation (ORG-1, ruling A2; ORG-0 record section 6.2) ─────
+
+    /**
+     * Permanently revoke every OPEN invitation of an Organization that is being disabled, in the disabling transaction. Called ONLY by
+     * {@see OrganizationRelationships::disable()}, which has ALREADY taken the actor's user row (shared) and the Organization row (exclusive), in
+     * that order, and has read the portal state from the locked row. This method takes the rest of the sequence:
+     *
+     *   (actor S, organization X: held by the caller)  ->  nominate the open invitation ids (a plain read)  ->  lock them X, primary key ascending
+     *   ->  revalidate each at ONE instant taken after the locks  ->  revoke and audit
+     *
+     * It acquires no Gate, no policy and no permission-cache load: authority was established before the transaction and re-read from the tables
+     * by the caller under the locks (a first cache load inside this lock sequence can close a cycle, R1-3 6.2.3). No new invitation can be issued between
+     * the nomination and the locks, because issuance needs the Organization row the caller holds; the revalidation still stands for the rows
+     * nominated, since an operator revocation, an acceptance or an authority-loss hook may have committed first (those rows are left exactly as they
+     * are: an accepted, an earlier-revoked and an expired invitation keep their history, and nothing is relabelled).
+     *
+     * THE SLOT. The revocation CLEARS `live_email`, as an operator's revocation does, and unlike the authority-loss hooks. The hooks leave the slot
+     * because writing it would make InnoDB share-lock the Organization row from inside a hook that holds no Organization lock (O4/R1); this
+     * transaction already holds that row exclusively, so the reason does not apply, and clearing is the simpler invariant: a revoked-on-disable row
+     * is a plain terminal row that holds nothing, issuance after re-enable finds no holder to release, and the unique backstop is never reached.
+     * A row that a hook had revoked earlier keeps its slot (it is not open, so it is not touched here), and issuance still releases it under the
+     * Organization lock as it always did: both histories are proved by test.
+     *
+     * Never writes `organization_id` (so no foreign-key check reaches the Organization row again) and never reactivates anything. `revoked_by` is
+     * the actor, whose row the caller share-locked first (the R1-3 R3 rule that carries over).
+     *
+     * @return list<int> the ids actually revoked, ascending
+     */
+    public function revokeOpenForDisable(int $organizationId, User $actor): array
+    {
+        $this->requireTransaction(__FUNCTION__);
+
+        $nominated = DB::table('organization_invitations')
+            ->where('organization_id', $organizationId)
+            ->whereNull('accepted_at')->whereNull('revoked_at')
+            ->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if ($nominated === []) {
+            return [];
+        }
+
+        $locked = DB::table('organization_invitations')->whereIn('id', $nominated)->orderBy('id')->lockForUpdate()->get();
+
+        // One instant, taken AFTER the locks: the rows are judged, and the update repeats the same conditions with the same instant.
+        $now = now();
+        $open = $locked->filter(fn (object $row) => (int) $row->organization_id === $organizationId && $this->isOpenRow($row, $now))->values();
+
+        if ($open->isEmpty()) {
+            return [];
+        }
+
+        $ids = $open->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        $revoked = DB::table('organization_invitations')
+            ->whereIn('id', $ids)->where('organization_id', $organizationId)
+            ->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', $now)
+            ->update([
+                'revoked_at' => $now,
+                'revoked_by' => $actor->getKey(),
+                'revoked_reason' => self::REASON_ORGANIZATION_DISABLED,
+                'live_email' => null,
+                'updated_at' => $now,
+            ]);
+
+        // The rows are locked, so the statement cannot have missed one; a difference would mean a broken invariant.
+        if ($revoked !== count($ids)) {
+            throw new LogicException("Revoked {$revoked} invitations on disable but expected ".count($ids).'.');
+        }
+
+        $organization = $this->subject($organizationId);
+
+        foreach ($open as $row) {
+            $this->audit($actor, $organization, self::REVOKED, [
+                'invitation_id' => (int) $row->id,
+                'email' => $row->email,
+                'invited_by' => (int) $row->invited_by,
+                'reason' => self::REASON_ORGANIZATION_DISABLED,
+                'source' => self::SOURCE_ORGANIZATION_DISABLED,
+            ]);
+        }
+
+        return $ids;
+    }
+
     // ── Internals ─────────────────────────────────────────
+
+    /** ORG-1 (issuance): the locked Organization row must be Enabled. @throws OrganizationInvitationException */
+    private function requireEnabled(object $organization): void
+    {
+        $state = PortalState::of($organization);
+
+        if (! $state->isEnabled()) {
+            throw OrganizationInvitationException::portalRefused((string) $organization->name, $state);
+        }
+    }
+
+    /** ORG-1 (acceptance): the same rule, answered as the uniform dead link. @throws OrganizationInvitationException */
+    private function requireEnabledForAcceptance(object $organization): void
+    {
+        $state = PortalState::of($organization);
+
+        if (! $state->isEnabled()) {
+            throw OrganizationInvitationException::unavailable($state->isDisabled() ? 'organization_disabled' : 'portal_not_enabled');
+        }
+    }
 
     private function authorize(User $actor): void
     {
@@ -675,7 +802,7 @@ final class OrganizationInvitations
 
     private function lockOrganization(int $organizationId): ?object
     {
-        $org = DB::table('organizations')->where('id', $organizationId)->lockForUpdate()->first(['id', 'name']);
+        $org = DB::table('organizations')->where('id', $organizationId)->lockForUpdate()->first(['id', 'name', ...PortalState::columns()]);
 
         if ($org !== null) {
             $org->id = (int) $org->id;

@@ -291,7 +291,7 @@ function issuingRace(bool $sharedFirst): void
     // The workers are separate processes reading COMMITTED rows: the creation permission and a membership must be committed too.
     $permission = Permission::firstOrCreate(['name' => 'tickets.create', 'guard_name' => 'web']);
     $user->givePermissionTo($permission);
-    $organization = Organization::factory()->create(['owner_id' => $user->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $user->id]);
     ticketJoin($user, $organization);
 
     $workers = (int) (getenv('TICKET_RACE_WORKERS') ?: 4);

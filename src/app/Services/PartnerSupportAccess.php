@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Policies\TicketPolicy;
+use App\Support\Organizations\PortalState;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -18,8 +19,8 @@ use LogicException;
  *     an operator designated THIS membership, see {@see PartnerSupportGrants}). A half-written pair is not a grant: it fails closed;
  *  2. `S` is active (`users.disabled_at` null) and is NOT an operator (an operator works from the operator surface, with platform
  *     authority, never through a membership row);
- *  3. `P` is still a partner (`can_manage_customers`) and is not disabled (`organizations.disabled_at`);
- *  4. the ticket's organization `C` is managed by `P` RIGHT NOW (`C.managed_by_organization_id = P.id`), is not disabled, and is the
+ *  3. `P` is still a partner (`can_manage_customers`) and its portal is ENABLED (ORG-1: {@see PortalState}: portal access enabled and not disabled);
+ *  4. the ticket's organization `C` is managed by `P` RIGHT NOW (`C.managed_by_organization_id = P.id`), its portal is ENABLED, and it is the
  *     ticket's own organization (`tickets.organization_id`).
  *
  * Nothing else is an input. Deliberately NOT: the membership ROLE (admin or member), administrator APPROVAL, Spatie roles and permissions
@@ -65,25 +66,27 @@ final class PartnerSupportAccess
      */
     public static function supportedOrganizations(int $actorId): Builder
     {
-        return self::grantQuery($actorId)
+        $query = self::grantQuery($actorId)
             ->join('organizations as c', 'c.managed_by_organization_id', '=', 'p.id')
-            ->whereColumn('c.id', '!=', 'p.id') // no CHECK can stop self-management (MO-1A); the rule must not depend on the service having refused it
-            ->whereNull('c.disabled_at')
-            ->select(['c.id', 'c.name']);
+            ->whereColumn('c.id', '!=', 'p.id'); // no CHECK can stop self-management (MO-1A); the rule must not depend on the service having refused it
+
+        // ORG-1: the customer's portal must be Enabled (the second line beside `disabled_at`: a Not enabled customer cannot be managed at all, and a CHECK says so).
+        return PortalState::whereEnabled($query, 'c')->select(['c.id', 'c.name']);
     }
 
     /** `organization_members m` (with a complete grant) joined to an active user and an enabled partner `p`. */
     private static function grantQuery(int $actorId): Builder
     {
-        return DB::table('organization_members as m')
+        $query = DB::table('organization_members as m')
             ->join('users as u', 'u.id', '=', 'm.user_id')
             ->join('organizations as p', 'p.id', '=', 'm.organization_id')
             ->where('m.user_id', $actorId)
             ->whereNotNull('m.support_granted_at')
             ->whereNotNull('m.support_granted_by')
             ->whereNull('u.disabled_at')
-            ->where('p.can_manage_customers', true)
-            ->whereNull('p.disabled_at');
+            ->where('p.can_manage_customers', true);
+
+        return PortalState::whereEnabled($query, 'p');
     }
 
     /** The locked refusals of {@see refusal()}: the account itself may not act (suspended, an operator), the customer is not one they support, the named contact is not eligible. */
@@ -153,13 +156,14 @@ final class PartnerSupportAccess
         }
 
         $rows = DB::table('organizations')->whereIn('id', [$organizationId, (int) $nominated])->orderBy('id')->sharedLock()
-            ->get(['id', 'managed_by_organization_id', 'can_manage_customers', 'disabled_at'])->keyBy('id');
+            ->get(['id', 'managed_by_organization_id', 'can_manage_customers', ...PortalState::columns()])->keyBy('id');
         $customer = $rows->get($organizationId);
         $partner = $rows->get((int) $nominated);
 
+        // ORG-1: both rows must be Enabled, read from the rows just locked (the locked twin of the whereEnabled() joins above).
         if ($customer === null || $partner === null
-            || $customer->disabled_at !== null || (int) $customer->managed_by_organization_id !== (int) $partner->id
-            || ! $partner->can_manage_customers || $partner->disabled_at !== null) {
+            || ! PortalState::of($customer)->isEnabled() || (int) $customer->managed_by_organization_id !== (int) $partner->id
+            || ! $partner->can_manage_customers || ! PortalState::of($partner)->isEnabled()) {
             return self::REFUSED_ORGANIZATION;
         }
 

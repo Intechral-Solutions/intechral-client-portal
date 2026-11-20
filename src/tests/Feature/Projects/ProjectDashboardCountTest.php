@@ -67,7 +67,7 @@ it('counts only the active projects a plain member belongs to', function () {
 
 it('ignores a company link when counting', function () {
     $user = makeUser('user');
-    $org = Organization::factory()->create(['owner_id' => $this->owner->id]);
+    $org = Organization::factory()->create(['portal_enabled_by' => $this->owner->id]);
     $org->members()->attach($user, ['role' => 'member']);
     $company = CrmCompany::factory()->create(['created_by' => $this->owner->id, 'organization_id' => $org->id]);
     Project::factory()->active()->create(['created_by' => $this->owner->id])->companies()->attach($company);

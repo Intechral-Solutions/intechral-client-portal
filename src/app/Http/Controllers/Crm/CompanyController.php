@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Crm;
 
 use App\Http\Controllers\Controller;
 use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Services\CrmService;
 use App\Services\OrganizationListFacts;
 use Illuminate\Http\RedirectResponse;
@@ -92,8 +93,14 @@ class CompanyController extends Controller
             ->with('success', 'Organization deleted.');
     }
 
+    /**
+     * Initial enablement of portal access. The ability is `manageMembership` (portal.operator AND crm.manage, an active account), asked here as the first
+     * statement and again by the service from the tables under its locks; it is not `manageRelationships`, which governs disable and re-enable (ADR-011 section 2).
+     */
     public function promote(Request $request, CrmCompany $company): RedirectResponse
     {
+        $this->authorize('manageMembership', Organization::class);
+
         $org = $this->service->promoteToOrganization($company, $request->user());
 
         return redirect()->route('organizations.show', $org)

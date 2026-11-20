@@ -47,7 +47,7 @@ function ticketCompanyFixture(): array
     $peer = tap(ticketUser())->givePermissionTo('tickets.view_org');
     $outsider = ticketUser();
 
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach($owner, ['role' => 'member']);
     $organization->members()->attach($peer, ['role' => 'member']);
     $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
@@ -111,7 +111,7 @@ it('BASELINE H4: /tickets is an operator\'s own-requests list, while the operato
 it('F-1 (R1-2, replaces the EPIC-010D baseline): creation attributes the ticket to the member\'s organization and ignores a company_id it is sent', function () {
     $operator = ticketUser('operator');
     $member = ticketUser();
-    $organization = Organization::factory()->create(['owner_id' => $operator->id]);
+    $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
     $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
     $payload = ['description' => 'x', 'category' => 'General', 'priority' => 'low'];
