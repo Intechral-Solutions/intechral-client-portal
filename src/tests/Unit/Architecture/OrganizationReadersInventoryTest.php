@@ -115,7 +115,7 @@ function orgReadersInventory(): array
         'Services/PartnerSupportAccess.php' => 'DECIDES: partner support authority, unlocked (grantQuery, supportedOrganizations) and locked (refusal)',
         'Services/ServiceRequestAccess.php' => 'DECIDES: filing a request, its locked recheck and both candidate reads',
         'Services/OrganizationRelationships.php' => 'DECIDES: designate, link, reassign, both candidate lists, disable and re-enable',
-        'Services/CrmService.php' => 'DECIDES: initial enablement (promoteToOrganization)',
+        'Services/OrganizationDirectory.php' => 'DECIDES: initial enablement (enablePortalAccess) and the deletion of a never-enabled Organization (delete); create, update and their helpers write the Directory profile only',
         'Services/OrganizationListFacts.php' => 'DECIDES: a row existing is not portal access (portalStatus)',
         'Services/OrganizationPreflight.php' => 'DECIDES: the Directory-only invariant, the approval check',
         'Notifications/OrganizationInvitationNotification.php' => 'DECIDES: the send-time eligibility of a queued invitation mail',
@@ -130,18 +130,25 @@ function orgReadersInventory(): array
         'Http/Controllers/Operator/TicketController.php' => 'DISPLAY: the operator ticket list filter, only organizations that already have tickets',
         'Http/Controllers/Operator/TicketReportController.php' => 'DISPLAY: the operator CSV export prints the organization name of a ticket the report already selected',
         'Http/Presenters/RequesterTicketPresenter.php' => 'DISPLAY: the organization name on the requester\'s own ticket (TicketPolicy decides who sees it; ruling A keeps it visible while Disabled)',
-        'Models/CrmCompany.php' => 'DISPLAY: declares the Directory profile\'s link to its Organization; the link is written only by CrmService and OrganizationRelationships',
+        'Models/CrmContact.php' => 'DISPLAY: declares the Person\'s affiliation with an Organization (descriptive, never authority); the Person is operator-only (DirectoryOperatorScope)',
+        'Models/Project.php' => 'DISPLAY: declares the project link to Organizations (metadata; it widens no one\'s visibility); written only by ProjectService',
+        'Services/CrmService.php' => 'DISPLAY: a Person\'s affiliation write takes the Organization row SHARED and proves it exists; the affiliation is descriptive, never authority',
+        'Http/Controllers/Crm/CompanyController.php' => 'DISPLAY: the transitional Directory pages, operator-only (manageDirectory); every write is OrganizationDirectory under lock',
+        'Http/Controllers/Crm/ContactController.php' => 'DISPLAY: the Directory People pages, operator-only (manageDirectory); the organization option list for an affiliation',
+        'Http/Presenters/ProjectPresenter.php' => 'DISPLAY: the Organization options a project form offers, through the membership scope; a link is metadata',
+        'Rules/AccessibleOrganization.php' => 'DISPLAY: validates that an id names an Organization the actor can see; an unknown and a hidden id fail alike',
+        'Services/ProjectService.php' => 'DISPLAY: locks (shared, ascending) and proves the existence of the Organizations a project link names; a link is metadata, never portal authority',
         'Models/OrganizationInvitation.php' => 'DISPLAY: declares the relation; acceptance reads the Organization through OrganizationInvitations, never through it',
         'Models/Ticket.php' => 'DISPLAY: declares the relation, unscoped, for names on pages and mails; attribution is decided by ServiceRequestAccess',
-        'Models/User.php' => 'DISPLAY: declares the membership relation. Its one reader, orgCompanyIds(), has no caller (see orgReadersDormant())',
+        'Models/User.php' => 'DISPLAY: declares the membership relation',
         'Notifications/NewTicketAlertNotification.php' => 'DISPLAY: names the ticket\'s organization in an operator mail; the recipients are decided elsewhere',
         'Notifications/PartnerReplyAlertNotification.php' => 'DISPLAY: names the ticket\'s organization in an operator mail; the recipients are decided elsewhere',
         'Notifications/TicketCreatedNotification.php' => 'DISPLAY: names the ticket\'s organization in the confirmation mail; the recipient is the ticket\'s own requester',
         'Notifications/TicketRepliedNotification.php' => 'DISPLAY: names the ticket\'s organization in the reply mail; the recipient is decided by the ticket\'s participants',
         'Queries/PartnerSupportQuery.php' => 'DISPLAY: a name subselect of a list that PartnerSupportAccess already limits to Enabled customers',
         'Queries/RequesterTicketQuery.php' => 'DISPLAY: a name subselect of the requester\'s own tickets (TicketPolicy decides; ruling A keeps them visible while Disabled)',
-        'Queries/TaskListState.php' => 'DISPLAY: a filter value object whose `organization` is a Directory profile id, not a read of the organizations table',
-        'Queries/TaskQuery.php' => 'DISPLAY: applies that Directory profile filter to project companies; no Organization row is read',
+        'Queries/TaskListState.php' => 'DISPLAY: a filter value object whose `organization` is an Organization id, not a read of the organizations table',
+        'Queries/TaskQuery.php' => 'DISPLAY: applies the Organization filter to project links and lists the options through the membership scope; decides no portal act',
         'Services/UserMembershipList.php' => 'DISPLAY: the memberships a User row already has, for the Users list',
         'Console/Commands/CleanupE2eInvitees.php' => 'DISPLAY: deletes E2E fixtures only; not a production path (ADR-011 bypass sweep)',
         'Support/Rehearsal/IntegritySnapshot.php' => 'DISPLAY: reads the rehearsal snapshot; not a production path',
@@ -173,9 +180,11 @@ function orgReadersExemptions(): array
             'write' => 'writes the change a caller decided under its lock',
             'nameOf' => 'a name for a message or an audit entry',
         ],
-        'Services/CrmService.php' => [
-            'deleteCompany' => 'takes a link away (a delete of a Directory profile): not a grant of anything; locks the Organization row first for the lock order',
-            'uniqueSlug' => 'slug uniqueness for a new row; no portal decision',
+        'Services/OrganizationDirectory.php' => [
+            'update' => 'writes profile columns and the classification only; never a portal-state column, and the classification is never authority',
+            'lockOrganization' => 'the lock helper: locks the row exclusively and reads it raw; every caller decides on the state of the row it locked, through PortalState',
+            'insertWithUniqueSlug' => 'slug uniqueness for a new row; no portal decision',
+            'audit' => 'names the Organization in an audit entry after the decision',
         ],
         'Services/OrganizationListFacts.php' => [
             'relationships' => 'operator list facts (partner names, customer counts) shown beside portalStatus(), which decides the label',
@@ -185,6 +194,7 @@ function orgReadersExemptions(): array
             'relationships' => 'a read-only check of the stored relationship invariants',
             'adminApproval' => 'a read-only check, already restricted to rows with portal access (portal_enabled_at is not null)',
             'partnerSupport' => 'a read-only check of the stored grant invariants',
+            'canonical' => 'ORG-2: a read-only check of the stored Organization invariants (a creator that exists, a classification in the catalogue); it decides no portal act and the classification is never an authority input',
         ],
         'Notifications/OrganizationInvitationNotification.php' => [
             'row' => 'fetches the columns shouldSend() decides on with PortalState',
@@ -199,7 +209,7 @@ function orgReadersExemptions(): array
  */
 function orgReadersDormant(): array
 {
-    return ['Models/User.php' => 'orgCompanyIds'];
+    return [];
 }
 
 /** @return array<string, string> method name => its source (signature and body), for the methods of a class file with comments removed */
@@ -405,6 +415,9 @@ it('keeps no stale exemption: every exempt method exists, still reads Organizati
 });
 
 it('has no caller for a reader that is classified as dormant', function () {
+    // ORG-2 removed the one dormant reader (User::orgCompanyIds(), which had no caller). The machinery stays: a reader classified dormant later is still checked.
+    expect(orgReadersDormant())->toBeArray();
+
     foreach (orgReadersDormant() as $file => $method) {
         expect(orgReadersMethods(file_get_contents(app_path($file))))->toHaveKey($method);
         $callers = [];

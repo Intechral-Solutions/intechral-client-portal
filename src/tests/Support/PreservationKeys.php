@@ -28,33 +28,40 @@ final class PreservationKeys
     ];
 
     /**
-     * The same 13 keys as they stand in the LIVE schema (Release 1.0, ORG-1): `organizations.owner_id` was renamed `portal_enabled_by` by the portal-state
-     * migration, and the foreign key kept its original constraint name. {@see USER_KEYS} stays the historical H1 inventory (the pinned M2 migration and the
-     * rehearsal harness, whose databases never run the ORG-1 migration, still know the column as `owner_id`).
+     * The same count of keys as they stand in the LIVE (canonical) schema. Two things changed since the historical H1 inventory above:
+     *   - Release 1.0 (ORG-1): `organizations.owner_id` was renamed `portal_enabled_by` and the foreign key kept its original constraint name;
+     *   - Release 1.0 (ORG-2): `crm_companies` was retired, so its `created_by` key is gone, and `organizations.created_by` (NOT NULL, RESTRICT to users,
+     *     constraint `organizations_created_by_foreign`) takes its place: the creator of a durable Organization record is protected exactly as the creator
+     *     of a Company profile was.
+     * {@see USER_KEYS} stays the historical H1 inventory (the pinned M2 migration and the rehearsal harness, whose databases never run those migrations, still
+     * know the schema that way).
      *
      * @return list<array{0: string, 1: string, 2: string}>
      */
     public static function liveUserKeys(): array
     {
-        return array_map(
-            fn (array $key) => $key[1] === 'owner_id' && $key[0] === 'organizations' ? ['organizations', 'portal_enabled_by', $key[2]] : $key,
-            self::USER_KEYS
-        );
+        return array_map(fn (array $key) => match (true) {
+            $key[0] === 'organizations' && $key[1] === 'owner_id' => ['organizations', 'portal_enabled_by', $key[2]],
+            $key[0] === 'crm_companies' => ['organizations', 'created_by', 'organizations_created_by_foreign'],
+            default => $key,
+        }, self::USER_KEYS);
     }
 
     /**
-     * Every foreign key that points at `users` or `crm_companies`, as "table.column -> parent" => "DELETE/UPDATE (constraint)".
+     * Every foreign key that points at `users` or `organizations`, as "table.column -> parent" => "DELETE/UPDATE (constraint)". The canonical counterpart of
+     * the historical "users and crm_companies" listing: `crm_companies` is gone, and the Organization is now the parent of the Person affiliation and the
+     * project link, so those references are part of the same contract.
      *
      * @return array<string, string>
      */
-    public static function toUsersAndCompanies(): array
+    public static function toUsersAndOrganizations(): array
     {
         return collect(DB::select(
             "select k.table_name as t, k.column_name as c, k.referenced_table_name as p, k.constraint_name as n, r.delete_rule as d, r.update_rule as u
              from information_schema.key_column_usage k
              join information_schema.referential_constraints r
                on r.constraint_schema = k.constraint_schema and r.constraint_name = k.constraint_name and r.table_name = k.table_name
-             where k.table_schema = database() and k.referenced_table_name in ('users', 'crm_companies')
+             where k.table_schema = database() and k.referenced_table_name in ('users', 'organizations')
              order by k.table_name, k.column_name"
         ))->mapWithKeys(fn (object $row) => ["{$row->t}.{$row->c} -> {$row->p}" => "{$row->d}/{$row->u} ({$row->n})"])->all();
     }

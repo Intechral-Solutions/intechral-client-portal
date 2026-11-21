@@ -17,7 +17,6 @@
  * the reply states and the query budgets are here too.
  */
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
@@ -339,11 +338,9 @@ it('sends the create page its exact props: the actor\'s own organizations by id 
     $member = ticketUser();
     $organization = Organization::factory()->create(['name' => 'Zed Holdings', 'portal_enabled_by' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
-    // MO-1A: one company per organization (unique key), so a multi-company member belongs to two organizations.
+    // A member of two organizations.
     $second = Organization::factory()->create(['name' => 'Acme Ltd', 'portal_enabled_by' => $operator->id]);
     $second->members()->attach($member, ['role' => 'member']);
-    CrmCompany::factory()->create(['name' => 'Zed Co', 'created_by' => $operator->id, 'organization_id' => $organization->id]);
-    CrmCompany::factory()->create(['name' => 'Acme Co', 'created_by' => $operator->id, 'organization_id' => $second->id]);
 
     $response = $this->actingAs($member)->get(route('tickets.create'))->assertOk();
     $own = ticketOwnProps($response);

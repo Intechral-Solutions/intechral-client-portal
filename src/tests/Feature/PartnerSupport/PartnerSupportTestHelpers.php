@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TicketReply;
@@ -18,14 +17,12 @@ use Illuminate\Support\Facades\DB;
 require_once __DIR__.'/../Pilot/PilotTestHelpers.php';
 require_once __DIR__.'/../Tickets/TicketTestHelpers.php';
 
-/** An organization with exactly one CRM company (the pair a managed relationship needs). */
+/** An Enabled organization (the unit a managed relationship needs; one entity since ORG-2, no separate Directory profile row). */
 function psPaired(string $name): Organization
 {
     $owner = User::factory()->create();
-    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
-    CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
-    return $organization;
+    return Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
 }
 
 /** Make the user a plain member of the organization (written as an operator act would). */

@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Presenters\ProjectOverviewPresenter;
-use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskChecklistItem;
@@ -168,7 +168,7 @@ function growTasksWorld(User $member, User $owner, int $n): void
         $other = makeUser();
         $project->members()->attach($other->id, ['role' => 'member']);
         $project->milestones()->create(['name' => "MS {$step}", 'due_date' => today()]);
-        $project->companies()->attach(CrmCompany::factory()->create(['created_by' => $owner->id])->id);
+        $project->organizations()->attach(Organization::factory()->create(['portal_enabled_by' => $owner->id])->id);
         makeTask($project->columns[$step % 5], ['assignee_id' => $member->id, 'priority' => 'high', 'title' => "Budget task {$step}", 'due_date' => today()->subDay()]);
         makeTask($project->columns[1], ['assignee_id' => $other->id, 'priority' => 'high', 'title' => "Budget other {$step}", 'position' => 1]);
         Task::factory()->standalone()->create(['created_by' => $member->id, 'assignee_id' => null, 'title' => "Budget loose {$step}", 'priority' => 'high']);

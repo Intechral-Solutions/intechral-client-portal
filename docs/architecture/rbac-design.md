@@ -174,15 +174,16 @@ custom   → assigned permissions      one user may have many memberships
 Tenant-aware models follow their real schema path:
 
 ```php
-// Direct tenant key: CrmCompany
-$query->whereIn('organization_id', $user->organizations()->select('organizations.id'));
+// Organization -> organization_members (a Directory-only Organization has no member, so no customer sees it)
+$query->whereIn('organizations.id', $user->organizations()->select('organizations.id'));
 
-// Indirect paths:
-// Organization -> organization_members
-// CrmContact   -> company.organization_id
+// CrmContact (a Person): operator-only (DirectoryOperatorScope). Its organization_id is a Directory
+// affiliation and decides no access (ORG-2, ruling D7).
+// Before ORG-2 (main until it merges): CrmCompany.organization_id was the direct tenant key and
+// CrmContact was scoped through company.organization_id.
 ```
 
-Operators bypass these scopes; "operator" is the explicit `portal.operator` eligibility (`CustomerPilotGate::isOperator`), not the built-in role's name (R1-1). A non-operator with no memberships receives an empty tenant view. Projects, invoices, and time entries have no `organization_id` column and continue to use ownership, membership, invoice-client, and policy logic instead of the direct scope. Tickets gained `organization_id` in R1-2 (2026-11-10) as **attribution, not access**: no scope applies to `Ticket`, and visibility stays the requester or an operator holding `tickets.assign` ([ADR-005 Amendment 2](./adr/ADR-005-organization-multitenancy.md#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope)). For `Project` specifically that means `project_members` membership or `projects.admin`: a project's linked CRM company (`project_company`) is visibility metadata only and never grants access on its own (EPIC-011E D2).
+Operators bypass these scopes; "operator" is the explicit `portal.operator` eligibility (`CustomerPilotGate::isOperator`), not the built-in role's name (R1-1). A non-operator with no memberships receives an empty tenant view. Projects, invoices, and time entries have no `organization_id` column and continue to use ownership, membership, invoice-client, and policy logic instead of the direct scope. Tickets gained `organization_id` in R1-2 (2026-11-10) as **attribution, not access**: no scope applies to `Ticket`, and visibility stays the requester or an operator holding `tickets.assign` ([ADR-005 Amendment 2](./adr/ADR-005-organization-multitenancy.md#amendment-2-r1-2-2026-11-10-ticket-scoping-is-policy-based-with-a-direct-attribution-column-no-organizationscope)). For `Project` specifically that means `project_members` membership or `projects.admin`: a project's linked Organization (`project_organization`; `project_company` before ORG-2) is visibility metadata only and never grants access on its own (EPIC-011E D2).
 
 ### Organization Permissions
 
@@ -203,7 +204,7 @@ The built-in `user` role no longer receives the `*.view_org` permissions (R1-1);
 
 ### Organization Tables
 
-- `organizations` — owned by a user; linked from `crm_companies.organization_id`
+- `organizations` — the one canonical Organization: the Directory profile, the portal state and the memberships (Release 1.0, ORG-2; before it, linked from `crm_companies.organization_id`)
 - `organization_members` — unique `user_id` + `organization_id`, with `admin` or `member`; users may join multiple organizations
 
 > **Note:** A full org-role table system is not built. The current role is the simple enum on `organization_members`.

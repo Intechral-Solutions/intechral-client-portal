@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Policies\OrganizationPolicy;
 use App\Shared\Permissions\BuiltInRoles;
 use App\Shared\Permissions\PermissionCatalogue;
+use App\Shared\Pilot\CustomerPilotGate;
 use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -164,6 +165,32 @@ final class OrganizationAuthority
     public static function isRelationshipManager(int $userId): bool
     {
         return in_array($userId, self::relationshipManagerIds([$userId]), true);
+    }
+
+    /**
+     * Release 1.0 (ORG-2, CP6 F-2): whether the account holds operator ELIGIBILITY, `portal.operator` directly or through any role, RIGHT NOW and from the TABLES
+     * ALONE. This is {@see CustomerPilotGate::isOperator()} (the product's one test of "operator") without the Gate: for a decision made inside a locked transaction,
+     * where a Gate call would load the permission cache under a lock and could answer from a copy older than a revocation that has already committed. It
+     * does NOT check that the account is active and does not ask for `crm.manage`; it answers only "is this account a customer or an operator". The two are
+     * kept equal by a parameterized drift test (ProjectOperatorEligibilityTest).
+     */
+    public static function holdsOperatorCapability(int $userId): bool
+    {
+        return DB::table('users')
+            ->where('users.id', $userId)
+            ->where(self::holds(PermissionCatalogue::PORTAL_OPERATOR))
+            ->exists();
+    }
+
+    /**
+     * Release 1.0 (ORG-2): the same question for the THIRD ability, {@see OrganizationPolicy::manageDirectory}: whether the account is, RIGHT NOW and from the
+     * TABLES ALONE, someone that ability would admit. Creating, editing, classifying and deleting an Organization decide here, inside their locked
+     * transaction, for the reason {@see isMembershipManager()} gives (no Gate, no permission-cache load under a row lock). A separate method on purpose
+     * (ADR-011 section 2); a parameterized drift test keeps it equal to its policy ability.
+     */
+    public static function isDirectoryManager(int $userId): bool
+    {
+        return in_array($userId, self::activeOperatorsWithDirectory([$userId]), true);
     }
 
     /**

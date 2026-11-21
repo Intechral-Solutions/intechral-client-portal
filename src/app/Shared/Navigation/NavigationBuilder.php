@@ -320,9 +320,8 @@ final class NavigationBuilder
     }
 
     /**
-     * Directory offers People and Organizations (DIR-1, ADR-010). An Organization is ONE concept that today lives in two tables
-     * (`crm_companies`, the Directory profile, and `organizations`, the portal tenancy record); the model is unified in what the
-     * operator sees, not by consolidating the tables. The administrative index of portal organizations is therefore not a third
+     * Directory offers People and Organizations (DIR-1, ADR-010). An Organization is ONE concept and, since ORG-2, one table
+     * (`organizations`: the Directory profile and the portal state are one row; a never-enabled Organization is Directory-only). The administrative index of portal organizations is therefore not a third
      * Directory entry: it is System → Organization access ({@see self::system()}).
      *
      * @return array<string, mixed>|null

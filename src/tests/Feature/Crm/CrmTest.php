@@ -1,10 +1,11 @@
 <?php
 
-use App\Models\CrmCompany;
+use App\Exceptions\OrganizationRelationshipException;
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\CrmService;
+use App\Services\OrganizationDirectory;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seedRolesAndPermissions();
@@ -32,7 +33,7 @@ it('allows operators to access the CRM company list', function () {
 
 // ── Companies ─────────────────────────────────────────────────────────────────
 
-it('creates a company', function () {
+it('creates an Organization from the Directory page', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
@@ -42,10 +43,17 @@ it('creates a company', function () {
         'phone' => '555-1234',
     ])->assertRedirect();
 
-    expect(CrmCompany::where('name', 'Acme Corp')->exists())->toBeTrue();
+    $organization = Organization::withoutGlobalScopes()->where('name', 'Acme Corp')->first();
+
+    // One entity: created Directory-only (never enabled), by the operator, with the default classification.
+    expect($organization)->not->toBeNull()
+        ->and($organization->portal_enabled_at)->toBeNull()
+        ->and($organization->portalState()->isNotEnabled())->toBeTrue()
+        ->and($organization->created_by)->toBe($operator->id)
+        ->and($organization->classification->value)->toBe('general');
 });
 
-it('validates company name is required', function () {
+it('validates the Organization name is required', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
@@ -54,7 +62,7 @@ it('validates company name is required', function () {
     ])->assertSessionHasErrors('name');
 });
 
-it('validates company website must be a url', function () {
+it('validates the Organization website must be a url', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
@@ -64,29 +72,29 @@ it('validates company website must be a url', function () {
     ])->assertSessionHasErrors('website');
 });
 
-it('updates a company', function () {
+it('updates an Organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
     $this->actingAs($operator)->put(route('crm.companies.update', $company), [
         'name' => 'Updated Name',
         'phone' => '999-0000',
     ])->assertRedirect();
 
-    expect($company->fresh()->name)->toBe('Updated Name');
+    expect($company->fresh()->name)->toBe('Updated Name')->and($company->fresh()->phone)->toBe('999-0000');
 });
 
-it('deletes a company', function () {
+it('deletes a never-enabled Organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
     $this->actingAs($operator)->delete(route('crm.companies.destroy', $company))->assertRedirect();
 
-    expect(CrmCompany::find($company->id))->toBeNull();
+    expect(Organization::withoutGlobalScopes()->find($company->id))->toBeNull();
 });
 
 // ── Contacts ──────────────────────────────────────────────────────────────────
@@ -121,20 +129,20 @@ it('validates contact first and last name are required', function () {
     ])->assertSessionHasErrors(['first_name', 'last_name']);
 });
 
-it('links a contact to a company', function () {
+it('affiliates a Person with an Organization', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
     $this->actingAs($operator)->post(route('crm.contacts.store'), [
         'first_name' => 'John',
         'last_name' => 'Smith',
-        'crm_company_id' => $company->id,
+        'organization_id' => $company->id,
     ])->assertRedirect();
 
     $contact = CrmContact::where('first_name', 'John')->first();
-    expect($contact->crm_company_id)->toBe($company->id);
+    expect($contact->organization_id)->toBe($company->id);
 });
 
 it('updates a contact', function () {
@@ -163,34 +171,44 @@ it('deletes a contact', function () {
     expect(CrmContact::find($contact->id))->toBeNull();
 });
 
-// ── Promote to organization ───────────────────────────────────────────────────
+// ── Initial enablement of portal access ───────────────────────────────────────
 
-it('promotes a company to an organization', function () {
+it('enables portal access for a Directory-only Organization, keeping its row, its id and its creator', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
+    $creator = User::factory()->create();
 
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'name' => 'Promote Me']);
+    $company = Organization::factory()->directoryOnly()->create(['created_by' => $creator->id, 'name' => 'Promote Me']);
 
-    $this->actingAs($operator)->post(route('crm.companies.promote', $company))->assertRedirect();
+    $this->actingAs($operator)->post(route('crm.companies.promote', $company))->assertRedirect(route('organizations.show', $company));
 
     $company->refresh();
-    expect($company->isPromoted())->toBeTrue();
-    expect($company->organization)->not->toBeNull();
-    expect($company->organization->name)->toBe('Promote Me');
+    expect($company->portalState()->isEnabled())->toBeTrue()
+        ->and($company->name)->toBe('Promote Me')
+        ->and($company->portal_enabled_by)->toBe($operator->id)
+        ->and($company->created_by)->toBe($creator->id, 'enablement never rewrites who created the record')
+        ->and($company->portal_enabled_at)->not->toBeNull()
+        ->and(Organization::withoutGlobalScopes()->count())->toBe(1, 'no second row is created')
+        ->and($company->hasMember($operator))->toBeTrue('the enabling operator is the automatic admin member');
 });
 
-it('promoting twice returns the same organization', function () {
+it('refuses initial enablement of an already Enabled Organization with a controlled already_enabled result and writes nothing', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
+    $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id]);
+    $service = app(OrganizationDirectory::class);
+    $service->enablePortalAccess($company, $operator);
+    $before = [(array) DB::table('organizations')->where('id', $company->id)->first(), DB::table('activity_log')->count(), DB::table('organization_members')->count()];
 
-    $service = app(CrmService::class);
-    $org1 = $service->promoteToOrganization($company, $operator);
-    $org2 = $service->promoteToOrganization($company->fresh(), $operator);
+    try {
+        $service->enablePortalAccess($company->fresh(), $operator);
+        $this->fail('a second initial enablement must be refused');
+    } catch (OrganizationRelationshipException $e) {
+        expect($e->reason)->toBe(OrganizationRelationshipException::ALREADY_ENABLED);
+    }
 
-    expect($org1->id)->toBe($org2->id);
-    expect(Organization::count())->toBe(1);
+    expect([(array) DB::table('organizations')->where('id', $company->id)->first(), DB::table('activity_log')->count(), DB::table('organization_members')->count()])->toBe($before);
 });
 
 // ── Organization member management ───────────────────────────────────────────
@@ -259,19 +277,16 @@ it('returns 404 removing a user who is not a member', function () {
     $this->actingAs($operator)->delete(route('organizations.members.destroy', [$org, $user]))->assertNotFound();
 });
 
-// ── CrmService helpers ────────────────────────────────────────────────────────
+// ── Directory service helpers ────────────────────────────────────────────────
 
-it('generates a unique slug on promotion', function () {
+it('generates a unique slug when two Organizations share a name', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $service = app(CrmService::class);
+    $service = app(OrganizationDirectory::class);
 
-    $company1 = CrmCompany::factory()->create(['created_by' => $operator->id, 'name' => 'Same Name']);
-    $company2 = CrmCompany::factory()->create(['created_by' => $operator->id, 'name' => 'Same Name']);
+    $org1 = $service->create($operator, ['name' => 'Same Name']);
+    $org2 = $service->create($operator, ['name' => 'Same Name']);
 
-    $org1 = $service->promoteToOrganization($company1, $operator);
-    $org2 = $service->promoteToOrganization($company2, $operator);
-
-    expect($org1->slug)->not->toBe($org2->slug);
+    expect($org1->slug)->toBe('same-name')->and($org2->slug)->toBe('same-name-2');
 });

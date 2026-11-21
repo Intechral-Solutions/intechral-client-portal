@@ -5,6 +5,11 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Support\CommittedUsers;
+use Tests\Support\HistoricalSchema;
+
+// Release 1.0 (ORG-2): this file's subject is a migration that has since been superseded or is undone and redone here, so it runs on the disposable rehearsal database built to the schema
+// before ORG-2 (tests/Support/HistoricalSchema.php), never on the shared testing database. Nothing below this line was changed except where a comment says so.
+beforeEach(fn () => HistoricalSchema::use(HistoricalSchema::ORG2));
 
 /*
  * Release 1.0 (R1-2A): the ticket attribution migration. Kept in its own file for the reason PreservationMigrationsTest is: DDL commits

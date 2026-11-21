@@ -13,7 +13,7 @@ use RuntimeException;
  * changed. `reason` is a stable code for tests and callers; the message is written for the operator.
  *
  * Rendered like the other business refusals: HTTP 409 with the message for a JSON caller, and back with the error under
- * `field` ("relationship" for a relationship operation, "company" for the company-deletion guard) for a browser.
+ * `field` ("relationship" for a relationship operation, "company" for the enablement refusals on the Directory pages, whose name is transitional until ORG-3) for a browser.
  */
 final class OrganizationRelationshipException extends RuntimeException
 {
@@ -29,16 +29,15 @@ final class OrganizationRelationshipException extends RuntimeException
 
     public const HAS_CUSTOMERS = 'has_customers';
 
-    public const COMPANY_PAIRING = 'company_pairing';
-
-    public const COMPANY_IN_RELATIONSHIP = 'company_in_relationship';
-
     /** Release 1.0 (ORG-1): the portal-state lifecycle. Every one is a refusal made BEFORE the database could be asked to violate a CHECK. */
     public const PORTAL_NOT_ENABLED = 'portal_not_enabled';
 
     public const PORTAL_DISABLED = 'portal_disabled';
 
     public const ENABLEMENT_REFUSED = 'enablement_refused';
+
+    /** Initial enablement of an Organization that is already Enabled: a controlled refusal with no side effect (ORG-2; ADR-011 amendment 1, ruling 4). */
+    public const ALREADY_ENABLED = 'already_enabled';
 
     private function __construct(string $message, public readonly string $reason, public readonly string $field = 'relationship')
     {
@@ -57,6 +56,12 @@ final class OrganizationRelationshipException extends RuntimeException
     public static function neverEnabled(string $organization): self
     {
         return new self("\"{$organization}\" has never had portal access, so it cannot be disabled or re-enabled. Enable portal access first.", self::PORTAL_NOT_ENABLED);
+    }
+
+    /** Initial enablement of an Organization that is ALREADY Enabled. It is not idempotent: re-enabling is a different act (`manageRelationships`), and a second initial enablement would re-record who enabled it and when. */
+    public static function alreadyEnabled(string $organization): self
+    {
+        return new self("\"{$organization}\" already has portal access. Nothing was changed.", self::ALREADY_ENABLED, 'company');
     }
 
     /** Initial enablement of an Organization that is Disabled: enabling never clears a disabled state (re-enable is a separate act), and never starts from a row that is not the one it created. */
@@ -97,18 +102,6 @@ final class OrganizationRelationshipException extends RuntimeException
     public static function hasCustomers(string $organization, int $customers): self
     {
         return new self("\"{$organization}\" still manages {$customers} customer organization(s). Unlink or reassign them before removing its partner designation.", self::HAS_CUSTOMERS);
-    }
-
-    public static function companyPairing(string $organization, int $companies): self
-    {
-        $state = $companies === 0 ? 'has no Directory profile' : "is linked to {$companies} Directory profiles";
-
-        return new self("\"{$organization}\" {$state}; a managed relationship needs exactly one. Resolve it in the Directory first.", self::COMPANY_PAIRING);
-    }
-
-    public static function companyInRelationship(string $company, string $organization): self
-    {
-        return new self("Cannot delete \"{$company}\": the organization \"{$organization}\" with portal access is designated as a partner or is managed by another organization. Remove the relationship first.", self::COMPANY_IN_RELATIONSHIP, 'company');
     }
 
     public function render(Request $request): JsonResponse|RedirectResponse

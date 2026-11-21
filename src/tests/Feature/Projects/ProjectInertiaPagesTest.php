@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\TimeEntry;
@@ -42,13 +41,13 @@ function errorsSeenBy(string $bag, string $url): array
     return json_decode(json_encode($errors), true);
 }
 
-/** A company the given non-operator can see: CrmCompany is scoped to the viewer's organizations. */
-function companyVisibleTo(User $viewer, string $name, array $attributes = []): CrmCompany
+/** An Organization the given non-operator can see: Organization is scoped to the viewer's memberships. (Named "company" for the wire name `companies` it travels under.) */
+function companyVisibleTo(User $viewer, string $name, array $attributes = []): Organization
 {
-    $org = Organization::factory()->create(['portal_enabled_by' => makeUser('operator')->id]);
+    $org = Organization::factory()->create([...$attributes, 'name' => $name, 'portal_enabled_by' => makeUser('operator')->id]);
     $org->members()->attach($viewer->id, ['role' => 'member']);
 
-    return CrmCompany::factory()->create([...$attributes, 'name' => $name, 'organization_id' => $org->id, 'created_by' => $org->portal_enabled_by]);
+    return $org;
 }
 
 beforeEach(function () {
@@ -119,7 +118,7 @@ it('sends no derived health for an on-hold project, whose lifecycle status carri
 });
 
 it('never puts raw model attributes, creators, members, companies, budgets or emails on the index', function () {
-    $this->project->companies()->attach(CrmCompany::factory()->create(['created_by' => $this->admin->id, 'name' => 'Linked Client Co']));
+    $this->project->organizations()->attach(Organization::factory()->create(['portal_enabled_by' => $this->admin->id, 'name' => 'Linked Client Co']));
     $this->project->members()->attach($this->candidate->id, ['role' => 'member']);
     $this->project->update(['budget' => '4321.00']);
 
@@ -204,8 +203,7 @@ it('does not list a project that is only linked to the viewer\'s company', funct
     $orgUser = makeUser('user');
     $org = Organization::factory()->create(['portal_enabled_by' => $this->admin->id]);
     $org->members()->attach($orgUser, ['role' => 'member']);
-    $company = CrmCompany::factory()->create(['created_by' => $this->admin->id, 'organization_id' => $org->id]);
-    $this->project->companies()->attach($company);
+    $this->project->organizations()->attach($org);
 
     $this->actingAs($orgUser)->get(route('projects.index'))
         ->assertInertia(fn (Assert $page) => $page->component('projects/index')->has('projects.data', 0));
@@ -267,7 +265,7 @@ it('tells an empty status filter from having no projects at all', function () {
 
 it('gives a non-admin manager the create page without any member directory', function () {
     companyVisibleTo($this->manager, 'Acme Co');
-    CrmCompany::factory()->create(['created_by' => $this->admin->id, 'name' => 'Other Tenant Co']); // not theirs
+    Organization::factory()->create(['portal_enabled_by' => $this->admin->id, 'name' => 'Other Tenant Co']); // not theirs
 
     $response = $this->actingAs($this->manager)->get(route('projects.create'))
         ->assertInertia(fn (Assert $page) => $page
@@ -361,7 +359,7 @@ it('renders the edit page with explicit project, member, company and ability pro
     $this->project->members()->attach($this->candidate->id, ['role' => 'member']);
     $linked = companyVisibleTo($this->manager, 'Linked Co');
     companyVisibleTo($this->manager, 'Other Co');
-    $this->project->companies()->attach($linked);
+    $this->project->organizations()->attach($linked);
 
     $response = $this->actingAs($this->manager)->get(route('projects.edit', $this->project))
         ->assertInertia(fn (Assert $page) => $page
@@ -454,14 +452,14 @@ it('gives every independent edit form its own error bag', function () {
 });
 
 it('saves each edit section on its own without touching the others', function () {
-    $company = CrmCompany::factory()->create(['created_by' => $this->admin->id]);
+    $company = Organization::factory()->create(['portal_enabled_by' => $this->admin->id]);
 
     $this->actingAs($this->admin)->put(route('projects.companies.sync', $this->project), ['companies' => [$company->id]])->assertRedirect();
     expect($this->project->fresh()->name)->toBe('Alpha')
         ->and($this->project->members()->count())->toBe(2);
 
     $this->actingAs($this->admin)->put(route('projects.update', $this->project), ['name' => 'Alpha 2', 'status' => 'active'])->assertRedirect();
-    expect($this->project->companies()->pluck('crm_companies.id')->all())->toBe([$company->id])
+    expect($this->project->organizations()->pluck('organizations.id')->all())->toBe([$company->id])
         ->and($this->project->members()->count())->toBe(2);
 });
 

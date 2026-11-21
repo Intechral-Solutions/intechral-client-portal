@@ -1,13 +1,13 @@
 <?php
 
+use App\Exceptions\OrganizationDirectoryException;
 use App\Exceptions\OrganizationRelationshipException;
-use App\Models\CrmCompany;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Services\CrmService;
+use App\Services\OrganizationDirectory;
 use App\Services\OrganizationRelationships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -30,14 +30,12 @@ beforeEach(function () {
     $this->operator = User::factory()->create()->assignRole('operator');
 });
 
-/** An organization with exactly one CRM company: the pair a managed relationship needs. */
+/** An Enabled organization, the unit a managed relationship needs. (Before ORG-2 it also needed exactly one CRM company; there is one entity now.) */
 function pairedOrganization(string $name): Organization
 {
     $owner = User::factory()->create();
-    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
-    CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
-    return $organization;
+    return Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
 }
 
 /** A partner: designated through the service, as production does. */
@@ -216,21 +214,22 @@ it('refuses self-management, a non-partner manager, a managed partner and chains
         ->and(Activity::count())->toBe($audited, 'a refusal leaves no audit row');
 });
 
-it('requires an unambiguous company pairing for both ends', function () {
+it('needs no Directory profile pairing: the Organization is the whole record, and only an Enabled one can be linked or designated', function () {
     $service = app(OrganizationRelationships::class);
     $unisa = partnerOrganization('UNISA', $this->operator);
-    $withoutCompany = Organization::factory()->create(['name' => 'No Company']);
-
-    expect(relationshipRefusal(fn () => $service->assignCustomer($withoutCompany, $unisa, $this->operator))->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING)
-        ->and(relationshipRefusal(fn () => $service->designatePartner($withoutCompany, $this->operator))->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING)
-        ->and(relationshipRow($withoutCompany)->managed_by_organization_id)->toBeNull()
-        ->and((bool) relationshipRow($withoutCompany)->can_manage_customers)->toBeFalse();
-
-    // The partner side too: a partner whose company is gone cannot gain customers.
     $customer = pairedOrganization('Customer A');
-    DB::table('crm_companies')->where('organization_id', $unisa->id)->update(['organization_id' => null]);
 
-    expect(relationshipRefusal(fn () => $service->assignCustomer($customer, $unisa, $this->operator))->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING);
+    // Both ends are one row each, and nothing else has to exist for the relationship to be made.
+    expect($service->assignCustomer($customer, $unisa, $this->operator))->toBeTrue()
+        ->and(relationshipRow($customer)->managed_by_organization_id)->toBe($unisa->id);
+
+    // A Directory-only Organization (never enabled) is refused by the ORG-1 portal-state rule, not by any pairing rule.
+    $directoryOnly = Organization::factory()->directoryOnly()->create(['name' => 'Directory Only']);
+
+    expect(relationshipRefusal(fn () => $service->assignCustomer($directoryOnly, $unisa, $this->operator))->reason)->toBe(OrganizationRelationshipException::PORTAL_NOT_ENABLED)
+        ->and(relationshipRefusal(fn () => $service->designatePartner($directoryOnly, $this->operator))->reason)->toBe(OrganizationRelationshipException::PORTAL_NOT_ENABLED)
+        ->and(relationshipRow($directoryOnly)->managed_by_organization_id)->toBeNull()
+        ->and((bool) relationshipRow($directoryOnly)->can_manage_customers)->toBeFalse();
 });
 
 it('reports a missing organization as not found', function () {
@@ -398,12 +397,12 @@ it('shows an operator the relationship, offers only valid actions, and shows a s
     $unisa = partnerOrganization('UNISA', $this->operator);
     $customer = pairedOrganization('Customer A');
     $spare = pairedOrganization('Spare Customer');
-    $broken = Organization::factory()->create(['name' => 'Broken Pairing']);
+    $broken = Organization::factory()->directoryOnly()->create(['name' => 'Directory Only Org']);   // never enabled: no candidate
     app(OrganizationRelationships::class)->assignCustomer($customer, $unisa, $this->operator);
 
     $partnerPage = $this->actingAs($this->operator)->get(route('organizations.show', $unisa))->assertOk();
     $partnerPage->assertSee('Partner relationship')->assertSee('Managed customers (1)')->assertSee('Customer A')
-        ->assertSee('Link customer')->assertSee('Spare Customer')->assertDontSee('Broken Pairing')
+        ->assertSee('Link customer')->assertSee('Spare Customer')->assertDontSee('Directory Only Org')
         ->assertSee('Remove partner designation')->assertSee('Unlink its customers first.')
         ->assertDontSee('Designate as partner');
 
@@ -414,7 +413,7 @@ it('shows an operator the relationship, offers only valid actions, and shows a s
     $plainPage->assertSee('Not managed by a partner.')->assertSee('Designate as partner')->assertSee('Link to partner');
 
     $brokenPage = $this->actingAs($this->operator)->get(route('organizations.show', $broken))->assertOk();
-    $brokenPage->assertSee('linked to 0 Directory profiles')->assertDontSee('Designate as partner')->assertDontSee('Link to partner');
+    $brokenPage->assertDontSee('Designate as partner')->assertDontSee('Link to partner');   // a never-enabled Organization is offered neither: the server would refuse both
 
     // A customer who holds crm.manage and belongs to the customer organization can open their own organization's page,
     // and must learn nothing about any other organization from the relationship.
@@ -472,35 +471,34 @@ it('moves a customer only on an explicit Reassign, and audits the move', functio
     $this->actingAs($this->operator)->get(route('organizations.show', $plain->id))->assertDontSee('name="reassign"', false);
 });
 
-it('still offers Unlink for a managed organization whose company is gone, and the server allows it', function () {
+it('offers Unlink for a managed organization, and the server allows it', function () {
     $service = app(OrganizationRelationships::class);
     $unisa = partnerOrganization('UNISA', $this->operator);
     $customer = pairedOrganization('Customer A');
     $service->assignCustomer($customer, $unisa, $this->operator);
-    DB::table('crm_companies')->where('organization_id', $customer->id)->update(['organization_id' => null]);
 
     $page = $this->actingAs($this->operator)->get(route('organizations.show', $customer->id))->assertOk();
-    $page->assertSee('linked to 0 Directory profiles')->assertSee('Unlink from partner')
-        ->assertDontSee('Link to partner')->assertDontSee('Reassign');
+    $page->assertSee('Unlink from partner');
 
-    // Creating a relationship still needs the pair: the broken organization cannot be linked anywhere new.
     $service->unlinkCustomer($customer, $this->operator);
-    expect(relationshipRefusal(fn () => $service->assignCustomer($customer, $unisa, $this->operator))->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING)
-        ->and(relationshipRow($customer)->managed_by_organization_id)->toBeNull();
+    expect(relationshipRow($customer)->managed_by_organization_id)->toBeNull();
 });
 
-it('reads a company with no organization under a shared row lock before deleting it', function () {
-    $company = CrmCompany::factory()->create(['organization_id' => null]);
+it('takes the actor row, then the Organization row exclusively, then nothing for a Directory-only deletion, and never a Company lock', function () {
+    $organization = Organization::factory()->directoryOnly()->create();
 
     DB::flushQueryLog();
     DB::enableQueryLog();
-    app(CrmService::class)->deleteCompany($company);
-    $log = DB::getQueryLog();
+    app(OrganizationDirectory::class)->delete($organization, $this->operator);
+    $log = collect(DB::getQueryLog())->pluck('query')->map(fn ($sql) => preg_replace('/\s+/', ' ', $sql));
     DB::disableQueryLog();
 
-    $locked = collect($log)->filter(fn ($query) => str_contains($query['query'], 'select `organization_id` from `crm_companies`') && str_contains($query['query'], 'lock in share mode'));
+    $locks = $log->filter(fn ($sql) => str_contains($sql, 'lock in share mode') || str_contains($sql, 'for update'))->values();
 
-    expect($locked)->toHaveCount(1)->and(CrmCompany::withoutGlobalScopes()->whereKey($company->id)->exists())->toBeFalse();
+    expect($locks[0])->toContain('from `users`')->toContain('lock in share mode')
+        ->and($locks[1])->toContain('from `organizations`')->toContain('for update')
+        ->and($log->contains(fn ($sql) => str_contains($sql, 'crm_companies')))->toBeFalse()
+        ->and(Organization::withoutGlobalScopes()->whereKey($organization->id)->exists())->toBeFalse();
 });
 
 // ── Relationship grants nothing ──────────────────────────────────────────────
@@ -519,9 +517,8 @@ it('grants a partner and its members no access to a customer: tickets, projects,
     $project = Project::factory()->create();
     $project->members()->attach($customerUser, ['role' => 'member']);
     $invoice = Invoice::factory()->create(['client_id' => $customerUser->id]);
-    $customerCompany = CrmCompany::withoutGlobalScopes()->where('organization_id', $customer->id)->firstOrFail();
 
-    $observe = function () use ($unisaAdmin, $ticket, $project, $invoice, $customer, $customerCompany): array {
+    $observe = function () use ($unisaAdmin, $ticket, $project, $invoice, $customer): array {
         $this->actingAs($unisaAdmin);
 
         return [
@@ -531,9 +528,8 @@ it('grants a partner and its members no access to a customer: tickets, projects,
             'visible projects' => Project::visibleTo($unisaAdmin)->count(),
             'invoice' => $unisaAdmin->can('view', $invoice),
             'organization page' => $this->get(route('organizations.show', $customer))->status(),
-            'company page' => $this->get(route('crm.companies.show', $customerCompany))->status(),
+            'directory page' => $this->get(route('crm.companies.show', $customer))->status(),
             'organizations visible' => Organization::pluck('name')->all(),
-            'companies visible' => CrmCompany::pluck('name')->all(),
         ];
     };
 
@@ -543,8 +539,8 @@ it('grants a partner and its members no access to a customer: tickets, projects,
 
     expect($after)->toBe($before)
         ->and($after['ticket'])->toBeFalse()->and($after['project'])->toBeFalse()->and($after['invoice'])->toBeFalse()
-        ->and($after['organization page'])->toBe(404)->and($after['company page'])->toBe(404)
-        ->and($after['organizations visible'])->toBe(['UNISA'])->and($after['companies visible'])->toBe(['UNISA']);
+        ->and($after['organization page'])->toBe(404)->and($after['directory page'])->toBe(404)
+        ->and($after['organizations visible'])->toBe(['UNISA']);
 
     // The customer's own boundaries are untouched too: owner-only tickets, and a peer in the customer organization sees nothing of it.
     $peer = User::factory()->create()->assignRole('user');
@@ -552,87 +548,75 @@ it('grants a partner and its members no access to a customer: tickets, projects,
     expect($peer->can('view', $ticket))->toBeFalse()->and($customerUser->can('view', $ticket))->toBeTrue();
 });
 
-// ── Company deletion and promotion ───────────────────────────────────────────
+// ── Deletion and initial enablement ──────────────────────────────────────────
 
-it('refuses to delete the company of a partner or of a managed customer, with a business message and no side effect', function () {
+it('refuses to delete a partner or a managed customer, with a business message and no side effect: both have had portal access', function () {
     $service = app(OrganizationRelationships::class);
     $unisa = partnerOrganization('UNISA', $this->operator);
     $customer = pairedOrganization('Customer A');
     $service->assignCustomer($customer, $unisa, $this->operator);
-    $companies = [
-        'partner' => CrmCompany::withoutGlobalScopes()->where('organization_id', $unisa->id)->firstOrFail(),
-        'customer' => CrmCompany::withoutGlobalScopes()->where('organization_id', $customer->id)->firstOrFail(),
-    ];
+    $organizations = ['partner' => $unisa, 'customer' => $customer];
     $audited = Activity::count();
 
-    foreach ($companies as $company) {
-        $this->actingAs($this->operator)->from(route('crm.companies.edit', $company))->delete(route('crm.companies.destroy', $company))
-            ->assertRedirect(route('crm.companies.edit', $company))
+    foreach ($organizations as $organization) {
+        $this->actingAs($this->operator)->from(route('crm.companies.edit', $organization))->delete(route('crm.companies.destroy', $organization))
+            ->assertRedirect(route('crm.companies.edit', $organization))
             ->assertSessionHasErrors('company');
 
-        $this->actingAs($this->operator)->deleteJson(route('crm.companies.destroy', $company))
+        $this->actingAs($this->operator)->deleteJson(route('crm.companies.destroy', $organization))
             ->assertStatus(409)
-            ->assertJsonPath('message', fn ($message) => str_contains($message, 'is designated as a partner or is managed by another organization'));
+            ->assertJsonPath('message', fn ($message) => str_contains($message, 'has (or had) portal access'));
 
-        expect(fn () => app(CrmService::class)->deleteCompany($company))
-            ->toThrow(OrganizationRelationshipException::class, 'Remove the relationship first.');
+        expect(fn () => app(OrganizationDirectory::class)->delete($organization, $this->operator))
+            ->toThrow(OrganizationDirectoryException::class, 'Only an Organization that never had portal access can be deleted');
 
-        expect(DB::table('crm_companies')->where('id', $company->id)->exists())->toBeTrue();
+        expect(DB::table('organizations')->where('id', $organization->id)->exists())->toBeTrue();
     }
 
     expect(Activity::count())->toBe($audited)
         ->and(relationshipRow($customer)->managed_by_organization_id)->toBe($unisa->id);
 
-    // Once the relationship is gone, the company deletes as any other does.
+    // Removing the relationship changes nothing about that: an Organization that has had portal access is disabled, never deleted (ruling 5).
     $service->unlinkCustomer($customer, $this->operator);
     $service->removePartner($unisa, $this->operator);
-    app(CrmService::class)->deleteCompany($companies['customer']);
-    app(CrmService::class)->deleteCompany($companies['partner']);
 
-    expect(DB::table('crm_companies')->whereIn('id', [$companies['customer']->id, $companies['partner']->id])->exists())->toBeFalse();
+    expect(fn () => app(OrganizationDirectory::class)->delete($customer, $this->operator))->toThrow(OrganizationDirectoryException::class)
+        ->and(DB::table('organizations')->whereIn('id', [$customer->id, $unisa->id])->count())->toBe(2);
 });
 
-it('keeps deleting a promoted company that has no relationship', function () {
-    $organization = pairedOrganization('Plain');
-    $company = CrmCompany::withoutGlobalScopes()->where('organization_id', $organization->id)->firstOrFail();
+it('enables a Directory-only Organization once: a repeat, or a stale model, is refused as already_enabled and changes nothing', function () {
+    $service = app(OrganizationDirectory::class);
+    $organization = Organization::factory()->directoryOnly()->create(['name' => 'Fresh Co', 'created_by' => $this->operator->id]);
+    $stale = Organization::withoutGlobalScopes()->find($organization->id); // a second request's copy, loaded before the first enablement
 
-    app(CrmService::class)->deleteCompany($company);
+    $first = $service->enablePortalAccess($organization, $this->operator);
+    $snapshot = (array) DB::table('organizations')->where('id', $first->id)->first();
 
-    expect(DB::table('crm_companies')->where('id', $company->id)->exists())->toBeFalse()
-        ->and(DB::table('organizations')->where('id', $organization->id)->exists())->toBeTrue('the organization is not deleted with its company');
-});
+    foreach ([$organization, $stale] as $model) {
+        expect(fn () => $service->enablePortalAccess($model, $this->operator))->toThrow(OrganizationRelationshipException::class, 'already has portal access');
+    }
 
-it('promotes a company once: a repeat, or a stale model, returns the same organization', function () {
-    $service = app(CrmService::class);
-    $company = CrmCompany::factory()->create(['name' => 'Fresh Co', 'organization_id' => null, 'created_by' => $this->operator->id]);
-    $stale = CrmCompany::withoutGlobalScopes()->find($company->id); // a second request's copy, loaded before the first promotion
-
-    $first = $service->promoteToOrganization($company, $this->operator);
-    $again = $service->promoteToOrganization($company, $this->operator);
-    $viaStale = $service->promoteToOrganization($stale, $this->operator);
-
-    expect($again->id)->toBe($first->id)->and($viaStale->id)->toBe($first->id)
-        ->and($stale->organization_id)->toBe($first->id)
+    expect((array) DB::table('organizations')->where('id', $first->id)->first())->toBe($snapshot)
         ->and(Organization::withoutGlobalScopes()->where('name', 'Fresh Co')->count())->toBe(1)
         ->and(DB::table('organization_members')->where('organization_id', $first->id)->count())->toBe(1)
-        ->and(DB::table('crm_companies')->where('id', $company->id)->value('organization_id'))->toBe($first->id)
-        ->and($first->slug)->toBe('fresh-co');
+        ->and($first->slug)->not->toBeEmpty();
 });
 
-it('promotion picks a slug no other tenant holds, even for an actor the membership scope blinds', function () {
-    $service = app(CrmService::class);
+it('picks a slug no other tenant holds, even for an actor the membership scope blinds', function () {
+    $service = app(OrganizationDirectory::class);
     Organization::factory()->create(['name' => 'Taken', 'slug' => 'shared-name']);
-    $company = CrmCompany::factory()->create(['name' => 'Shared Name', 'organization_id' => null, 'created_by' => $this->operator->id]);
 
-    // Authenticated as someone who sees no organization: the scoped slug check would have found none and collided.
+    // Authenticated as someone who sees no organization: a scoped slug check would have found none and collided.
     $this->actingAs(customRoleOperator());
-    $organization = $service->promoteToOrganization($company, $this->operator);
+    $organization = $service->create($this->operator, ['name' => 'Shared Name']);
 
     expect($organization->slug)->toBe('shared-name-2');
 });
 
 // ── Existing contracts the work must not move ────────────────────────────────
 
-it('leaves the organization fields the application can mass-assign unchanged', function () {
+it('keeps portal state, relationship columns, the Directory profile and the internal columns out of what the application can mass-assign', function () {
+    // ORG-1's restrictive contract, restored by CP6 (F-7): ONLY name and slug. The Directory profile, the Classification and the creator are written by
+    // OrganizationDirectory by explicit column; portal state and the relationship columns change only through the services that authorize, lock and audit them.
     expect((new Organization)->getFillable())->toBe(['name', 'slug']);
 });

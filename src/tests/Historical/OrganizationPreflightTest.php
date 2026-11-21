@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
@@ -11,6 +10,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Support\Historical\Models\CrmCompany;
+use Tests\Support\HistoricalSchema;
+
+// Release 1.0 (ORG-2): this file characterizes `organizations:preflight` on the HISTORICAL schema (it reads and builds `crm_companies` throughout), so it runs on the
+// disposable rehearsal database built to the schema before ORG-2 (tests/Support/HistoricalSchema.php). The canonical schema's preflight is tested in
+// IntegritySnapshotSchemasTest. Nothing below this line was changed.
+beforeEach(fn () => HistoricalSchema::use(HistoricalSchema::ORG2));
 
 /*
  * Release 1.0 (MO-1A): `organizations:preflight`, the read-only report on the organization, company and membership data the

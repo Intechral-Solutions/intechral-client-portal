@@ -20,15 +20,15 @@ use Illuminate\Support\Facades\Gate;
  *  - only a designated partner (`can_manage_customers`) may manage customers;
  *  - a partner cannot itself be managed, and an organization cannot manage itself, so there is exactly one level;
  *  - an organization has at most one managing organization;
- *  - both ends have exactly one CRM company (an unambiguous pair), so the relationship has a directory record to point at;
  *  - a partner cannot lose its designation while it still has customers.
  * One CHECK constraint backs the first rule's counterpart (a partner cannot be managed); there is no CHECK for self-management
  * (MariaDB refuses one on an AUTO_INCREMENT column). The rest span rows and only this class can hold them.
  *
  * Concurrency. Every mutation is one transaction. The organization rows it needs are locked FOR UPDATE in ascending id order
- * (one lock order for all callers, so two operations on the same pair cannot deadlock), the company pairing is read under a
- * shared lock afterwards (organizations before companies, which is also the order CrmService::deleteCompany follows), and
- * every rule is checked against the locked, current rows, never against a model the caller loaded earlier.
+ * (one lock order for all callers, so two operations on the same pair cannot deadlock) and every rule is checked against the locked,
+ * current rows, never against a model the caller loaded earlier. (Before ORG-2 each end also had to have exactly one CRM company, read under
+ * a shared lock after the Organization rows. There is one Organization entity now, so that rule and its lock are gone; the Organization
+ * row, locked first, is the whole record.)
  *
  * Reads here are deliberately unscoped (`DB::table`, `withoutGlobalScopes`): OrganizationMembershipScope hides organizations
  * from any account that is not operator-eligible (`portal.operator`, R1-1), so a scoped read, run in a session that is not
@@ -87,8 +87,6 @@ final class OrganizationRelationships
             if ($row->managed_by_organization_id !== null) {
                 throw OrganizationRelationshipException::isManaged($row->name, $this->nameOf($row->managed_by_organization_id));
             }
-
-            $this->assertSingleCompany($row);
 
             $this->write($organization, ['can_manage_customers' => true]);
             $this->audit($actor, $organization, self::DESIGNATED, [
@@ -254,8 +252,6 @@ final class OrganizationRelationships
                 throw OrganizationRelationshipException::isPartner($customerRow->name);
             }
 
-            $this->assertSingleCompany($customerRow, $partnerRow);
-
             $previous = $customerRow->managed_by_organization_id;
 
             if ($previous === $partnerRow->id) {
@@ -318,33 +314,25 @@ final class OrganizationRelationships
         return $id === null ? null : Organization::withoutGlobalScopes()->find($id, ['id', 'name', 'slug']);
     }
 
-    /** Organizations that could be linked to this partner now: not partners, not managed, one company, not itself. */
+    /** Organizations that could be linked to this partner now: not partners, not managed, not itself. */
     public static function eligibleCustomers(Organization $partner): Collection
     {
         return PortalState::whereEnabled(Organization::withoutGlobalScopes()
             ->where('can_manage_customers', false)
             ->whereNull('managed_by_organization_id')
             ->whereKeyNot($partner->getKey()))
-            ->whereIn('id', self::singleCompanyOrganizations())
             ->orderBy('name')->orderBy('id')
             ->get(['id', 'name']);
     }
 
-    /** Partners this organization could be linked to now (the server still decides): not itself, one company. */
+    /** Partners this organization could be linked to now (the server still decides): not itself. */
     public static function eligiblePartners(Organization $customer): Collection
     {
         return PortalState::whereEnabled(Organization::withoutGlobalScopes()
             ->where('can_manage_customers', true)
             ->whereKeyNot($customer->getKey()))
-            ->whereIn('id', self::singleCompanyOrganizations())
             ->orderBy('name')->orderBy('id')
             ->get(['id', 'name']);
-    }
-
-    /** How many CRM companies point at the organization (unscoped). Exactly one is an unambiguous pair. */
-    public static function companyCount(int $organizationId): int
-    {
-        return DB::table('crm_companies')->where('organization_id', $organizationId)->count();
     }
 
     // ── Internals ─────────────────────────────────────────
@@ -379,25 +367,6 @@ final class OrganizationRelationships
 
             return $row;
         })->all();
-    }
-
-    /** Every given organization must have exactly one CRM company; read under a shared lock so none can be deleted meanwhile. */
-    private function assertSingleCompany(object ...$rows): void
-    {
-        $counts = DB::table('crm_companies')
-            ->whereIn('organization_id', array_map(fn (object $row) => $row->id, $rows))
-            ->orderBy('id')
-            ->sharedLock()
-            ->get(['id', 'organization_id'])
-            ->countBy('organization_id');
-
-        foreach ($rows as $row) {
-            $companies = (int) ($counts[$row->id] ?? 0);
-
-            if ($companies !== 1) {
-                throw OrganizationRelationshipException::companyPairing($row->name, $companies);
-            }
-        }
     }
 
     /** The organization row, exclusively locked, with its name and its portal-state columns as they are now. */
@@ -451,12 +420,5 @@ final class OrganizationRelationships
     private function nameOf(int $organizationId): string
     {
         return (string) DB::table('organizations')->where('id', $organizationId)->value('name');
-    }
-
-    /** Subquery: organization ids that have exactly one company. */
-    private static function singleCompanyOrganizations(): \Closure
-    {
-        return fn ($query) => $query->select('organization_id')->from('crm_companies')
-            ->whereNotNull('organization_id')->groupBy('organization_id')->havingRaw('count(*) = 1');
     }
 }

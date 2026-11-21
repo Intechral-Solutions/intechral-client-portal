@@ -72,11 +72,6 @@
         <p class="text-sm text-text-muted">Not managed by a partner.</p>
         @endif
 
-        @if ($relationship['companies'] !== 1)
-        <p class="text-xs text-text-muted">
-            This organization is linked to {{ $relationship['companies'] }} Directory {{ \Illuminate\Support\Str::plural('profile', $relationship['companies']) }}. A managed relationship needs exactly one, so none can be set until that is resolved in the Directory.
-        </p>
-        @else
             @if ($relationship['candidatePartners']->isNotEmpty())
             <form method="POST" action="{{ route('organizations.manager.assign', $organization->id) }}" class="flex gap-2">
                 @csrf @method('PUT')
@@ -94,10 +89,8 @@
             @elseif (! $relationship['manager'])
             <p class="text-xs text-text-muted">No partner is available yet. Designate an organization as a partner first.</p>
             @endif
-        @endif
 
-        {{-- Outside the company branch: unlinking needs no company (the server allows it), so an organization whose company was
-             resolved away since it was linked can still be released. Linking and reassigning stay behind the one-company rule. --}}
+        {{-- Unlinking is always available to an organization that has a managing partner. --}}
         @if ($relationship['manager'])
         <form method="POST" action="{{ route('organizations.manager.unlink', $organization->id) }}" onsubmit="return confirm('Unlink {{ addslashes($organization->name) }} from its managing partner?')">
             @csrf @method('DELETE')

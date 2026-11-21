@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectColumn;
 use App\Services\ProjectService;
@@ -33,7 +33,7 @@ beforeEach(function () {
     $this->withoutExceptionHandling();
     $this->operator = makeUser('operator');
     $this->extra = makeUser();
-    $this->company = CrmCompany::factory()->create();
+    $this->company = Organization::factory()->create();   // the Organization the project links to
 });
 
 /** Throw when the $nth INSERT into $table is issued during this test. */
@@ -57,7 +57,7 @@ function createResidue(string $name = 'Atomic'): array
         'columns' => ProjectColumn::whereIn('project_id', $ids)->count(),
         'done_columns' => ProjectColumn::whereIn('project_id', $ids)->where('is_done_column', true)->count(),
         'members' => DB::table('project_members')->whereIn('project_id', $ids)->count(),
-        'companies' => DB::table('project_company')->whereIn('project_id', $ids)->count(),
+        'companies' => DB::table('project_organization')->whereIn('project_id', $ids)->count(),
     ];
 }
 
@@ -136,16 +136,16 @@ it('FLIPPED IN WP1 (INV-P10): a failure syncing the extra members leaves nothing
 
 it('FLIPPED IN WP1 (INV-P10): a failure linking the companies leaves no project, members or links', function () {
     // Before: a committed project with its members and the company link that ran before the throw.
-    failOnInsertInto('project_company', 1);
+    failOnInsertInto('project_organization', 1);
 
     expect(fn () => postCreate($this))->toThrow(RuntimeException::class);
 
     expect(createResidue())->toBe(['projects' => 0, 'columns' => 0, 'done_columns' => 0, 'members' => 0, 'companies' => 0])
-        ->and(DB::table('project_company')->count())->toBe(0);
+        ->and(DB::table('project_organization')->count())->toBe(0);
 });
 
 it('FLIPPED IN WP1 (INV-P10): the service itself is atomic, with no controller in the loop', function () {
-    failOnInsertInto('project_company', 1);
+    failOnInsertInto('project_organization', 1);
 
     expect(fn () => app(ProjectService::class)->create($this->operator, [
         'name' => 'Atomic',

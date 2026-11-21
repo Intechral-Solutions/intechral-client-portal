@@ -11,7 +11,6 @@
  * one process). The worker is tests/Support/organization_invitation_worker.php, extended in ORG-1 with the lifecycle operations.
  */
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\User;
@@ -185,10 +184,6 @@ function psrFixture(): array
     $partner = Organization::factory()->create(['name' => 'Race Partner', 'portal_enabled_by' => $admin->id]);
     $cust = Organization::factory()->create(['name' => 'Race Customer', 'portal_enabled_by' => $admin->id]);
     $org2 = Organization::factory()->create(['name' => 'Race Candidate', 'portal_enabled_by' => $admin->id]);
-    $companies = [];
-    foreach ([$partner, $cust, $org2] as $paired) {
-        $companies[] = CrmCompany::factory()->create(['name' => $paired->name, 'organization_id' => $paired->id, 'created_by' => $admin->id])->id;
-    }
 
     $stamp = ['created_at' => now(), 'updated_at' => now()];
     DB::table('organization_members')->insert([
@@ -197,11 +192,11 @@ function psrFixture(): array
         ['organization_id' => $partner->id, 'user_id' => $pmember->id, 'role' => 'member'] + $stamp,
     ]);
 
-    // The partner is designated through the service, as in production (it needs its single company, created above).
+    // The partner is designated through the service, as in production.
     app(OrganizationRelationships::class)->designatePartner($partner, $admin);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    return compact('cleanup', 'admin', 'actor', 'issuer', 'other', 'role', 'r1', 'r2', 'member', 'madmin', 'newcomer', 'pmember', 'org', 'partner', 'cust', 'org2', 'companies')
+    return compact('cleanup', 'admin', 'actor', 'issuer', 'other', 'role', 'r1', 'r2', 'member', 'madmin', 'newcomer', 'pmember', 'org', 'partner', 'cust', 'org2')
         + ['orgIds' => [$org->id, $partner->id, $cust->id, $org2->id]];
 }
 
@@ -210,7 +205,6 @@ function psrTeardown(array $f): void
     DB::table('organization_invitations')->delete();
     DB::table('organizations')->whereIn('id', $f['orgIds'])->update(['managed_by_organization_id' => null]);
     DB::table('organization_members')->whereIn('organization_id', $f['orgIds'])->delete();
-    DB::table('crm_companies')->whereIn('id', $f['companies'])->delete();
     DB::table('activity_log')->delete();
     DB::table('jobs')->delete();
     DB::table('sessions')->delete();

@@ -27,9 +27,9 @@
     <div class="mt-8 rounded-lg border border-danger p-5 bg-surface">
         <h2 class="mb-2 text-sm font-semibold text-danger">Delete Organization</h2>
         {{-- DIR-1: what the existing delete does, no more. It removes the Directory record only; its People are kept and lose their affiliation.
-             The refusals are the ones CrmService::deleteCompany already makes. Nothing here promises the later DIR-2 rule about portal access. --}}
+             The refusals are made by OrganizationDirectory::delete. --}}
         <p class="mb-2 text-xs text-text-muted">This permanently removes this Organization's Directory record. Its People are kept: they stay in the Directory and lose their affiliation with it.</p>
-        <p class="mb-4 text-xs text-text-muted">It cannot be deleted while projects are linked to it, or while its portal access is a partner or is managed by a partner. Those checks are made when you confirm.</p>
+        <p class="mb-4 text-xs text-text-muted">Only an Organization that never had portal access can be deleted, and not while projects are linked to it. Those checks are made when you confirm.</p>
         <form method="POST" action="{{ route('crm.companies.destroy', $company) }}"
               onsubmit="return confirm('Delete {{ addslashes($company->name) }}? This cannot be undone.')">
             @csrf @method('DELETE')

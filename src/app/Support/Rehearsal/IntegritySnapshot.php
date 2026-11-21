@@ -4,6 +4,7 @@ namespace App\Support\Rehearsal;
 
 use App\Services\ProjectIntegrityAudit;
 use App\Support\Database\DatabaseProfile;
+use App\Support\Organizations\Classification;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -119,6 +120,8 @@ final class IntegritySnapshot
         $this->timeChecks();
         $this->invoiceChecks();
         $this->organizationChecks($schema);
+        $this->portalStateChecks($schema);
+        $this->canonicalOrganizationChecks($schema);
         $this->membershipChecks($schema);
         $this->invitationChecks($schema);
         $files = $this->fileChecks();
@@ -335,12 +338,88 @@ final class IntegritySnapshot
         $this->check('organizations:managed_by_non_partner', 'select count(*) as n from organizations o join organizations m on m.id = o.managed_by_organization_id where m.can_manage_customers = 0');
         $this->check('organizations:partner_that_is_managed', 'select count(*) as n from organizations where can_manage_customers = 1 and managed_by_organization_id is not null');
         $this->check('organizations:manages_itself', 'select count(*) as n from organizations where managed_by_organization_id = id');
+
+        // The HISTORICAL schema only. While `crm_companies` exists the pair rule holds: a relationship needs exactly one Company. ORG-2 retires the table and
+        // the rule with it (a relationship then needs only the portal state, which `portalStateChecks` verifies); the check is not skipped silently, it
+        // belongs to the schema it describes.
+        if (isset($schema['columns']['crm_companies'])) {
+            $this->check(
+                'organizations:relationship_without_single_company',
+                'select count(*) as n from organizations o
+                 where (o.can_manage_customers = 1 or o.managed_by_organization_id is not null)
+                   and (select count(*) from crm_companies k where k.organization_id = o.id) <> 1'
+            );
+        }
+    }
+
+    /**
+     * Release 1.0 (ORG-1, ADR-011 section 2): the portal-state rules, each a count that must be ZERO. Run once the portal-state columns exist, on the
+     * historical schema (after ORG-1) and the canonical one alike. The database CHECKs state the first four; a dump is loaded with checks off and an
+     * older engine may not enforce them, so each is read back from the rows. The last five are the Directory-only invariant S11, which no database
+     * constraint can state across tables: an Organization that has never had portal access has no member, invitation, ticket, designation or relationship.
+     * Same rules and the same wording of reason as `organizations:preflight`, as counts only.
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    private function portalStateChecks(array $schema): void
+    {
+        $columns = $schema['columns']['organizations'] ?? [];
+
+        if (! isset($columns['portal_enabled_at'], $columns['portal_enabled_by'])) {
+            return;
+        }
+
+        $this->check('organizations:portal_provenance_pair_broken', 'select count(*) as n from organizations where (portal_enabled_at is null) <> (portal_enabled_by is null)');
+        $this->check('organizations:disabled_without_portal', 'select count(*) as n from organizations where disabled_at is not null and portal_enabled_at is null');
+        $this->check('organizations:partner_without_portal', 'select count(*) as n from organizations where can_manage_customers = 1 and portal_enabled_at is null');
+        $this->check('organizations:managed_without_portal', 'select count(*) as n from organizations where managed_by_organization_id is not null and portal_enabled_at is null');
+
+        $this->check('organizations:directory_only_with_members', 'select count(*) as n from organizations o where o.portal_enabled_at is null and exists (select 1 from organization_members m where m.organization_id = o.id)');
+        if (isset($schema['columns']['organization_invitations'])) {
+            $this->check('organizations:directory_only_with_invitations', 'select count(*) as n from organizations o where o.portal_enabled_at is null and exists (select 1 from organization_invitations i where i.organization_id = o.id)');
+        }
+        if (isset($schema['columns']['tickets']['organization_id'])) {
+            $this->check('organizations:directory_only_with_tickets', 'select count(*) as n from organizations o where o.portal_enabled_at is null and exists (select 1 from tickets t where t.organization_id = o.id)');
+        }
+        $this->check('organizations:directory_only_partner', 'select count(*) as n from organizations where portal_enabled_at is null and can_manage_customers = 1');
+        $this->check('organizations:directory_only_with_relationships', 'select count(*) as n from organizations o where o.portal_enabled_at is null and (o.managed_by_organization_id is not null or exists (select 1 from organizations c where c.managed_by_organization_id = o.id))');
+    }
+
+    /**
+     * Release 1.0 (ORG-2): what only the CANONICAL schema has. Run once `organizations` carries the profile columns, so the baseline and every rehearsal that
+     * stops before the consolidation simply have none of these (a check that appears after a migration is not a difference; a non-zero one is a failure).
+     * `created_by` completeness (the column is NOT NULL and a foreign key, so these are zero on a live database; they are read back because a dump is
+     * loaded with checks off), the Classification catalogue (there is deliberately no database CHECK, so this is where an unknown value is caught), and the
+     * relationship rows of the two re-pointed links. The foreign-key orphan checks over `crm_contacts.organization_id` and `project_organization` come from
+     * the generic loop over every foreign key.
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    private function canonicalOrganizationChecks(array $schema): void
+    {
+        $columns = $schema['columns']['organizations'] ?? [];
+
+        if (! isset($columns['created_by'], $columns['classification'])) {
+            return;
+        }
+
+        $this->check('organizations:created_by_missing', 'select count(*) as n from organizations o where o.created_by is null or not exists (select 1 from users u where u.id = o.created_by)');
+
+        $known = Classification::values();
         $this->check(
-            'organizations:relationship_without_single_company',
-            'select count(*) as n from organizations o
-             where (o.can_manage_customers = 1 or o.managed_by_organization_id is not null)
-               and (select count(*) from crm_companies k where k.organization_id = o.id) <> 1'
+            'organizations:unknown_classification',
+            'select count(*) as n from organizations where classification is null or classification not in ('.implode(',', array_fill(0, count($known), '?')).')',
+            $known
         );
+
+        if (isset($schema['columns']['project_organization'])) {
+            $this->check('project_organization:project_missing', 'select count(*) as n from project_organization l where not exists (select 1 from projects p where p.id = l.project_id)');
+            $this->check('project_organization:organization_missing', 'select count(*) as n from project_organization l where not exists (select 1 from organizations o where o.id = l.organization_id)');
+        }
+
+        if (isset($schema['columns']['crm_contacts']['organization_id'])) {
+            $this->check('crm_contacts:organization_missing', 'select count(*) as n from crm_contacts c where c.organization_id is not null and not exists (select 1 from organizations o where o.id = c.organization_id)');
+        }
     }
 
     /** Release 1.0 (MO-2A1): only once the approval columns exist. Both are zero on any database the application itself wrote. */

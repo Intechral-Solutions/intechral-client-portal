@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Shared\Scopes\OrganizationThroughCompanyScope;
+use App\Shared\Scopes\DirectoryOperatorScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +14,7 @@ class CrmContact extends Model
     protected $table = 'crm_contacts';
 
     protected $fillable = [
-        'crm_company_id',
+        'organization_id',
         'first_name',
         'last_name',
         'email',
@@ -26,14 +26,18 @@ class CrmContact extends Model
 
     protected static function booted(): void
     {
-        static::addGlobalScope(new OrganizationThroughCompanyScope);
+        static::addGlobalScope(new DirectoryOperatorScope);
     }
 
     // ── Relationships ──────────────────────────────────────
 
-    public function company(): BelongsTo
+    /**
+     * The Person's one optional Organization (the canonical affiliation, owner ruling D7). Read through Organization's own membership scope, so a Person is
+     * never shown an Organization the viewer cannot see; the Person itself is operator-only ({@see DirectoryOperatorScope}).
+     */
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(CrmCompany::class, 'crm_company_id');
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function creator(): BelongsTo

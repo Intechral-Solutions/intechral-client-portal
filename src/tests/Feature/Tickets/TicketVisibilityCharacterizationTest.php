@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\TimeEntry;
@@ -50,7 +49,7 @@ function ticketCompanyFixture(): array
     $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach($owner, ['role' => 'member']);
     $organization->members()->attach($peer, ['role' => 'member']);
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
+    $company = $organization; // one entity since ORG-2
 
     $ticket = ticketFor($owner, ['title' => 'Company linked ticket', 'organization_id' => $organization->id]);
 
@@ -61,7 +60,7 @@ it('TARGET H4: a same-company peer holding tickets.view_org neither lists nor op
     $f = ticketCompanyFixture();
 
     expect($f['peer']->can('tickets.view_org'))->toBeTrue()
-        ->and($f['peer']->orgCompanyIds())->toBe([$f['company']->id]);
+        ->and($f['peer']->organizations()->pluck('organizations.id')->all())->toBe([$f['company']->id]);
 
     // From the page's props, not its markup: a URL assertion against serialized JSON (escaped
     // slashes) would pass whatever was listed.
@@ -113,7 +112,7 @@ it('F-1 (R1-2, replaces the EPIC-010D baseline): creation attributes the ticket 
     $member = ticketUser();
     $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     $organization->members()->attach($member, ['role' => 'member']);
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $organization->id]);
+    $company = Organization::factory()->create(['portal_enabled_by' => $operator->id]);   // any id: it is neither validated nor stored
     $payload = ['description' => 'x', 'category' => 'General', 'priority' => 'low'];
 
     // A company id is neither validated nor stored any more (the column is gone); the organization is the member's own.

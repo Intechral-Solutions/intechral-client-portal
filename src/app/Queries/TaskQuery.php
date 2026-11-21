@@ -2,7 +2,7 @@
 
 namespace App\Queries;
 
-use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectColumn;
 use App\Models\ProjectMilestone;
@@ -38,9 +38,9 @@ use InvalidArgumentException;
  * rows that actor may view. That keeps the capability and the row rule independently testable.
  *
  * Request-context code: the actor must be the authenticated user. Authorization above is composed
- * from `$actor`, but the organization filter and its options go through `CrmCompany`, whose
- * global `OrganizationScope` reads `Auth::user()`. Run for anyone else (a queue job, a console
- * command, an acting-as context) the company options and filter would follow the wrong tenant
+ * from `$actor`, but the organization filter's options go through `Organization`, whose
+ * global membership scope reads `Auth::user()`. Run for anyone else (a queue job, a console
+ * command, an acting-as context) the organization options would follow the wrong tenant
  * scope. That use is not supported, and no cross-domain bridge is added for it.
  */
 final class TaskQuery
@@ -176,9 +176,11 @@ final class TaskQuery
             $query->where('tasks.assignee_id', $state->assignee);
         }
 
-        // A company link narrows board tasks; a standalone task has no project, so never matches.
+        // An Organization link narrows board tasks; a standalone task has no project, so never matches. The relation is read THROUGH Organization's membership
+        // scope (whereHas on a model with a global scope applies it): a non-operator's filter can only match an Organization they belong to, and an id they
+        // could not have chosen from the options below matches nothing. The rows filtered are already limited by the actor's PROJECT visibility.
         if ($state->organization !== null) {
-            $query->whereHas('project.companies', fn (Builder $companies) => $companies->whereKey($state->organization));
+            $query->whereHas('project.organizations', fn (Builder $organizations) => $organizations->whereKey($state->organization));
         }
 
         if ($state->search !== '') {
@@ -268,10 +270,10 @@ final class TaskQuery
                 User::whereIn('id', $this->inView()->whereNotNull('tasks.assignee_id')->select('tasks.assignee_id'))
                     ->orderBy('name')->orderBy('id')->get(['id', 'name'])
             ),
-            // Companies linked to projects the actor can view. CrmCompany's own tenant scope still
-            // applies on top, so this never names a company the actor's CRM scope would hide.
+            // Organizations linked to projects the actor can view. Organization's own membership scope still
+            // applies on top, so this never names an Organization the actor could not see.
             'organizations' => self::named(
-                CrmCompany::whereHas('projects', fn (Builder $project) => $project->visibleTo($this->actor))
+                Organization::whereHas('projects', fn (Builder $project) => $project->visibleTo($this->actor))
                     ->orderBy('name')->orderBy('id')->get(['id', 'name'])
             ),
         ];

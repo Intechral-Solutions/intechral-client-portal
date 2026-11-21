@@ -16,13 +16,12 @@
 
 use App\Exceptions\OrganizationInvitationException;
 use App\Exceptions\OrganizationRelationshipException;
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\User;
 use App\Notifications\OrganizationInvitationNotification;
-use App\Services\CrmService;
 use App\Services\InvitationAcceptance;
 use App\Services\OrganizationAuthority;
+use App\Services\OrganizationDirectory;
 use App\Services\OrganizationInvitations;
 use App\Services\OrganizationRelationships;
 use Illuminate\Database\Events\QueryExecuted;
@@ -261,13 +260,13 @@ it('refuses to disable or re-enable an organization that has never had portal ac
 
 it('keeps disable and re-enable on manageRelationships and initial enablement on manageMembership: separate abilities', function () {
     $service = file_get_contents(app_path('Services/OrganizationRelationships.php'));
-    $crm = file_get_contents(app_path('Services/CrmService.php'));
+    $directory = file_get_contents(app_path('Services/OrganizationDirectory.php'));
     $controller = file_get_contents(app_path('Http/Controllers/Crm/CompanyController.php'));
 
     // The lifecycle transitions authorize 'manageRelationships' only; initial enablement authorizes 'manageMembership' only, in the service and the route.
     preg_match('/public function disable\(.*?\n    }\n/s', $service, $disable);
     preg_match('/public function enable\(.*?\n    }\n/s', $service, $enable);
-    preg_match('/public function promoteToOrganization\(.*?\n    }\n/s', $crm, $promote);
+    preg_match('/public function enablePortalAccess\(.*?\n    }\n/s', $directory, $promote);
 
     expect($disable[0])->toContain('$this->authorize($actor)')->toContain('requireRelationshipManager')->not->toContain('isMembershipManager')
         ->and($enable[0])->toContain('requireRelationshipManager')->not->toContain('isMembershipManager')
@@ -292,17 +291,20 @@ it('answers both table predicates exactly as the two policy abilities do, and ke
         ->and(OrganizationAuthority::isRelationshipManager($user->id))->toBe(Gate::forUser($user)->allows('manageRelationships', Organization::class));
 })->with(['an active operator', 'a suspended operator', 'portal.operator only', 'crm.manage only', 'a customer', 'a custom role holding both']);
 
-// ── Initial enablement (the existing Company-promotion path, hardened) ───────
+// ── Initial enablement (Not enabled -> Enabled, one transition) ──────────────
 
 it('enables portal access once, recording who and when, with an audit entry that shares the instant', function () {
-    $company = CrmCompany::factory()->create(['name' => 'Fresh Co', 'organization_id' => null, 'created_by' => $this->operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Fresh Co', 'created_by' => $this->operator->id]);
+    $this->travel(10)->minutes();   // the Organization was created earlier: enablement is a later instant
 
-    $organization = app(CrmService::class)->promoteToOrganization($company, $this->operator);
+    $organization = app(OrganizationDirectory::class)->enablePortalAccess($company, $this->operator);
     $row = DB::table('organizations')->where('id', $organization->id)->first();
-    $entry = DB::table('activity_log')->where('description', CrmService::PORTAL_ENABLED)->where('subject_id', $organization->id)->first();
+    $entry = DB::table('activity_log')->where('description', OrganizationDirectory::PORTAL_ENABLED)->where('subject_id', $organization->id)->first();
     $properties = json_decode($entry->properties, true);
 
-    expect($row->portal_enabled_at)->toBe($row->created_at)
+    // Enablement is a transition of an EXISTING row: its creation instant and creator are its own, and the enablement instant is the audit entry's.
+    expect($row->portal_enabled_at)->not->toBe($row->created_at)
+        ->and((int) $row->created_by)->toBe($this->operator->id)
         ->and((int) $row->portal_enabled_by)->toBe($this->operator->id)
         ->and($row->disabled_at)->toBeNull()
         ->and($entry->created_at)->toBe($row->portal_enabled_at)
@@ -311,22 +313,32 @@ it('enables portal access once, recording who and when, with an audit entry that
         ->and(DB::table('organization_members')->where('organization_id', $organization->id)->where('user_id', $this->operator->id)->value('role'))->toBe('admin');
 });
 
-it('treats a second promotion as a no-op, and refuses one for an organization that is Disabled without clearing it', function () {
-    $company = CrmCompany::factory()->create(['name' => 'Twice Co', 'organization_id' => null, 'created_by' => $this->operator->id]);
-    $service = app(CrmService::class);
+it('refuses a second initial enablement as already_enabled with no side effect, and refuses one for an organization that is Disabled without clearing it', function () {
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Twice Co', 'created_by' => $this->operator->id]);
+    $service = app(OrganizationDirectory::class);
 
-    $first = $service->promoteToOrganization($company, $this->operator);
+    $first = $service->enablePortalAccess($company, $this->operator);
     $entries = DB::table('activity_log')->count();
-    $again = $service->promoteToOrganization($company->fresh(), $this->operator);
+    $snapshot = (array) DB::table('organizations')->where('id', $first->id)->first();
+    $members = DB::table('organization_members')->count();
 
-    expect($again->id)->toBe($first->id)->and(DB::table('activity_log')->count())->toBe($entries);
+    try {
+        $service->enablePortalAccess($company->fresh(), $this->operator);
+        throw new RuntimeException('a second initial enablement was not refused');
+    } catch (OrganizationRelationshipException $e) {
+        expect($e->reason)->toBe(OrganizationRelationshipException::ALREADY_ENABLED);
+    }
+
+    expect(DB::table('activity_log')->count())->toBe($entries)
+        ->and((array) DB::table('organizations')->where('id', $first->id)->first())->toBe($snapshot)
+        ->and(DB::table('organization_members')->count())->toBe($members);
 
     $this->relationships->disable($first, $this->operator);
     $disabledAt = DB::table('organizations')->where('id', $first->id)->value('disabled_at');
     $entries = DB::table('activity_log')->count();
 
     try {
-        $service->promoteToOrganization($company->fresh(), $this->operator);
+        $service->enablePortalAccess($company->fresh(), $this->operator);
         throw new RuntimeException('enablement was not refused');
     } catch (OrganizationRelationshipException $e) {
         expect($e->reason)->toBe(OrganizationRelationshipException::ENABLEMENT_REFUSED);
@@ -338,17 +350,35 @@ it('treats a second promotion as a no-op, and refuses one for an organization th
     $this->actingAs($this->operator)->post(route('crm.companies.promote', $company))->assertSessionHasErrors('company');
 });
 
-it('requires manageMembership at the route even for an account the route middleware lets through', function () {
+it('requires manageMembership at the route even for an account the route middleware lets through: exactly 404 for a Directory-only Organization this account cannot see, in every surface mode', function (string $mode) {
+    config(['portal.customer_surface_mode' => $mode]);
+
     $stray = User::factory()->create()->assignRole('user');
     $stray->givePermissionTo('crm.manage');
-    $company = CrmCompany::factory()->create(['name' => 'Guarded Co', 'organization_id' => null, 'created_by' => $this->operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Guarded Co', 'created_by' => $this->operator->id]);
 
-    // The company is out of this account's reach (404) or the controller refuses it (403): either way nothing is enabled. The service's own refusal
-    // for an account that does reach it is proved in OrganizationPortalStateFenceTest.
-    expect($this->actingAs($stray)->post(route('crm.companies.promote', $company))->getStatusCode())->toBeIn([403, 404]);
+    // A Directory-only Organization has no members, so no customer can see it: the binding finds nothing (404) whichever mode answers first, and nothing is
+    // enabled. (closed and pilot: the surface gate's 404; legacy: the route-model binding's 404. A visible Organization reaching the controller's own 403 is
+    // the next test.) The service's own refusal for an account that does reach it is proved in OrganizationPortalStateFenceTest.
+    expect($this->actingAs($stray)->post(route('crm.companies.promote', $company))->getStatusCode())->toBe(404, $mode);
 
-    expect(DB::table('crm_companies')->where('id', $company->id)->value('organization_id'))->toBeNull();
-});
+    // The control: the operator is not refused in the same mode.
+    $this->actingAs($this->operator)->post(route('crm.companies.promote', $company))->assertRedirect();
+
+    expect(DB::table('organizations')->where('id', $company->id)->value('portal_enabled_at'))->not->toBeNull();
+})->with(['closed', 'pilot', 'legacy']);
+
+it('answers a customer who can see the Organization but holds only a stray crm.manage 403 in legacy and 404 in closed and pilot when asked to enable it', function (string $mode, int $status) {
+    config(['portal.customer_surface_mode' => $mode]);
+
+    $stray = User::factory()->create()->assignRole('user');
+    $stray->givePermissionTo('crm.manage');
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Visible Co', 'created_by' => $this->operator->id]);
+    DB::table('organization_members')->insert(['organization_id' => $company->id, 'user_id' => $stray->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now()]);   // visible to it (a state the application cannot produce on a Directory-only Organization; inserted to reach the controller's own check)
+
+    expect($this->actingAs($stray)->post(route('crm.companies.promote', $company))->getStatusCode())->toBe($status, $mode)
+        ->and(DB::table('organizations')->where('id', $company->id)->value('portal_enabled_at'))->toBeNull();
+})->with([['closed', 404], ['pilot', 404], ['legacy', 403]]);
 
 // ── What the locked part of disable does not do ──────────────────────────────
 

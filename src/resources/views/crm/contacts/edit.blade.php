@@ -8,6 +8,10 @@
         <h1 class="mt-2 text-2xl font-semibold text-text">Edit Person</h1>
     </div>
 
+    @error('person')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
+
     <div class="rounded-lg border p-6 bg-surface border-rule">
         <form method="POST" action="{{ route('crm.contacts.update', $contact) }}" class="space-y-4">
             @csrf @method('PUT')

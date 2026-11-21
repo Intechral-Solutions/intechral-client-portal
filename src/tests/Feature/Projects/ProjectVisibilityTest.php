@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
@@ -23,14 +22,14 @@ beforeEach(function () {
     $this->orgUser = makeUser('user', ['name' => 'Org User']); // role user: projects.view_org + tasks.view_org
     $this->org = Organization::factory()->create(['portal_enabled_by' => $this->owner->id]);
     $this->org->members()->attach($this->orgUser, ['role' => 'member']);
-    $this->company = CrmCompany::factory()->create(['created_by' => $this->owner->id, 'organization_id' => $this->org->id]);
+    $this->company = $this->org; // one entity since ORG-2: the Organization the projects link to
 
     $this->linkedNotMember = Project::factory()->create(['created_by' => $this->owner->id, 'name' => 'Linked Not Member']);
     $this->linkedMember = Project::factory()->create(['created_by' => $this->owner->id, 'name' => 'Linked And Member']);
     $this->memberOnly = Project::factory()->create(['created_by' => $this->owner->id, 'name' => 'Member Only']);
     $this->unrelated = Project::factory()->create(['created_by' => $this->owner->id, 'name' => 'Unrelated']);
     foreach ([$this->linkedNotMember, $this->linkedMember] as $project) {
-        $project->companies()->attach($this->company);
+        $project->organizations()->attach($this->company);
     }
     foreach ([$this->linkedMember, $this->memberOnly] as $project) {
         $project->members()->attach($this->orgUser, ['role' => 'member']);

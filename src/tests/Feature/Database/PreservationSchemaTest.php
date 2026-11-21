@@ -28,23 +28,24 @@ it('restricts delete on each of the 13 business-record foreign keys to users, un
         ->and($key->parent_column)->toBe('id')
         ->and($key->d)->toBe('RESTRICT')
         ->and($key->u)->toBe('RESTRICT')
-        // ORG-1: a Directory-only Organization has no enabling operator, so portal_enabled_by (the former owner_id) is the one nullable key here.
+        // ORG-1: a Directory-only Organization has no enabling operator, so portal_enabled_by (the former owner_id) is the one nullable key here. ORG-2:
+        // organizations.created_by is NOT NULL (every Organization has a creator, backfilled from the enabling operator).
         ->and($key->nullable)->toBe($table === 'organizations' && $column === 'portal_enabled_by' ? 'YES' : 'NO');
 })->with(PreservationKeys::liveUserKeys());
 
-it('restricts delete on project_company.crm_company_id (H2), under its original name, and keeps ON UPDATE', function () {
-    $keys = PreservationKeys::toUsersAndCompanies();
+it('restricts delete on project_organization.organization_id (H2), under its own name, and keeps ON UPDATE', function () {
+    $keys = PreservationKeys::toUsersAndOrganizations();
 
-    expect($keys['project_company.crm_company_id -> crm_companies'])->toBe('RESTRICT/RESTRICT (project_company_crm_company_id_foreign)')
-        ->and(DB::selectOne("select is_nullable as n from information_schema.columns where table_schema = database() and table_name = 'project_company' and column_name = 'crm_company_id'")->n)->toBe('NO');
+    expect($keys['project_organization.organization_id -> organizations'])->toBe('RESTRICT/RESTRICT (project_organization_organization_id_foreign)')
+        ->and(DB::selectOne("select is_nullable as n from information_schema.columns where table_schema = database() and table_name = 'project_organization' and column_name = 'organization_id'")->n)->toBe('NO');
 });
 
-it('changes exactly those 14 foreign keys and no other reference to users or companies', function () {
+it('changes exactly those 14 foreign keys and no other reference to users or organizations', function () {
     $restricted = [];
     foreach (PreservationKeys::liveUserKeys() as [$table, $column, $constraint]) {
         $restricted["{$table}.{$column} -> users"] = "RESTRICT/RESTRICT ({$constraint})";
     }
-    $restricted['project_company.crm_company_id -> crm_companies'] = 'RESTRICT/RESTRICT (project_company_crm_company_id_foreign)';
+    $restricted['project_organization.organization_id -> organizations'] = 'RESTRICT/RESTRICT (project_organization_organization_id_foreign)';
 
     $unchanged = [
         // Credential and membership children and derived rows: still removed with their user (H1, "Unchanged").
@@ -70,14 +71,19 @@ it('changes exactly those 14 foreign keys and no other reference to users or com
         'ticket_status_histories.user_id -> users' => 'SET NULL/RESTRICT (ticket_status_histories_user_id_foreign)',
         'tickets.assignee_id -> users' => 'SET NULL/RESTRICT (tickets_assignee_id_foreign)',
         'users.invited_by -> users' => 'SET NULL/RESTRICT (users_invited_by_foreign)',
-        // The other company references.
-        'crm_contacts.crm_company_id -> crm_companies' => 'SET NULL/RESTRICT (crm_contacts_crm_company_id_foreign)',
+        // The other references to the Organization (ORG-2: the Company table is gone; the Person affiliation points at the Organization and SET NULLs).
+        'crm_contacts.organization_id -> organizations' => 'SET NULL/RESTRICT (crm_contacts_organization_id_foreign)',
+        // Organization references that belong to earlier packages, RESTRICT: an Organization with any of these cannot be deleted (ADR-011 section 11).
+        'organization_invitations.organization_id -> organizations' => 'RESTRICT/RESTRICT (organization_invitations_organization_id_foreign)',
+        'organization_members.organization_id -> organizations' => 'RESTRICT/RESTRICT (organization_members_organization_id_foreign)',
+        'organizations.managed_by_organization_id -> organizations' => 'RESTRICT/RESTRICT (organizations_managed_by_organization_id_foreign)',
+        'tickets.organization_id -> organizations' => 'RESTRICT/RESTRICT (tickets_organization_id_foreign)',
         // `tickets.company_id` is gone (R1-2A, migration 2026_11_10_120000): a ticket is attributed to an organization, not a CRM company.
     ];
 
     $expected = $restricted + $unchanged;
     ksort($expected);
-    $actual = PreservationKeys::toUsersAndCompanies();
+    $actual = PreservationKeys::toUsersAndOrganizations();
     ksort($actual);
 
     expect($actual)->toBe($expected);

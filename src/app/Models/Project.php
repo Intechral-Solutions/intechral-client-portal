@@ -57,9 +57,13 @@ class Project extends Model
         return $this->hasMany(Task::class);
     }
 
-    public function companies(): BelongsToMany
+    /**
+     * The Organizations this Project is linked to (`project_organization`, ORG-2). Loaded through Organization's membership scope, so an actor sees only the
+     * links they may see; a write goes through ProjectService::syncOrganizations, which keeps the ones the actor cannot see.
+     */
+    public function organizations(): BelongsToMany
     {
-        return $this->belongsToMany(CrmCompany::class, 'project_company')
+        return $this->belongsToMany(Organization::class, 'project_organization')
             ->withTimestamps();
     }
 

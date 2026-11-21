@@ -13,7 +13,6 @@
  *   6. what a direct customer does today (tickets, member projects, Home) is unchanged.
  */
 
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Invoice;
 use App\Models\Organization;
@@ -75,14 +74,13 @@ function hardeningCustomOperator(array $permissions = []): User
     return pilotCustomRoleUser('support-lead-'.uniqid(), ['portal.operator', ...$permissions]);
 }
 
-/** @return array{organizations: list<int>, companies: list<int>, contacts: list<int>} what the organization scopes show this account */
+/** @return array{organizations: list<int>, contacts: list<int>} what the Directory scopes show this account */
 function hardeningScopeView(User $user): array
 {
     test()->actingAs($user);
 
     return [
         'organizations' => Organization::query()->pluck('id')->sort()->values()->all(),
-        'companies' => CrmCompany::query()->pluck('id')->sort()->values()->all(),
         'contacts' => CrmContact::query()->pluck('id')->sort()->values()->all(),
     ];
 }
@@ -238,15 +236,13 @@ describe('a customer with an explicit billing or time grant', function () {
 
 // ── 2. Operator eligibility for the three organization scopes ──────────────────────────────────────────────────────
 
-describe('organization scopes follow portal.operator, not a role name', function () {
+describe('the Directory scopes follow portal.operator, not a role name', function () {
     beforeEach(function () {
         $admin = pilotOperator();
         $this->mine = Organization::factory()->create(['portal_enabled_by' => $admin->id]);
         $this->theirs = Organization::factory()->create(['portal_enabled_by' => $admin->id]);
-        $this->myCompany = CrmCompany::factory()->create(['created_by' => $admin->id, 'organization_id' => $this->mine->id]);
-        $this->theirCompany = CrmCompany::factory()->create(['created_by' => $admin->id, 'organization_id' => $this->theirs->id]);
-        $this->myContact = CrmContact::factory()->create(['crm_company_id' => $this->myCompany->id, 'created_by' => $admin->id]);
-        $this->theirContact = CrmContact::factory()->create(['crm_company_id' => $this->theirCompany->id, 'created_by' => $admin->id]);
+        $this->myContact = CrmContact::factory()->create(['organization_id' => $this->mine->id, 'created_by' => $admin->id]);
+        $this->theirContact = CrmContact::factory()->create(['organization_id' => $this->theirs->id, 'created_by' => $admin->id]);
     });
 
     it('gives the built-in operator and a custom-role operator the same cross-organization view, in every mode', function (string $mode) {
@@ -256,11 +252,10 @@ describe('organization scopes follow portal.operator, not a role name', function
 
         expect($custom)->toBe($builtIn)
             ->and($custom['organizations'])->toContain($this->mine->id, $this->theirs->id)
-            ->and($custom['companies'])->toContain($this->myCompany->id, $this->theirCompany->id)
             ->and($custom['contacts'])->toContain($this->myContact->id, $this->theirContact->id);
     })->with(['closed', 'pilot', 'legacy']);
 
-    it('keeps an ordinary customer, and a customer with every operational capability, to its own organizations', function (string $mode) {
+    it('keeps an ordinary customer, and a customer with every operational capability, to its own organizations and to no People at all (ruling D7)', function (string $mode) {
         pilotMode($mode);
         $member = pilotCustomer();
         $everything = hardeningEverythingButEligibility();
@@ -271,8 +266,7 @@ describe('organization scopes follow portal.operator, not a role name', function
             $seen = hardeningScopeView($user);
 
             expect($seen['organizations'])->toBe([$this->mine->id])
-                ->and($seen['companies'])->toBe([$this->myCompany->id])
-                ->and($seen['contacts'])->toBe([$this->myContact->id]);
+                ->and($seen['contacts'])->toBe([]);   // a Person is visible only to operators, whichever Organization they belong to
         }
     })->with(['closed', 'pilot', 'legacy']);
 
@@ -280,7 +274,7 @@ describe('organization scopes follow portal.operator, not a role name', function
         pilotMode('pilot');
         $seen = hardeningScopeView(hardeningEverythingButEligibility());
 
-        expect($seen)->toBe(['organizations' => [], 'companies' => [], 'contacts' => []]);
+        expect($seen)->toBe(['organizations' => [], 'contacts' => []]);
     });
 
     it('does not treat the operator role NAME as eligibility: an operator whose capability was never synchronized is scoped like a customer', function () {
@@ -292,7 +286,7 @@ describe('organization scopes follow portal.operator, not a role name', function
 
         $seen = hardeningScopeView(pilotOperator());
 
-        expect($seen['organizations'])->toBe([])->and($seen['companies'])->toBe([]);
+        expect($seen['organizations'])->toBe([])->and($seen['contacts'])->toBe([]);
     });
 });
 
@@ -573,7 +567,7 @@ describe('ticket-linked task and time access does not follow a wider ticket view
 });
 
 it('has no remaining operator test by role name in the organization scopes', function () {
-    foreach (['OrganizationScope', 'OrganizationMembershipScope', 'OrganizationThroughCompanyScope'] as $scope) {
+    foreach (['OrganizationMembershipScope', 'DirectoryOperatorScope'] as $scope) {
         $source = file_get_contents(app_path("Shared/Scopes/{$scope}.php"));
 
         expect($source)->not->toContain("hasRole('operator')")

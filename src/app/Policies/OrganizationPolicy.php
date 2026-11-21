@@ -42,7 +42,19 @@ class OrganizationPolicy
     }
 
     /**
-     * The shared boundary of both abilities: an ACTIVE account holding both capabilities. A suspended operator is denied here, so
+     * Who may create, edit, classify and delete the Directory profile of an Organization (Release 1.0, ORG-2): the same two capabilities, in an ACTIVE
+     * account. A THIRD ability, not an alias: Directory authority, membership authority (initial enablement) and relationship authority (disable and
+     * re-enable) are different questions that happen to have the same answer today (ADR-011 section 2), and a later release may let them differ. No new
+     * global permission is introduced: it is `portal.operator` and `crm.manage`, as for the other two. The record of an Organization's Classification,
+     * website, notes or People is Directory data and nothing here reads it as authority.
+     */
+    public function manageDirectory(User $user): bool
+    {
+        return $this->operatorWithDirectory($user);
+    }
+
+    /**
+     * The shared boundary of all three abilities: an ACTIVE account holding both capabilities. A suspended operator is denied here, so
      * the rule holds for the service calls made with an explicit actor (`artisan tinker`, a job) as well as for web requests, where
      * ActiveUserProvider already refuses to authenticate a suspended account. Active means what it means everywhere else:
      * {@see User::isSuspended()}, `users.disabled_at`.

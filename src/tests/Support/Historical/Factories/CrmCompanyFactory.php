@@ -1,12 +1,12 @@
 <?php
 
-namespace Database\Factories;
+namespace Tests\Support\Historical\Factories;
 
-use App\Models\CrmCompany;
-use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Tests\Support\Historical\Models\CrmCompany;
 
+/** Test-only: a pre-ORG-2 `crm_companies` row. */
 class CrmCompanyFactory extends Factory
 {
     protected $model = CrmCompany::class;
@@ -26,6 +26,6 @@ class CrmCompanyFactory extends Factory
 
     public function promoted(): static
     {
-        return $this->state(fn () => ['organization_id' => Organization::factory()]);
+        return $this->state(fn () => ['organization_id' => OrganizationFactory::new()]);
     }
 }

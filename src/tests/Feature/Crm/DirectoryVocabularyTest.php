@@ -8,11 +8,10 @@
  * Technical names (CrmContact, crm_* tables, crm.* routes, crm.manage, Organization) are NOT asserted away: only what a person reads is.
  */
 
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\CrmService;
+use App\Services\OrganizationDirectory;
 use App\Services\ProjectService;
 use App\Shared\Navigation\NavigationBuilder;
 use Illuminate\Http\Request;
@@ -45,11 +44,11 @@ function dir1Words(string $text): array
 // ── Every touched page, as rendered ───────────────────────────────────────────
 
 it('uses no retired word on any Directory, Organization access, User or Role page an operator reads', function () {
-    $promoted = CrmCompany::factory()->create(['name' => 'Acme Holdings', 'created_by' => $this->operator->id]);
-    $organization = app(CrmService::class)->promoteToOrganization($promoted, $this->operator);
-    $bare = CrmCompany::factory()->create(['name' => 'Globex Group', 'created_by' => $this->operator->id]);
-    $person = CrmContact::factory()->create(['first_name' => 'Pat', 'last_name' => 'Doe', 'crm_company_id' => $promoted->id, 'email' => 'pat@acme.test']);
-    $drifter = CrmContact::factory()->create(['first_name' => 'Sam', 'last_name' => 'Roe', 'crm_company_id' => null]);
+    $promoted = Organization::factory()->directoryOnly()->create(['name' => 'Acme Holdings', 'created_by' => $this->operator->id]);
+    $organization = app(OrganizationDirectory::class)->enablePortalAccess($promoted, $this->operator);
+    $bare = Organization::factory()->directoryOnly()->withProfile()->create(['name' => 'Globex Group', 'created_by' => $this->operator->id]);
+    $person = CrmContact::factory()->create(['first_name' => 'Pat', 'last_name' => 'Doe', 'organization_id' => $promoted->id, 'email' => 'pat@acme.test']);
+    $drifter = CrmContact::factory()->create(['first_name' => 'Sam', 'last_name' => 'Roe', 'organization_id' => null]);
     $member = User::factory()->create(['name' => 'Mary Member'])->assignRole('user');
     DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $member->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
     $role = Role::create(['name' => 'dir1-vocab', 'guard_name' => 'web']);
@@ -161,25 +160,25 @@ it('uses the glossary in every Directory flash message', function () {
     $this->actingAs($this->operator);
 
     $this->post(route('crm.companies.store'), ['name' => 'Flash Holdings'])->assertSessionHas('success', 'Organization created.');
-    $company = CrmCompany::where('name', 'Flash Holdings')->firstOrFail();
+    $company = Organization::withoutGlobalScopes()->where('name', 'Flash Holdings')->firstOrFail();
 
     $this->put(route('crm.companies.update', $company), ['name' => 'Flash Holdings Ltd'])->assertSessionHas('success', 'Organization updated.');
     $this->post(route('crm.companies.promote', $company))->assertSessionHas('success', 'Portal access is enabled for "Flash Holdings Ltd".');
 
-    $this->post(route('crm.contacts.store'), ['first_name' => 'Ann', 'last_name' => 'Lee', 'crm_company_id' => $company->id])->assertSessionHas('success', 'Person created.');
+    $this->post(route('crm.contacts.store'), ['first_name' => 'Ann', 'last_name' => 'Lee', 'organization_id' => $company->id])->assertSessionHas('success', 'Person created.');
     $person = CrmContact::where('last_name', 'Lee')->firstOrFail();
     $this->put(route('crm.contacts.update', $person), ['first_name' => 'Anne', 'last_name' => 'Lee'])->assertSessionHas('success', 'Person updated.');
     $this->delete(route('crm.contacts.destroy', $person))->assertSessionHas('success', 'Person deleted.');
 
-    $other = CrmCompany::factory()->create(['created_by' => $this->operator->id]);
+    $other = Organization::factory()->directoryOnly()->create(['created_by' => $this->operator->id]);
     $this->delete(route('crm.companies.destroy', $other))->assertSessionHas('success', 'Organization deleted.');
 });
 
 it('names an invalid organization as an organization in validation messages, on People and on Projects', function () {
     $this->actingAs($this->operator);
 
-    $this->post(route('crm.contacts.store'), ['first_name' => 'No', 'last_name' => 'Org', 'crm_company_id' => 999999])
-        ->assertSessionHasErrors(['crm_company_id' => 'The selected organization is invalid.']);
+    $this->post(route('crm.contacts.store'), ['first_name' => 'No', 'last_name' => 'Org', 'organization_id' => 999999])
+        ->assertSessionHasErrors(['organization_id' => 'The selected organization is invalid.']);
 
     $project = app(ProjectService::class)->create($this->operator, ['name' => 'Linked Project']);
 

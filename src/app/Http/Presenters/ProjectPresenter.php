@@ -2,7 +2,7 @@
 
 namespace App\Http\Presenters;
 
-use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
@@ -155,21 +155,22 @@ final class ProjectPresenter
     }
 
     /**
-     * Companies the actor may link, scoped by CrmCompany's own global scope.
+     * Organizations the actor may link, scoped by Organization's own membership scope (an operator sees all; anyone else only their own). The wire name
+     * `companies` is kept (the React form reads it) until the unified Directory interface.
      *
      * @return array<int, array{id: int, name: string}>
      */
     public static function companyOptions(): array
     {
-        return CrmCompany::orderBy('name')
+        return Organization::orderBy('name')
             ->get(['id', 'name'])
-            ->map(fn (CrmCompany $company) => ['id' => $company->id, 'name' => $company->name])
+            ->map(fn (Organization $organization) => ['id' => $organization->id, 'name' => $organization->name])
             ->all();
     }
 
     /** @return array<int, int> */
     public static function linkedCompanyIds(Project $project): array
     {
-        return $project->companies()->pluck('crm_companies.id')->all();
+        return $project->organizations()->pluck('organizations.id')->all();
     }
 }
