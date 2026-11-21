@@ -1,16 +1,19 @@
 <?php
 
-use App\Exceptions\OrganizationRelationshipException;
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\OrganizationPreflight;
 use App\Services\OrganizationRelationships;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Tests\Support\CommittedUsers;
+use Tests\Support\Historical\Models\CrmCompany;
+use Tests\Support\HistoricalSchema;
+
+// Release 1.0 (ORG-2): this file's subject is a migration that has since been superseded or is undone and redone here, so it runs on the disposable rehearsal database built to the schema
+// before ORG-2 (tests/Support/HistoricalSchema.php), never on the shared testing database. Nothing below this line was changed except where a comment says so.
+beforeEach(fn () => HistoricalSchema::use(HistoricalSchema::ORG2));
 
 /*
  * Release 1.0 (MO-1A): the two migrations themselves. Kept in its own file for the reason PreservationMigrationsTest is:
@@ -335,24 +338,10 @@ describe('MO-1A unique company link', function () {
                 ->and(DB::selectOne("select count(*) as n from information_schema.statistics where table_schema = database() and table_name = 'crm_companies' and index_name = 'crm_companies_organization_id_unique'")->n)->toBe(0)
                 ->and(DB::table('crm_companies')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all())->toBe($before, 'nothing was repaired, merged or deleted');
 
-            // The relationship service treats the pair as ambiguous, so neither end of a relationship can be this organization.
-            // The DDL above ended the real transaction while Laravel still counts one open, so the service's own transaction
-            // would be a savepoint with nothing to belong to: open a real one, as the service finds it in production.
+            // (ORG-2: this test also pinned OrganizationRelationships' refusal of an Organization with an ambiguous Company pairing, COMPANY_PAIRING. That
+            // service rule was retired with the Company, by the owner's consolidation ruling: there is one entity, so there is no pairing to be ambiguous. The
+            // migration's own refusal and the preflight's report of the duplicate, which this test is about, are kept below unchanged.)
             DB::unprepared('start transaction');
-            Gate::before(fn () => true);   // authorization is the subject of OrganizationRelationshipsTest, not of this one
-            $service = app(OrganizationRelationships::class);
-            $service->designatePartner($partner, $owner);
-
-            $refusal = null;
-            try {
-                $service->assignCustomer($ambiguous, $partner, $owner);
-            } catch (OrganizationRelationshipException $e) {
-                $refusal = $e;
-            }
-
-            expect($refusal?->reason)->toBe(OrganizationRelationshipException::COMPANY_PAIRING)
-                ->and($refusal->getMessage())->toContain('is linked to 2 Directory profiles')
-                ->and(fn () => $service->designatePartner($ambiguous, $owner))->toThrow(OrganizationRelationshipException::class);
 
             $report = app(OrganizationPreflight::class)->report();
             expect($report['duplicateLinks'])->toBe([['organization_id' => $ambiguous->id, 'company_ids' => [$first->id, $second->id]]])

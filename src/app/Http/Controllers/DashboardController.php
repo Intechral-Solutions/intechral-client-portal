@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Invoice;
 use App\Models\Organization;
@@ -88,7 +87,7 @@ class DashboardController extends Controller
         $crmStats = null;
         if ($user->can('crm.manage')) {
             $crmStats = [
-                'companies' => CrmCompany::count(),
+                'companies' => Organization::count(),
                 'contacts' => CrmContact::count(),
                 // Organizations whose portal access is enabled: the tile is labelled "With portal access", and a disabled one has none. ORG-1: nor has one
                 // that was never enabled (a Directory-only row must not count as portal access just because it exists).

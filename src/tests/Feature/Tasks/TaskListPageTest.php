@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Task;
 use App\Models\Ticket;
@@ -445,17 +444,15 @@ it('offers projects that have rows in the current view, never an invisible one',
     expect(collect($operatorProps['filterOptions']['projects'])->pluck('name')->all())->toBe(['Hidden Harbor', 'Visible Venture']);
 });
 
-it('offers organizations only through visible projects and the actor\'s own CRM scope, and filters by any well-formed id', function () {
-    $org = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
-    $org->members()->attach($this->member, ['role' => 'member']);
-    $visibleCompany = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'organization_id' => $org->id, 'name' => 'Seen Co']);
-    // MO-1A: one company per organization (unique key), so the second company has its own organization, which the member also belongs to.
-    $hiddenOrg = Organization::factory()->create(['portal_enabled_by' => $this->operator->id]);
-    $hiddenOrg->members()->attach($this->member, ['role' => 'member']);
-    $hiddenCompany = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'organization_id' => $hiddenOrg->id, 'name' => 'Behind Hidden Co']);
-    $otherTenant = CrmCompany::factory()->create(['created_by' => $this->operator->id, 'name' => 'Other Tenant Co']);
-    $this->visible->companies()->attach([$visibleCompany->id, $otherTenant->id]);
-    $this->hidden->companies()->attach($hiddenCompany);
+it('offers organizations only through visible projects and the actor\'s own membership scope, and filters by any well-formed id', function () {
+    // One entity since ORG-2: the Organization is what a project links to and what the filter offers. The member belongs to two of them.
+    $visibleCompany = Organization::factory()->create(['portal_enabled_by' => $this->operator->id, 'name' => 'Seen Co']);
+    $visibleCompany->members()->attach($this->member, ['role' => 'member']);
+    $hiddenCompany = Organization::factory()->create(['portal_enabled_by' => $this->operator->id, 'name' => 'Behind Hidden Co']);
+    $hiddenCompany->members()->attach($this->member, ['role' => 'member']);
+    $otherTenant = Organization::factory()->create(['portal_enabled_by' => $this->operator->id, 'name' => 'Other Tenant Co']);   // the member does not belong to it
+    $this->visible->organizations()->attach([$visibleCompany->id, $otherTenant->id]);
+    $this->hidden->organizations()->attach($hiddenCompany);
     Task::factory()->standalone()->create(['title' => 'My standalone', 'created_by' => $this->member->id, 'assignee_id' => $this->member->id]);
 
     $props = listProps($this->actingAs($this->member)->get(route('tasks.index')));
@@ -466,7 +463,7 @@ it('offers organizations only through visible projects and the actor\'s own CRM 
     expect(listTitles($response))->toBe(['Visible mine'])
         ->and(listProps($response)['filters']['organization'])->toBe($visibleCompany->id);
 
-    // Companies outside the offered labels (the CRM scope hides one; the other sits behind a
+    // Companies outside the offered labels (the membership scope hides one; the other sits behind a
     // project the member cannot see) stay applied and match nothing, and are never named.
     foreach ([$hiddenCompany, $otherTenant] as $forged) {
         $response = $this->actingAs($this->member)->get(route('tasks.index', ['organization' => $forged->id]));

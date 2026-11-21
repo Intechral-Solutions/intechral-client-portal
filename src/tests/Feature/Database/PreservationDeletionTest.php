@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\CmsPage;
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Invoice;
 use App\Models\Organization;
@@ -47,7 +46,8 @@ function recordsOwnedThroughEachKey(): array
         'tasks.created_by' => fn (User $u) => ['tasks', Task::factory()->standalone()->create(['created_by' => $u->id])->id],
         'projects.created_by' => fn (User $u) => ['projects', Project::factory()->create(['created_by' => $u->id])->id],
         'organizations.portal_enabled_by' => fn (User $u) => ['organizations', Organization::factory()->create(['portal_enabled_by' => $u->id])->id],
-        'crm_companies.created_by' => fn (User $u) => ['crm_companies', CrmCompany::factory()->create(['created_by' => $u->id])->id],
+        // ORG-2: the Company profile table is gone; the creator of an Organization is protected by the key that replaced it.
+        'organizations.created_by' => fn (User $u) => ['organizations', Organization::factory()->create(['created_by' => $u->id])->id],
         'crm_contacts.created_by' => fn (User $u) => ['crm_contacts', CrmContact::factory()->create(['created_by' => $u->id])->id],
         'cms_pages.created_by' => fn (User $u) => ['cms_pages', CmsPage::factory()->create(['created_by' => $u->id])->id],
         'invoices.client_id' => fn (User $u) => ['invoices', Invoice::factory()->create(['client_id' => $u->id])->id],
@@ -192,43 +192,43 @@ it('L1 regression (R0.9-1C): outside any test transaction, User::destroy() and f
         ->and(DB::table('model_has_permissions')->where('model_type', User::class)->where('model_id', $user->id)->exists())->toBeFalse();
 });
 
-describe('a company that projects reference (H2)', function () {
+describe('an Organization that projects reference (H2)', function () {
     it('cannot be deleted, and the association survives the refused delete', function () {
-        $company = CrmCompany::factory()->create();
+        $organization = Organization::factory()->create();
         $project = Project::factory()->create();
-        DB::table('project_company')->insert(['project_id' => $project->id, 'crm_company_id' => $company->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('project_organization')->insert(['project_id' => $project->id, 'organization_id' => $organization->id, 'created_at' => now(), 'updated_at' => now()]);
 
-        expect(fn () => DB::table('crm_companies')->where('id', $company->id)->delete())
+        expect(fn () => DB::table('organizations')->where('id', $organization->id)->delete())
             ->toThrow(QueryException::class, 'Cannot delete or update a parent row');
 
-        expect(DB::table('crm_companies')->where('id', $company->id)->exists())->toBeTrue()
-            ->and(DB::table('project_company')->where('crm_company_id', $company->id)->where('project_id', $project->id)->exists())->toBeTrue();
+        expect(DB::table('organizations')->where('id', $organization->id)->exists())->toBeTrue()
+            ->and(DB::table('project_organization')->where('organization_id', $organization->id)->where('project_id', $project->id)->exists())->toBeTrue();
     });
 
-    it('can be deleted again once no project references it, and its contacts are detached, not deleted', function () {
-        $company = CrmCompany::factory()->create();
-        $contact = CrmContact::factory()->create(['crm_company_id' => $company->id]);
+    it('can be deleted again once no project references it, and its people are detached, not deleted', function () {
+        $organization = Organization::factory()->create();
+        $contact = CrmContact::factory()->create(['organization_id' => $organization->id]);
         $project = Project::factory()->create();
-        DB::table('project_company')->insert(['project_id' => $project->id, 'crm_company_id' => $company->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('project_organization')->insert(['project_id' => $project->id, 'organization_id' => $organization->id, 'created_at' => now(), 'updated_at' => now()]);
 
-        // Removing the PROJECT removes its association rows (project_company.project_id still cascades)...
+        // Removing the PROJECT removes its association rows (project_organization.project_id still cascades)...
         DB::table('projects')->where('id', $project->id)->delete();
-        expect(DB::table('project_company')->where('crm_company_id', $company->id)->exists())->toBeFalse();
+        expect(DB::table('project_organization')->where('organization_id', $organization->id)->exists())->toBeFalse();
 
-        // ...and then the company can go, leaving its contact with no company.
-        DB::table('crm_companies')->where('id', $company->id)->delete();
+        // ...and then the Organization can go, leaving its person with no Organization.
+        DB::table('organizations')->where('id', $organization->id)->delete();
 
-        expect(DB::table('crm_companies')->where('id', $company->id)->exists())->toBeFalse()
+        expect(DB::table('organizations')->where('id', $organization->id)->exists())->toBeFalse()
             ->and(DB::table('crm_contacts')->where('id', $contact->id)->exists())->toBeTrue()
-            ->and(DB::table('crm_contacts')->where('id', $contact->id)->value('crm_company_id'))->toBeNull();
+            ->and(DB::table('crm_contacts')->where('id', $contact->id)->value('organization_id'))->toBeNull();
     });
 
     it('can still be deleted when no project references it', function () {
-        $company = CrmCompany::factory()->create();
+        $organization = Organization::factory()->create();
 
-        DB::table('crm_companies')->where('id', $company->id)->delete();
+        DB::table('organizations')->where('id', $organization->id)->delete();
 
-        expect(DB::table('crm_companies')->where('id', $company->id)->exists())->toBeFalse();
+        expect(DB::table('organizations')->where('id', $organization->id)->exists())->toBeFalse();
     });
 });
 

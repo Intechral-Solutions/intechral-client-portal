@@ -2,7 +2,12 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\HistoricalSchema;
 use Tests\Support\PreservationKeys;
+
+// Release 1.0 (ORG-2): this file's subject is a migration that has since been superseded or is undone and redone here, so it runs on the disposable rehearsal database built to the schema
+// before ORG-2 (tests/Support/HistoricalSchema.php), never on the shared testing database. Nothing below this line was changed except where a comment says so.
+beforeEach(fn () => HistoricalSchema::use(HistoricalSchema::ORG2));
 
 /*
  * Release 0.9 (R0.9-1B): the behaviour of the three schema-protection migrations themselves. Kept in its own file

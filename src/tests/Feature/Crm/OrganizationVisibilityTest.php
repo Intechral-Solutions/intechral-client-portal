@@ -8,10 +8,9 @@
  *    nothing relationship-shaped is read for anyone else, not merely that the markup is hidden;
  *  - a member row links to the System user page only for a viewer who holds `users.view`;
  *  - "Owner" is relabelled for what the value is, the operator who enabled portal access, and carries no authority;
- *  - the Directory deletion warning states what deleteCompany really does.
+ *  - the Directory deletion warning states what OrganizationDirectory::delete really does.
  */
 
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Organization;
 use App\Models\User;
@@ -26,14 +25,12 @@ beforeEach(function () {
     $this->operator = User::factory()->create(['name' => 'Olive Operator'])->assignRole('operator');
 });
 
-/** An organization and its Directory profile, the pair a managed relationship needs. */
+/** An Enabled Organization, the unit a managed relationship needs (one entity since ORG-2: no separate Directory profile row). */
 function dir1Pair(string $name, ?User $enabledBy = null): Organization
 {
     $owner = $enabledBy ?? User::factory()->create(['name' => 'Enabler of '.$name]);
-    $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
-    CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $owner->id]);
 
-    return $organization;
+    return Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $owner->id]);
 }
 
 /** A partner Alpha that manages Beta, a disabled organization Gamma, an unmanaged Delta, and a Directory profile with no portal access. */
@@ -43,7 +40,7 @@ function dir1Landscape(User $operator): array
     $beta = dir1Pair('Beta Customer', $operator);
     $gamma = dir1Pair('Gamma Offline', $operator);
     $delta = dir1Pair('Delta Standalone', $operator);
-    $plain = CrmCompany::factory()->create(['name' => 'Epsilon Profile Only', 'organization_id' => null, 'created_by' => $operator->id]);
+    $plain = Organization::factory()->directoryOnly()->create(['name' => 'Epsilon Profile Only', 'created_by' => $operator->id]);
 
     $service = app(OrganizationRelationships::class);
     $service->designatePartner($alpha, $operator);
@@ -154,7 +151,15 @@ it('builds no relationship fact for an actor who may not manage relationships, o
         }
     }
 
-    foreach ([route('organizations.index'), route('crm.companies.index')] as $url) {
+    // ORG-2: the Directory Organizations list asks `manageDirectory` (portal.operator AND crm.manage), so this actor, who holds `crm.manage` only, is refused it
+    // outright: no relationship fact is built for them there either, and no read of the relationship column happens at all.
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $this->actingAs($actor)->get(route('crm.companies.index'))->assertForbidden();
+    expect(collect(DB::getQueryLog())->pluck('query')->implode("\n"))->not->toContain('managed_by_organization_id');
+    DB::disableQueryLog();
+
+    foreach ([route('organizations.index')] as $url) {
         DB::flushQueryLog();
         DB::enableQueryLog();
         $page = $this->actingAs($actor)->get($url)->assertOk();
@@ -266,13 +271,13 @@ it('describes the stored owner as the operator who enabled portal access, and ch
 // ── The Directory deletion warning ────────────────────────────────────────────
 
 it('warns that deleting an Organization keeps its People, and promises nothing the code does not do', function () {
-    $company = CrmCompany::factory()->create(['name' => 'Warned Org', 'created_by' => $this->operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Warned Org', 'created_by' => $this->operator->id]);
 
     $page = $this->actingAs($this->operator)->get(route('crm.companies.edit', $company))->assertOk();
 
     $page->assertSee('Delete Organization')
         ->assertSee('Its People are kept: they stay in the Directory and lose their affiliation with it.')
-        ->assertSee('cannot be deleted while projects are linked to it, or while its portal access is a partner or is managed by a partner')
+        ->assertSee('Only an Organization that never had portal access can be deleted, and not while projects are linked to it.')
         // The retired, false claim, and the later DIR-2 rule that does not exist yet.
         ->assertDontSee('and all its contacts')
         ->assertDontSee('permanently remove the company')
@@ -280,26 +285,26 @@ it('warns that deleting an Organization keeps its People, and promises nothing t
 });
 
 it('deletes the Organization record and keeps its People, exactly as the warning says', function () {
-    $company = CrmCompany::factory()->create(['name' => 'Soon Gone', 'created_by' => $this->operator->id]);
-    $person = CrmContact::factory()->create(['crm_company_id' => $company->id]);
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'Soon Gone', 'created_by' => $this->operator->id]);
+    $person = CrmContact::factory()->create(['organization_id' => $company->id]);
 
     $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
         ->assertRedirect(route('crm.companies.index'))
         ->assertSessionHas('success', 'Organization deleted.');
 
-    expect(CrmCompany::find($company->id))->toBeNull()
+    expect(Organization::withoutGlobalScopes()->find($company->id))->toBeNull()
         ->and($person->fresh())->not->toBeNull()
-        ->and($person->fresh()->crm_company_id)->toBeNull();
+        ->and($person->fresh()->organization_id)->toBeNull();
 });
 
 it('still refuses to delete the Organization of a partner, with the refusal the warning describes', function () {
     $world = dir1Landscape($this->operator);
-    $company = $world['alpha']->company;
+    $company = $world['alpha'];
 
     $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
         ->assertSessionHasErrors('company');
 
-    expect(CrmCompany::find($company->id))->not->toBeNull();
+    expect(Organization::withoutGlobalScopes()->find($company->id))->not->toBeNull();
 });
 
 // ── Customer isolation (DIR-0 S2), in the modes that restrict ─────────────────
@@ -309,8 +314,8 @@ it('answers a customer 404 on every Directory and Organization route in closed a
     $world = dir1Landscape($this->operator);
     $customer = User::factory()->create()->assignRole('user');
     DB::table('organization_members')->insert(['organization_id' => $world['alpha']->id, 'user_id' => $customer->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now()]);
-    $company = $world['alpha']->company;
-    $person = CrmContact::factory()->create(['crm_company_id' => $company->id]);
+    $company = $world['alpha'];
+    $person = CrmContact::factory()->create(['organization_id' => $company->id]);
 
     foreach ([
         route('crm.companies.index'), route('crm.companies.show', $company), route('crm.companies.edit', $company), route('crm.companies.create'),

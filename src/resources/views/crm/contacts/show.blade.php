@@ -19,11 +19,11 @@
     @endif
 
     <div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
-        @if ($contact->company)
+        @if ($contact->organization)
         <div>
             <p class="text-xs font-medium mb-0.5 text-text-muted">Organization</p>
-            <x-ui.link :href="route('crm.companies.show', $contact->company)" class="text-sm font-medium">
-                {{ $contact->company->name }}
+            <x-ui.link :href="route('crm.companies.show', $contact->organization)" class="text-sm font-medium">
+                {{ $contact->organization->name }}
             </x-ui.link>
         </div>
         @endif

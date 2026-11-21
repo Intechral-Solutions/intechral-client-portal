@@ -4,20 +4,39 @@ namespace App\Models;
 
 use App\Services\OrganizationAuthority;
 use App\Shared\Scopes\OrganizationMembershipScope;
+use App\Support\Organizations\Classification;
 use App\Support\Organizations\PortalState;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Organization extends Model
 {
     use HasFactory;
 
+    /**
+     * The restrictive ORG-1 contract, unchanged by ORG-2 (CP6, F-7): ONLY `name` and `slug` are mass-assignable. The Directory profile (`website`, `phone`,
+     * `address`, `notes`) and the internal columns (`classification`, `created_by`) are written by App\Services\OrganizationDirectory alone, by explicit column,
+     * after its authority checks, so no request array can reach them through `create()`, `fill()` or `update()`. Fixtures set them explicitly (a factory is
+     * unguarded). An architecture test (OrganizationMassAssignmentTest) pins this list.
+     */
     protected $fillable = [
         'name',
         'slug',
+    ];
+
+    /**
+     * INTERNAL columns (owner ruling 10). They are never part of a generic serialization (`toArray`, `toJson`, an Inertia prop built from a model, a
+     * notification payload): `notes` is the operators' private commentary, `created_by` is provenance, and `classification` is a descriptive label that is
+     * never an authority input. A page that is allowed to show one selects and names it explicitly (see the Directory views); `$hidden` is the backstop, never the
+     * only control, and the leakage tests read real responses.
+     */
+    protected $hidden = [
+        'notes',
+        'created_by',
+        'classification',
     ];
 
     /**
@@ -27,11 +46,12 @@ class Organization extends Model
      * silently undercount for an account the scope filters, and no query that decides an integrity rule may do that.
      *
      * The same holds for the PORTAL STATE (Release 1.0, ORG-1): `portal_enabled_at`, `portal_enabled_by` and `disabled_at` are not
-     * fillable either. They change only through CrmService::promoteToOrganization (initial enablement) and OrganizationRelationships
+     * fillable either. They change only through OrganizationDirectory::enablePortalAccess (initial enablement) and OrganizationRelationships
      * (disable, re-enable), each authorized, locked and audited. Fixtures set them explicitly (a factory is unguarded).
      */
     protected $casts = [
         'can_manage_customers' => 'boolean',
+        'classification' => Classification::class,
     ];
 
     protected static function booted(): void
@@ -54,9 +74,25 @@ class Organization extends Model
             ->withTimestamps();
     }
 
-    public function company(): HasOne
+    /** The operator who created the record. PROVENANCE ONLY, never an authority input (ADR-011 section 2). */
+    public function creator(): BelongsTo
     {
-        return $this->hasOne(CrmCompany::class, 'organization_id');
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The People affiliated with this Organization (Directory records, owner ruling D7: visible to authorized operators only, through CrmContact's own scope).
+     * An affiliation is descriptive: it is never read as authority, membership or portal access.
+     */
+    public function people(): HasMany
+    {
+        return $this->hasMany(CrmContact::class, 'organization_id');
+    }
+
+    /** The Projects this Organization is linked to (`project_organization`). A link is metadata: it widens no one's visibility and prevents deleting the Organization. */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_organization')->withTimestamps();
     }
 
     // ── Helpers ────────────────────────────────────────────

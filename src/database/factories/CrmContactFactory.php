@@ -13,7 +13,8 @@ class CrmContactFactory extends Factory
     public function definition(): array
     {
         return [
-            'crm_company_id' => null,
+            // The Person's one optional Organization (ORG-2: `organization_id`, canonical).
+            'organization_id' => null,
             'first_name' => $this->faker->firstName(),
             'last_name' => $this->faker->lastName(),
             'email' => $this->faker->optional()->safeEmail(),

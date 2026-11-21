@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Organizations\Classification;
 use App\Support\Organizations\PortalState;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,11 @@ use Illuminate\Support\Facades\Schema;
  * has never had portal access ({@see PortalState::NotEnabled}) has no member, invitation, ticket, partner designation or managing relationship. A
  * violation is a FAILURE. The administrator-approval check counts only Organizations that have had portal access, so a Directory-only row neither
  * counts as having portal access nor floods the report.
+ *
+ * TWO SCHEMAS (Release 1.0, ORG-2). Until the consolidation migration `crm_companies` exists and the Company sections below apply (they are the historical
+ * schema's checks and are kept exactly). After it the table is gone: those sections report nothing, and `canonical` re-verifies what only the canonical
+ * schema has: every Organization has an existing creator, and every classification is in the built-in catalogue (there is deliberately no database CHECK for
+ * it). Which schema is in force is read from the database, never assumed.
  */
 final class OrganizationPreflight
 {
@@ -32,7 +38,9 @@ final class OrganizationPreflight
         $failures = [];
         $warnings = [];
 
-        $duplicates = DB::table('crm_companies')
+        $hasCompanies = Schema::hasTable('crm_companies');
+
+        $duplicates = ! $hasCompanies ? [] : DB::table('crm_companies')
             ->select('organization_id', DB::raw('group_concat(id order by id) as company_ids'))
             ->whereNotNull('organization_id')->groupBy('organization_id')->havingRaw('count(*) > 1')
             ->orderBy('organization_id')->get()
@@ -42,7 +50,7 @@ final class OrganizationPreflight
             $failures[] = count($duplicates).' organization(s) are linked to more than one CRM company. The unique-link migration will refuse to run, and no relationship can involve them. Decide for each which company keeps the organization; nothing was changed.';
         }
 
-        $withoutCompany = DB::table('organizations')
+        $withoutCompany = ! $hasCompanies ? [] : DB::table('organizations')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('crm_companies')->whereColumn('crm_companies.organization_id', 'organizations.id'))
             ->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
 
@@ -50,7 +58,7 @@ final class OrganizationPreflight
             $warnings[] = count($withoutCompany).' organization(s) have no CRM company. They cannot be designated as partners or linked as customers until they have exactly one.';
         }
 
-        $companiesWithoutOrganization = DB::table('crm_companies')->whereNull('organization_id')->count();
+        $companiesWithoutOrganization = $hasCompanies ? DB::table('crm_companies')->whereNull('organization_id')->count() : 0;
 
         $operators = OrganizationAuthority::operatorIds();
         $admins = DB::table('organization_members')
@@ -89,13 +97,14 @@ final class OrganizationPreflight
         $invitations = $this->invitations($failures, $warnings);
         $partnerSupport = $this->partnerSupport($failures, $warnings, $operators);
         $portalState = $this->portalState($failures);
+        $canonical = $this->canonical($failures);
 
         return [
             'duplicateLinks' => $duplicates,
             'organizationsWithoutCompany' => $withoutCompany,
             'companiesWithoutOrganization' => $companiesWithoutOrganization,
             'organizations' => DB::table('organizations')->count(),
-            'companies' => DB::table('crm_companies')->count(),
+            'companies' => $hasCompanies ? DB::table('crm_companies')->count() : 0,
             'adminMemberships' => $admins,
             'operatorAdminMemberships' => $operatorHeld,
             'multiOrganizationUsers' => $multiOrganization,
@@ -105,6 +114,7 @@ final class OrganizationPreflight
             'invitations' => $invitations,
             'partnerSupport' => $partnerSupport,
             'portalState' => $portalState,
+            'canonical' => $canonical,
             'failures' => $failures,
             'warnings' => $warnings,
         ];
@@ -167,7 +177,8 @@ final class OrganizationPreflight
             'managedByNonPartner' => $this->ids('select o.id from organizations o join organizations m on m.id = o.managed_by_organization_id where m.can_manage_customers = 0'),
             'partnerThatIsManaged' => $this->ids('select id from organizations where can_manage_customers = 1 and managed_by_organization_id is not null'),
             'managesItself' => $this->ids('select id from organizations where managed_by_organization_id = id'),
-            'withoutSingleCompany' => $this->ids(
+            // The historical schema's pair rule. ORG-2 retires `crm_companies`, and the rule with it.
+            'withoutSingleCompany' => ! Schema::hasTable('crm_companies') ? [] : $this->ids(
                 'select o.id from organizations o where (o.can_manage_customers = 1 or o.managed_by_organization_id is not null or exists (select 1 from organizations c where c.managed_by_organization_id = o.id))
                  and (select count(*) from crm_companies k where k.organization_id = o.id) <> 1'
             ),
@@ -463,6 +474,43 @@ final class OrganizationPreflight
             'notEnabled' => (int) ($states[PortalState::NotEnabled->value] ?? 0),
             'enabled' => (int) ($states[PortalState::Enabled->value] ?? 0),
             'disabled' => (int) ($states[PortalState::Disabled->value] ?? 0),
+            'violations' => $violations,
+        ];
+    }
+
+    /**
+     * What only the canonical schema has (ORG-2), or null while `organizations` has no profile columns. Ids only. `created_by` is NOT NULL with a foreign key,
+     * so a violation means a database loaded with checks off or edited by hand; the classification has no database CHECK, so this is where an unknown value is caught.
+     *
+     * @param  list<string>  $failures
+     * @return array<string, mixed>|null
+     */
+    private function canonical(array &$failures): ?array
+    {
+        if (! Schema::hasColumn('organizations', 'created_by') || ! Schema::hasColumn('organizations', 'classification')) {
+            return null;
+        }
+
+        $known = Classification::values();
+        $unknown = array_map(fn ($row) => (int) $row->id, DB::select(
+            'select id from organizations where classification is null or classification not in ('.implode(',', array_fill(0, count($known), '?')).') order by id',
+            $known
+        ));
+
+        $violations = [
+            'createdByMissing' => $this->ids('select o.id from organizations o where o.created_by is null or not exists (select 1 from users u where u.id = o.created_by) order by o.id'),
+            'unknownClassification' => $unknown,
+        ];
+
+        foreach ($violations as $rule => $ids) {
+            if ($ids !== []) {
+                $failures[] = "Organization rule broken ({$rule}): organization(s) ".implode(', ', $ids).'. The application never writes such a row; investigate how it happened. Nothing was changed.';
+            }
+        }
+
+        return [
+            'byClassification' => DB::table('organizations')->select('classification', DB::raw('count(*) as n'))->groupBy('classification')->orderBy('classification')->pluck('n', 'classification')
+                ->map(fn ($n) => (int) $n)->all(),
             'violations' => $violations,
         ];
     }

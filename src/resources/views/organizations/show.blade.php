@@ -9,9 +9,9 @@
             <h1 class="mt-2 text-2xl font-semibold text-text">{{ $organization->name }}</h1>
             <p class="mt-0.5 text-xs font-mono text-text-muted">{{ $organization->slug }}</p>
         </div>
-        @if ($organization->company)
-        <x-ui.button :href="route('crm.companies.show', $organization->company)" variant="secondary">View Directory profile</x-ui.button>
-        @endif
+        @can('manageDirectory', \App\Models\Organization::class)
+        <x-ui.button :href="route('crm.companies.show', $organization)" variant="secondary">View Directory profile</x-ui.button>
+        @endcan
     </div>
 
     @if (session('success'))

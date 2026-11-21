@@ -6,7 +6,7 @@
  * HTTP response and the absence of the other account's data.
  */
 
-use App\Models\CrmCompany;
+use App\Models\Organization;
 use App\Models\Project;
 use App\Shared\Permissions\PermissionCatalogue;
 use Illuminate\Testing\TestResponse;
@@ -134,8 +134,8 @@ it('keeps the 403 for a customer who lost projects.view, and for it alone', func
 it('does not widen visibility: a company link or an operator role on the other side changes nothing', function () {
     $customer = pilotCustomer();
     $theirs = pilotProjectFor(pilotCustomer(), 'Theirs Only');
-    $company = CrmCompany::factory()->create();
-    $theirs['project']->companies()->attach($company->id);
+    $company = Organization::factory()->create();
+    $theirs['project']->organizations()->attach($company->id);
     pilotMode('pilot');
 
     $this->actingAs($customer)->get(route('projects.show', $theirs['project']))->assertNotFound();

@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\CmsPage;
-use App\Models\CrmCompany;
 use App\Models\CrmContact;
 use App\Models\Invoice;
 use App\Models\Organization;
@@ -104,13 +103,13 @@ function uiTargetPages(): array
         'crm.contacts.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.contacts.edit', CrmContact::factory()->create())), 7],
         'crm.contacts.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.contacts.show', CrmContact::factory()->create())), 0],
         'crm.companies.index' => function ($t) {
-            CrmCompany::factory()->create();
+            Organization::factory()->directoryOnly()->create();
 
             return [uiGet($t, uiActor('operator'), route('crm.companies.index')), 1];
         },
         'crm.companies.create' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.create')), 5],
-        'crm.companies.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.edit', CrmCompany::factory()->create())), 5],
-        'crm.companies.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.show', CrmCompany::factory()->create())), 0],
+        'crm.companies.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.edit', Organization::factory()->directoryOnly()->create())), 5],
+        'crm.companies.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.show', Organization::factory()->directoryOnly()->create())), 0],
         'organizations.index' => function ($t) {
             Organization::factory()->create();
 

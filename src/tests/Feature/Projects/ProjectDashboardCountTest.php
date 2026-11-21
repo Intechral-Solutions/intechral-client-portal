@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\User;
@@ -69,8 +68,7 @@ it('ignores a company link when counting', function () {
     $user = makeUser('user');
     $org = Organization::factory()->create(['portal_enabled_by' => $this->owner->id]);
     $org->members()->attach($user, ['role' => 'member']);
-    $company = CrmCompany::factory()->create(['created_by' => $this->owner->id, 'organization_id' => $org->id]);
-    Project::factory()->active()->create(['created_by' => $this->owner->id])->companies()->attach($company);
+    Project::factory()->active()->create(['created_by' => $this->owner->id])->organizations()->attach($org);
     $user->givePermissionTo('projects.manage');
 
     expect(dashboardProjectCount($user))->toBe(0);

@@ -41,11 +41,14 @@ const REVIEWED_DELETE_CALLS = [
     // pointers are SET NULL, and only membership and credential rows cascade. The file is task-aware only because
     // User declares its `projects()` relation.
     'Models/User.php' => ['return $this->getConnection()->transaction(fn () => parent::delete());'],
-    // Release 0.9 R0.9-1D (R0.9-1B finding L2): a CRM COMPANY and a CRM contact, never a task or project row.
-    // deleteCompany() refuses first when project_company still references the company (that key is RESTRICT, so the
-    // database refuses it too and nothing cascades into a project); a project is never a child of a company. The file is
-    // task-aware only because that refusal counts the linked projects.
-    'Services/CrmService.php' => ['$company->delete();', '$contact->delete();'],
+    // Release 1.0 (ORG-2): an ORGANIZATION row, never a task or project row, and only a never-enabled one, through the one authorized service. It
+    // refuses first when a project link still exists (project_organization.organization_id is RESTRICT, so the database refuses it too and nothing
+    // cascades into a project). The file is project-aware only because that refusal names the link table. (The CRM Company this entry used to cover,
+    // and the CRM contact in CrmService, which is no longer project-aware, were R0.9-1D's.)
+    'Services/OrganizationDirectory.php' => ['DB::table(\'organizations\')->where(\'id\', $row->id)->delete();'],
+    // Release 1.0 (ORG-2): LINK rows between a project and an Organization (the pivot), never the project row: a synchronization removes the links the
+    // actor owns and keeps the rest. The project row is only locked.
+    'Services/ProjectService.php' => ['DB::table(\'project_organization\')->where(\'project_id\', $project->getKey())->whereIn(\'organization_id\', $remove)->delete();'],
 ];
 
 /**

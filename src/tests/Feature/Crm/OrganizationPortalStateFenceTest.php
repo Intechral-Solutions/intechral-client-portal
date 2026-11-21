@@ -14,14 +14,13 @@ use App\Exceptions\OrganizationInvitationException;
 use App\Exceptions\OrganizationMembershipException;
 use App\Exceptions\OrganizationRelationshipException;
 use App\Exceptions\PartnerSupportException;
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\OrganizationInvitationNotification;
-use App\Services\CrmService;
 use App\Services\InvitationAcceptance;
+use App\Services\OrganizationDirectory;
 use App\Services\OrganizationInvitations;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationPreflight;
@@ -319,7 +318,6 @@ it('refuses to designate, link or reassign a Directory-only organization, and of
     $partner = psPaired('Partner');
     $relationships->designatePartner($partner, $this->operator);
     $directoryOnly = psfOrg('not_enabled', null, 'Directory Only');
-    CrmCompany::factory()->create(['name' => 'Directory Only', 'organization_id' => $directoryOnly->id, 'created_by' => $this->operator->id]);
     $before = psfFootprint();
 
     psfRefused(fn () => $relationships->designatePartner($directoryOnly, $this->operator), OrganizationRelationshipException::class, OrganizationRelationshipException::PORTAL_NOT_ENABLED);
@@ -418,7 +416,7 @@ it('refuses every fenced act to an actor who may not manage membership or relati
     $newcomer = pilotCustomer();
     $staff = pilotCustomer();
     psJoin($staff, $partner);
-    $company = CrmCompany::factory()->create(['name' => 'To Enable', 'organization_id' => null, 'created_by' => $this->operator->id]);
+    $company = Organization::factory()->directoryOnly()->create(['name' => 'To Enable', 'created_by' => $this->operator->id]);
     $before = psfFootprint();
 
     $acts = [
@@ -432,7 +430,7 @@ it('refuses every fenced act to an actor who may not manage membership or relati
         'assign' => fn () => app(OrganizationRelationships::class)->assignCustomer($customerOrg, $partner, $actor),
         'disable' => fn () => app(OrganizationRelationships::class)->disable($org, $actor),
         'enable' => fn () => app(OrganizationRelationships::class)->enable($org, $actor),
-        'initial enablement' => fn () => app(CrmService::class)->promoteToOrganization($company, $actor),
+        'initial enablement' => fn () => app(OrganizationDirectory::class)->enablePortalAccess($company, $actor),
     ];
 
     foreach ($acts as $name => $act) {
@@ -440,7 +438,7 @@ it('refuses every fenced act to an actor who may not manage membership or relati
     }
 
     expect(psfFootprint())->toBe($before)
-        ->and(DB::table('crm_companies')->where('id', $company->id)->value('organization_id'))->toBeNull();
+        ->and(DB::table('organizations')->where('id', $company->id)->value('portal_enabled_at'))->toBeNull();
 })->with(['a customer', 'a suspended operator', 'portal.operator without crm.manage', 'crm.manage without portal.operator']);
 
 // ── No new Directory-only portal capability ──────────────────────────────────

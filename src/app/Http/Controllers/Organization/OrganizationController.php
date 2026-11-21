@@ -18,7 +18,7 @@ class OrganizationController extends Controller
 {
     public function index(Request $request): View
     {
-        $organizations = Organization::with(['portalEnabledBy', 'company'])
+        $organizations = Organization::with(['portalEnabledBy'])
             ->withCount('members')
             ->orderBy('name')
             ->orderBy('id')
@@ -36,7 +36,7 @@ class OrganizationController extends Controller
 
     public function show(Organization $organization): View
     {
-        $organization->load(['portalEnabledBy', 'company', 'members']);
+        $organization->load(['portalEnabledBy', 'members']);
 
         // Release 1.0 (MO-2A1): membership administration is operator-only, so the candidate list (every active account that is not
         // yet a member) and the approval details are built only for an actor who may manage membership. Anyone else who can open
@@ -76,18 +76,18 @@ class OrganizationController extends Controller
     private function relationshipPanel(Organization $organization): array
     {
         $isPartner = (bool) $organization->can_manage_customers;
+        // Offered only where the server would accept it: designating and linking need an ENABLED Organization (ORG-1), so a never-enabled or Disabled one is offered neither.
+        $enabled = $organization->portalState()->isEnabled();
         $manager = OrganizationRelationships::managerOf($organization);
-        $companies = OrganizationRelationships::companyCount($organization->getKey());
 
         return [
             'isPartner' => $isPartner,
             'manager' => $manager,
             'customers' => $isPartner ? OrganizationRelationships::managedCustomers($organization) : collect(),
-            'companies' => $companies,
             // Offered only where the server would accept it; the server decides regardless.
-            'canDesignate' => ! $isPartner && $manager === null && $companies === 1,
+            'canDesignate' => $enabled && ! $isPartner && $manager === null,
             'candidateCustomers' => $isPartner ? OrganizationRelationships::eligibleCustomers($organization) : collect(),
-            'candidatePartners' => ! $isPartner && $companies === 1 ? OrganizationRelationships::eligiblePartners($organization) : collect(),
+            'candidatePartners' => $enabled && ! $isPartner ? OrganizationRelationships::eligiblePartners($organization) : collect(),
         ];
     }
 }

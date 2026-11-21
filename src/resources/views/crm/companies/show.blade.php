@@ -14,7 +14,7 @@
             @endif
         </div>
         <div class="flex gap-2">
-            @if (! $company->isPromoted())
+            @if ($company->portalState()->isNotEnabled())
             <form method="POST" action="{{ route('crm.companies.promote', $company) }}">
                 @csrf
                 <x-ui.button type="submit" variant="secondary"
@@ -23,7 +23,7 @@
                 </x-ui.button>
             </form>
             @else
-            <x-ui.button :href="route('organizations.show', $company->organization)" variant="secondary">View portal access ↗</x-ui.button>
+            <x-ui.button :href="route('organizations.show', $company)" variant="secondary">View portal access ↗</x-ui.button>
             @endif
             <x-ui.button :href="route('crm.companies.edit', $company)" variant="secondary">Edit</x-ui.button>
         </div>
@@ -33,10 +33,15 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
+    @error('company')
+    <x-ui.alert variant="danger" class="mb-6">{{ $message }}</x-ui.alert>
+    @enderror
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {{-- Details --}}
         <div class="lg:col-span-1 rounded-lg border p-5 space-y-3 bg-surface border-rule">
             <h2 class="text-xs font-semibold uppercase tracking-wide mb-2 text-text-muted">Details</h2>
+            <div><p class="text-xs text-text-muted">Classification</p><p class="text-sm text-text">{{ $company->classification->label() }}</p></div>
             @if ($company->phone)
             <div><p class="text-xs text-text-muted">Phone</p><p class="text-sm text-text">{{ $company->phone }}</p></div>
             @endif
@@ -56,7 +61,7 @@
             </div>
             <table class="w-full text-sm">
                 <tbody class="divide-y divide-rule">
-                    @forelse ($company->contacts as $contact)
+                    @forelse ($company->people as $contact)
                     <tr>
                         <td class="px-5 py-3">
                             <x-ui.link variant="row" :href="route('crm.contacts.show', $contact)">

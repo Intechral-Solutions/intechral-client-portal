@@ -55,15 +55,15 @@
                     </td>
                     <td class="px-4 py-3 text-text-secondary">{{ $company->phone ?? '—' }}</td>
                     <td class="px-4 py-3">
-                        @if ($company->isPromoted())
-                        @php($state = $portalStatus[$company->organization_id] ?? null)
+                        @if (! $company->portalState()->isNotEnabled())
+                        @php($state = $portalStatus[$company->id] ?? null)
                         <span class="inline-flex items-center gap-2">
                             @if ($state === OrganizationListFacts::DISABLED)
                             <x-ui.status tone="warning">Disabled</x-ui.status>
                             @else
                             <x-ui.status tone="success">Enabled</x-ui.status>
                             @endif
-                            <x-ui.link :href="route('organizations.show', $company->organization_id)" class="text-xs font-medium" aria-label="Manage portal access for {{ $company->name }}">Manage</x-ui.link>
+                            <x-ui.link :href="route('organizations.show', $company)" class="text-xs font-medium" aria-label="Manage portal access for {{ $company->name }}">Manage</x-ui.link>
                         </span>
                         @else
                         <x-ui.status glyph="dashed">Not enabled</x-ui.status>
@@ -71,7 +71,7 @@
                     </td>
                     @if ($relationships !== null)
                     {{-- Built only for an actor who may manage relationships (DIR-0 S7): $relationships is null otherwise and this never renders. --}}
-                    @php($fact = $company->isPromoted() ? ($relationships[$company->organization_id] ?? null) : null)
+                    @php($fact = ! $company->portalState()->isNotEnabled() ? ($relationships[$company->id] ?? null) : null)
                     <td class="px-4 py-3 text-text-secondary">{{ $fact['managedBy']['name'] ?? '—' }}</td>
                     <td class="px-4 py-3 text-right text-text-secondary">{{ $fact !== null && $fact['isPartner'] ? $fact['manages'] : '—' }}</td>
                     @endif

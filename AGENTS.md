@@ -19,8 +19,11 @@ Likewise for the **Directory** (DIR-1; glossary in [`docs/product/release-1.0-di
 Operator-visible text says **Directory** for the workspace, **Person** / **People** for a Directory record of a human, and **Organization**
 for the one concept that spans the Directory profile and the portal organization. It says **Enable portal access** (never "Promote"),
 **Portal access** for the state and section, **Organization access** for the System index, and **Linked organizations** on projects. It never
-says "Company", "CRM", "Org" or "Contact" for a Directory record. `CrmContact`, `CrmCompany`, `crm_*` tables, `crm.*` routes, `crm.manage` and
-`Organization` stay the technical names. **"Contact" keeps its Helpdesk meaning**: the customer contact a partner raises a service request for
+says "Company", "CRM", "Org" or "Contact" for a Directory record. Since ORG-2 there is ONE canonical Organization record (`Organization`, the
+`organizations` table: Directory profile, portal state and memberships); `CrmContact` / `crm_contacts` (a Person, whose `organization_id` is a Directory
+affiliation that decides no access), the `crm.*` routes (transitional names, kept until ORG-3), `crm.manage` and `project_organization` (the Project link)
+stay the technical names. `CrmCompany`, `crm_companies` and `project_company` are retired: never reintroduce them, and never describe them as current.
+**Classification** is a descriptive label only and is never an input to any authorization decision; its editing selector arrives with ORG-3. **"Contact" keeps its Helpdesk meaning**: the customer contact a partner raises a service request for
 is always a User, and that wording is unchanged. A detail page may use the record's own name as its title, but the navigation item and the
 section it opens must still agree.
 

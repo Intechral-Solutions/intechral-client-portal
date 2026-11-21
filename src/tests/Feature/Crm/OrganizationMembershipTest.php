@@ -698,7 +698,7 @@ it('leaves no other writer of organization membership: the legacy CrmService met
         ->and(method_exists(Organization::class, 'isAdmin'))->toBeFalse()
         ->and(method_exists(Organization::class, 'hasAdminRole'))->toBeTrue();
 
-    // Only the membership service writes the table, and the promotion of a company attaches its promoter (unchanged behaviour).
+    // Only the membership service writes the table, and initial enablement of an Organization (OrganizationDirectory, which replaced the Company promotion in ORG-2) attaches its promoter (unchanged behaviour).
     $writers = collect(new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path(), FilesystemIterator::SKIP_DOTS)))
         ->filter(fn (SplFileInfo $file) => $file->getExtension() === 'php')
         ->filter(fn (SplFileInfo $file) => preg_match('/members\(\)\s*->\s*(attach|sync|syncWithoutDetaching|detach|updateExistingPivot)\(|table\(\s*[\'"]organization_members[\'"]\s*\)[^;]*->\s*(insert|update|delete|upsert)\(/s', file_get_contents($file->getPathname())) === 1)
@@ -712,7 +712,7 @@ it('leaves no other writer of organization membership: the legacy CrmService met
     // memberships of accounts it removes, in local and testing only (OrganizationInvitationFlowTest pins "delete only").
     // R1-4: and PartnerSupportGrants, which writes ONLY the two support-designation columns (`support_granted_at`, `support_granted_by`) of an existing row,
     // never a role, an approval or a membership; PartnerSupportAccessTest and PartnerSupportGrantsTest pin that it changes nothing else.
-    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/CrmService.php', 'Services/OrganizationMembership.php', 'Services/PartnerSupportGrants.php']);
+    expect($writers)->toBe(['Console/Commands/CleanupE2eInvitees.php', 'Services/OrganizationDirectory.php', 'Services/OrganizationMembership.php', 'Services/PartnerSupportGrants.php']);
 });
 
 it('takes the organization row lock before touching the membership table', function () {

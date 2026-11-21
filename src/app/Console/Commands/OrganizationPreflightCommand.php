@@ -22,13 +22,23 @@ class OrganizationPreflightCommand extends Command
             return $failed ? self::FAILURE : self::SUCCESS;
         }
 
-        $this->line("Organizations: {$report['organizations']}   CRM companies: {$report['companies']}   Companies without an organization: {$report['companiesWithoutOrganization']}");
+        if ($report['canonical'] === null) {
+            // The schema before ORG-2: the Company record still exists and this is the gate that decides whether the migration may run.
+            $this->line("Organizations: {$report['organizations']}   CRM companies: {$report['companies']}   Companies without an organization: {$report['companiesWithoutOrganization']}");
+        } else {
+            // The canonical schema: there is one Organization record. The retired Company record is not mentioned as if it were current.
+            $this->line("Organizations: {$report['organizations']}");
+        }
 
         if ($report['portalState'] === null) {
             $this->line('Portal state: not migrated yet (the ORG-1 columns do not exist).');
         } else {
             $s = $report['portalState'];
             $this->line(sprintf('Portal state: %d enabled, %d disabled, %d not enabled (Directory-only)', $s['enabled'], $s['disabled'], $s['notEnabled']));
+        }
+
+        if ($report['canonical'] !== null) {
+            $this->line('Classification: '.(collect($report['canonical']['byClassification'])->map(fn (int $n, string $classification) => "{$n} {$classification}")->implode(', ') ?: 'none'));
         }
 
         $tickets = $report['ticketAttribution'];

@@ -22,7 +22,6 @@
  *   J. the creation's locks: users together, then organizations together, each ascending, in that order
  */
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Ticket;
 use App\Models\User;
@@ -74,12 +73,7 @@ function psRaceFixture(): array
     $actor->givePermissionTo($permissions->all());
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $make = function (string $name) use ($actor): Organization {
-        $organization = Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $actor->id]);
-        CrmCompany::factory()->create(['name' => $name, 'organization_id' => $organization->id, 'created_by' => $actor->id]);
-
-        return $organization;
-    };
+    $make = fn (string $name): Organization => Organization::factory()->create(['name' => $name, 'portal_enabled_by' => $actor->id]);
 
     $partner = $make('Race Partner');
     $customer = $make('Race Customer');
@@ -109,7 +103,6 @@ function psRaceCleanup(array $f): void
     DB::table('activity_log')->where('subject_type', Organization::class)->whereIn('subject_id', $organizations)->delete();
     DB::table('activity_log')->whereIn('causer_id', $users)->delete();
     DB::table('organizations')->whereIn('id', $organizations)->update(['managed_by_organization_id' => null]);
-    DB::table('crm_companies')->where('created_by', $f['actor']->id)->delete();
     DB::table('organization_members')->whereIn('organization_id', $organizations)->delete();
     DB::table('organizations')->whereIn('id', $organizations)->update(['portal_enabled_by' => $f['actor']->id]);
     CommittedUsers::delete($users);

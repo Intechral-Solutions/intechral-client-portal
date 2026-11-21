@@ -23,23 +23,37 @@
  *        add_member {organization, user, role, actor} | approve_member {organization, user, actor} | create_ticket {user, organization}
  *   ORG-1 (portal state): disable {organization, actor} | enable {organization, actor} | promote_member {organization, user, actor}
  *        grant_support {organization, user, actor} | designate {organization, actor} | assign_customer {customer, partner, actor}
+ *   ORG-2 (CP6, Directory and Projects): remove_member {organization, user, actor} | dir_create {actor, data} | dir_update {organization, actor, data} | dir_classify {organization, actor, classification}
+ *        dir_delete {organization, actor} | dir_enable {organization, actor} (initial enablement) | person_create {actor, data} | person_update {contact, data} | person_delete {contact}
+ *        project_sync {project, actor, ids} | project_create {actor, data}
+ *
+ * Every worker also reports `connectionId` (the MariaDB session it ran on), so a test can name the two real connections of a pair.
+ *
+ * `hold` may carry `every: true`: the worker then freezes at EVERY matching statement (not only the n-th), writing `<tag>.held.<k>` and waiting for
+ * `<tag>.release.<k>` for the k-th match (k from 1). The restart tests use it to interleave a change of its own at each attempt of a bounded restart loop.
  */
 
 use App\Exceptions\LastAccountAdministratorException;
+use App\Exceptions\OrganizationDirectoryException;
 use App\Exceptions\OrganizationInvitationException;
 use App\Exceptions\OrganizationMembershipException;
 use App\Exceptions\OrganizationRelationshipException;
 use App\Exceptions\PartnerSupportException;
+use App\Models\CrmContact;
 use App\Models\Organization;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\AccessGrants;
 use App\Services\AccountLifecycleService;
 use App\Services\BuiltInRoleSynchronizer;
+use App\Services\CrmService;
 use App\Services\InvitationAcceptance;
+use App\Services\OrganizationDirectory;
 use App\Services\OrganizationInvitations;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
 use App\Services\PartnerSupportGrants;
+use App\Services\ProjectService;
 use App\Services\TicketService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Console\Kernel;
@@ -50,7 +64,10 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 require __DIR__.'/../../vendor/autoload.php';
 
@@ -63,6 +80,7 @@ $hold = $operation['hold'] ?? null;
 // A short lock wait, so a genuine hang fails the test within seconds (a lock wait timeout is an error outcome, never a pass); long enough that a blocked worker outlives the parent's observation.
 DB::statement('SET SESSION innodb_lock_wait_timeout = 15');
 
+$connectionId = (int) DB::selectOne('select connection_id() as id')->id;
 $statements = [];
 $heldAt = null;
 $heldCount = 0;
@@ -79,7 +97,17 @@ DB::listen(function (QueryExecuted $query) use (&$statements, &$heldAt, &$heldCo
         $statements[] = ['sql' => preg_replace('/\s+/', ' ', $sql), 'cache' => $table !== null, 'keys' => $keys, 'transactional' => DB::transactionLevel() > 0, 'at' => microtime(true)];
     }
 
-    if ($hold !== null && $heldAt === null && preg_match($hold['pattern'], $sql) === 1 && ++$heldCount >= ($hold['nth'] ?? 1)) {
+    if ($hold !== null && ($hold['every'] ?? false) && preg_match($hold['pattern'], $sql) === 1) {
+        // Freeze at every match: the k-th match writes <tag>.held.<k> and waits for <tag>.release.<k>.
+        $k = ++$heldCount;
+        $heldAt ??= microtime(true);
+        file_put_contents($hold['dir'].'/'.$hold['tag'].'.held.'.$k, (string) microtime(true));
+
+        $deadline = microtime(true) + 40;
+        while (! is_file($hold['dir'].'/'.$hold['tag'].'.release.'.$k) && microtime(true) < $deadline) {
+            usleep(5_000);
+        }
+    } elseif ($hold !== null && ! ($hold['every'] ?? false) && $heldAt === null && preg_match($hold['pattern'], $sql) === 1 && ++$heldCount >= ($hold['nth'] ?? 1)) {
         $heldAt = microtime(true);
         file_put_contents($hold['dir'].'/'.$hold['tag'].'.held', (string) $heldAt);
 
@@ -186,6 +214,51 @@ try {
             Organization::withoutGlobalScopes()->findOrFail($operation['partner']),
             User::findOrFail($operation['actor']),
         )],
+        'remove_member' => (function () use ($app, $operation) {
+            $app->make(OrganizationMembership::class)->remove(
+                Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+                User::findOrFail($operation['user']),
+                User::findOrFail($operation['actor']),
+            );
+
+            return ['removed' => true];
+        })(),
+        'dir_create' => ['organization' => $app->make(OrganizationDirectory::class)->create(User::findOrFail($operation['actor']), $operation['data'])->id],
+        'dir_update' => ['changed' => $app->make(OrganizationDirectory::class)->update(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+            $operation['data'],
+        )],
+        'dir_classify' => ['changed' => $app->make(OrganizationDirectory::class)->changeClassification(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+            $operation['classification'],
+        )],
+        'dir_delete' => (function () use ($app, $operation) {
+            $app->make(OrganizationDirectory::class)->delete(
+                Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+                User::findOrFail($operation['actor']),
+            );
+
+            return ['deleted' => true];
+        })(),
+        'dir_enable' => ['enabled' => $app->make(OrganizationDirectory::class)->enablePortalAccess(
+            Organization::withoutGlobalScopes()->findOrFail($operation['organization']),
+            User::findOrFail($operation['actor']),
+        )->id],
+        'person_create' => ['person' => $app->make(CrmService::class)->createContact(User::findOrFail($operation['actor']), $operation['data'])->id],
+        'person_update' => ['person' => $app->make(CrmService::class)->updateContact(CrmContact::withoutGlobalScopes()->findOrFail($operation['contact']), $operation['data'])->id],
+        'person_delete' => (function () use ($app, $operation) {
+            $app->make(CrmService::class)->deleteContact(CrmContact::withoutGlobalScopes()->findOrFail($operation['contact']));
+
+            return ['deleted' => true];
+        })(),
+        'project_sync' => (function () use ($app, $operation) {
+            $app->make(ProjectService::class)->syncOrganizations(Project::findOrFail($operation['project']), User::findOrFail($operation['actor']), $operation['ids']);
+
+            return ['synced' => true];
+        })(),
+        'project_create' => ['project' => $app->make(ProjectService::class)->create(User::findOrFail($operation['actor']), $operation['data'])->id],
         'create_ticket' => ['ticket' => $app->make(TicketService::class)->create(
             User::findOrFail($operation['user']),
             ['title' => 'Race ticket', 'description' => 'Created by the concurrency worker.', 'category' => 'General', 'priority' => 'low'],
@@ -206,6 +279,17 @@ try {
 } catch (PartnerSupportException $e) {
     $outcome = 'support:'.$e->reason;
     $detail = $e->getMessage();
+} catch (OrganizationDirectoryException $e) {
+    $outcome = 'directory:'.$e->reason;
+    $detail = $e->getMessage();
+} catch (ValidationException $e) {
+    $outcome = 'validation:'.implode(',', array_keys($e->errors()));
+    $detail = implode(' | ', array_merge(...array_values($e->errors())));
+} catch (ConflictHttpException $e) {
+    $outcome = 'conflict';
+    $detail = $e->getMessage();
+} catch (HttpException $e) {
+    $outcome = 'http:'.$e->getStatusCode();
 } catch (AuthorizationException) {
     $outcome = 'unauthorized';
 } catch (LastAccountAdministratorException) {
@@ -219,6 +303,7 @@ try {
 }
 
 echo json_encode([
+    'connectionId' => $connectionId,
     'outcome' => $outcome,
     'detail' => $detail,
     'result' => is_array($result ?? null) ? $result : null,

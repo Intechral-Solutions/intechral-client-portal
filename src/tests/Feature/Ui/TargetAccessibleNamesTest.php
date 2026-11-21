@@ -242,7 +242,7 @@ it('applies the three approved Finance name changes and keeps the placeholders a
 
 it('leaves a control that already had an authored name with exactly that name', function () {
     $operator = User::factory()->create()->assignRole('operator');
-    $contact = CrmContact::factory()->create(['crm_company_id' => null]);
+    $contact = CrmContact::factory()->create(['organization_id' => null]);
     $page = CmsPage::factory()->create();
 
     expect(uiNames(uiPage($this, 'operator', route('crm.contacts.index')), '//input[@name="search"]'))->toBe(['Search by name or email…'])

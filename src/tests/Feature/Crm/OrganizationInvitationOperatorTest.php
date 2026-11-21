@@ -160,10 +160,32 @@ describe('the Invitations card', function () {
 
         expect($html)->toContain('mine-new@example.test')->and($html)->toContain('mine-old@example.test')->and($html)->not->toContain('theirs@example.test')
             ->and(strpos($html, 'mine-new@example.test'))->toBeLessThan(strpos($html, 'mine-old@example.test'))
-            ->and($html)->toContain('Invited by '.$this->operator->name)
+            ->and($html)->toContain('Invited by '.e($this->operator->name))
             ->and($html)->toContain('Pending')
             ->and($html)->toContain('Expires '.now()->addDays(OrganizationInvitations::LIFETIME_DAYS)->format('M j, Y'));
     });
+
+    // CP7, G-7: the page ESCAPES the inviter's name (correctly), so a name with an apostrophe or an ampersand is not on the page as typed. The assertion compares against
+    // the framework's own escaped form; the names below are fixed rather than left to the Faker, so the escaped case is exercised on every run and not one run in N.
+    it('names the inviter in escaped form: apostrophes and ampersands are shown, not corrupted, and the raw form is never emitted', function (string $name, bool $escapes) {
+        $this->operator->forceFill(['name' => $name])->save();
+        regInvOpen('named@example.test', $this->org, $this->operator);
+
+        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->getContent();
+
+        expect($html)->toContain('Invited by '.e($name));
+
+        if ($escapes) {
+            expect(e($name))->not->toBe($name)->and($html)->not->toContain('Invited by '.$name);
+        } else {
+            expect(e($name))->toBe($name);
+        }
+    })->with([
+        'an apostrophe' => ["Siobhan O'Brien", true],
+        'an ampersand' => ['Smith & Sons', true],
+        'a tag-like name' => ['<b>Bold</b>', true],
+        'an ordinary name' => ['Dana Whitfield', false],
+    ]);
 
     it('never renders a token or a hash, in any state', function () {
         [$open, $openToken] = regInvOpen('open@example.test', $this->org, $this->operator);

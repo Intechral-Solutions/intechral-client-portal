@@ -14,17 +14,17 @@
 </div>
 
 <div class="space-y-2">
-    <x-ui.label for="crm_company_id">Organization</x-ui.label>
-    <x-ui.select name="crm_company_id" class="w-full">
+    <x-ui.label for="organization_id">Organization</x-ui.label>
+    <x-ui.select name="organization_id" class="w-full">
         <option value="">No organization</option>
         @foreach ($companies as $company)
         <option value="{{ $company->id }}"
-                @selected(old('crm_company_id', $contact->crm_company_id ?? $companyId ?? '') == $company->id)>
+                @selected(old('organization_id', $contact->organization_id ?? $companyId ?? '') == $company->id)>
             {{ $company->name }}
         </option>
         @endforeach
     </x-ui.select>
-    <x-ui.field-error for="crm_company_id" />
+    <x-ui.field-error for="organization_id" />
 </div>
 
 <div class="grid grid-cols-2 gap-4">

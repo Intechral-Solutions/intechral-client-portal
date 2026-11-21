@@ -7,7 +7,7 @@ use App\Http\Presenters\ProjectOverviewPresenter;
 use App\Http\Presenters\ProjectPresenter;
 use App\Models\Project;
 use App\Queries\ProjectHealth;
-use App\Rules\AccessibleCrmCompany;
+use App\Rules\AccessibleOrganization;
 use App\Services\ProjectService;
 use App\Shared\Pilot\CustomerPilotGate;
 use Illuminate\Http\RedirectResponse;
@@ -15,8 +15,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ProjectController extends Controller
 {
@@ -109,11 +111,11 @@ class ProjectController extends Controller
             'budget' => 'nullable|numeric|min:0',
             ...$this->memberRules(),
             'companies' => 'nullable|array',
-            'companies.*' => [new AccessibleCrmCompany],
+            'companies.*' => [new AccessibleOrganization],
         ], [], ['companies' => 'linked organizations', 'companies.*' => 'organization']);
 
         // One service-owned transaction: the project, its board, the creator, the extra members and
-        // the company links all persist together or not at all (EPIC-015 INV-P10).
+        // the Organization links all persist together or not at all (EPIC-015 INV-P10).
         $project = $this->service->create(auth()->user(), $data);
 
         // A new project lands on its Overview, the project's home (EPIC-015 Q5). An ordinary
@@ -217,10 +219,19 @@ class ProjectController extends Controller
 
         $data = $request->validate([
             'companies' => 'present|array',
-            'companies.*' => [new AccessibleCrmCompany],
+            'companies.*' => [new AccessibleOrganization],
         ], [], ['companies' => 'linked organizations', 'companies.*' => 'organization']);
 
-        $project->companies()->sync($data['companies']);
+        // The service takes the Organization locks in order, preserves the links this actor cannot see, and serializes through the project row.
+        try {
+            $this->service->syncOrganizations($project, $request->user(), $data['companies']);
+        } catch (ConflictHttpException) {
+            // The restart bound ran out: the links kept changing and NOTHING was written. Answer like any other form error (a redirect back carrying the
+            // message under the field the page already renders), never a raw 409 page, and never a success flash.
+            throw ValidationException::withMessages([
+                'companies' => 'The linked organizations were changed by someone else while this was being saved. Nothing was changed; please review the list and try again.',
+            ]);
+        }
 
         return redirect()->route('projects.edit', $project)
             ->with('success', 'Linked organizations updated.');

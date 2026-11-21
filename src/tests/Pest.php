@@ -11,10 +11,13 @@
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\HistoricalTestCase;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->in('Feature');
 uses(TestCase::class)->in('Unit');
+// Release 1.0 (ORG-2): historical-schema and superseded-migration tests run on the disposable rehearsal database, not the testing database.
+uses(HistoricalTestCase::class)->in('Historical');
 
 /** The nested attachment download URL (C6-R): addressed by the ticket's public reference, never the numeric key. */
 function ticketAttachmentUrl(TicketAttachment $attachment): string

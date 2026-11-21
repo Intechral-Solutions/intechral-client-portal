@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\CrmCompany;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
@@ -228,8 +227,8 @@ it('never widens the view, whatever the filter, search or sort (property)', func
     $foreignMilestone = $p2->milestones()->create(['name' => 'M2', 'due_date' => today()]);
     $this->t['b1']->update(['milestone_id' => $milestone->id]);
     $this->t['b4']->update(['milestone_id' => $foreignMilestone->id]);
-    $company = CrmCompany::factory()->create(['created_by' => $this->actors['operator']->id]);
-    $p2->companies()->attach($company);
+    $company = Organization::factory()->create(['portal_enabled_by' => $this->actors['operator']->id]);
+    $p2->organizations()->attach($company);
 
     $variants = [
         ['completion' => 'open'], ['completion' => 'done'], ['completion' => 'any'],
@@ -266,8 +265,8 @@ it('returns nothing for a project, milestone or organization outside the authori
     $p2 = $this->world['projects']['p2'];
     $foreign = $p2->milestones()->create(['name' => 'Hidden', 'due_date' => today()]);
     $this->t['b4']->update(['milestone_id' => $foreign->id]);
-    $company = CrmCompany::factory()->create(['created_by' => $this->actors['operator']->id]);
-    $p2->companies()->attach($company);
+    $company = Organization::factory()->create(['portal_enabled_by' => $this->actors['operator']->id]);
+    $p2->organizations()->attach($company);
 
     $query = new TaskQuery($member, TaskQuery::VIEW_ALL);
 
@@ -334,11 +333,10 @@ it('filters by assignee, or by no assignee', function () {
         ->and(labelsOf($this->world, idsOf($query->results(anyState('all', ['assignee' => 'none'])))))->toBe(['b3']);
 });
 
-it('narrows by organization through the project\'s company link, never matching a standalone task', function () {
+it('narrows by organization through the project\'s Organization link, never matching a standalone task', function () {
     $operator = $this->actors['operator'];
-    $org = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
-    $company = CrmCompany::factory()->create(['created_by' => $operator->id, 'organization_id' => $org->id]);
-    $this->world['projects']['p1']->companies()->attach($company);
+    $company = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
+    $this->world['projects']['p1']->organizations()->attach($company);
 
     $labels = labelsOf($this->world, idsOf(
         (new TaskQuery($operator, TaskQuery::VIEW_ALL))->results(anyState('all', ['organization' => $company->id]))

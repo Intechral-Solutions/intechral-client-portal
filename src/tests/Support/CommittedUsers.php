@@ -3,6 +3,7 @@
 namespace Tests\Support;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Removes users a test COMMITTED to the shared testing database, together with the durable records they own,
@@ -56,12 +57,19 @@ final class CommittedUsers
             ['tickets', 'user_id'],           // replies, attachments and status history cascade
             ['projects', 'created_by'],       // columns, members, milestones, remaining tasks and company links cascade
             ['crm_contacts', 'created_by'],
-            ['crm_companies', 'created_by'],
+            ['crm_companies', 'created_by'],           // the historical schema only (ORG-2 retired the table): skipped below when it does not exist
             ['cms_pages', 'created_by'],
+            ['organizations', 'created_by'],           // ORG-2, canonical schema only: replaces crm_companies.created_by (skipped below on the historical one)
             ['organizations', 'portal_enabled_by'],    // members are RESTRICT since ORG-1: they are deleted first, below
         ];
 
         foreach ($owned as [$table, $column]) {
+            // The same helper serves the current schema and the historical one the tests under tests/Historical build: a key whose table or column the schema
+            // in force does not have is not there to satisfy.
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
+                continue;
+            }
+
             // ORG-1: `organization_members.organization_id` is RESTRICT, so the members of an Organization go before the Organization does.
             if ($table === 'organizations') {
                 DB::table('organization_members')->whereIn('organization_id', DB::table('organizations')->whereIn($column, $ids)->select('id'))->delete();
