@@ -336,10 +336,11 @@ describe('the Invitations card', function () {
     it('is absent for an account that cannot manage membership, and for a customer\'s own organization page', function () {
         regInvOpen('private@example.test', $this->org, $this->operator);
 
-        // A customer holding a stray crm.manage can open the page of an organization they belong to; the card (and its addresses) is not built.
+        // A customer holding a stray crm.manage is refused the page of an organization they belong to (ORG-3a: `manageDirectory`; until then they could open it and the
+        // card was merely not built). Neither the card nor an address reaches them.
         $stray = opInvCustomer($this->org, ['crm.manage']);
         $this->actingAs($stray)->get(route('organizations.show', $this->org))
-            ->assertOk()->assertDontSee('Invitations')->assertDontSee('private@example.test')
+            ->assertForbidden()->assertDontSee('Invitations')->assertDontSee('private@example.test')
             ->assertDontSee(route('organizations.invitations.store', $this->org), false);
 
         // portal.operator without crm.manage never reaches the page.

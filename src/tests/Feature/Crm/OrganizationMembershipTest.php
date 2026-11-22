@@ -613,7 +613,7 @@ it('disables demotion and removal of the only approved administrator and asks fo
         ->assertSee('action="'.route('organizations.members.destroy', [$organization, $only]).'"', false);
 });
 
-it('shows a customer holding crm.manage who belongs to the organization the plain member list and no controls, candidates or approvals', function () {
+it('refuses a customer holding crm.manage who belongs to the organization its page, so no member, control, candidate or approval reaches them', function () {
     $organization = memOrg();
     $viewer = memCustomer(['name' => 'Vera Viewer'])->givePermissionTo('crm.manage');
     $colleague = memCustomer(['name' => 'Colin Colleague']);
@@ -621,8 +621,10 @@ it('shows a customer holding crm.manage who belongs to the organization the plai
     memAttach($organization, $viewer, 'member');
     memAttach($organization, $colleague, 'admin', $this->operator);
 
-    $this->actingAs($viewer)->get(route('organizations.show', $organization))->assertOk()
-        ->assertSee('Colin Colleague')
+    // ORG-3a: the page asks `manageDirectory`, so this actor is refused it outright. (Until then they were shown the plain member list, which is still what an actor
+    // who passes the Directory ability and not the membership ability would see: OrganizationVisibilityTest reaches that branch with a policy that separates the two.)
+    $this->actingAs($viewer)->get(route('organizations.show', $organization))->assertForbidden()
+        ->assertDontSee('Colin Colleague')
         ->assertDontSee('Sasha Stranger')
         ->assertDontSee('Approved administrator')
         ->assertDontSee('Revoke approval')

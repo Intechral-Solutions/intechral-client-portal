@@ -1,4 +1,3 @@
-@use('App\Services\OrganizationListFacts')
 @extends('layouts.app', ['title' => 'Organization access'])
 
 @section('content')
@@ -7,7 +6,7 @@
     <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold text-text">Organization access</h1>
-            <p class="mt-1 text-sm text-text-secondary">Organizations with portal access enabled: their members, invitations and administration.</p>
+            <p class="mt-1 text-sm text-text-secondary">Organizations with portal access enabled: their members, invitations and administration. A disabled Organization stays listed; one that has never had portal access is in the Directory only.</p>
         </div>
         <x-ui.button :href="route('crm.companies.index')" variant="secondary" class="shrink-0">View Organizations</x-ui.button>
     </div>
@@ -45,11 +44,7 @@
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-text-muted">{{ $org->slug }}</td>
                     <td class="px-4 py-3">
-                        @if (($portalStatus[$org->id] ?? null) === OrganizationListFacts::DISABLED)
-                        <x-ui.status tone="warning">Disabled</x-ui.status>
-                        @else
-                        <x-ui.status tone="success">Enabled</x-ui.status>
-                        @endif
+                        <x-organization.portal-state :state="$org->portalState()" />
                     </td>
                     <td class="px-4 py-3 text-text-secondary">{{ $org->portalEnabledBy?->name ?? '—' }}</td>
                     <td class="px-4 py-3 text-right text-text-secondary">{{ $org->members_count }}</td>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Organization;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Crm\CompanyController;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\OrganizationInvitationList;
@@ -10,42 +11,57 @@ use App\Services\OrganizationListFacts;
 use App\Services\OrganizationMembership;
 use App\Services\OrganizationRelationships;
 use App\Services\PartnerSupportGrants;
+use App\Support\Organizations\PortalState;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
+/**
+ * System → Organization access (Release 1.0, DIR-1; corrected in ORG-3a). The route's `can:crm.manage` is only the first gate: a customer who holds a stray
+ * `crm.manage` passes it, and the list and the detail carry internal administration (every member's name and address, approvals, invitations, support
+ * designations). So BOTH actions ask `manageDirectory` first, an active account holding `portal.operator` AND `crm.manage`, exactly as the Directory pages do
+ * ({@see CompanyController}). No ability, permission or policy method is new. The ability is asked AFTER route-model binding, which is
+ * what keeps the three answers apart: an Organization a tenant scope hides is a 404 (hidden and unknown alike), a visible one is a 403 for an actor who may not.
+ */
 class OrganizationController extends Controller
 {
     public function index(Request $request): View
     {
-        $organizations = Organization::with(['portalEnabledBy'])
+        $this->authorize('manageDirectory', Organization::class);
+
+        // ORG-3a: only Organizations whose portal access has EVER been enabled (Enabled or Disabled). A Directory-only Organization has nothing to administer here and is
+        // not "Enabled": it lives in the Directory, and enabling portal access is what brings it into this list. The state shown is the row's own (PortalState), never a
+        // default for a row the read did not classify.
+        $organizations = PortalState::whereEverEnabled(Organization::query())
+            ->with(['portalEnabledBy'])
             ->withCount('members')
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(25);
 
-        $ids = $organizations->getCollection()->pluck('id')->all();
+        // Release 1.0 (DIR-1): "Managed by" / "Manages N" ONLY for an actor who may manage relationships. The relationship facts are not read at all for anyone else
+        // (null), so there is nothing to hide in the view (DIR-0 invariant S7).
+        $relationships = OrganizationListFacts::relationships($request->user(), $organizations->getCollection()->pluck('id')->all());
 
-        // Release 1.0 (DIR-1): portal state for every row, and "Managed by" / "Manages N" ONLY for an actor who may manage relationships. The
-        // relationship facts are not read at all for anyone else (null), so there is nothing to hide in the view (DIR-0 invariant S7).
-        $portalStatus = OrganizationListFacts::portalStatus($ids);
-        $relationships = OrganizationListFacts::relationships($request->user(), $ids);
-
-        return view('organizations.index', compact('organizations', 'portalStatus', 'relationships'));
+        return view('organizations.index', compact('organizations', 'relationships'));
     }
 
     public function show(Organization $organization): View
     {
+        $this->authorize('manageDirectory', Organization::class);
+
         $organization->load(['portalEnabledBy', 'members']);
+        $state = $organization->portalState();
 
         // Release 1.0 (MO-2A1): membership administration is operator-only, so the candidate list (every active account that is not
-        // yet a member) and the approval details are built only for an actor who may manage membership. Anyone else who can open
-        // this page (a customer holding a stray crm.manage) sees the plain member list and no way to change it.
+        // yet a member) and the approval details are built only for an actor who may manage membership. The three abilities (Directory, membership,
+        // relationships) are separate on purpose and answer alike today; an actor who passed `manageDirectory` above but may not manage membership would see
+        // the plain member list and no way to change it. A customer holding a stray `crm.manage` never reaches this line (ORG-3a: refused above).
         $canManageMembership = Gate::allows('manageMembership', Organization::class);
 
-        // Candidates to add: active accounts only (Release 0.9, H3). Existing members, suspended or not, are listed
-        // from the relation above.
-        $availableUsers = $canManageMembership
+        // Candidates to add: active accounts only (Release 0.9, H3), and only where an add would be accepted: an Enabled Organization (ORG-1 refuses it for any other state,
+        // so the form is not offered for one). Existing members, suspended or not, are listed from the relation above.
+        $availableUsers = $canManageMembership && $state->isEnabled()
             ? User::active()->whereDoesntHave('organizations', fn ($q) => $q->where('organizations.id', $organization->id)
             )->orderBy('name')->get(['id', 'name', 'email'])
             : collect();
@@ -69,24 +85,27 @@ class OrganizationController extends Controller
             : null;
         $canManageRelationships = Gate::allows('manageRelationships', Organization::class);
 
-        return view('organizations.show', compact('organization', 'availableUsers', 'relationship', 'memberships', 'invitations', 'support', 'canManageRelationships'));
+        return view('organizations.show', compact('organization', 'state', 'availableUsers', 'relationship', 'memberships', 'invitations', 'support', 'canManageRelationships'));
     }
 
     /** @return array<string, mixed> */
     private function relationshipPanel(Organization $organization): array
     {
         $isPartner = (bool) $organization->can_manage_customers;
-        // Offered only where the server would accept it: designating and linking need an ENABLED Organization (ORG-1), so a never-enabled or Disabled one is offered neither.
-        $enabled = $organization->portalState()->isEnabled();
+        // Offered only where the server would accept it: designating, linking a customer and linking to a partner all need an ENABLED Organization (ORG-1; the
+        // service refuses both ends of a link), so a never-enabled or Disabled one is offered none of them. Unlinking and removing a designation ask nothing of the
+        // state (they take authority away), so they stay offered. The server decides regardless.
+        $state = $organization->portalState();
+        $enabled = $state->isEnabled();
         $manager = OrganizationRelationships::managerOf($organization);
 
         return [
             'isPartner' => $isPartner,
+            'state' => $state,
             'manager' => $manager,
             'customers' => $isPartner ? OrganizationRelationships::managedCustomers($organization) : collect(),
-            // Offered only where the server would accept it; the server decides regardless.
             'canDesignate' => $enabled && ! $isPartner && $manager === null,
-            'candidateCustomers' => $isPartner ? OrganizationRelationships::eligibleCustomers($organization) : collect(),
+            'candidateCustomers' => $enabled && $isPartner ? OrganizationRelationships::eligibleCustomers($organization) : collect(),
             'candidatePartners' => $enabled && ! $isPartner ? OrganizationRelationships::eligiblePartners($organization) : collect(),
         ];
     }

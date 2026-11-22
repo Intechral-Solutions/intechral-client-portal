@@ -415,11 +415,11 @@ it('shows an operator the relationship, offers only valid actions, and shows a s
     $brokenPage = $this->actingAs($this->operator)->get(route('organizations.show', $broken))->assertOk();
     $brokenPage->assertDontSee('Designate as partner')->assertDontSee('Link to partner');   // a never-enabled Organization is offered neither: the server would refuse both
 
-    // A customer who holds crm.manage and belongs to the customer organization can open their own organization's page,
-    // and must learn nothing about any other organization from the relationship.
+    // A customer who holds crm.manage and belongs to the customer organization is refused the page (ORG-3a: `manageDirectory`; until then they could open their own
+    // organization's page), and learns nothing about any other organization from the relationship.
     $member = User::factory()->create()->assignRole('user')->givePermissionTo('crm.manage');
     $customer->members()->attach($member, ['role' => 'member']);
-    $this->actingAs($member)->get(route('organizations.show', $customer))->assertOk()
+    $this->actingAs($member)->get(route('organizations.show', $customer))->assertForbidden()
         ->assertDontSee('Partner relationship')->assertDontSee('UNISA')->assertDontSee('Spare Customer');
 });
 

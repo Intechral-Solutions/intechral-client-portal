@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\OrganizationListFacts;
 use App\Services\OrganizationRelationships;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\Models\Role;
 
@@ -73,12 +74,10 @@ it('shows Not enabled, Enabled and Disabled on the Directory Organizations list'
     $world = dir1Landscape($this->operator);
 
     $page = $this->actingAs($this->operator)->get(route('crm.companies.index'))->assertOk();
-    $status = $page->viewData('portalStatus');
 
-    expect($status[$world['alpha']->id])->toBe(OrganizationListFacts::ENABLED)
-        ->and($status[$world['gamma']->id])->toBe(OrganizationListFacts::DISABLED)
-        // A Directory profile with no portal organization has no state to report; the list words that as Not enabled.
-        ->and($status)->toHaveCount(4);
+    // ORG-3a: the state is the row's own, drawn by the one badge (OrganizationAccessPresentationTest pins the badge itself); here, what each row says.
+    $page->assertSee('data-portal-state="enabled"', false)->assertSee('data-portal-state="disabled"', false)->assertSee('data-portal-state="not_enabled"', false);
+    $page->assertViewMissing('portalStatus');
 
     $rows = collect(explode('<tr', $page->getContent()))->mapWithKeys(function (string $row) {
         $text = html_entity_decode(trim(preg_replace('/\s+/', ' ', strip_tags('<tr'.$row))));
@@ -101,6 +100,8 @@ it('shows Enabled or Disabled on Organization access, never Not enabled, and nam
     $page->assertSee('Organization access')
         ->assertSee('Enabled by')
         ->assertSee('Olive Operator')
+        // ORG-3a: the Directory-only Organization of the landscape (Epsilon) is not on this list at all, so it cannot be drawn as Enabled.
+        ->assertDontSee('Epsilon Profile Only')
         ->assertDontSee('Not enabled')
         ->assertDontSee('>Owner<', false);
 
@@ -151,30 +152,17 @@ it('builds no relationship fact for an actor who may not manage relationships, o
         }
     }
 
-    // ORG-2: the Directory Organizations list asks `manageDirectory` (portal.operator AND crm.manage), so this actor, who holds `crm.manage` only, is refused it
-    // outright: no relationship fact is built for them there either, and no read of the relationship column happens at all.
-    DB::flushQueryLog();
-    DB::enableQueryLog();
-    $this->actingAs($actor)->get(route('crm.companies.index'))->assertForbidden();
-    expect(collect(DB::getQueryLog())->pluck('query')->implode("\n"))->not->toContain('managed_by_organization_id');
-    DB::disableQueryLog();
-
-    foreach ([route('organizations.index')] as $url) {
+    // ORG-2 (Directory) and ORG-3a (Organization access): both lists ask `manageDirectory` (portal.operator AND crm.manage), so this actor, who holds `crm.manage`
+    // only, is refused each outright: no relationship fact is built for them, and no read of the relationship column happens at all. (Until ORG-3a the Organization
+    // access list answered them 200 with the relationship facts null; the builder-level refusal below still pins that null.)
+    foreach ([route('crm.companies.index'), route('organizations.index')] as $url) {
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $page = $this->actingAs($actor)->get($url)->assertOk();
+        $this->actingAs($actor)->get($url)->assertForbidden();
         $queries = collect(DB::getQueryLog())->pluck('query')->implode("\n");
         DB::disableQueryLog();
 
-        // Not merely hidden: the data is never built, so no query reads the managing-relationship column and the view receives null.
-        // (`can_manage_customers` is deliberately not asserted: the shell's own navigation reads the ACTOR'S support grant with it.)
-        expect($page->viewData('relationships'))->toBeNull()
-            ->and($queries)->not->toContain('managed_by_organization_id');
-
-        $page->assertDontSee('Managed by')->assertDontSee('Manages');
-        // Beta is managed by Alpha. Alpha's name appears exactly once, in Alpha's own row: nowhere does it appear as Beta's manager.
-        $text = dir1VisibleText($page->getContent());
-        expect(substr_count($text, 'Alpha Partner'))->toBe(1);
+        expect($queries)->not->toContain('managed_by_organization_id');
     }
 });
 
@@ -223,15 +211,40 @@ it('links a member to the System user page only for a viewer who holds users.vie
     $this->actingAs($withoutView)->get(route('organizations.show', $organization))
         ->assertOk()->assertSee('Mary Member')->assertDontSee($target, false);
 
-    // The plain member list (an actor who may not manage membership): same rule.
+    // The plain member list (an actor who may not manage membership): same rule. ORG-3a: an actor who holds `crm.manage` only can no longer open this page at all
+    // (`manageDirectory` refuses them), and the three abilities are separate on purpose, so the branch is reached here with a policy that passes the Directory
+    // ability and not the membership ability: the shape a later release may give an actor of a different kind.
+    Gate::policy(Organization::class, Dir1DirectoryWithoutMembershipPolicy::class);
+
     foreach ([['users.view', true], [null, false]] as [$permission, $linked]) {
         $viewer = dir1DirectoryOnly($permission === null ? [] : [$permission]);
         DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $viewer->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
 
         $page = $this->actingAs($viewer)->get(route('organizations.show', $organization))->assertOk()->assertSee('Mary Member');
         $linked ? $page->assertSee($target, false) : $page->assertDontSee($target, false);
+        // No administration reaches the plain list: no approval, no role control, no invitation card.
+        $page->assertDontSee('Approve administrator')->assertDontSee('Send invitation')->assertDontSee('Make Admin');
     }
 });
+
+/** A policy that lets an actor into the Directory pages and into nothing that administers membership or relationships. */
+class Dir1DirectoryWithoutMembershipPolicy
+{
+    public function manageDirectory(User $user): bool
+    {
+        return true;
+    }
+
+    public function manageMembership(User $user): bool
+    {
+        return false;
+    }
+
+    public function manageRelationships(User $user): bool
+    {
+        return false;
+    }
+}
 
 function dir1CustomOperator(string $name, array $extra): User
 {

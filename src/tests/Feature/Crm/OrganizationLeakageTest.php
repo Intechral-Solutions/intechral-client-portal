@@ -122,10 +122,7 @@ it('keeps the shared page props free of the Directory columns for a member and f
         }
     }
 
-    // (The stray crm.manage holder's refusal from the Directory itself, with its exact status per surface mode, is the next test.)
-
-    // The organization page (the operator administration page) is built for an operator; a customer holding crm.manage sees the member list only.
-    expectNoLeak($this->actingAs($stray)->get(route('organizations.show', $this->organization)), 'organizations.show as a stray crm.manage');
+    // (The stray crm.manage holder's refusal from the Directory and from the Organization access pages, with its exact status per surface mode, is the tests below.)
 });
 
 it('keeps them off the partner-support pages of the partner that manages this Organization', function () {
@@ -255,4 +252,49 @@ it('refuses a customer holding only a stray crm.manage the Directory with the ex
         expect($response->getStatusCode())->toBe(expectedSurfaceStatus($mode, $bindsHiddenRecord), "{$mode}: {$url}");
         expectNoLeak($response, $url);
     }
+})->with(['closed', 'pilot', 'legacy']);
+
+it('refuses a customer holding only a stray crm.manage the Organization access pages with the exact status of the mode: 403 for its own Organization, 404 for a hidden or unknown one, and no membership, invitation or relationship data', function (string $mode) {
+    config(['portal.customer_surface_mode' => $mode]);
+
+    // ORG-3a: the access pages ask `manageDirectory` (`portal.operator` AND `crm.manage`), so `crm.manage` alone no longer opens the member list. The refusal must be the
+    // exact status, and the body must hold nothing of the Organization's members, invitations or relationships (the content the page would show an operator).
+    $stray = User::factory()->create(['name' => 'Stray Admin Person'])->assignRole('user')->givePermissionTo('crm.manage');
+    $this->organization->members()->attach($stray, ['role' => 'admin']);
+    $hidden = Organization::factory()->create(['name' => 'Hidden Leak Co', 'portal_enabled_by' => $this->operator->id]);
+    $partner = Organization::factory()->create(['name' => 'Partner Leak Co', 'portal_enabled_by' => $this->operator->id]);
+    app(OrganizationRelationships::class)->designatePartner($partner, $this->operator);
+    app(OrganizationRelationships::class)->assignCustomer($this->organization, $partner->fresh(), $this->operator);
+    app(OrganizationInvitations::class)->issue($this->organization, 'pending.invitee@leak.test', $this->operator);
+
+    $private = ['Mary Member', $this->member->email, 'pending.invitee@leak.test', 'Partner Leak Co', 'Approve administrator', 'Send invitation', 'Remove', 'Disable organization'];
+
+    // [url, binds a record this customer cannot see (a hidden or unknown Organization is not in the customer's scope: 404 before any authorization)]
+    $pages = [
+        [route('organizations.index'), false],
+        [route('organizations.show', $this->organization), false],
+        [route('organizations.show', $hidden), true],
+        [route('organizations.show', 999999), true],
+    ];
+
+    foreach ($pages as [$url, $bindsHiddenRecord]) {
+        // The control: the SAME page and mode answer an operator, so the refusal below is the customer's and not a broken route (the unknown id is the exception).
+        if ($url !== route('organizations.show', 999999)) {
+            $this->actingAs($this->operator)->get($url)->assertOk();
+        }
+
+        $response = $this->actingAs($stray)->get($url);
+        $expected = expectedSurfaceStatus($mode, $bindsHiddenRecord);
+        expect($response->getStatusCode())->toBe($expected, "{$mode}: {$url}");
+        expectNoLeak($response, $url);
+
+        $body = html_entity_decode((string) $response->getContent(), ENT_QUOTES | ENT_HTML5);
+        foreach ($private as $needle) {
+            // (`Remove` and the other control labels are anything a rendered administration page carries; a refusal page must hold none of them.)
+            expect(str_contains($body, $needle))->toBeFalse("{$mode}: {$url} contains `{$needle}`");
+        }
+    }
+
+    // The exact statuses the mode implies, spelled out so the table above cannot drift into "either": legacy distinguishes forbidden from hidden, the others hide the route.
+    expect(expectedSurfaceStatus($mode, false))->toBe($mode === 'legacy' ? 403 : 404)->and(expectedSurfaceStatus($mode, true))->toBe(404);
 })->with(['closed', 'pilot', 'legacy']);
