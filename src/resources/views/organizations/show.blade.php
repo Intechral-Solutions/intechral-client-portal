@@ -7,7 +7,10 @@
         <div>
             <x-ui.link variant="quiet" :href="route('organizations.index')" class="text-sm">&larr; Organization access</x-ui.link>
             <h1 class="mt-2 text-2xl font-semibold text-text">{{ $organization->name }}</h1>
-            <p class="mt-0.5 text-xs font-mono text-text-muted">{{ $organization->slug }}</p>
+            <p class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                <span class="font-mono">{{ $organization->slug }}</span>
+                <x-organization.portal-state :state="$state" />
+            </p>
         </div>
         @can('manageDirectory', \App\Models\Organization::class)
         <x-ui.button :href="route('crm.companies.show', $organization)" variant="secondary">View Directory profile</x-ui.button>
@@ -18,8 +21,14 @@
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
-    @if ($organization->disabled_at !== null)
-    <x-ui.alert variant="warning" class="mb-6">This organization is disabled (since {{ \Illuminate\Support\Carbon::parse($organization->disabled_at)->format('M j, Y') }}). No new request can be filed for it and partner support access to its requests is suspended. Nothing else is removed.</x-ui.alert>
+    {{-- ORG-3a: what each state means for this page. The controls below follow it exactly: a control is drawn only where the service would accept it. --}}
+    @if ($state->isDisabled())
+    <x-ui.alert variant="warning" class="mb-6">This organization is disabled (since {{ \Illuminate\Support\Carbon::parse($organization->disabled_at)->format('M j, Y') }}). No new request can be filed for it and partner support access to its requests is suspended. Its open invitations were permanently revoked when it was disabled and do not return if portal access is enabled again; its members, approvals and relationships are not removed. While it is disabled, members can still be removed or demoted and approvals revoked, but no member can be added, promoted or approved, no invitation sent and no support access or partner link granted.</x-ui.alert>
+    @elseif ($state->isNotEnabled())
+    <x-ui.alert variant="info" class="mb-6">
+        This organization has never had portal access: it exists in the Directory only. Nothing here can be administered until portal access is enabled from its
+        <x-ui.link :href="route('crm.companies.show', $organization)">Directory profile</x-ui.link>{{ '.' }}
+    </x-ui.alert>
     @endif
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -42,25 +51,27 @@
             </div>
             @if ($canManageRelationships)
             <div class="border-t pt-3 border-rule">
-                <p class="text-xs text-text-muted">Status</p>
-                <p class="text-sm text-text">{{ $organization->disabled_at === null ? 'Enabled' : 'Disabled' }}</p>
-                <x-ui.field-error for="support" class="mt-1" />
-                @if ($organization->disabled_at === null)
-                <form method="POST" action="{{ route('organizations.disable', $organization->id) }}" class="mt-2" onsubmit="return confirm('Disable {{ addslashes($organization->name) }}? No new request can be filed for it, and partner support access to its requests stops until it is enabled.')">
+                <x-ui.field-error for="support" class="mb-1" />
+                @if ($state->isEnabled())
+                <form method="POST" action="{{ route('organizations.disable', $organization->id) }}" class="mt-2" onsubmit="return confirm('Disable {{ addslashes($organization->name) }}? No new request can be filed for it, and partner support access to its requests stops until it is enabled. Its open invitations are permanently revoked: enabling it again does not restore them, and new invitations must be sent.')">
                     @csrf
                     <x-ui.button type="submit" variant="secondary" tone="danger" size="sm">Disable organization</x-ui.button>
                 </form>
-                @else
-                <form method="POST" action="{{ route('organizations.enable', $organization->id) }}" class="mt-2">
+                @elseif ($state->isDisabled())
+                {{-- Re-enabling gives back what disabling suspended and nothing it removed: invitations revoked at disable stay revoked (a new invitation is a new credential). --}}
+                <form method="POST" action="{{ route('organizations.enable', $organization->id) }}" class="mt-2" onsubmit="return confirm('Enable {{ addslashes($organization->name) }} again? Requests can be filed for it again and partner support access resumes. Invitations that were revoked when it was disabled do not return: send new ones if they are still needed.')">
                     @csrf
                     <x-ui.button type="submit" variant="secondary" size="sm">Enable organization</x-ui.button>
                 </form>
+                @else
+                <p class="mt-1 text-xs text-text-muted">Portal access has never been enabled. It is enabled once, from the Directory profile.</p>
                 @endif
             </div>
             @endif
         </div>
 
-        @if ($relationship !== null)
+        {{-- A never-enabled Organization with no relationship has nothing to show here, so the panel is absent rather than an empty box of refusals. --}}
+        @if ($relationship !== null && ! ($state->isNotEnabled() && ! $relationship['isPartner'] && ! $relationship['manager']))
         @include('organizations._relationship')
         @endif
         </div>
@@ -72,6 +83,9 @@
                 <h2 class="text-sm font-semibold text-text">Members</h2>
                 @if ($memberships !== null)
                 <p class="mt-1 text-xs text-text-muted">The administrator role grants nothing by itself. An administrator holds delegated authority only after an operator approves that membership, and no delegated authority is active in this release.</p>
+                @if (! $state->isEnabled() && ! ($state->isNotEnabled() && $memberships->isEmpty()))
+                <p class="mt-1 text-xs text-text-muted">Portal access is {{ $state->isDisabled() ? 'disabled' : 'not enabled' }}, so no member can be added, promoted or approved. Members can still be removed or demoted and approvals revoked.</p>
+                @endif
                 @endif
             </div>
 
@@ -122,7 +136,7 @@
                         <td class="px-5 py-3 align-top text-right">
                             <div class="flex flex-col items-end gap-2">
                                 <div class="flex items-center justify-end gap-3">
-                                    @if ($member->role === 'admin' && ! $member->hasApprovalData && $member->refusal === null)
+                                    @if ($state->isEnabled() && $member->role === 'admin' && ! $member->hasApprovalData && $member->refusal === null)
                                     <form method="POST" action="{{ route('organizations.members.approve', [$organization, $member->id]) }}">
                                         @csrf
                                         <x-ui.button type="submit" variant="secondary" size="sm">Approve administrator</x-ui.button>
@@ -131,6 +145,8 @@
                                     {{-- Toggle role. Promoting never approves; demoting clears any approval. --}}
                                     @if ($lastApproved)
                                     <x-ui.button variant="ghost" size="sm" disabled>Make Member</x-ui.button>
+                                    @elseif ($member->role !== 'admin' && ! $state->isEnabled())
+                                    {{-- Promotion is new authority: only an Enabled organization may. Demotion takes authority away and is always offered. --}}
                                     @else
                                     <form method="POST" action="{{ route('organizations.members.role', [$organization, $member->id]) }}">
                                         @csrf @method('PUT')
@@ -183,7 +199,7 @@
                                         <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Revoke support access</x-ui.button>
                                     </form>
                                     @endif
-                                    @if (! $grant->granted && $member->active && ! $member->operator)
+                                    @if ($state->isEnabled() && ! $grant->granted && $member->active && ! $member->operator)
                                     <form method="POST" action="{{ route('organizations.members.support.grant', [$organization->id, $member->id]) }}">
                                         @csrf
                                         <x-ui.button type="submit" variant="secondary" size="sm">Grant support access</x-ui.button>
@@ -198,7 +214,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">No members yet.</td></tr>
+                    <tr><td class="px-5 py-8 text-center text-sm text-text-muted">{{ $state->isNotEnabled() ? 'No portal members: portal access is not enabled.' : 'No members yet.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -228,7 +244,10 @@
             </table>
             @endif
 
-            {{-- Add member form --}}
+            {{-- Add member form: only an Enabled organization accepts a new member (ORG-1), so no other state is offered the form. --}}
+            @if ($memberships !== null && ! $state->isEnabled() && ! ($state->isNotEnabled() && $memberships->isEmpty()))
+            <p class="border-t px-5 py-4 text-xs text-text-muted border-rule">Members can be added only while portal access is enabled.</p>
+            @endif
             @if ($memberships !== null && $availableUsers->isNotEmpty())
             <div class="border-t px-5 py-4 border-rule">
                 <form method="POST" action="{{ route('organizations.members.store', $organization) }}" class="flex gap-2">
@@ -250,7 +269,8 @@
             @endif
         </div>
 
-        @if ($invitations !== null)
+        {{-- Likewise a never-enabled Organization with no invitation: no card. (Rows that exist stay, so an open one can still be revoked.) --}}
+        @if ($invitations !== null && ! ($state->isNotEnabled() && $invitations['rows']->isEmpty()))
         @include('organizations._invitations')
         @endif
         </div>

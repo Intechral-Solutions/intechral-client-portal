@@ -40,6 +40,23 @@ it('keeps the row form and the query form equal over every state, and fails clos
     expect(PortalState::of(['portal_enabled_at' => null, 'disabled_at' => now()])->isEnabled())->toBeFalse();
 });
 
+it('keeps the ever-enabled query form equal to "not Not enabled" over every state (ORG-3a: the System list filter)', function () {
+    $ids = [
+        'enabled' => Organization::factory()->create()->id,
+        'disabled' => Organization::factory()->disabled()->create()->id,
+        'not_enabled' => Organization::factory()->directoryOnly()->create()->id,
+    ];
+
+    $viaQuery = PortalState::whereEverEnabled(DB::table('organizations'))->orderBy('organizations.id')->pluck('organizations.id')->map(fn ($id) => (int) $id)->all();
+    $viaRow = DB::table('organizations')->orderBy('id')->get(['id', ...PortalState::columns()])
+        ->reject(fn (object $row) => PortalState::of($row)->isNotEnabled())->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+    expect($viaQuery)->toBe([$ids['enabled'], $ids['disabled']])->and($viaRow)->toBe($viaQuery)
+        // Through the model too, and with an alias.
+        ->and(PortalState::whereEverEnabled(Organization::query())->orderBy('id')->pluck('id')->all())->toBe($viaQuery)
+        ->and(PortalState::whereEverEnabled(DB::table('organizations as o'), 'o')->orderBy('o.id')->pluck('o.id')->map(fn ($id) => (int) $id)->all())->toBe($viaQuery);
+});
+
 it('uses an alias, and refuses a read that did not select the columns it needs', function () {
     $enabled = Organization::factory()->create();
     Organization::factory()->directoryOnly()->create();

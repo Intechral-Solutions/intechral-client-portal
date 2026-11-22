@@ -116,13 +116,13 @@ function orgReadersInventory(): array
         'Services/ServiceRequestAccess.php' => 'DECIDES: filing a request, its locked recheck and both candidate reads',
         'Services/OrganizationRelationships.php' => 'DECIDES: designate, link, reassign, both candidate lists, disable and re-enable',
         'Services/OrganizationDirectory.php' => 'DECIDES: initial enablement (enablePortalAccess) and the deletion of a never-enabled Organization (delete); create, update and their helpers write the Directory profile only',
-        'Services/OrganizationListFacts.php' => 'DECIDES: a row existing is not portal access (portalStatus)',
         'Services/OrganizationPreflight.php' => 'DECIDES: the Directory-only invariant, the approval check',
         'Notifications/OrganizationInvitationNotification.php' => 'DECIDES: the send-time eligibility of a queued invitation mail',
         'Http/Controllers/DashboardController.php' => 'DECIDES: the "With portal access" count',
 
         // ── DISPLAY: decides nothing a Directory-only row could widen ──
-        'Http/Controllers/Organization/OrganizationController.php' => 'DISPLAY: the operator-only directory list and detail; shows the row and its state. ORG-3 filters the System list',
+        'Http/Controllers/Organization/OrganizationController.php' => 'DISPLAY: the operator-only (manageDirectory) System list and detail; the list is filtered to ever-enabled Organizations through PortalState, the detail draws only the controls the state allows, and the services decide every act',
+        'Services/OrganizationListFacts.php' => 'DISPLAY: the operator list facts (partner names, customer counts), built only for an actor who may manage relationships; the portal state of a row is drawn from the row (PortalState), not built here (ORG-3a)',
         'Http/Controllers/Organization/OrganizationRelationshipController.php' => 'DISPLAY: operator-only lookup by id; every rule is decided by OrganizationRelationships under lock',
         'Http/Controllers/Organization/OrganizationSupportController.php' => 'DISPLAY: operator-only lookup by id; every rule is decided by PartnerSupportGrants and OrganizationRelationships',
         'Http/Controllers/Organization/OrganizationInvitationController.php' => 'DISPLAY: operator-only route binding (crm.manage, tenant-scoped); issue and revoke are decided by OrganizationInvitations under lock',
@@ -185,9 +185,6 @@ function orgReadersExemptions(): array
             'lockOrganization' => 'the lock helper: locks the row exclusively and reads it raw; every caller decides on the state of the row it locked, through PortalState',
             'insertWithUniqueSlug' => 'slug uniqueness for a new row; no portal decision',
             'audit' => 'names the Organization in an audit entry after the decision',
-        ],
-        'Services/OrganizationListFacts.php' => [
-            'relationships' => 'operator list facts (partner names, customer counts) shown beside portalStatus(), which decides the label',
         ],
         'Services/OrganizationPreflight.php' => [
             'report' => 'the read-only preflight: assembles the checks below',

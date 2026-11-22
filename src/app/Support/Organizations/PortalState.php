@@ -66,6 +66,17 @@ enum PortalState: string
         return $query->whereNotNull($alias.'.portal_enabled_at')->whereNull($alias.'.disabled_at');
     }
 
+    /**
+     * Enabled or Disabled, that is, portal access has EVER been enabled: `portal_enabled_at` is set. The complement of {@see isNotEnabled()} for a query, as
+     * {@see whereEnabled()} is for Enabled. The System index of Organization access lists exactly these (ORG-3a): an Organization that has never had portal
+     * access has nothing to administer there. Presentation only; it decides no portal act. A row the CHECKs forbid (`disabled_at` without `portal_enabled_at`)
+     * is Not enabled and is therefore excluded, as {@see of()} fails closed.
+     */
+    public static function whereEverEnabled(Builder|EloquentBuilder $query, string $alias = 'organizations'): Builder|EloquentBuilder
+    {
+        return $query->whereNotNull($alias.'.portal_enabled_at');
+    }
+
     public function isEnabled(): bool
     {
         return $this === self::Enabled;

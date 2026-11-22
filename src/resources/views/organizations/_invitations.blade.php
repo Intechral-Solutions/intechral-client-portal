@@ -6,6 +6,7 @@
     The card shows operator-only data: an invitee's address and the names of the inviter and of the person who accepted. It never shows
     a link, a token or a hash: the plaintext exists only in the mailed message, and only the hash is stored.
 
+    $state = the Organization's PortalState (ORG-3a): the send form and Resend are drawn only for Enabled; Revoke follows the row (it takes a credential away).
     $invitations = ['rows' => the newest rows (see OrganizationInvitationList), 'total' => all rows, 'truncated' => bool]
 --}}
 @php
@@ -18,6 +19,7 @@
         <p class="mt-1 text-xs text-text-muted">Invite a new person into {{ $organization->name }}. Invited people join as ordinary members; administrators are made separately. An address that already has an account cannot be invited: use Add member instead.</p>
     </div>
 
+    @if ($state->isEnabled())
     <div class="border-b px-5 py-4 border-rule">
         <form method="POST" action="{{ route('organizations.invitations.store', $organization) }}" class="flex flex-wrap items-end gap-2">
             @csrf
@@ -29,6 +31,10 @@
         </form>
         <x-ui.field-error for="invitation-email" error-key="email" class="mt-2" />
     </div>
+    @else
+    {{-- ORG-3a: issuing (and so Resend) needs an Enabled organization; the service refuses it otherwise, so no form is drawn. A pending invitation can still be revoked below. --}}
+    <p class="border-b px-5 py-4 text-xs text-text-muted border-rule">Invitations can be sent only while portal access is enabled. @if ($state->isDisabled())Invitations that were open when it was disabled were revoked and do not return; send new ones once it is enabled again.@endif</p>
+    @endif
 
     @if ($invitations['rows']->isEmpty())
     <p class="px-5 py-8 text-center text-sm text-text-muted">No invitations yet.</p>
@@ -73,7 +79,7 @@
                 </td>
                 <td class="px-5 py-3 align-top text-right">
                     <div class="flex items-center justify-end gap-3">
-                        @if ($invitation->canResend)
+                        @if ($state->isEnabled() && $invitation->canResend)
                         <form method="POST" action="{{ route('organizations.invitations.store', $organization) }}">
                             @csrf
                             <input type="hidden" name="email" value="{{ $invitation->email }}">

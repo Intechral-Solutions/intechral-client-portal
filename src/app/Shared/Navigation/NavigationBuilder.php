@@ -2,6 +2,7 @@
 
 namespace App\Shared\Navigation;
 
+use App\Models\Organization;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\PartnerSupportAccess;
@@ -328,7 +329,10 @@ final class NavigationBuilder
      */
     private function directory(User $user): ?array
     {
-        if (! $user->can('crm.manage')) {
+        // The same ability the Directory pages ask (ORG-3a): `portal.operator` AND `crm.manage`, in an active account. `crm.manage` alone
+        // is an ordinary permission a custom role can carry; an account holding it without operator eligibility is a customer, and is refused
+        // these pages, so the entry that leads to them is not drawn for it.
+        if (! $user->can('manageDirectory', Organization::class)) {
             return null;
         }
 
@@ -415,11 +419,12 @@ final class NavigationBuilder
             ]);
         }
 
-        // Release 1.0 (DIR-1): the administrative index of portal organizations, under the same `crm.manage` gate the route has always
-        // had. `organizations.show` (and the organization administration actions that return to it) stays inside this item until DIR-2
-        // unifies the Organization page under Directory. An actor holding `crm.manage` and nothing else in System still reaches it,
-        // because this workspace appears whenever any one of its views survives.
-        if ($user->can('crm.manage')) {
+        // Release 1.0 (DIR-1): the administrative index of portal organizations. `organizations.show` (and the organization administration
+        // actions that return to it) stays inside this item until ORG-3b moves the Organization workspace under Directory. Since ORG-3a the
+        // item is drawn under the ability the PAGES ask, `manageDirectory` (`portal.operator` AND `crm.manage`, active account), so that
+        // an account holding a stray `crm.manage` does not get a link that ends in a 403. An actor who may manage the Directory and holds
+        // nothing else in System still reaches it, because this workspace appears whenever any one of its views survives.
+        if ($user->can('manageDirectory', Organization::class)) {
             $views[] = $this->item('system.organization-access', 'Organization access', route('organizations.index'), 'document', [
                 'organizations.index',
                 'organizations.show',

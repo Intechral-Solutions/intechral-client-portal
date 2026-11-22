@@ -37,13 +37,11 @@ class CompanyController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // Release 1.0 (DIR-1): the portal-access state of every row, and "Managed by" / "Manages N" only for an actor who may manage
-        // relationships. The relationship facts are not read for anyone else (null), so nothing is merely hidden in the view (DIR-0 S7).
-        $organizationIds = $companies->getCollection()->pluck('id')->all();
-        $portalStatus = OrganizationListFacts::portalStatus($organizationIds);
-        $relationships = OrganizationListFacts::relationships($request->user(), $organizationIds);
+        // Release 1.0 (DIR-1): "Managed by" / "Manages N" only for an actor who may manage relationships. The relationship facts are not read for anyone
+        // else (null), so nothing is merely hidden in the view (DIR-0 S7). The portal-access state of each row is the row's own (ORG-3a: PortalState, drawn by one badge).
+        $relationships = OrganizationListFacts::relationships($request->user(), $companies->getCollection()->pluck('id')->all());
 
-        return view('crm.companies.index', compact('companies', 'search', 'portalStatus', 'relationships'));
+        return view('crm.companies.index', compact('companies', 'search', 'relationships'));
     }
 
     public function create(): View

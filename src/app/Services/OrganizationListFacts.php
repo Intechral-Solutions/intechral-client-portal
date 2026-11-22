@@ -9,55 +9,23 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Read-only facts the two Organization lists show about portal organizations (Release 1.0, DIR-1). It writes nothing, takes no lock and
+ * Read-only facts the two Organization lists show about portal organizations (Release 1.0, DIR-1; ORG-3a). It writes nothing, takes no lock and
  * reads the tables directly, never through the `Organization` model: the tenant scope would silently drop rows for an account that is not
  * operator-eligible, and a list that undercounts is a wrong answer, not a shorter one (the same reason {@see OrganizationRelationships}
  * keeps its readers unscoped).
  *
- * TWO methods, two different sensitivities:
+ * ONE method since ORG-3a: {@see relationships()}. The portal STATE of each row is no longer a fact built here. It used to be (`portalStatus()`, a map of
+ * id to the strings `enabled` and `disabled`, with a Not enabled row simply absent), and a list that read "anything but Disabled" as Enabled drew a
+ * Directory-only Organization as Enabled. Both lists now draw the state from the row they already hold, through {@see PortalState}
+ * and the one badge (`<x-organization.portal-state>`), which has no default arm.
  *
- *  - {@see portalStatus()} is ordinary organization state (enabled or disabled) and is not gated here; the pages that call it are already
- *    behind `crm.manage`.
- *  - {@see relationships()} is a MANAGING-RELATIONSHIP fact (DIR-0 invariant S7). It is built only for an actor who passes
- *    `manageRelationships` (`portal.operator` AND `crm.manage`, active) and returns null for anyone else, so there is nothing to hide in
- *    the view: an unauthorized actor never causes a manager's name, a customer count or any derived value to be read, let alone rendered.
- *    The check lives here, not only in the controller, so a new caller cannot forget it.
+ * {@see relationships()} is a MANAGING-RELATIONSHIP fact (DIR-0 invariant S7). It is built only for an actor who passes
+ * `manageRelationships` (`portal.operator` AND `crm.manage`, active) and returns null for anyone else, so there is nothing to hide in
+ * the view: an unauthorized actor never causes a manager's name, a customer count or any derived value to be read, let alone rendered.
+ * The check lives here, not only in the controller, so a new caller cannot forget it.
  */
 final class OrganizationListFacts
 {
-    public const ENABLED = 'enabled';
-
-    public const DISABLED = 'disabled';
-
-    /**
-     * Whether each portal organization is enabled or disabled, keyed by organization id. An id with no row is absent from the result (the
-     * caller treats that as "not enabled", which for a Directory profile with no portal organization is exactly right). ORG-1: so is an
-     * Organization row that has never had portal access ({@see PortalState::NotEnabled}): a row existing is not portal access.
-     *
-     * @param  list<int|null>  $organizationIds
-     * @return array<int, string>
-     */
-    public static function portalStatus(array $organizationIds): array
-    {
-        $ids = self::ids($organizationIds);
-
-        if ($ids === []) {
-            return [];
-        }
-
-        $status = [];
-
-        foreach (DB::table('organizations')->whereIn('id', $ids)->get(['id', ...PortalState::columns()]) as $row) {
-            $state = PortalState::of($row);
-
-            if (! $state->isNotEnabled()) {
-                $status[(int) $row->id] = $state->isEnabled() ? self::ENABLED : self::DISABLED;
-            }
-        }
-
-        return $status;
-    }
-
     /**
      * "Managed by" and "Manages N" for each organization, keyed by organization id, or NULL when the actor may not manage relationships.
      * Two bounded queries however many ids are asked for.

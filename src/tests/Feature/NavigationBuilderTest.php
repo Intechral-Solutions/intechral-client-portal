@@ -416,11 +416,16 @@ it('emits System with only the sections each administrative capability permits',
     'cms.edit only' => [['cms.edit'], ['system.pages']],
     'users.view and cms.edit' => [['users.view', 'cms.edit'], ['system.users', 'system.pages']],
     'all three' => [['users.view', 'roles.view', 'cms.edit'], ['system.users', 'system.roles', 'system.pages']],
-    // DIR-1: Organization access is a System entry under the same crm.manage gate the route has always had. crm.manage alone is enough
-    // to reach it, so an actor with no other System capability still finds it.
-    'crm.manage only' => [['crm.manage'], ['system.organization-access']],
-    'users.view and crm.manage' => [['users.view', 'crm.manage'], ['system.users', 'system.organization-access']],
-    'all four' => [['users.view', 'roles.view', 'crm.manage', 'cms.edit'], ['system.users', 'system.roles', 'system.organization-access', 'system.pages']],
+    // DIR-1 put Organization access in System; ORG-3a draws it under the ability its pages ask, `manageDirectory`: `portal.operator` AND `crm.manage`
+    // (never either alone). An actor with both and no other System capability still finds it; one holding a stray `crm.manage` does not, because the page
+    // would refuse it, and one holding `portal.operator` alone is not offered a Directory destination either.
+    'portal.operator and crm.manage' => [['portal.operator', 'crm.manage'], ['system.organization-access']],
+    'crm.manage only (a customer with a stray grant)' => [['crm.manage'], []],
+    'portal.operator only' => [['portal.operator'], []],
+    'users.view and a stray crm.manage' => [['users.view', 'crm.manage'], ['system.users']],
+    'users.view, portal.operator and crm.manage' => [['users.view', 'portal.operator', 'crm.manage'], ['system.users', 'system.organization-access']],
+    'all four with operator eligibility' => [['users.view', 'roles.view', 'portal.operator', 'crm.manage', 'cms.edit'], ['system.users', 'system.roles', 'system.organization-access', 'system.pages']],
+    'all four, crm.manage without operator eligibility' => [['users.view', 'roles.view', 'crm.manage', 'cms.edit'], ['system.users', 'system.roles', 'system.pages']],
 ]);
 
 it('omits a workspace entirely rather than emitting it empty', function () {
@@ -446,6 +451,7 @@ it('never resolves a workspace default destination to an inaccessible item', fun
         actor('user', ['tickets.assign']),
         actor('user', ['time.view_all']),
         actor('user', ['crm.manage']),
+        actor('user', ['portal.operator', 'crm.manage']),
         actor('user', ['cms.edit']),
         actor('user', ['roles.view']),
     ] as $subject) {
@@ -771,14 +777,14 @@ it('offers exactly People and Organizations in Directory, with no Portal access 
         ->and(navigationValuesDeep($directory, 'href'))->not->toContain(route('organizations.index'));
 });
 
-it('shows System Organization access to an actor with crm.manage, opening the existing index', function () {
-    $system = workspaces(navigationFor(actor('user', ['crm.manage']), 'dashboard'))['system'];
+it('shows System Organization access to an actor who may manage the Directory, opening the existing index', function () {
+    $system = workspaces(navigationFor(actor('user', ['portal.operator', 'crm.manage']), 'dashboard'))['system'];
     $item = contextItems($system)['system.organization-access'];
 
     expect($item['label'])->toBe('Organization access')
         ->and($item['href'])->toBe(route('organizations.index'))
         ->and($item['visit'])->toBe('document')
-        // crm.manage alone: the workspace default is that surviving entry, never a filtered-out one.
+        // `portal.operator` and `crm.manage` alone: the workspace default is that surviving entry, never a filtered-out one.
         ->and($system['href'])->toBe(route('organizations.index'));
 });
 
@@ -816,20 +822,60 @@ it('keeps Directory active, and not System, on every Directory route', function 
 });
 
 it('keeps every previously authorized destination reachable for a narrowly assigned actor, and gives a customer nothing new', function () {
-    // Directory without crm.manage does not exist, and System without any of its capabilities does not either.
-    foreach ([['users.view'], ['roles.view'], ['cms.edit'], ['crm.manage']] as $permissions) {
+    // System without any of its capabilities does not exist, and neither does Directory without `manageDirectory`.
+    foreach ([['users.view'], ['roles.view'], ['cms.edit'], ['portal.operator', 'crm.manage']] as $permissions) {
         $subject = actor('user', $permissions);
         $hrefs = navigationValuesDeep(navigationFor($subject, 'dashboard'), 'href');
+        $manages = $permissions === ['portal.operator', 'crm.manage'];
 
-        expect(in_array(route('organizations.index'), $hrefs, true))->toBe($permissions === ['crm.manage'])
+        expect(in_array(route('organizations.index'), $hrefs, true))->toBe($manages)
             ->and(in_array(route('users.index'), $hrefs, true))->toBe($permissions === ['users.view'])
-            ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($permissions === ['crm.manage']);
+            ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($manages)
+            ->and(in_array(route('crm.contacts.index'), $hrefs, true))->toBe($manages);
     }
 
     $customer = navigationFor(actor('user'), 'dashboard');
 
     expect(array_keys(workspaces($customer)))->not->toContain('directory', 'system')
         ->and(navigationValuesDeep($customer, 'href'))->not->toContain(route('organizations.index'), route('crm.contacts.index'), route('crm.companies.index'));
+});
+
+// ORG-3a: both administrative Organization entries (Directory, and System → Organization access) are drawn under `manageDirectory`, the ability the pages ask,
+// so navigation and authorization agree. The pages are asserted in OrganizationAccessPresentationTest and OrganizationLeakageTest; this pins the entries.
+it('offers Directory and Organization access to an operator, a custom-role operator and nobody else', function (callable $makeActor, bool $offered) {
+    $navigation = navigationFor($makeActor(), 'dashboard');
+    $workspaces = workspaces($navigation);
+    $hrefs = navigationValuesDeep($navigation, 'href');
+
+    expect(array_key_exists('directory', $workspaces))->toBe($offered)
+        ->and(in_array(route('organizations.index'), $hrefs, true))->toBe($offered)
+        ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($offered)
+        ->and(in_array(route('crm.contacts.index'), $hrefs, true))->toBe($offered);
+
+    if ($offered) {
+        expect(array_keys(contextItems($workspaces['directory'])))->toBe(['directory.people', 'directory.organizations'])
+            ->and(array_keys(contextItems($workspaces['system'])))->toContain('system.organization-access');
+    } else {
+        expect(array_keys($workspaces))->not->toContain('directory')
+            ->and(navigationValuesDeep($navigation, 'key'))->not->toContain('system.organization-access');
+    }
+})->with([
+    'built-in operator' => [fn () => actor('operator'), true],
+    'custom-role operator (portal.operator and crm.manage)' => [fn () => actorWithPermissions(['portal.operator', 'crm.manage']), true],
+    'customer holding a stray crm.manage' => [fn () => actor('user', ['crm.manage']), false],
+    'customer-role member with a custom role carrying only crm.manage' => [fn () => actorWithPermissions(['crm.manage']), false],
+    'portal.operator without crm.manage' => [fn () => actorWithPermissions(['portal.operator', 'users.view']), false],
+    'ordinary customer' => [fn () => actor('user'), false],
+]);
+
+it('does not offer the administrative Organization entries to a suspended operator', function () {
+    $operator = actor('operator');
+    $operator->forceFill(['disabled_at' => now()])->save();
+
+    $navigation = navigationFor($operator->fresh(), 'dashboard');
+
+    expect(array_keys(workspaces($navigation)))->not->toContain('directory')
+        ->and(navigationValuesDeep($navigation, 'key'))->not->toContain('system.organization-access');
 });
 
 it('removes the stale comment that said the two Organization entries could only be unified by a database consolidation', function () {

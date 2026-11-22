@@ -32,7 +32,9 @@
             </ul>
         </div>
 
-        @if ($relationship['candidateCustomers']->isNotEmpty())
+        @if (! $relationship['state']->isEnabled())
+        <p class="text-xs text-text-muted">Customers can be linked only while this organization's portal access is enabled. Existing customers can still be unlinked.</p>
+        @elseif ($relationship['candidateCustomers']->isNotEmpty())
         <form method="POST" action="{{ route('organizations.customers.link', $organization->id) }}" class="flex gap-2">
             @csrf
             <x-ui.select name="customer_id" id="customer_id" aria-label="Customer organization to link" class="min-w-0 flex-1">
@@ -44,7 +46,7 @@
         </form>
         <x-ui.field-error for="customer_id" />
         @else
-        <p class="text-xs text-text-muted">No organization is available to link: a customer must not be a partner or already managed, and must have exactly one Directory profile.</p>
+        <p class="text-xs text-text-muted">No organization is available to link: a customer must have portal access enabled, must not be a partner and must not already be managed.</p>
         @endif
 
         <div class="border-t pt-3 border-rule">
@@ -86,6 +88,8 @@
                 <x-ui.button type="submit">{{ $relationship['manager'] ? 'Reassign' : 'Link to partner' }}</x-ui.button>
             </form>
             <x-ui.field-error for="partner_id" />
+            @elseif (! $relationship['state']->isEnabled())
+            <p class="text-xs text-text-muted">This organization can be linked to a partner or designated as one only while its portal access is enabled.@if ($relationship['manager']) It can still be unlinked.@endif</p>
             @elseif (! $relationship['manager'])
             <p class="text-xs text-text-muted">No partner is available yet. Designate an organization as a partner first.</p>
             @endif

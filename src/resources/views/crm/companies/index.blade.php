@@ -1,4 +1,3 @@
-@use('App\Services\OrganizationListFacts')
 @extends('layouts.app', ['title' => 'Organizations'])
 
 @section('content')
@@ -55,19 +54,12 @@
                     </td>
                     <td class="px-4 py-3 text-text-secondary">{{ $company->phone ?? '—' }}</td>
                     <td class="px-4 py-3">
-                        @if (! $company->portalState()->isNotEnabled())
-                        @php($state = $portalStatus[$company->id] ?? null)
                         <span class="inline-flex items-center gap-2">
-                            @if ($state === OrganizationListFacts::DISABLED)
-                            <x-ui.status tone="warning">Disabled</x-ui.status>
-                            @else
-                            <x-ui.status tone="success">Enabled</x-ui.status>
-                            @endif
+                            <x-organization.portal-state :state="$company->portalState()" />
+                            @if (! $company->portalState()->isNotEnabled())
                             <x-ui.link :href="route('organizations.show', $company)" class="text-xs font-medium" aria-label="Manage portal access for {{ $company->name }}">Manage</x-ui.link>
+                            @endif
                         </span>
-                        @else
-                        <x-ui.status glyph="dashed">Not enabled</x-ui.status>
-                        @endif
                     </td>
                     @if ($relationships !== null)
                     {{-- Built only for an actor who may manage relationships (DIR-0 S7): $relationships is null otherwise and this never renders. --}}
