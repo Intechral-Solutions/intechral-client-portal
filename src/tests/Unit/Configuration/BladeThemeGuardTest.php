@@ -71,11 +71,6 @@ function guardTargetInventory(): array
         'components/ui/tag.blade.php',
         'components/ui/textarea.blade.php',
         'components/ui/visibility-toggle.blade.php',
-        'crm/companies/_form.blade.php',
-        'crm/companies/create.blade.php',
-        'crm/companies/edit.blade.php',
-        'crm/companies/index.blade.php',
-        'crm/companies/show.blade.php',
         'crm/contacts/_form.blade.php',
         'crm/contacts/create.blade.php',
         'crm/contacts/edit.blade.php',
@@ -90,9 +85,19 @@ function guardTargetInventory(): array
         'operator/tickets/index.blade.php',
         'operator/tickets/reports.blade.php',
         'operator/tickets/show.blade.php',
+        'organizations/_approvals.blade.php',
+        'organizations/_form.blade.php',
         'organizations/_invitations.blade.php',
+        'organizations/_lifecycle.blade.php',
+        'organizations/_members.blade.php',
         'organizations/_relationship.blade.php',
+        'organizations/_support.blade.php',
+        'organizations/access.blade.php',
+        'organizations/create.blade.php',
+        'organizations/edit.blade.php',
         'organizations/index.blade.php',
+        'organizations/people.blade.php',
+        'organizations/portal.blade.php',
         'organizations/show.blade.php',
         'pagination/direction-d.blade.php',
         'pagination/simple-direction-d.blade.php',
@@ -493,7 +498,7 @@ it('keeps the Level B target inventory exact, and says what to do when a view is
 
     expect($message)->toBe('')
         ->and($inventory)->toBe($discovered)
-        ->and(count($inventory))->toBe(61);
+        ->and(count($inventory))->toBe(66);
 });
 
 it('draws the inventory only from the §17.2 roots, and lists every file once', function () {
@@ -598,9 +603,9 @@ it('Level B: the Focused shell partials carry the same Direction D rules as the 
     }
 
     expect(implode("\n", $violations))->toBe('')
-        // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship; 60 after R1-3C: organizations/_invitations; 61 after DIR-1: admin/roles/_permission).
+        // They are scanned, never inventoried: the exact Level B membership stays exact (57 after MO-1A: organizations/_relationship; 60 after R1-3C: organizations/_invitations; 61 after DIR-1: admin/roles/_permission; 66 after ORG-3b: the Organization workspace views moved from crm/companies to organizations and Portal access was split into sections).
         ->and(array_intersect(guardFocusedShellPartials(), guardTargetInventory()))->toBe([])
-        ->and(count(guardTargetInventory()))->toBe(61);
+        ->and(count(guardTargetInventory()))->toBe(66);
 });
 
 it('keeps every allowlist entry reasoned and still needed', function () {

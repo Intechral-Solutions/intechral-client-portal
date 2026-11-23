@@ -80,7 +80,7 @@
                             @foreach ($memberOf->take(5) as $membership)
                             <li>
                                 @can('crm.manage')
-                                <x-ui.link variant="row" :href="route('organizations.show', $membership->organization_id)">{{ $membership->name }}</x-ui.link>
+                                <x-ui.link variant="row" :href="route('organizations.portal', $membership->organization_id)">{{ $membership->name }}</x-ui.link>
                                 @else
                                 {{ $membership->name }}
                                 @endcan

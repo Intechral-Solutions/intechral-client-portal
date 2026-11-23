@@ -466,7 +466,7 @@ it('gives a Directory-only organization no capability through any operator route
     $this->actingAs($someone);
     expect(Organization::query()->pluck('id')->all())->toBe([$theirOrg->id])
         ->and(app(ServiceRequestAccess::class)->eligibleOrganizations($someone))->toBe([['id' => $theirOrg->id, 'name' => 'Their Org']]);
-    $this->get(route('organizations.show', $directoryOnly))->assertNotFound();
+    $this->get(route('organizations.portal', $directoryOnly))->assertNotFound();
 
     // And the preflight stays clean: nothing above created portal data on the row.
     expect(app(OrganizationPreflight::class)->report()['portalState']['violations']['directoryOnlyWithMembers'])->toBe([]);

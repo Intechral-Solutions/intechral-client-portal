@@ -22,7 +22,7 @@
         @if ($contact->organization)
         <div>
             <p class="text-xs font-medium mb-0.5 text-text-muted">Organization</p>
-            <x-ui.link :href="route('crm.companies.show', $contact->organization)" class="text-sm font-medium">
+            <x-ui.link :href="route('organizations.show', $contact->organization)" class="text-sm font-medium">
                 {{ $contact->organization->name }}
             </x-ui.link>
         </div>

@@ -102,16 +102,16 @@ class OrganizationRelationshipController extends Controller
     }
 
     /**
-     * Back to the organization's page when THIS actor can open it, otherwise to the organizations index. The check is
-     * deliberately scoped: organizations.show binds through the tenant scope, which keys on `portal.operator` (R1-1): an operator-eligible actor,
+     * Back to the organization's Portal access page when THIS actor can open it, otherwise to the Organization access list. The check is
+     * deliberately scoped: organizations.portal binds through the tenant scope, which keys on `portal.operator` (R1-1): an operator-eligible actor,
      * built-in or custom-role, opens every organization; an actor who is not eligible and not a member would be answered 404 for a change
      * that just succeeded, so they go to the index instead.
      */
     private function back(Organization $organization, string $message): RedirectResponse
     {
         $target = Organization::query()->whereKey($organization->getKey())->exists()
-            ? route('organizations.show', $organization)
-            : route('organizations.index');
+            ? route('organizations.portal', $organization)
+            : route('organizations.access');
 
         return redirect($target)->with('success', $message);
     }

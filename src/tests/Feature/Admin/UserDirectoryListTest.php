@@ -219,7 +219,7 @@ it('links an organization only for a viewer who may open it', function () {
     $organization = Organization::factory()->create(['name' => 'Linked Org']);
     $member = dir1Customer('Member One');
     dir1Membership($member, $organization);
-    $target = route('organizations.show', $organization->id);
+    $target = route('organizations.portal', $organization->id);
 
     // users.view without crm.manage: the name is plain text and no organization destination is offered.
     $viewer = dir1CustomRoleOperator('Users Viewer', ['portal.operator', 'users.view']);

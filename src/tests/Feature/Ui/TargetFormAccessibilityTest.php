@@ -102,25 +102,25 @@ function uiTargetPages(): array
         'crm.contacts.create' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.contacts.create')), 7],
         'crm.contacts.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.contacts.edit', CrmContact::factory()->create())), 7],
         'crm.contacts.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.contacts.show', CrmContact::factory()->create())), 0],
-        'crm.companies.index' => function ($t) {
+        'organizations.index' => function ($t) {
             Organization::factory()->directoryOnly()->create();
 
-            return [uiGet($t, uiActor('operator'), route('crm.companies.index')), 1];
+            return [uiGet($t, uiActor('operator'), route('organizations.index')), 1];
         },
-        'crm.companies.create' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.create')), 5],
-        'crm.companies.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.edit', Organization::factory()->directoryOnly()->create())), 5],
-        'crm.companies.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('crm.companies.show', Organization::factory()->directoryOnly()->create())), 0],
-        'organizations.index' => function ($t) {
+        'organizations.create' => fn ($t) => [uiGet($t, uiActor('operator'), route('organizations.create')), 5],
+        'organizations.edit' => fn ($t) => [uiGet($t, uiActor('operator'), route('organizations.edit', Organization::factory()->directoryOnly()->create())), 5],
+        'organizations.show' => fn ($t) => [uiGet($t, uiActor('operator'), route('organizations.show', Organization::factory()->directoryOnly()->create())), 0],
+        'organizations.access' => function ($t) {
             Organization::factory()->create();
 
-            return [uiGet($t, uiActor('operator'), route('organizations.index')), 0];
+            return [uiGet($t, uiActor('operator'), route('organizations.access')), 0];
         },
-        'organizations.show' => function ($t) {
+        'organizations.portal' => function ($t) {
             $operator = uiActor('operator');
             $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
             $organization->members()->attach(uiActor('user')->id, ['role' => 'member']);
 
-            return [uiGet($t, $operator, route('organizations.show', $organization)), 2];
+            return [uiGet($t, $operator, route('organizations.portal', $organization)), 2];
         },
 
         // ── Finance ──────────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ function uiFailedForms(): array
             return uiFailedSubmission($t, $operator, route('operator.tickets.show', $ticket), 'put', route('operator.tickets.status', $ticket), ['status' => 'not-a-status']);
         },
         'crm.contacts.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('crm.contacts.create'), 'post', route('crm.contacts.store'), ['email' => 'not-an-email']),
-        'crm.companies.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('crm.companies.create'), 'post', route('crm.companies.store'), ['website' => 'x']),
+        'organizations.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('organizations.create'), 'post', route('organizations.store'), ['website' => 'x']),
         'billing.invoices.create (row 2 invalid)' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('billing.invoices.create'), 'post', route('billing.invoices.store'), [
             'client_id' => '', 'issued_at' => '2026-04-01', 'due_at' => '2026-03-01', 'currency' => 'USD',
             'items' => [
@@ -226,12 +226,12 @@ function uiFailedForms(): array
             return uiFailedSubmission($t, uiActor('operator'), route('users.show', $user), 'put', route('users.roles.update', $user), ['roles' => ['no-such-role']]);
         },
         'operator.cms.create' => fn ($t) => uiFailedSubmission($t, uiActor('operator'), route('operator.cms.create'), 'post', route('operator.cms.store'), ['title' => '']),
-        'organizations.show add member' => function ($t) {
+        'organizations.portal add member' => function ($t) {
             $operator = uiActor('operator');
             $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
             uiActor('user');
 
-            return uiFailedSubmission($t, $operator, route('organizations.show', $organization), 'post', route('organizations.members.store', $organization), ['user_id' => '', 'role' => 'nonsense']);
+            return uiFailedSubmission($t, $operator, route('organizations.portal', $organization), 'post', route('organizations.members.store', $organization), ['user_id' => '', 'role' => 'nonsense']);
         },
     ];
 }

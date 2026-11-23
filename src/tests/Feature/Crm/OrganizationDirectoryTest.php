@@ -174,12 +174,12 @@ describe('update', function () {
     });
 
     it('through the browser: a blank optional field is cleared and an omitted one is left alone', function () {
-        $this->actingAs($this->operator)->put(route('crm.companies.update', $this->organization), ['name' => 'Keeps Co', 'website' => '', 'phone' => '', 'address' => '', 'notes' => ''])
-            ->assertRedirect(route('crm.companies.show', $this->organization));
+        $this->actingAs($this->operator)->put(route('organizations.update', $this->organization), ['name' => 'Keeps Co', 'website' => '', 'phone' => '', 'address' => '', 'notes' => ''])
+            ->assertRedirect(route('organizations.show', $this->organization));
 
         expect(DB::table('organizations')->where('id', $this->organization->id)->first(['website', 'phone', 'address', 'notes']))->toEqual((object) ['website' => null, 'phone' => null, 'address' => null, 'notes' => null]);
 
-        $this->actingAs($this->operator)->put(route('crm.companies.update', $this->organization), ['name' => 'Renamed'])->assertRedirect();
+        $this->actingAs($this->operator)->put(route('organizations.update', $this->organization), ['name' => 'Renamed'])->assertRedirect();
         expect($this->organization->fresh()->name)->toBe('Renamed');
     });
 

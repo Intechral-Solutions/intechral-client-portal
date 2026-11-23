@@ -39,7 +39,7 @@ it('shows the organization and the inviter for an account created by an organiza
         ->assertDontSee('Invited by');
 
     // An operator may open the organization, so the name links to it.
-    expect($page->getContent())->toContain(route('organizations.show', $organization));
+    expect($page->getContent())->toContain(route('organizations.portal', $organization));
 });
 
 it('neither names nor links the organization to a viewer the organization tenant scope hides it from', function () {
@@ -54,7 +54,7 @@ it('neither names nor links the organization to a viewer the organization tenant
     $content = $this->actingAs($viewer)->get(route('users.show', $user))->assertOk()
         ->assertSee('by invitation from Ivy Issuer')->getContent();
 
-    expect($content)->not->toContain('Acme Holdings')->not->toContain(route('organizations.show', $organization))
+    expect($content)->not->toContain('Acme Holdings')->not->toContain(route('organizations.portal', $organization))
         ->and(preg_replace('/\\s+/', ' ', strip_tags($content)))->toContain('Joined an organization by invitation from Ivy Issuer');
 });
 

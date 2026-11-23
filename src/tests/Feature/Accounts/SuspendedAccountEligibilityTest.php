@@ -235,7 +235,7 @@ describe('organization membership', function () {
         $active = makeUser('user', ['name' => 'Active Person']);
         $suspended = makeUser('user', ['name' => 'Suspended Person', 'disabled_at' => now()]);
 
-        $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+        $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
         expect($page->viewData('availableUsers')->pluck('name')->all())->toContain('Active Person')->not->toContain('Suspended Person');
 
         $this->actingAs($this->operator)->post(route('organizations.members.store', $organization), ['user_id' => $suspended->id, 'role' => 'member'])

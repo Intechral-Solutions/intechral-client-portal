@@ -131,7 +131,7 @@ class DashboardController extends Controller
             'quickActions' => $quickActions,
             'crmSummary' => $crmStats ? [
                 ...$crmStats,
-                'href' => route('crm.companies.index'),
+                'href' => route('organizations.index'),
                 'visit' => 'document',
             ] : null,
         ]);

@@ -10,7 +10,6 @@ use App\Http\Controllers\Billing\InvoiceController;
 use App\Http\Controllers\Billing\InvoicePaymentController;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Controllers\CmsController;
-use App\Http\Controllers\Crm\CompanyController;
 use App\Http\Controllers\Crm\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Operator\CmsPageController;
@@ -19,11 +18,14 @@ use App\Http\Controllers\Operator\TicketController as OperatorTicketController;
 use App\Http\Controllers\Operator\TicketReplyController as OperatorReplyController;
 use App\Http\Controllers\Operator\TicketReportController;
 use App\Http\Controllers\Operator\TimeReportController;
+use App\Http\Controllers\Organization\LegacyCompanyRedirectController;
+use App\Http\Controllers\Organization\OrganizationAccessController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\OrganizationInvitationController;
 use App\Http\Controllers\Organization\OrganizationMemberController;
 use App\Http\Controllers\Organization\OrganizationRelationshipController;
 use App\Http\Controllers\Organization\OrganizationSupportController;
+use App\Http\Controllers\Organization\OrganizationWorkspaceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\ProjectController;
@@ -276,18 +278,19 @@ Route::middleware(['auth', 'can:time.view_all'])->prefix('operator/time')->name(
     Route::get('/', [TimeReportController::class, 'index'])->name('index');
 });
 
-// CRM — company + contact management (operators with crm.manage)
-Route::middleware(['auth', 'can:crm.manage'])->prefix('crm')->name('crm.')->group(function () {
-    // Companies (literal routes before {company} wildcard)
-    Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
-    Route::get('/companies/create', [CompanyController::class, 'create'])->name('companies.create');
-    Route::post('/companies', [CompanyController::class, 'store'])->name('companies.store');
-    Route::get('/companies/{company}', [CompanyController::class, 'show'])->name('companies.show');
-    Route::get('/companies/{company}/edit', [CompanyController::class, 'edit'])->name('companies.edit');
-    Route::put('/companies/{company}', [CompanyController::class, 'update'])->name('companies.update');
-    Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])->name('companies.destroy');
-    Route::post('/companies/{company}/promote', [CompanyController::class, 'promote'])->name('companies.promote');
+// Retired (ORG-3b): the Directory's Organization pages moved from /crm/companies to /organizations. These GET-only, UNNAMED redirects keep old bookmarks working; the route
+// names `crm.companies.*` no longer exist, and no write is served at the old URIs. They sit behind the same `auth` and `can:crm.manage` gates as before, so a customer is answered
+// exactly as the old pages answered it (403 in legacy mode, 404 in the closed and pilot modes), and the target applies its own authorization. A controller, not closures,
+// so `route:cache` can serialize them.
+Route::middleware(['auth', 'can:crm.manage'])->prefix('crm/companies')->group(function () {
+    Route::get('/', [LegacyCompanyRedirectController::class, 'index']);
+    Route::get('/create', [LegacyCompanyRedirectController::class, 'create']);
+    Route::get('/{company}', [LegacyCompanyRedirectController::class, 'show'])->whereNumber('company');
+    Route::get('/{company}/edit', [LegacyCompanyRedirectController::class, 'edit'])->whereNumber('company');
+});
 
+// CRM — People (contacts). The Organization routes live under /organizations.
+Route::middleware(['auth', 'can:crm.manage'])->prefix('crm')->name('crm.')->group(function () {
     // Contacts (literal routes before {contact} wildcard)
     Route::get('/contacts', [ContactController::class, 'index'])->name('contacts.index');
     Route::get('/contacts/create', [ContactController::class, 'create'])->name('contacts.create');
@@ -298,10 +301,26 @@ Route::middleware(['auth', 'can:crm.manage'])->prefix('crm')->name('crm.')->grou
     Route::delete('/contacts/{contact}', [ContactController::class, 'destroy'])->name('contacts.destroy');
 });
 
-// Organizations (operators only)
+// Organizations (operators only): the Directory's Organization workspace (ORG-3b) and its administrative action endpoints. The group's `can:crm.manage` is only the
+// first gate; every page asks `manageDirectory` in its controller. Literal paths (`access`, `create`) precede the `{organization}` wildcard.
 Route::middleware(['auth', 'can:crm.manage'])->prefix('organizations')->name('organizations.')->group(function () {
+    // The Directory list and the Directory writes (the retired crm.companies.*).
     Route::get('/', [OrganizationController::class, 'index'])->name('index');
-    Route::get('/{organization}', [OrganizationController::class, 'show'])->name('show');
+    Route::get('/create', [OrganizationController::class, 'create'])->name('create');
+    Route::post('/', [OrganizationController::class, 'store'])->name('store');
+    // System -> Organization access: the filtered list of Organizations whose portal access has ever been enabled.
+    Route::get('/access', [OrganizationAccessController::class, 'index'])->name('access');
+
+    // The workspace: one path per tab (Overview, People, Portal access). `organizations.show` is the canonical identity URL and the Overview.
+    Route::get('/{organization}', [OrganizationWorkspaceController::class, 'show'])->name('show');
+    Route::get('/{organization}/people', [OrganizationWorkspaceController::class, 'people'])->name('people');
+    Route::get('/{organization}/portal', [OrganizationWorkspaceController::class, 'portal'])->name('portal');
+    Route::get('/{organization}/edit', [OrganizationController::class, 'edit'])->name('edit');
+    Route::put('/{organization}', [OrganizationController::class, 'update'])->name('update');
+    Route::delete('/{organization}', [OrganizationController::class, 'destroy'])->name('destroy');
+    // Initial enablement of portal access (`manageMembership`); disable and re-enable are `organizations.disable` and `organizations.enable` below.
+    Route::post('/{organization}/promote', [OrganizationController::class, 'promote'])->name('promote');
+
     Route::post('/{organization}/members', [OrganizationMemberController::class, 'store'])->name('members.store');
     Route::put('/{organization}/members/{user}/role', [OrganizationMemberController::class, 'updateRole'])->name('members.role');
     Route::delete('/{organization}/members/{user}', [OrganizationMemberController::class, 'destroy'])->name('members.destroy');

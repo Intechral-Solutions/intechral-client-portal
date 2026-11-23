@@ -235,7 +235,7 @@ function pilotExcludedRequests(array $fx, Invoice $invoice, CmsPage $page): arra
         'cms create' => ['POST', '/operator/cms', ['title' => 'x', 'slug' => 'x', 'body' => 'x']],
         // Operator surfaces
         'operator queue' => ['GET', '/operator/tickets'],
-        'crm' => ['GET', '/crm/companies'],
+        'crm' => ['GET', '/organizations'],
         'users admin' => ['GET', '/admin/users'],
         'roles admin' => ['GET', '/admin/roles'],
         // R1-3B retired the organization-less invitation: the route no longer exists, so it is refused like any unknown one.
@@ -386,7 +386,7 @@ it('leaves operator workflows reachable with the gate on', function () {
     $p = $fx['project']->id;
     foreach ([
         '/billing/invoices', "/billing/invoices/{$invoice->id}", '/time', '/tasks', "/projects/{$p}", "/projects/{$p}/board",
-        "/projects/{$p}/tasks", "/projects/{$p}/milestones", "/projects/{$p}/edit", '/operator/tickets', '/crm/companies',
+        "/projects/{$p}/tasks", "/projects/{$p}/milestones", "/projects/{$p}/edit", '/operator/tickets', '/organizations',
         '/operator/cms', '/admin/users', '/admin/roles', '/pages', '/dashboard', '/profile',
     ] as $uri) {
         $this->actingAs($operator)->get($uri)->assertOk();

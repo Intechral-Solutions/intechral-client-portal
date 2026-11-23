@@ -76,7 +76,7 @@ it('refuses a closed customer every business route, verb and JSON request, discl
         ['GET', '/projects'], ['GET', "/projects/{$p}"], ['GET', "/projects/{$p}/board"], ['GET', "/projects/{$p}/milestones"],
         ['GET', '/my/invoices'], ['GET', "/my/invoices/{$invoice->id}"], ['GET', "/billing/invoices/{$invoice->id}/pay"],
         ['GET', '/time'], ['GET', '/tasks'], ['GET', '/pages'], ['GET', "/pages/{$page->slug}"],
-        ['GET', '/operator/tickets'], ['GET', '/crm/companies'], ['GET', '/admin/users'],
+        ['GET', '/operator/tickets'], ['GET', '/organizations'], ['GET', '/admin/users'],
     ];
 
     $tickets = Ticket::count();
@@ -148,7 +148,7 @@ it('leaves operators entirely unaffected in closed mode', function () {
     $operator = pilotOperator();
     pilotMode('closed');
 
-    foreach (['/dashboard', '/billing/invoices', "/billing/invoices/{$invoice->id}", '/time', '/tasks', "/projects/{$fx['project']->id}", '/projects', '/operator/tickets', '/crm/companies', '/admin/users', '/pages'] as $uri) {
+    foreach (['/dashboard', '/billing/invoices', "/billing/invoices/{$invoice->id}", '/time', '/tasks', "/projects/{$fx['project']->id}", '/projects', '/operator/tickets', '/organizations', '/admin/users', '/pages'] as $uri) {
         $this->actingAs($operator)->get($uri)->assertOk();
     }
 

@@ -314,16 +314,16 @@ it('lets a custom-role operator holding both capabilities use the operations, wi
 
     // Not a member, but eligible (R1-1): the organization page resolves for them, so the success lands on it.
     $this->actingAs($lead)->put(route('organizations.partner.designate', $unisa->id))
-        ->assertRedirect(route('organizations.show', $unisa->id));
+        ->assertRedirect(route('organizations.portal', $unisa->id));
     $this->actingAs($lead)->post(route('organizations.customers.link', $unisa->id), ['customer_id' => $customer->id])
-        ->assertRedirect(route('organizations.show', $unisa->id))
+        ->assertRedirect(route('organizations.portal', $unisa->id))
         ->assertSessionHas('success', '"Customer A" is now managed by "UNISA".');
 
     expect(relationshipRow($customer)->managed_by_organization_id)->toBe($unisa->id)
         ->and(Activity::where('causer_id', $lead->id)->count())->toBe(2);
 
-    $this->actingAs($lead)->delete(route('organizations.manager.unlink', $customer->id))->assertRedirect(route('organizations.show', $customer->id));
-    $this->actingAs($lead)->delete(route('organizations.partner.remove', $unisa->id))->assertRedirect(route('organizations.show', $unisa->id));
+    $this->actingAs($lead)->delete(route('organizations.manager.unlink', $customer->id))->assertRedirect(route('organizations.portal', $customer->id));
+    $this->actingAs($lead)->delete(route('organizations.partner.remove', $unisa->id))->assertRedirect(route('organizations.portal', $unisa->id));
 
     expect(relationshipRow($customer)->managed_by_organization_id)->toBeNull()
         ->and((bool) relationshipRow($unisa)->can_manage_customers)->toBeFalse();
@@ -343,19 +343,19 @@ it('lands each actor on a page they can open, with the success message, after a 
 
     $nonMember = customRoleOperator();
     $alpha = pairedOrganization('Alpha');
-    $visit($nonMember, $alpha, route('organizations.show', $alpha->id), '"Alpha" is now a partner.');
+    $visit($nonMember, $alpha, route('organizations.portal', $alpha->id), '"Alpha" is now a partner.');
 
     $member = customRoleOperator();
     $beta = pairedOrganization('Beta');
     $beta->members()->attach($member, ['role' => 'member']);
-    $visit($member, $beta, route('organizations.show', $beta->id), '"Beta" is now a partner.');
+    $visit($member, $beta, route('organizations.portal', $beta->id), '"Beta" is now a partner.');
 
     $gamma = pairedOrganization('Gamma');
-    $visit($this->operator, $gamma, route('organizations.show', $gamma->id), '"Gamma" is now a partner.');
+    $visit($this->operator, $gamma, route('organizations.portal', $gamma->id), '"Gamma" is now a partner.');
 
     // R1-1: nor is a custom-role operator refused a page they are not a member of; a customer that is not a member still is.
-    $this->actingAs($nonMember)->get(route('organizations.show', $gamma->id))->assertOk();
-    $this->actingAs(User::factory()->create()->assignRole('user'))->get(route('organizations.show', $gamma->id))->assertNotFound();
+    $this->actingAs($nonMember)->get(route('organizations.portal', $gamma->id))->assertOk();
+    $this->actingAs(User::factory()->create()->assignRole('user'))->get(route('organizations.portal', $gamma->id))->assertNotFound();
 });
 
 it('is not reachable by a customer in pilot mode, even one holding crm.manage', function () {
@@ -376,9 +376,9 @@ it('answers a rule refusal with a business message, 409 for JSON, and no change'
     $customer = pairedOrganization('Customer A');
     app(OrganizationRelationships::class)->assignCustomer($customer, $unisa, $this->operator);
 
-    $this->actingAs($this->operator)->from(route('organizations.show', $unisa->id))
+    $this->actingAs($this->operator)->from(route('organizations.portal', $unisa->id))
         ->delete(route('organizations.partner.remove', $unisa->id))
-        ->assertRedirect(route('organizations.show', $unisa->id))
+        ->assertRedirect(route('organizations.portal', $unisa->id))
         ->assertSessionHasErrors(['relationship' => '"UNISA" still manages 1 customer organization(s). Unlink or reassign them before removing its partner designation.']);
 
     $this->actingAs($this->operator)->deleteJson(route('organizations.partner.remove', $unisa->id))
@@ -400,26 +400,26 @@ it('shows an operator the relationship, offers only valid actions, and shows a s
     $broken = Organization::factory()->directoryOnly()->create(['name' => 'Directory Only Org']);   // never enabled: no candidate
     app(OrganizationRelationships::class)->assignCustomer($customer, $unisa, $this->operator);
 
-    $partnerPage = $this->actingAs($this->operator)->get(route('organizations.show', $unisa))->assertOk();
+    $partnerPage = $this->actingAs($this->operator)->get(route('organizations.portal', $unisa))->assertOk();
     $partnerPage->assertSee('Partner relationship')->assertSee('Managed customers (1)')->assertSee('Customer A')
         ->assertSee('Link customer')->assertSee('Spare Customer')->assertDontSee('Directory Only Org')
         ->assertSee('Remove partner designation')->assertSee('Unlink its customers first.')
         ->assertDontSee('Designate as partner');
 
-    $managedPage = $this->actingAs($this->operator)->get(route('organizations.show', $customer))->assertOk();
+    $managedPage = $this->actingAs($this->operator)->get(route('organizations.portal', $customer))->assertOk();
     $managedPage->assertSee('Managed by')->assertSee('UNISA')->assertSee('Unlink from partner')->assertSee('Reassign');
 
-    $plainPage = $this->actingAs($this->operator)->get(route('organizations.show', $spare))->assertOk();
+    $plainPage = $this->actingAs($this->operator)->get(route('organizations.portal', $spare))->assertOk();
     $plainPage->assertSee('Not managed by a partner.')->assertSee('Designate as partner')->assertSee('Link to partner');
 
-    $brokenPage = $this->actingAs($this->operator)->get(route('organizations.show', $broken))->assertOk();
+    $brokenPage = $this->actingAs($this->operator)->get(route('organizations.portal', $broken))->assertOk();
     $brokenPage->assertDontSee('Designate as partner')->assertDontSee('Link to partner');   // a never-enabled Organization is offered neither: the server would refuse both
 
     // A customer who holds crm.manage and belongs to the customer organization is refused the page (ORG-3a: `manageDirectory`; until then they could open their own
     // organization's page), and learns nothing about any other organization from the relationship.
     $member = User::factory()->create()->assignRole('user')->givePermissionTo('crm.manage');
     $customer->members()->attach($member, ['role' => 'member']);
-    $this->actingAs($member)->get(route('organizations.show', $customer))->assertForbidden()
+    $this->actingAs($member)->get(route('organizations.portal', $customer))->assertForbidden()
         ->assertDontSee('Partner relationship')->assertDontSee('UNISA')->assertDontSee('Spare Customer');
 });
 
@@ -432,9 +432,9 @@ it('refuses a plain Link of a customer another partner already manages, with a c
     $audited = Activity::count();
 
     // A stale "Link customer" form on UNISA's page (the customer was linked to Other Partner after it was drawn).
-    $this->actingAs($this->operator)->from(route('organizations.show', $unisa->id))
+    $this->actingAs($this->operator)->from(route('organizations.portal', $unisa->id))
         ->post(route('organizations.customers.link', $unisa->id), ['customer_id' => $customer->id])
-        ->assertRedirect(route('organizations.show', $unisa->id))
+        ->assertRedirect(route('organizations.portal', $unisa->id))
         ->assertSessionHasErrors(['relationship' => '"Customer A" is already managed by "Other Partner" (it may have been linked since this page was loaded). Nothing was changed. Reload, then use Reassign if you mean to move it.']);
 
     $this->actingAs($this->operator)->postJson(route('organizations.customers.link', $unisa->id), ['customer_id' => $customer->id])->assertStatus(409);
@@ -466,9 +466,9 @@ it('moves a customer only on an explicit Reassign, and audits the move', functio
         ->and(Activity::where('subject_id', $customer->id)->where('description', OrganizationRelationships::CUSTOMER_REASSIGNED)->count())->toBe(1);
 
     // The customer page offers Reassign (and sends the flag) only when it shows a current partner.
-    $this->actingAs($this->operator)->get(route('organizations.show', $customer->id))->assertSee('name="reassign"', false);
+    $this->actingAs($this->operator)->get(route('organizations.portal', $customer->id))->assertSee('name="reassign"', false);
     $plain = pairedOrganization('Plain');
-    $this->actingAs($this->operator)->get(route('organizations.show', $plain->id))->assertDontSee('name="reassign"', false);
+    $this->actingAs($this->operator)->get(route('organizations.portal', $plain->id))->assertDontSee('name="reassign"', false);
 });
 
 it('offers Unlink for a managed organization, and the server allows it', function () {
@@ -477,7 +477,7 @@ it('offers Unlink for a managed organization, and the server allows it', functio
     $customer = pairedOrganization('Customer A');
     $service->assignCustomer($customer, $unisa, $this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $customer->id))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $customer->id))->assertOk();
     $page->assertSee('Unlink from partner');
 
     $service->unlinkCustomer($customer, $this->operator);
@@ -527,8 +527,8 @@ it('grants a partner and its members no access to a customer: tickets, projects,
             'project' => $unisaAdmin->can('view', $project),
             'visible projects' => Project::visibleTo($unisaAdmin)->count(),
             'invoice' => $unisaAdmin->can('view', $invoice),
-            'organization page' => $this->get(route('organizations.show', $customer))->status(),
-            'directory page' => $this->get(route('crm.companies.show', $customer))->status(),
+            'organization page' => $this->get(route('organizations.portal', $customer))->status(),
+            'directory page' => $this->get(route('organizations.show', $customer))->status(),
             'organizations visible' => Organization::pluck('name')->all(),
         ];
     };
@@ -559,11 +559,11 @@ it('refuses to delete a partner or a managed customer, with a business message a
     $audited = Activity::count();
 
     foreach ($organizations as $organization) {
-        $this->actingAs($this->operator)->from(route('crm.companies.edit', $organization))->delete(route('crm.companies.destroy', $organization))
-            ->assertRedirect(route('crm.companies.edit', $organization))
+        $this->actingAs($this->operator)->from(route('organizations.edit', $organization))->delete(route('organizations.destroy', $organization))
+            ->assertRedirect(route('organizations.edit', $organization))
             ->assertSessionHasErrors('company');
 
-        $this->actingAs($this->operator)->deleteJson(route('crm.companies.destroy', $organization))
+        $this->actingAs($this->operator)->deleteJson(route('organizations.destroy', $organization))
             ->assertStatus(409)
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'has (or had) portal access'));
 

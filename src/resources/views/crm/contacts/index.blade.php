@@ -48,7 +48,7 @@
                     </td>
                     <td class="px-4 py-3 text-text-secondary">
                         @if ($contact->organization)
-                        <x-ui.link variant="quiet" :href="route('crm.companies.show', $contact->organization)">
+                        <x-ui.link variant="quiet" :href="route('organizations.show', $contact->organization)">
                             {{ $contact->organization->name }}
                         </x-ui.link>
                         @else —

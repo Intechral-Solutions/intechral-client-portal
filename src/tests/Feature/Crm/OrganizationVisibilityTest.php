@@ -73,7 +73,7 @@ function dir1DirectoryOnly(array $extra = []): User
 it('shows Not enabled, Enabled and Disabled on the Directory Organizations list', function () {
     $world = dir1Landscape($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('crm.companies.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
 
     // ORG-3a: the state is the row's own, drawn by the one badge (OrganizationAccessPresentationTest pins the badge itself); here, what each row says.
     $page->assertSee('data-portal-state="enabled"', false)->assertSee('data-portal-state="disabled"', false)->assertSee('data-portal-state="not_enabled"', false);
@@ -95,7 +95,7 @@ it('shows Not enabled, Enabled and Disabled on the Directory Organizations list'
 it('shows Enabled or Disabled on Organization access, never Not enabled, and names the operator who enabled access', function () {
     dir1Landscape($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
 
     $page->assertSee('Organization access')
         ->assertSee('Enabled by')
@@ -111,7 +111,7 @@ it('shows Enabled or Disabled on Organization access, never Not enabled, and nam
 });
 
 it('links Organization access back to the Directory Organizations list with the glossary wording', function () {
-    $this->actingAs($this->operator)->get(route('organizations.index'))
+    $this->actingAs($this->operator)->get(route('organizations.access'))
         ->assertOk()
         ->assertSee('View Organizations')
         ->assertSee('Organizations with portal access enabled')
@@ -125,7 +125,7 @@ it('links Organization access back to the Directory Organizations list with the 
 it('shows Managed by and Manages N on both lists for an operator who may manage relationships', function () {
     $world = dir1Landscape($this->operator);
 
-    foreach ([route('organizations.index'), route('crm.companies.index')] as $url) {
+    foreach ([route('organizations.access'), route('organizations.index')] as $url) {
         $page = $this->actingAs($this->operator)->get($url)->assertOk();
         $facts = $page->viewData('relationships');
 
@@ -155,7 +155,7 @@ it('builds no relationship fact for an actor who may not manage relationships, o
     // ORG-2 (Directory) and ORG-3a (Organization access): both lists ask `manageDirectory` (portal.operator AND crm.manage), so this actor, who holds `crm.manage`
     // only, is refused each outright: no relationship fact is built for them, and no read of the relationship column happens at all. (Until ORG-3a the Organization
     // access list answered them 200 with the relationship facts null; the builder-level refusal below still pins that null.)
-    foreach ([route('crm.companies.index'), route('organizations.index')] as $url) {
+    foreach ([route('organizations.index'), route('organizations.access')] as $url) {
         DB::flushQueryLog();
         DB::enableQueryLog();
         $this->actingAs($actor)->get($url)->assertForbidden();
@@ -206,9 +206,9 @@ it('links a member to the System user page only for a viewer who holds users.vie
     $withView = dir1CustomOperator('Operator With View', ['users.view']);
     $withoutView = dir1CustomOperator('Operator Without View', []);
 
-    $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk()->assertSee($target, false);
-    $this->actingAs($withView)->get(route('organizations.show', $organization))->assertOk()->assertSee($target, false);
-    $this->actingAs($withoutView)->get(route('organizations.show', $organization))
+    $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk()->assertSee($target, false);
+    $this->actingAs($withView)->get(route('organizations.portal', $organization))->assertOk()->assertSee($target, false);
+    $this->actingAs($withoutView)->get(route('organizations.portal', $organization))
         ->assertOk()->assertSee('Mary Member')->assertDontSee($target, false);
 
     // The plain member list (an actor who may not manage membership): same rule. ORG-3a: an actor who holds `crm.manage` only can no longer open this page at all
@@ -220,7 +220,7 @@ it('links a member to the System user page only for a viewer who holds users.vie
         $viewer = dir1DirectoryOnly($permission === null ? [] : [$permission]);
         DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $viewer->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
 
-        $page = $this->actingAs($viewer)->get(route('organizations.show', $organization))->assertOk()->assertSee('Mary Member');
+        $page = $this->actingAs($viewer)->get(route('organizations.portal', $organization))->assertOk()->assertSee('Mary Member');
         $linked ? $page->assertSee($target, false) : $page->assertDontSee($target, false);
         // No administration reaches the plain list: no approval, no role control, no invitation card.
         $page->assertDontSee('Approve administrator')->assertDontSee('Send invitation')->assertDontSee('Make Admin');
@@ -264,14 +264,14 @@ it('describes the stored owner as the operator who enabled portal access, and ch
         DB::table('activity_log')->count(),
     ];
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
     $page->assertSee('Portal access enabled by')->assertSee('Olive Operator')
-        ->assertSee('View Directory profile')
+        ->assertSee('aria-label="Organization sections"', false)
         ->assertDontSee('View CRM Record')
         ->assertDontSee('>Owner<', false);
 
+    $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
     $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
-    $this->actingAs($this->operator)->get(route('crm.companies.index'))->assertOk();
 
     expect([
         DB::table('organizations')->orderBy('id')->get()->all(),
@@ -286,7 +286,7 @@ it('describes the stored owner as the operator who enabled portal access, and ch
 it('warns that deleting an Organization keeps its People, and promises nothing the code does not do', function () {
     $company = Organization::factory()->directoryOnly()->create(['name' => 'Warned Org', 'created_by' => $this->operator->id]);
 
-    $page = $this->actingAs($this->operator)->get(route('crm.companies.edit', $company))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.edit', $company))->assertOk();
 
     $page->assertSee('Delete Organization')
         ->assertSee('Its People are kept: they stay in the Directory and lose their affiliation with it.')
@@ -301,8 +301,8 @@ it('deletes the Organization record and keeps its People, exactly as the warning
     $company = Organization::factory()->directoryOnly()->create(['name' => 'Soon Gone', 'created_by' => $this->operator->id]);
     $person = CrmContact::factory()->create(['organization_id' => $company->id]);
 
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
-        ->assertRedirect(route('crm.companies.index'))
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $company))
+        ->assertRedirect(route('organizations.index'))
         ->assertSessionHas('success', 'Organization deleted.');
 
     expect(Organization::withoutGlobalScopes()->find($company->id))->toBeNull()
@@ -314,7 +314,7 @@ it('still refuses to delete the Organization of a partner, with the refusal the 
     $world = dir1Landscape($this->operator);
     $company = $world['alpha'];
 
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $company))
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $company))
         ->assertSessionHasErrors('company');
 
     expect(Organization::withoutGlobalScopes()->find($company->id))->not->toBeNull();
@@ -331,24 +331,24 @@ it('answers a customer 404 on every Directory and Organization route in closed a
     $person = CrmContact::factory()->create(['organization_id' => $company->id]);
 
     foreach ([
-        route('crm.companies.index'), route('crm.companies.show', $company), route('crm.companies.edit', $company), route('crm.companies.create'),
+        route('organizations.index'), route('organizations.show', $company), route('organizations.edit', $company), route('organizations.create'),
         route('crm.contacts.index'), route('crm.contacts.show', $person), route('crm.contacts.create'),
-        route('organizations.index'), route('organizations.show', $world['alpha']),
+        route('organizations.access'), route('organizations.portal', $world['alpha']),
     ] as $url) {
         $this->actingAs($customer)->get($url)->assertNotFound();
     }
 
-    $this->actingAs($customer)->delete(route('crm.companies.destroy', $company))->assertNotFound();
-    $this->actingAs($customer)->post(route('crm.companies.promote', $world['plain']))->assertNotFound();
+    $this->actingAs($customer)->delete(route('organizations.destroy', $company))->assertNotFound();
+    $this->actingAs($customer)->post(route('organizations.promote', $world['plain']))->assertNotFound();
 })->with(['closed', 'pilot']);
 
 it('renders the empty states of both lists, and ignores an array-shaped search instead of failing', function () {
-    $this->actingAs($this->operator)->get(route('organizations.index'))
+    $this->actingAs($this->operator)->get(route('organizations.access'))
         ->assertOk()
         ->assertSee('No organization has portal access yet.')
         ->assertSee('colspan="8"', false);
 
-    $this->actingAs($this->operator)->get(route('crm.companies.index').'?search[]=x')->assertOk();
+    $this->actingAs($this->operator)->get(route('organizations.index').'?search[]=x')->assertOk();
     $this->actingAs($this->operator)->get(route('crm.contacts.index').'?search[]=x')->assertOk();
 });
 
@@ -362,8 +362,8 @@ it('counts only organizations with enabled portal access in the dashboard "With 
 
 it('wraps each expanded administration list in a named, focusable, horizontally scrollable region with the focus ring', function () {
     foreach ([
-        [route('crm.companies.index'), 'Organizations list'],
-        [route('organizations.index'), 'Organizations with portal access'],
+        [route('organizations.index'), 'Organizations list'],
+        [route('organizations.access'), 'Organizations with portal access'],
         [route('users.index'), 'Users list'],
     ] as [$url, $name]) {
         $html = $this->actingAs($this->operator)->get($url)->assertOk()->getContent();

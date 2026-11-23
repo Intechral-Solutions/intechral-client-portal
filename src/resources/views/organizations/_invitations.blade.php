@@ -39,7 +39,9 @@
     @if ($invitations['rows']->isEmpty())
     <p class="px-5 py-8 text-center text-sm text-text-muted">No invitations yet.</p>
     @else
-    <table class="w-full text-sm">
+    {{-- ORG-3b: a named, focusable scroll region (the table is wider than a phone), as the lists are. --}}
+    <div role="region" tabindex="0" aria-label="Invitation list" class="relative overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus">
+    <table class="w-full min-w-xl text-sm">
         <caption class="sr-only">Invitations to {{ $organization->name }}, newest first</caption>
         <thead>
             <tr class="border-b border-rule text-left text-xs uppercase tracking-wide text-text-muted">
@@ -98,6 +100,7 @@
             @endforeach
         </tbody>
     </table>
+    </div>
     @if ($invitations['truncated'])
     <p class="border-t px-5 py-3 text-xs text-text-muted border-rule">Showing the {{ $invitations['rows']->count() }} most recent of {{ $invitations['total'] }} invitations.</p>
     @endif

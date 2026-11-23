@@ -261,7 +261,7 @@ it('clears the seeded E2E operator\'s issuance counter, and only that account\'s
     inviteeCleanup()->assertSuccessful()->expectsOutputToContain('Invitation issuance counter cleared for the seeded E2E operator.');
 
     // The seeded operator can issue again; another operator's counter is untouched; the production limit itself is unchanged.
-    $this->actingAs($seeded)->post(route('organizations.invitations.store', $this->suite), ['email' => 'a@example.test'])->assertRedirect(route('organizations.show', $this->suite));
+    $this->actingAs($seeded)->post(route('organizations.invitations.store', $this->suite), ['email' => 'a@example.test'])->assertRedirect(route('organizations.portal', $this->suite));
     $this->actingAs($bystander)->post(route('organizations.invitations.store', $this->suite), ['email' => 'b@example.test'])->assertStatus(429);
     expect(InvitationIssueThrottle::ATTEMPTS_PER_HOUR)->toBe(30);
 

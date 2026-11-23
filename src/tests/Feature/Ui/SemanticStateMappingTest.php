@@ -435,7 +435,7 @@ it('draws an organization member role as a tag, so admin is a kind and not a war
     $organization->members()->attach(semActor('user')->id, ['role' => 'admin']);
     $organization->members()->attach(semActor('user')->id, ['role' => 'member']);
 
-    $html = $this->actingAs($operator)->get(route('organizations.show', $organization))->assertOk()->getContent();
+    $html = $this->actingAs($operator)->get(route('organizations.portal', $organization))->assertOk()->getContent();
     $xpath = uiDom($html);
     $labels = [];
     foreach ($xpath->query('//*[@id="main-content"]//span[contains(@class,"rounded-tag")]') as $tag) {
@@ -529,8 +529,8 @@ it('never announces an ordinary success message assertively on any page that fla
         route('users.index') => 'status',
         route('operator.cms.index') => 'success',
         route('crm.contacts.index') => 'success',
-        route('crm.companies.index') => 'success',
         route('organizations.index') => 'success',
+        route('organizations.access') => 'success',
         route('billing.invoices.index') => 'success',
         route('operator.tickets.index') => 'status',
     ];

@@ -3,10 +3,10 @@
     $relationship only when the actor holds portal.operator AND crm.manage). An administrative link: it grants nobody any access
     to the customer's service requests, projects, time or invoices (R1-4 support access is a separate, per-member operator grant). Every action is enforced on the server whatever this panel shows.
 --}}
-<div class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
+<section id="relationship" aria-labelledby="relationship-heading" class="rounded-lg border p-5 space-y-4 bg-surface border-rule">
     <div>
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-text-muted">Partner relationship</h2>
-        <p class="mt-1 text-xs text-text-muted">Administrative only. The relationship alone gives a partner no access to a customer's service requests, projects, time or invoices. Partner support access is granted to named members separately, under Members.</p>
+        <h2 id="relationship-heading" class="text-sm font-semibold text-text">Partner relationship</h2>
+        <p class="mt-1 text-xs text-text-muted">Administrative only. The relationship alone gives a partner no access to a customer's service requests, projects, time or invoices. Partner support access is granted to named members separately, under Partner support access.</p>
     </div>
 
     <x-ui.field-error for="relationship" />
@@ -21,7 +21,7 @@
                 @forelse ($relationship['customers'] as $customer)
                 <li class="flex items-center justify-between gap-3 py-2">
                     <x-ui.link variant="row" :href="route('organizations.show', $customer->id)" class="text-sm">{{ $customer->name }}</x-ui.link>
-                    <form method="POST" action="{{ route('organizations.manager.unlink', $customer->id) }}" onsubmit="return confirm('Unlink {{ addslashes($customer->name) }} from {{ addslashes($organization->name) }}?')">
+                    <form method="POST" action="{{ route('organizations.manager.unlink', $customer->id) }}" onsubmit="return confirm(@js('Unlink '.$customer->name.' from '.$organization->name.'?'))">
                         @csrf @method('DELETE')
                         <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Unlink</x-ui.button>
                     </form>
@@ -51,7 +51,7 @@
 
         <div class="border-t pt-3 border-rule">
             @if ($relationship['customers']->isEmpty())
-            <form method="POST" action="{{ route('organizations.partner.remove', $organization->id) }}" onsubmit="return confirm('Remove the partner designation from {{ addslashes($organization->name) }}?')">
+            <form method="POST" action="{{ route('organizations.partner.remove', $organization->id) }}" onsubmit="return confirm(@js('Remove the partner designation from '.$organization->name.'?'))">
                 @csrf @method('DELETE')
                 <x-ui.button type="submit" variant="secondary" tone="danger" size="sm">Remove partner designation</x-ui.button>
             </form>
@@ -96,7 +96,7 @@
 
         {{-- Unlinking is always available to an organization that has a managing partner. --}}
         @if ($relationship['manager'])
-        <form method="POST" action="{{ route('organizations.manager.unlink', $organization->id) }}" onsubmit="return confirm('Unlink {{ addslashes($organization->name) }} from its managing partner?')">
+        <form method="POST" action="{{ route('organizations.manager.unlink', $organization->id) }}" onsubmit="return confirm(@js('Unlink '.$organization->name.' from its managing partner?'))">
             @csrf @method('DELETE')
             <x-ui.button type="submit" variant="ghost" tone="danger" size="sm">Unlink from partner</x-ui.button>
         </form>
@@ -112,4 +112,4 @@
         @endif
     </div>
     @endif
-</div>
+</section>

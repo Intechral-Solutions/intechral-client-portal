@@ -107,6 +107,6 @@ class OrganizationMemberController extends Controller
 
     private function back(Organization $organization, string $message): RedirectResponse
     {
-        return redirect()->route('organizations.show', $organization)->with('success', $message);
+        return redirect()->route('organizations.portal', $organization)->with('success', $message);
     }
 }

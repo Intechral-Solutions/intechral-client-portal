@@ -492,7 +492,7 @@ it('runs the operator routes end to end: add, promote, approve, demote, revoke, 
     $b = memCustomer();
     $this->actingAs($this->operator);
 
-    $this->post(route('organizations.members.store', $organization), ['user_id' => $a->id, 'role' => 'member'])->assertRedirect(route('organizations.show', $organization));
+    $this->post(route('organizations.members.store', $organization), ['user_id' => $a->id, 'role' => 'member'])->assertRedirect(route('organizations.portal', $organization));
     $this->post(route('organizations.members.store', $organization), ['user_id' => $b->id, 'role' => 'admin'])
         ->assertSessionHas('success', "{$b->name} added as an administrator. They are not approved: an administrator holds no delegated authority until an operator approves them.");
     $this->put(route('organizations.members.role', [$organization, $a]), ['role' => 'admin'])->assertRedirect();
@@ -529,8 +529,8 @@ it('answers a rule refusal with a business message, 409 for JSON, and no change'
     memAttach($organization, $only, 'admin', $this->operator);
     $this->actingAs($this->operator);
 
-    $this->from(route('organizations.show', $organization))->delete(route('organizations.members.destroy', [$organization, $only]))
-        ->assertRedirect(route('organizations.show', $organization))
+    $this->from(route('organizations.portal', $organization))->delete(route('organizations.members.destroy', [$organization, $only]))
+        ->assertRedirect(route('organizations.portal', $organization))
         ->assertSessionHasErrors('membership');
 
     $message = $this->deleteJson(route('organizations.members.destroy', [$organization, $only]))->assertStatus(409)->json('message');
@@ -549,7 +549,7 @@ it('gives the custom-role operator the built-in operator\'s reach (R1-1): the ro
 
     // R1-1: the three organization scopes key on `portal.operator` ({@see CustomerPilotGate::isOperator()}), so the organization
     // resolves for a custom-role operator exactly as it does for the built-in one. The capabilities (`crm.manage`) still decide.
-    $this->actingAs($lead)->get(route('organizations.show', $organization))->assertOk();
+    $this->actingAs($lead)->get(route('organizations.portal', $organization))->assertOk();
     $this->actingAs($lead)->post(route('organizations.members.approve', [$organization, $admin]))->assertRedirect();
 
     expect((int) memRow($organization, $admin)->admin_approved_by)->toBe($lead->id);
@@ -580,7 +580,7 @@ it('shows the operator role and approval separately, never presenting an unappro
     memAttach($organization, $operatorMember, 'admin');
     memAttach($organization, $plain, 'member');
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
     $page->assertSee('The administrator role grants nothing by itself')
         ->assertSee('Approved administrator')
         ->assertSee('Not approved: holds no delegated authority.')
@@ -598,7 +598,7 @@ it('disables demotion and removal of the only approved administrator and asks fo
     $only = memCustomer(['name' => 'Olivia Only']);
     memAttach($organization, $only, 'admin', $this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
     $page->assertSee('The only approved administrator: approve another before demoting or removing them.')
         ->assertSee('I understand this leaves '.$organization->name.' with no approved administrator.')
         ->assertSee('name="confirm_no_administrator"', false)
@@ -607,7 +607,7 @@ it('disables demotion and removal of the only approved administrator and asks fo
 
     $second = memCustomer();
     memAttach($organization, $second, 'admin', $this->operator);
-    $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk()
+    $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk()
         ->assertDontSee('The only approved administrator')
         ->assertDontSee('name="confirm_no_administrator"', false)
         ->assertSee('action="'.route('organizations.members.destroy', [$organization, $only]).'"', false);
@@ -623,7 +623,7 @@ it('refuses a customer holding crm.manage who belongs to the organization its pa
 
     // ORG-3a: the page asks `manageDirectory`, so this actor is refused it outright. (Until then they were shown the plain member list, which is still what an actor
     // who passes the Directory ability and not the membership ability would see: OrganizationVisibilityTest reaches that branch with a policy that separates the two.)
-    $this->actingAs($viewer)->get(route('organizations.show', $organization))->assertForbidden()
+    $this->actingAs($viewer)->get(route('organizations.portal', $organization))->assertForbidden()
         ->assertDontSee('Colin Colleague')
         ->assertDontSee('Sasha Stranger')
         ->assertDontSee('Approved administrator')
@@ -663,8 +663,8 @@ it('gives an approved administrator no access to anything: tickets, projects, in
         config(['portal.customer_surface_mode' => 'pilot']);
 
         return [
-            'organizations' => $this->actingAs($admin)->get(route('organizations.index'))->status(),
-            'organization page' => $this->actingAs($admin)->get(route('organizations.show', $organization))->status(),
+            'organizations' => $this->actingAs($admin)->get(route('organizations.access'))->status(),
+            'organization page' => $this->actingAs($admin)->get(route('organizations.portal', $organization))->status(),
             'add member' => $this->actingAs($admin)->post(route('organizations.members.store', $organization), ['user_id' => $peer->id, 'role' => 'member'])->status(),
         ];
     };
@@ -908,7 +908,7 @@ it('offers Revoke whenever EITHER approval column is populated, offers Approve o
     memHalfApprove($organization, $approverOnly, 'approver-only', $this->operator);
     memHalfApprove($organization, $stale, 'approver-only', $this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
     $html = $page->getContent();
 
     // Approve (POST) and Revoke (DELETE) share one URL, so count the controls: three rows hold approval data, one is clean.

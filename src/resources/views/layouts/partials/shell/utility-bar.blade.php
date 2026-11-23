@@ -36,7 +36,23 @@
 
                 @if ($shellActiveItem)
                     @include('layouts.partials.shell.icon', ['name' => 'chevron-right', 'class' => 'h-3.5 w-3.5 shrink-0 text-text-faint'])
-                    <span class="truncate px-1 font-medium text-text" aria-current="page">{{ $shellActiveItem['label'] }}</span>
+                    @if (! empty($breadcrumbTrail))
+                        {{-- ORG-3b: a record page names the record after its list. The page passes `breadcrumbTrail` (a list of [label, href|null], the last being the
+                             current page); the active item above becomes a link back to its list. Absent, the trail is exactly the two crumbs it always was. --}}
+                        <a href="{{ $shellActiveItem['href'] }}"
+                           class="truncate rounded-control px-1 py-0.5 text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">{{ $shellActiveItem['label'] }}</a>
+                        @foreach ($breadcrumbTrail as $crumb)
+                            @include('layouts.partials.shell.icon', ['name' => 'chevron-right', 'class' => 'h-3.5 w-3.5 shrink-0 text-text-faint'])
+                            @if ($loop->last || empty($crumb[1]))
+                                <span class="truncate px-1 font-medium text-text" aria-current="page">{{ $crumb[0] }}</span>
+                            @else
+                                <a href="{{ $crumb[1] }}"
+                                   class="truncate rounded-control px-1 py-0.5 text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">{{ $crumb[0] }}</a>
+                            @endif
+                        @endforeach
+                    @else
+                        <span class="truncate px-1 font-medium text-text" aria-current="page">{{ $shellActiveItem['label'] }}</span>
+                    @endif
                 @endif
             </nav>
         @else

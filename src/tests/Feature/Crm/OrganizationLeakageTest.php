@@ -80,12 +80,18 @@ function expectNoLeak(TestResponse $response, string $label): void
     expect(leakedIn((string) $response->getContent()))->toBe([], "{$label} leaks Directory data");
 }
 
-it('proves the scan can see: an authorized operator\'s Directory page shows every sentinel', function () {
-    $page = html_entity_decode($this->actingAs($this->operator)->get(route('crm.companies.show', $this->organization))->assertOk()->getContent(), ENT_QUOTES | ENT_HTML5);
+it('proves the scan can see: an authorized operator\'s Overview and People pages show every sentinel', function () {
+    // ORG-3b: the Directory columns are on the Overview, and the affiliated People on their own page. Together they are the whole of what the scan must see.
+    $read = fn (string $route) => html_entity_decode($this->actingAs($this->operator)->get(route($route, $this->organization))->assertOk()->getContent(), ENT_QUOTES | ENT_HTML5);
+    $overview = $read('organizations.show');
+    $people = $read('organizations.people');
 
-    foreach (['website', 'phone', 'address', 'notes', 'person'] as $key) {
-        expect(str_contains($page, LEAK_SENTINELS[$key]))->toBeTrue("the negative control cannot see {$key}");
+    foreach (['website', 'phone', 'address', 'notes', 'creator'] as $key) {
+        expect(str_contains($overview, LEAK_SENTINELS[$key]))->toBeTrue("the negative control cannot see {$key} on the Overview");
     }
+    expect(str_contains($people, LEAK_SENTINELS['person']))->toBeTrue('the negative control cannot see the Person on the People page');
+    // The Overview is a summary: it counts People and names none.
+    expect(str_contains($overview, LEAK_SENTINELS['person']))->toBeFalse();
 });
 
 it('keeps every Directory column off every page a customer member reads', function () {
@@ -238,9 +244,11 @@ it('refuses a customer holding only a stray crm.manage the Directory with the ex
 
     // The Organization is visible to this member (it binds); a Person is not (D7).
     $pages = [
-        [route('crm.companies.show', $this->organization), false],
-        [route('crm.companies.edit', $this->organization), false],
-        [route('crm.companies.index'), false],
+        [route('organizations.show', $this->organization), false],
+        [route('organizations.people', $this->organization), false],
+        [route('organizations.portal', $this->organization), false],
+        [route('organizations.edit', $this->organization), false],
+        [route('organizations.index'), false],
         [route('crm.contacts.index'), false],
         [route('crm.contacts.show', $this->person), true],
     ];
@@ -254,7 +262,7 @@ it('refuses a customer holding only a stray crm.manage the Directory with the ex
     }
 })->with(['closed', 'pilot', 'legacy']);
 
-it('refuses a customer holding only a stray crm.manage the Organization access pages with the exact status of the mode: 403 for its own Organization, 404 for a hidden or unknown one, and no membership, invitation or relationship data', function (string $mode) {
+it('refuses a customer holding only a stray crm.manage the Organization access list and every workspace page with the exact status of the mode: 403 for its own Organization, 404 for a hidden or unknown one, and no membership, invitation or relationship data', function (string $mode) {
     config(['portal.customer_surface_mode' => $mode]);
 
     // ORG-3a: the access pages ask `manageDirectory` (`portal.operator` AND `crm.manage`), so `crm.manage` alone no longer opens the member list. The refusal must be the
@@ -267,19 +275,25 @@ it('refuses a customer holding only a stray crm.manage the Organization access p
     app(OrganizationRelationships::class)->assignCustomer($this->organization, $partner->fresh(), $this->operator);
     app(OrganizationInvitations::class)->issue($this->organization, 'pending.invitee@leak.test', $this->operator);
 
-    $private = ['Mary Member', $this->member->email, 'pending.invitee@leak.test', 'Partner Leak Co', 'Approve administrator', 'Send invitation', 'Remove', 'Disable organization'];
+    $private = ['Mary Member', $this->member->email, 'pending.invitee@leak.test', 'Partner Leak Co', 'Approve administrator', 'Send invitation', 'Remove', 'Disable portal access'];
 
     // [url, binds a record this customer cannot see (a hidden or unknown Organization is not in the customer's scope: 404 before any authorization)]
     $pages = [
-        [route('organizations.index'), false],
+        [route('organizations.access'), false],
         [route('organizations.show', $this->organization), false],
+        [route('organizations.people', $this->organization), false],
+        [route('organizations.portal', $this->organization), false],
         [route('organizations.show', $hidden), true],
+        [route('organizations.people', $hidden), true],
+        [route('organizations.portal', $hidden), true],
         [route('organizations.show', 999999), true],
+        [route('organizations.people', 999999), true],
+        [route('organizations.portal', 999999), true],
     ];
 
     foreach ($pages as [$url, $bindsHiddenRecord]) {
         // The control: the SAME page and mode answer an operator, so the refusal below is the customer's and not a broken route (the unknown id is the exception).
-        if ($url !== route('organizations.show', 999999)) {
+        if (! str_contains($url, '/999999')) {
             $this->actingAs($this->operator)->get($url)->assertOk();
         }
 

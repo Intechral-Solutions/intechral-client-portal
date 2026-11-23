@@ -150,7 +150,7 @@ it('does not let the Classification decide who may do what: an operator may mana
 
         expect($this->operator->can('manageDirectory', Organization::class))->toBeTrue()
             ->and($customer->can('manageDirectory', Organization::class))->toBeFalse()
-            ->and($this->actingAs($this->operator)->get(route('crm.companies.show', $organization))->assertOk()->getContent())->toContain(e($classification->label()));
+            ->and($this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk()->getContent())->toContain(e($classification->label()));
     }
 });
 
@@ -159,9 +159,9 @@ it('does not let the Classification decide who may do what: an operator may mana
 it('shows the Classification read-only and offers no control to change it on the Directory form', function () {
     $organization = Organization::factory()->classified(Classification::Vendor)->directoryOnly()->create(['created_by' => $this->operator->id, 'name' => 'Read Only Co']);
 
-    $show = $this->actingAs($this->operator)->get(route('crm.companies.show', $organization))->assertOk()->getContent();
-    $edit = $this->actingAs($this->operator)->get(route('crm.companies.edit', $organization))->assertOk()->getContent();
-    $create = $this->actingAs($this->operator)->get(route('crm.companies.create'))->assertOk()->getContent();
+    $show = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk()->getContent();
+    $edit = $this->actingAs($this->operator)->get(route('organizations.edit', $organization))->assertOk()->getContent();
+    $create = $this->actingAs($this->operator)->get(route('organizations.create'))->assertOk()->getContent();
 
     expect($show)->toContain('Classification')->toContain(e(Classification::Vendor->label()));
 
@@ -174,8 +174,8 @@ it('shows the Classification read-only and offers no control to change it on the
 it('ignores a Classification forged into the Directory form: neither a create nor an update through the routes can set it', function () {
     $organization = Organization::factory()->classified(Classification::Vendor)->directoryOnly()->create(['created_by' => $this->operator->id, 'name' => 'Forge Co']);
 
-    $this->actingAs($this->operator)->put(route('crm.companies.update', $organization), ['name' => 'Forge Co Renamed', 'classification' => 'client'])->assertRedirect();
-    $this->actingAs($this->operator)->post(route('crm.companies.store'), ['name' => 'Forged New', 'classification' => 'vendor'])->assertRedirect();
+    $this->actingAs($this->operator)->put(route('organizations.update', $organization), ['name' => 'Forge Co Renamed', 'classification' => 'client'])->assertRedirect();
+    $this->actingAs($this->operator)->post(route('organizations.store'), ['name' => 'Forged New', 'classification' => 'vendor'])->assertRedirect();
 
     expect($organization->fresh()->name)->toBe('Forge Co Renamed')
         ->and($organization->fresh()->classification)->toBe(Classification::Vendor, 'an update through the form changed the Classification')

@@ -71,7 +71,7 @@
                         <dd class="text-right text-text">
                             Joined
                             @can('crm.manage')
-                            <x-ui.link variant="row" :href="route('organizations.show', $user->organizationInvitation->organization_id)">{{ $user->organizationInvitation->organization?->name ?? 'an organization' }}</x-ui.link>
+                            <x-ui.link variant="row" :href="route('organizations.portal', $user->organizationInvitation->organization_id)">{{ $user->organizationInvitation->organization?->name ?? 'an organization' }}</x-ui.link>
                             @else
                             {{ $user->organizationInvitation->organization?->name ?? 'an organization' }}
                             @endcan
@@ -109,7 +109,7 @@
                         <div class="min-w-0">
                             <p class="font-medium text-text">
                                 @can('crm.manage')
-                                <x-ui.link variant="row" :href="route('organizations.show', $membership->organization_id)">{{ $membership->name }}</x-ui.link>
+                                <x-ui.link variant="row" :href="route('organizations.portal', $membership->organization_id)">{{ $membership->name }}</x-ui.link>
                                 @else
                                 {{ $membership->name }}
                                 @endcan
