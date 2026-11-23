@@ -43,10 +43,12 @@ function address(label: string) {
     return `e2e-invitee+${randomBytes(6).toString('hex')}-${label}@example.test`;
 }
 
-/** The invitations card of the E2E organization, on the operator's page (found through the list, never by id arithmetic). */
+/** The invitations card of the E2E organization, on the operator's Portal access page (found through the System list, never by id arithmetic). */
 async function openOrganization(page: Page) {
     for (let list = 1; list <= 20; list++) {
-        await page.goto(list === 1 ? '/organizations' : `/organizations?page=${list}`);
+        await page.goto(
+            list === 1 ? '/organizations/access' : `/organizations/access?page=${list}`,
+        );
         const link = page.getByRole('link', { name: ORGANIZATION, exact: true });
 
         if ((await link.count()) > 0) {
@@ -71,10 +73,16 @@ async function invite(page: Page, email: string) {
 const row = (page: Page, email: string) =>
     page.getByRole('region', { name: 'Invitations' }).getByRole('row').filter({ hasText: email });
 
-/** The organization's own path, taken from the page the operator is on. */
+/**
+ * The organization's own path (`/organizations/{id}`: the Overview, and the base of every administrative endpoint), taken from the Organization page the operator is on
+ * (ORG-3b: the Invitations card is on the Portal access page, `${path}/portal`).
+ */
 function organizationPath(page: Page) {
-    return new URL(page.url()).pathname;
+    return new URL(page.url()).pathname.replace(/\/(portal|people)$/, '');
 }
+
+/** The Portal access page of an organization path: where the Invitations card is. */
+const portalPage = (orgPath: string) => `${orgPath}/portal`;
 
 async function csrfToken(page: Page) {
     return (await page.locator('meta[name="csrf-token"]').getAttribute('content')) ?? '';
@@ -228,7 +236,7 @@ test.describe('the operator-to-recipient journey', () => {
                 form: { email: smuggled },
             });
             expect([403, 404]).toContain(refused.status());
-            const asPage = await page.request.get(orgPath);
+            const asPage = await page.request.get(portalPage(orgPath));
             expect([403, 404]).toContain(asPage.status());
         } finally {
             await context.close();
@@ -241,7 +249,7 @@ test.describe('the operator-to-recipient journey', () => {
     test('the operator sees the outcome: accepted, by whom, and nothing left to revoke', async ({
         page,
     }) => {
-        await page.goto(orgPath);
+        await page.goto(portalPage(orgPath));
         const accepted = row(page, invitee);
 
         await expect(accepted).toContainText('Accepted');
@@ -255,7 +263,7 @@ test.describe('the operator-to-recipient journey', () => {
     test('inviting the address again is refused now: it belongs to an account', async ({
         page,
     }) => {
-        await page.goto(orgPath);
+        await page.goto(portalPage(orgPath));
         await invite(page, invitee);
 
         await expect(
@@ -562,7 +570,7 @@ test.describe("the recipient's form", () => {
         }
 
         // The invitation is still open: a refused attempt writes nothing.
-        await page.goto(organizationPath(page));
+        await page.goto(portalPage(organizationPath(page)));
         await expect(row(page, email)).toContainText('Pending');
     });
 });
@@ -643,13 +651,13 @@ test.describe('authorization', () => {
             form: { email },
         });
         const revoke = await page.request.delete(`${orgPath}/invitations/1`, { headers });
-        const view = await page.request.get(orgPath);
+        const view = await page.request.get(portalPage(orgPath));
 
         for (const response of [issue, revoke, view]) {
             expect([403, 404]).toContain(response.status());
         }
 
-        await page.goto(orgPath);
+        await page.goto(portalPage(orgPath));
         await expect(page.getByRole('region', { name: 'Invitations' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Send invitation' })).toHaveCount(0);
 

@@ -158,7 +158,7 @@ it('names the report date range by its existing From and To labels', function ()
 
 it('associates the CRM, CMS and System form labels with their fields, keeping the visible wording', function () {
     $contact = uiPage($this, 'operator', route('crm.contacts.create'));
-    $company = uiPage($this, 'operator', route('crm.companies.create'));
+    $company = uiPage($this, 'operator', route('organizations.create'));
     $cms = uiPage($this, 'operator', route('operator.cms.create'));
     $role = uiPage($this, 'operator', route('roles.create'));
 
@@ -193,7 +193,7 @@ it('names the organization member controls and the user-role group', function ()
     $operator = User::factory()->create()->assignRole('operator');
     $organization = Organization::factory()->create(['portal_enabled_by' => $operator->id]);
     User::factory()->create();
-    $org = $this->actingAs($operator)->get(route('organizations.show', $organization))->assertOk()->getContent();
+    $org = $this->actingAs($operator)->get(route('organizations.portal', $organization))->assertOk()->getContent();
 
     $user = User::factory()->create();
     $show = $this->actingAs($operator)->get(route('users.show', $user))->assertOk()->getContent();
@@ -246,7 +246,7 @@ it('leaves a control that already had an authored name with exactly that name', 
     $page = CmsPage::factory()->create();
 
     expect(uiNames(uiPage($this, 'operator', route('crm.contacts.index')), '//input[@name="search"]'))->toBe(['Search by name or email…'])
-        ->and(uiNames(uiPage($this, 'operator', route('crm.companies.index')), '//input[@name="search"]'))->toBe(['Search by name…'])
+        ->and(uiNames(uiPage($this, 'operator', route('organizations.index')), '//input[@name="search"]'))->toBe(['Search by name…'])
         ->and(uiNames($this->actingAs($operator)->get(route('crm.contacts.edit', $contact))->getContent(), '//input[@name="first_name"]'))->toBe(['First Name *'])
         ->and(uiNames($this->actingAs($operator)->get(route('operator.cms.edit', $page))->getContent(), '//input[@name="title"]'))->toBe(['Title *']);
 });

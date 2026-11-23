@@ -106,14 +106,14 @@ it('answers every Directory page for a privileged non-operator with a refusal, a
 
     // `crm.manage` alone is not Directory authority: the Directory pages ask `manageDirectory` (portal.operator AND crm.manage), so a customer who holds a
     // stray `crm.manage` reads no internal note and no People, even of their own Organization.
-    $this->actingAs($member)->get(route('crm.companies.index'))->assertForbidden();
-    $this->actingAs($member)->get(route('crm.companies.show', $orgA))->assertForbidden()->assertDontSee('SENTINEL-NOTE-A');
-    $this->actingAs($member)->get(route('crm.companies.edit', $orgA))->assertForbidden()->assertDontSee('SENTINEL-NOTE-A');
+    $this->actingAs($member)->get(route('organizations.index'))->assertForbidden();
+    $this->actingAs($member)->get(route('organizations.show', $orgA))->assertForbidden()->assertDontSee('SENTINEL-NOTE-A');
+    $this->actingAs($member)->get(route('organizations.edit', $orgA))->assertForbidden()->assertDontSee('SENTINEL-NOTE-A');
     $this->actingAs($member)->get(route('crm.contacts.index'))->assertForbidden();
 
     // A hidden Organization is not found at all (the membership scope resolves the binding first), exactly as one that does not exist.
-    $this->actingAs($member)->get(route('crm.companies.show', $orgB))->assertNotFound()->assertDontSee('SENTINEL-NOTE-B');
-    $this->actingAs($member)->get(route('crm.companies.show', 999999))->assertNotFound();
+    $this->actingAs($member)->get(route('organizations.show', $orgB))->assertNotFound()->assertDontSee('SENTINEL-NOTE-B');
+    $this->actingAs($member)->get(route('organizations.show', 999999))->assertNotFound();
 });
 
 it('prevents organization member management across tenant boundaries', function () {

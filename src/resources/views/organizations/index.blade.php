@@ -1,32 +1,39 @@
-@extends('layouts.app', ['title' => 'Organization access'])
+@extends('layouts.app', ['title' => 'Organizations'])
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
     <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold text-text">Organization access</h1>
-            <p class="mt-1 text-sm text-text-secondary">Organizations with portal access enabled: their members, invitations and administration. A disabled Organization stays listed; one that has never had portal access is in the Directory only.</p>
+            <h1 class="text-2xl font-semibold text-text">Organizations</h1>
+            <p class="mt-1 text-sm text-text-secondary">Organizations in the Directory. Portal access is enabled per Organization.</p>
         </div>
-        <x-ui.button :href="route('crm.companies.index')" variant="secondary" class="shrink-0">View Organizations</x-ui.button>
+        <x-ui.button :href="route('organizations.create')" class="shrink-0">+ New Organization</x-ui.button>
     </div>
 
     @if (session('success'))
     <x-ui.alert variant="success" class="mb-6">{{ session('success') }}</x-ui.alert>
     @endif
 
+    {{-- Search --}}
+    <form method="GET" class="mb-6 flex gap-2">
+        <x-ui.input type="text" name="search" :value="$search" placeholder="Search by name…" class="w-64" />
+        <x-ui.button type="submit" variant="secondary">Search</x-ui.button>
+        @if ($search)
+        <x-ui.button :href="route('organizations.index')" variant="secondary">Clear</x-ui.button>
+        @endif
+    </form>
+
     {{-- A horizontally scrollable region (DIR-1): the table is wider than a phone, so the card scrolls inside itself, never the page.
          It is a named, focusable region so a keyboard user can reach and scroll it, with the shared Direction D focus ring. --}}
-    <div role="region" tabindex="0" aria-label="Organizations with portal access" class="overflow-x-auto rounded-lg border border-rule bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+    <div role="region" tabindex="0" aria-label="Organizations list" class="overflow-x-auto rounded-lg border border-rule bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-rule-control">
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Slug</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Website</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Phone</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Portal access</th>
-                    {{-- The operator who enabled portal access. Provenance only: it confers no ownership and no authority. --}}
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Enabled by</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">Members</th>
                     @if ($relationships !== null)
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">Managed by</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">Manages</th>
@@ -42,29 +49,31 @@
                             {{ $org->name }}
                         </x-ui.link>
                     </td>
-                    <td class="px-4 py-3 font-mono text-xs text-text-muted">{{ $org->slug }}</td>
-                    <td class="px-4 py-3">
-                        <x-organization.portal-state :state="$org->portalState()" />
+                    <td class="px-4 py-3 text-text-secondary">
+                        {{ $org->website ? parse_url($org->website, PHP_URL_HOST) : '—' }}
                     </td>
-                    <td class="px-4 py-3 text-text-secondary">{{ $org->portalEnabledBy?->name ?? '—' }}</td>
-                    <td class="px-4 py-3 text-right text-text-secondary">{{ $org->members_count }}</td>
+                    <td class="px-4 py-3 text-text-secondary">{{ $org->phone ?? '—' }}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center gap-2">
+                            <x-organization.portal-state :state="$org->portalState()" />
+                            @if (! $org->portalState()->isNotEnabled())
+                            <x-ui.link :href="route('organizations.portal', $org)" class="text-xs font-medium" aria-label="Manage portal access for {{ $org->name }}">Manage</x-ui.link>
+                            @endif
+                        </span>
+                    </td>
                     @if ($relationships !== null)
                     {{-- Built only for an actor who may manage relationships (DIR-0 S7): $relationships is null otherwise and this never renders. --}}
-                    @php($fact = $relationships[$org->id] ?? null)
+                    @php($fact = ! $org->portalState()->isNotEnabled() ? ($relationships[$org->id] ?? null) : null)
                     <td class="px-4 py-3 text-text-secondary">{{ $fact['managedBy']['name'] ?? '—' }}</td>
                     <td class="px-4 py-3 text-right text-text-secondary">{{ $fact !== null && $fact['isPartner'] ? $fact['manages'] : '—' }}</td>
                     @endif
                     <td class="px-4 py-3 text-right">
-                        <x-ui.link variant="quiet" :href="route('organizations.show', $org)" class="text-xs" aria-label="Manage {{ $org->name }}">Manage</x-ui.link>
+                        <x-ui.link variant="quiet" :href="route('organizations.edit', $org)" class="text-xs">Edit</x-ui.link>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="{{ $relationships !== null ? 8 : 6 }}" class="px-4 py-12 text-center text-sm text-text-muted">
-                        No organization has portal access yet.
-                        <x-ui.link :href="route('crm.companies.index')">Open an Organization in the Directory</x-ui.link>
-                        and enable portal access to get started.
-                    </td>
+                    <td colspan="{{ $relationships !== null ? 7 : 5 }}" class="px-4 py-12 text-center text-sm text-text-muted">No organizations found.</td>
                 </tr>
                 @endforelse
             </tbody>

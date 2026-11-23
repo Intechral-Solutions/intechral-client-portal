@@ -261,7 +261,7 @@ it('refuses to disable or re-enable an organization that has never had portal ac
 it('keeps disable and re-enable on manageRelationships and initial enablement on manageMembership: separate abilities', function () {
     $service = file_get_contents(app_path('Services/OrganizationRelationships.php'));
     $directory = file_get_contents(app_path('Services/OrganizationDirectory.php'));
-    $controller = file_get_contents(app_path('Http/Controllers/Crm/CompanyController.php'));
+    $controller = file_get_contents(app_path('Http/Controllers/Organization/OrganizationController.php'));
 
     // The lifecycle transitions authorize 'manageRelationships' only; initial enablement authorizes 'manageMembership' only, in the service and the route.
     preg_match('/public function disable\(.*?\n    }\n/s', $service, $disable);
@@ -347,7 +347,7 @@ it('refuses a second initial enablement as already_enabled with no side effect, 
     expect(DB::table('organizations')->where('id', $first->id)->value('disabled_at'))->toBe($disabledAt)
         ->and(DB::table('activity_log')->count())->toBe($entries);
 
-    $this->actingAs($this->operator)->post(route('crm.companies.promote', $company))->assertSessionHasErrors('company');
+    $this->actingAs($this->operator)->post(route('organizations.promote', $company))->assertSessionHasErrors('company');
 });
 
 it('requires manageMembership at the route even for an account the route middleware lets through: exactly 404 for a Directory-only Organization this account cannot see, in every surface mode', function (string $mode) {
@@ -360,10 +360,10 @@ it('requires manageMembership at the route even for an account the route middlew
     // A Directory-only Organization has no members, so no customer can see it: the binding finds nothing (404) whichever mode answers first, and nothing is
     // enabled. (closed and pilot: the surface gate's 404; legacy: the route-model binding's 404. A visible Organization reaching the controller's own 403 is
     // the next test.) The service's own refusal for an account that does reach it is proved in OrganizationPortalStateFenceTest.
-    expect($this->actingAs($stray)->post(route('crm.companies.promote', $company))->getStatusCode())->toBe(404, $mode);
+    expect($this->actingAs($stray)->post(route('organizations.promote', $company))->getStatusCode())->toBe(404, $mode);
 
     // The control: the operator is not refused in the same mode.
-    $this->actingAs($this->operator)->post(route('crm.companies.promote', $company))->assertRedirect();
+    $this->actingAs($this->operator)->post(route('organizations.promote', $company))->assertRedirect();
 
     expect(DB::table('organizations')->where('id', $company->id)->value('portal_enabled_at'))->not->toBeNull();
 })->with(['closed', 'pilot', 'legacy']);
@@ -376,7 +376,7 @@ it('answers a customer who can see the Organization but holds only a stray crm.m
     $company = Organization::factory()->directoryOnly()->create(['name' => 'Visible Co', 'created_by' => $this->operator->id]);
     DB::table('organization_members')->insert(['organization_id' => $company->id, 'user_id' => $stray->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now()]);   // visible to it (a state the application cannot produce on a Directory-only Organization; inserted to reach the controller's own check)
 
-    expect($this->actingAs($stray)->post(route('crm.companies.promote', $company))->getStatusCode())->toBe($status, $mode)
+    expect($this->actingAs($stray)->post(route('organizations.promote', $company))->getStatusCode())->toBe($status, $mode)
         ->and(DB::table('organizations')->where('id', $company->id)->value('portal_enabled_at'))->toBeNull();
 })->with([['closed', 404], ['pilot', 404], ['legacy', 403]]);
 

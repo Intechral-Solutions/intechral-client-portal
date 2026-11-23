@@ -59,13 +59,16 @@ it('uses no retired word on any Directory, Organization access, User or Role pag
         'person without an organization' => route('crm.contacts.show', $drifter),
         'new person' => route('crm.contacts.create'),
         'edit person' => route('crm.contacts.edit', $person),
-        'organizations' => route('crm.companies.index'),
-        'organization with portal access' => route('crm.companies.show', $promoted),
-        'organization without portal access' => route('crm.companies.show', $bare),
-        'new organization' => route('crm.companies.create'),
-        'edit organization' => route('crm.companies.edit', $bare),
-        'organization access' => route('organizations.index'),
-        'organization administration' => route('organizations.show', $organization),
+        'organizations' => route('organizations.index'),
+        'organization with portal access' => route('organizations.show', $promoted),
+        'organization without portal access' => route('organizations.show', $bare),
+        'organization people' => route('organizations.people', $promoted),
+        'organization people (without portal access)' => route('organizations.people', $bare),
+        'organization portal access (without portal access)' => route('organizations.portal', $bare),
+        'new organization' => route('organizations.create'),
+        'edit organization' => route('organizations.edit', $bare),
+        'organization access' => route('organizations.access'),
+        'organization administration' => route('organizations.portal', $organization),
         'users' => route('users.index'),
         'user' => route('users.show', $member),
         'roles' => route('roles.index'),
@@ -81,12 +84,12 @@ it('uses no retired word on any Directory, Organization access, User or Role pag
 });
 
 it('scans an empty search result and the empty states too', function () {
-    foreach ([route('crm.contacts.index', ['search' => 'zzz']), route('crm.companies.index', ['search' => 'zzz']), route('users.index', ['search' => 'zzz'])] as $url) {
+    foreach ([route('crm.contacts.index', ['search' => 'zzz']), route('organizations.index', ['search' => 'zzz']), route('users.index', ['search' => 'zzz'])] as $url) {
         expect(dir1Words(dir1Readable($this->actingAs($this->operator)->get($url)->assertOk()->getContent())))->toBe([], $url);
     }
 
     // Organization access with nothing yet.
-    expect(dir1Words(dir1Readable($this->actingAs($this->operator)->get(route('organizations.index'))->getContent())))->toBe([]);
+    expect(dir1Words(dir1Readable($this->actingAs($this->operator)->get(route('organizations.access'))->getContent())))->toBe([]);
 });
 
 // ── Every state, from the source (a render cannot reach them all) ─────────────
@@ -109,8 +112,15 @@ it('uses no retired word in the visible text of any Directory, Organization acce
             preg_match_all('/\b(?:placeholder|aria-label|title|alt|value)="([^"{}]*)"/', $source, $attributes);
             // Strings inside onclick/onsubmit confirm() dialogs are read by a person as well.
             preg_match_all("/confirm\\('([^']*)'/", $source, $confirmations);
+            // ORG-3b: the confirmation is a JSON string, `confirm(@js('Disable '.$organization->name.'? ...'))`; every string literal inside it is read as well.
+            preg_match_all('/confirm\\(@js\\((.*?)\\)\\)"/s', $source, $jsConfirmations);
+            $jsLiterals = [];
+            foreach ($jsConfirmations[1] as $expression) {
+                preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $expression, $literals);
+                array_push($jsLiterals, ...$literals[1]);
+            }
 
-            foreach ([...$texts[1], ...$attributes[1], ...$confirmations[1]] as $text) {
+            foreach ([...$texts[1], ...$attributes[1], ...$confirmations[1], ...$jsLiterals] as $text) {
                 if (dir1Words($text) !== []) {
                     $violations[] = str_replace(resource_path('views/'), '', $file->getPathname()).': "'.trim($text).'"';
                 }
@@ -159,11 +169,11 @@ it('opens, from each Directory and System navigation entry, a page whose heading
 it('uses the glossary in every Directory flash message', function () {
     $this->actingAs($this->operator);
 
-    $this->post(route('crm.companies.store'), ['name' => 'Flash Holdings'])->assertSessionHas('success', 'Organization created.');
+    $this->post(route('organizations.store'), ['name' => 'Flash Holdings'])->assertSessionHas('success', 'Organization created.');
     $company = Organization::withoutGlobalScopes()->where('name', 'Flash Holdings')->firstOrFail();
 
-    $this->put(route('crm.companies.update', $company), ['name' => 'Flash Holdings Ltd'])->assertSessionHas('success', 'Organization updated.');
-    $this->post(route('crm.companies.promote', $company))->assertSessionHas('success', 'Portal access is enabled for "Flash Holdings Ltd".');
+    $this->put(route('organizations.update', $company), ['name' => 'Flash Holdings Ltd'])->assertSessionHas('success', 'Organization updated.');
+    $this->post(route('organizations.promote', $company))->assertSessionHas('success', 'Portal access is enabled for "Flash Holdings Ltd".');
 
     $this->post(route('crm.contacts.store'), ['first_name' => 'Ann', 'last_name' => 'Lee', 'organization_id' => $company->id])->assertSessionHas('success', 'Person created.');
     $person = CrmContact::where('last_name', 'Lee')->firstOrFail();
@@ -171,7 +181,7 @@ it('uses the glossary in every Directory flash message', function () {
     $this->delete(route('crm.contacts.destroy', $person))->assertSessionHas('success', 'Person deleted.');
 
     $other = Organization::factory()->directoryOnly()->create(['created_by' => $this->operator->id]);
-    $this->delete(route('crm.companies.destroy', $other))->assertSessionHas('success', 'Organization deleted.');
+    $this->delete(route('organizations.destroy', $other))->assertSessionHas('success', 'Organization deleted.');
 });
 
 it('names an invalid organization as an organization in validation messages, on People and on Projects', function () {

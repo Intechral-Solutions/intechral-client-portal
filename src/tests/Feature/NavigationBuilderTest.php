@@ -547,9 +547,11 @@ it('marks exactly one workspace and at most one contextual item active', functio
     'time allocation' => ['time.allocation', [], 'time', 'time.allocation'],
     'time reports' => ['operator.time.index', [], 'time', 'time.reports'],
     'crm contacts' => ['crm.contacts.index', [], 'directory', 'directory.people'],
-    'crm companies' => ['crm.companies.index', [], 'directory', 'directory.organizations'],
+    'organizations' => ['organizations.index', [], 'directory', 'directory.organizations'],
+    // ORG-3b: the Organization pages are all Directory → Organizations (the pages that take an Organization are in the dedicated test below).
+    'organization create' => ['organizations.create', [], 'directory', 'directory.organizations'],
     // DIR-1: the portal-organization index is System → Organization access, no longer a Directory entry.
-    'organization access' => ['organizations.index', [], 'system', 'system.organization-access'],
+    'organization access' => ['organizations.access', [], 'system', 'system.organization-access'],
     'operator invoices' => ['billing.invoices.index', [], 'finance', 'finance.invoices'],
     'admin users' => ['users.index', [], 'system', 'system.users'],
     'admin roles' => ['roles.index', [], 'system', 'system.roles'],
@@ -742,8 +744,8 @@ it('keeps every pre-WP3 destination reachable in the canonical model', function 
     $before = [
         'operator' => [
             'tickets.index', 'projects.index', 'tasks.index', 'time.index', 'billing.invoices.index',
-            'crm.companies.index', 'operator.tickets.index', 'operator.time.index',
-            'organizations.index', 'operator.cms.index', 'users.index', 'roles.index',
+            'organizations.index', 'operator.tickets.index', 'operator.time.index',
+            'organizations.access', 'operator.cms.index', 'users.index', 'roles.index',
         ],
         'user' => [
             'tickets.index', 'projects.index', 'tasks.index', 'time.index',
@@ -771,10 +773,10 @@ it('offers exactly People and Organizations in Directory, with no Portal access 
     expect(array_column($items, 'label'))->toBe(['People', 'Organizations'])
         ->and(array_keys($items))->toBe(['directory.people', 'directory.organizations'])
         ->and($items['directory.people']['href'])->toBe(route('crm.contacts.index'))
-        ->and($items['directory.organizations']['href'])->toBe(route('crm.companies.index'))
+        ->and($items['directory.organizations']['href'])->toBe(route('organizations.index'))
         ->and($directory['href'])->toBe(route('crm.contacts.index'))
         ->and(navigationValuesDeep($directory, 'label'))->not->toContain('Portal access')
-        ->and(navigationValuesDeep($directory, 'href'))->not->toContain(route('organizations.index'));
+        ->and(navigationValuesDeep($directory, 'href'))->not->toContain(route('organizations.access'));
 });
 
 it('shows System Organization access to an actor who may manage the Directory, opening the existing index', function () {
@@ -782,26 +784,34 @@ it('shows System Organization access to an actor who may manage the Directory, o
     $item = contextItems($system)['system.organization-access'];
 
     expect($item['label'])->toBe('Organization access')
-        ->and($item['href'])->toBe(route('organizations.index'))
+        ->and($item['href'])->toBe(route('organizations.access'))
         ->and($item['visit'])->toBe('document')
         // `portal.operator` and `crm.manage` alone: the workspace default is that surviving entry, never a filtered-out one.
-        ->and($system['href'])->toBe(route('organizations.index'));
+        ->and($system['href'])->toBe(route('organizations.access'));
 });
 
-it('keeps the organization detail and its administration inside System → Organization access until DIR-2', function () {
-    $navigation = navigationFor(actor('operator'), 'organizations.show', ['organization' => 1]);
+it('keeps the Organization workspace and its administration inside Directory → Organizations, and only the access list inside System', function () {
+    foreach (['organizations.show', 'organizations.people', 'organizations.portal', 'organizations.edit'] as $route) {
+        $navigation = navigationFor(actor('operator'), $route, ['organization' => 1]);
 
-    expect($navigation['currentWorkspace'])->toBe('system')
-        ->and(navigationActiveKeysDeep($navigation))->toBe(['system', 'system.organization-access']);
-
-    // Every organization action route returns to the same workspace; none falls back to Directory.
-    foreach (['organizations.members.store', 'organizations.invitations.store'] as $route) {
-        expect(navigationFor(actor('operator'), $route, ['organization' => 1])['currentWorkspace'])->toBe('system');
+        expect($navigation['currentWorkspace'])->toBe('directory', $route)
+            ->and(navigationActiveKeysDeep($navigation))->toBe(['directory', 'directory.organizations'], $route);
     }
 
-    foreach (['organizations.disable', 'organizations.partner.designate'] as $route) {
-        expect(navigationFor(actor('operator'), $route, ['organizationId' => 1])['currentWorkspace'])->toBe('system');
+    // Every organization action route belongs to the same workspace as the page it returns to; none is System.
+    foreach (['organizations.members.store', 'organizations.invitations.store', 'organizations.promote'] as $route) {
+        expect(navigationFor(actor('operator'), $route, ['organization' => 1])['currentWorkspace'])->toBe('directory', $route);
     }
+
+    foreach (['organizations.disable', 'organizations.enable', 'organizations.partner.designate'] as $route) {
+        expect(navigationFor(actor('operator'), $route, ['organizationId' => 1])['currentWorkspace'])->toBe('directory', $route);
+    }
+
+    // The System item is the list alone: the most specific workspace pattern wins over `organizations.*`.
+    $access = navigationFor(actor('operator'), 'organizations.access');
+
+    expect($access['currentWorkspace'])->toBe('system')
+        ->and(navigationActiveKeysDeep($access))->toBe(['system', 'system.organization-access']);
 });
 
 it('keeps Directory active, and not System, on every Directory route', function () {
@@ -810,9 +820,11 @@ it('keeps Directory active, and not System, on every Directory route', function 
     foreach ([
         ['crm.contacts.index', [], 'directory.people'],
         ['crm.contacts.show', ['contact' => 1], 'directory.people'],
-        ['crm.companies.index', [], 'directory.organizations'],
-        ['crm.companies.show', ['company' => 1], 'directory.organizations'],
-        ['crm.companies.edit', ['company' => 1], 'directory.organizations'],
+        ['organizations.index', [], 'directory.organizations'],
+        ['organizations.show', ['organization' => 1], 'directory.organizations'],
+        ['organizations.people', ['organization' => 1], 'directory.organizations'],
+        ['organizations.portal', ['organization' => 1], 'directory.organizations'],
+        ['organizations.edit', ['organization' => 1], 'directory.organizations'],
     ] as [$route, $parameters, $item]) {
         $navigation = navigationFor($actor, $route, $parameters);
 
@@ -828,16 +840,16 @@ it('keeps every previously authorized destination reachable for a narrowly assig
         $hrefs = navigationValuesDeep(navigationFor($subject, 'dashboard'), 'href');
         $manages = $permissions === ['portal.operator', 'crm.manage'];
 
-        expect(in_array(route('organizations.index'), $hrefs, true))->toBe($manages)
+        expect(in_array(route('organizations.access'), $hrefs, true))->toBe($manages)
             ->and(in_array(route('users.index'), $hrefs, true))->toBe($permissions === ['users.view'])
-            ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($manages)
+            ->and(in_array(route('organizations.index'), $hrefs, true))->toBe($manages)
             ->and(in_array(route('crm.contacts.index'), $hrefs, true))->toBe($manages);
     }
 
     $customer = navigationFor(actor('user'), 'dashboard');
 
     expect(array_keys(workspaces($customer)))->not->toContain('directory', 'system')
-        ->and(navigationValuesDeep($customer, 'href'))->not->toContain(route('organizations.index'), route('crm.contacts.index'), route('crm.companies.index'));
+        ->and(navigationValuesDeep($customer, 'href'))->not->toContain(route('organizations.access'), route('crm.contacts.index'), route('organizations.index'));
 });
 
 // ORG-3a: both administrative Organization entries (Directory, and System → Organization access) are drawn under `manageDirectory`, the ability the pages ask,
@@ -848,8 +860,8 @@ it('offers Directory and Organization access to an operator, a custom-role opera
     $hrefs = navigationValuesDeep($navigation, 'href');
 
     expect(array_key_exists('directory', $workspaces))->toBe($offered)
+        ->and(in_array(route('organizations.access'), $hrefs, true))->toBe($offered)
         ->and(in_array(route('organizations.index'), $hrefs, true))->toBe($offered)
-        ->and(in_array(route('crm.companies.index'), $hrefs, true))->toBe($offered)
         ->and(in_array(route('crm.contacts.index'), $hrefs, true))->toBe($offered);
 
     if ($offered) {

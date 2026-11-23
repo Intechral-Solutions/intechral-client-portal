@@ -14,21 +14,21 @@ beforeEach(function () {
 // ── Access control ────────────────────────────────────────────────────────────
 
 it('redirects guests from crm to login', function () {
-    $this->get(route('crm.companies.index'))->assertRedirect('/login');
+    $this->get(route('organizations.index'))->assertRedirect('/login');
 });
 
 it('returns 403 for users without crm.manage on company list', function () {
     $user = User::factory()->create();
     $user->assignRole('user'); // user role does not have crm.manage
 
-    $this->actingAs($user)->get(route('crm.companies.index'))->assertForbidden();
+    $this->actingAs($user)->get(route('organizations.index'))->assertForbidden();
 });
 
 it('allows operators to access the CRM company list', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $this->actingAs($operator)->get(route('crm.companies.index'))->assertOk();
+    $this->actingAs($operator)->get(route('organizations.index'))->assertOk();
 });
 
 // ── Companies ─────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ it('creates an Organization from the Directory page', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $this->actingAs($operator)->post(route('crm.companies.store'), [
+    $this->actingAs($operator)->post(route('organizations.store'), [
         'name' => 'Acme Corp',
         'website' => 'https://acme.com',
         'phone' => '555-1234',
@@ -57,7 +57,7 @@ it('validates the Organization name is required', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $this->actingAs($operator)->post(route('crm.companies.store'), [
+    $this->actingAs($operator)->post(route('organizations.store'), [
         'name' => '',
     ])->assertSessionHasErrors('name');
 });
@@ -66,7 +66,7 @@ it('validates the Organization website must be a url', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $this->actingAs($operator)->post(route('crm.companies.store'), [
+    $this->actingAs($operator)->post(route('organizations.store'), [
         'name' => 'Bad URL Co',
         'website' => 'not-a-url',
     ])->assertSessionHasErrors('website');
@@ -78,7 +78,7 @@ it('updates an Organization', function () {
 
     $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
-    $this->actingAs($operator)->put(route('crm.companies.update', $company), [
+    $this->actingAs($operator)->put(route('organizations.update', $company), [
         'name' => 'Updated Name',
         'phone' => '999-0000',
     ])->assertRedirect();
@@ -92,7 +92,7 @@ it('deletes a never-enabled Organization', function () {
 
     $company = Organization::factory()->directoryOnly()->create(['created_by' => $operator->id]);
 
-    $this->actingAs($operator)->delete(route('crm.companies.destroy', $company))->assertRedirect();
+    $this->actingAs($operator)->delete(route('organizations.destroy', $company))->assertRedirect();
 
     expect(Organization::withoutGlobalScopes()->find($company->id))->toBeNull();
 });
@@ -180,7 +180,7 @@ it('enables portal access for a Directory-only Organization, keeping its row, it
 
     $company = Organization::factory()->directoryOnly()->create(['created_by' => $creator->id, 'name' => 'Promote Me']);
 
-    $this->actingAs($operator)->post(route('crm.companies.promote', $company))->assertRedirect(route('organizations.show', $company));
+    $this->actingAs($operator)->post(route('organizations.promote', $company))->assertRedirect(route('organizations.portal', $company));
 
     $company->refresh();
     expect($company->portalState()->isEnabled())->toBeTrue()
@@ -217,7 +217,7 @@ it('allows operators to view organization list', function () {
     $operator = User::factory()->create();
     $operator->assignRole('operator');
 
-    $this->actingAs($operator)->get(route('organizations.index'))->assertOk();
+    $this->actingAs($operator)->get(route('organizations.access'))->assertOk();
 });
 
 it('adds a member to an organization', function () {

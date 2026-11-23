@@ -81,12 +81,12 @@ class OrganizationSupportController extends Controller
         return Organization::withoutGlobalScopes()->findOrFail($id);
     }
 
-    /** Back to the page when this actor can open it (the tenant scope decides), otherwise to the index. */
+    /** Back to the Portal access page when this actor can open it (the tenant scope decides), otherwise to the Organization access list. */
     private function back(Organization $organization, string $message): RedirectResponse
     {
         $target = Organization::query()->whereKey($organization->getKey())->exists()
-            ? route('organizations.show', $organization)
-            : route('organizations.index');
+            ? route('organizations.portal', $organization)
+            : route('organizations.access');
 
         return redirect($target)->with('success', $message);
     }

@@ -76,6 +76,8 @@ Merged on `main` up to `fec5c81`:
 
 *Amendment 2026-11-21 (ORG-2 merged, ORG-3 approved as four packages): **ORG-1 (PR #74) and ORG-2 (PR #75, `main` `11a6a73`; merged, not deployed) are in `main`.** ORG-3 is approved as a four-package sequence, ORG-3a to ORG-3d ([record](./release-1.0-org-3-organization-workspace.md)); only ORG-3a (portal-access correctness) is implemented, on its own branch and not merged until its pull request is. ORG-3b to ORG-3d, DIR-3 and DIR-4 are not started. The customer-facing gates of Release 1.0 are unchanged by this: the ORG-1 membership-writer lock-order remediation (with its concurrency review), a successful `backup:create` under the real hosting cron environment, a real-host `runtime:preflight` including the cross-context check, and an environment-specific migration approval and preflight for any populated database.*
 
+*Amendment 2026-11-22 (ORG-3a merged, ORG-3b implemented): **ORG-3a is in `main` (PR #76, `main` `75ec174`, post-merge CI green; not deployed).** ORG-3b (the routed Organization workspace: Overview, People and Portal access under Directory → Organizations; the `organizations.*` routes replace `crm.companies.*`, whose GET URLs redirect; JavaScript-safe confirmations) is implemented on its own branch and is not merged until its pull request is. ORG-3c, ORG-3d, DIR-3 and DIR-4 are not started. The customer-facing gates of Release 1.0 are unchanged by this and remain as listed above.*
+
 **Not in this release:** customer-facing delegation (MO-2B, which includes customer-side invitation and the existing-account invitation), customer **invitation single sign-on** (deferred; it needs provider-email verification and a Microsoft driver first), and anything of MO-3 and MO-4.
 
 ## Deployment facts

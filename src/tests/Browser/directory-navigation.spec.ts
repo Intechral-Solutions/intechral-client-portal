@@ -10,8 +10,9 @@ import { drawerLink, railLink } from './support/shell';
  *
  * Presentation and read queries only. Nothing here creates, edits or deletes anything, so it needs no cleanup and is safe to re-run. It
  * reads two fixtures DevSeeder always creates: the account `E2E Customer` and the organization `E2E Customer Org` it is a member of.
- * (The seeded organizations have no Directory profile; that is why this journey starts from System → Organization access, not from a
- * Directory profile.) The customer-isolation boundary (404 in closed and pilot modes) is proved in Pest and by customer-pilot.spec.ts.
+ * (Every Organization opens the one workspace, Directory → Organizations, whatever its portal state; the cross-link journey starts from
+ * System → Organization access because that list links straight to an Organization's Portal access page.) The customer-isolation
+ * boundary (404 in closed and pilot modes) is proved in Pest and by customer-pilot.spec.ts.
  */
 
 const XL = { width: 1440, height: 900 };
@@ -43,7 +44,7 @@ test('Directory offers People and Organizations; Organization access lives in Sy
     ).toHaveCount(2);
 
     await drawerLink(page, 'Directory', 'Organizations').click();
-    await expect(page).toHaveURL(/\/crm\/companies$/);
+    await expect(page).toHaveURL(/\/organizations$/);
     await expect(heading(page, 'Organizations')).toBeVisible();
     await expect(drawerLink(page, 'Directory', 'Organizations')).toHaveAttribute(
         'aria-current',
@@ -55,7 +56,7 @@ test('Directory offers People and Organizations; Organization access lives in Sy
     await railLink(page, 'System').click();
     await expect(currentRail(page)).toHaveText('System');
     await drawerLink(page, 'System', 'Organization access').click();
-    await expect(page).toHaveURL(/\/organizations$/);
+    await expect(page).toHaveURL(/\/organizations\/access$/);
     await expect(heading(page, 'Organization access')).toBeVisible();
     await expect(drawerLink(page, 'System', 'Organization access')).toHaveAttribute(
         'aria-current',
@@ -70,16 +71,22 @@ test('the membership cross-links: organization to user, user to organization, in
     page,
 }) => {
     await page.setViewportSize(XL);
-    await signedIn(page, '/organizations');
+    await signedIn(page, '/organizations/access');
 
-    // Organization access → the organization (still inside System).
+    // Organization access → the Portal access page of the organization workspace (Directory → Organizations, ORG-3b).
     await page.getByRole('link', { name: ORGANIZATION, exact: true }).first().click();
+    await expect(page).toHaveURL(/\/organizations\/\d+\/portal$/);
     await expect(heading(page, ORGANIZATION)).toBeVisible();
-    await expect(currentRail(page)).toHaveText('System');
-    await expect(drawerLink(page, 'System', 'Organization access')).toHaveAttribute(
+    await expect(currentRail(page)).toHaveText('Directory');
+    await expect(drawerLink(page, 'Directory', 'Organizations')).toHaveAttribute(
         'aria-current',
         'page',
     );
+    await expect(
+        page.getByRole('navigation', { name: 'Organization sections' }).getByRole('link', {
+            name: 'Portal access',
+        }),
+    ).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('Portal access enabled by')).toBeVisible();
 
     // Member row → the user page (the operator holds users.view).
@@ -94,6 +101,7 @@ test('the membership cross-links: organization to user, user to organization, in
     await expect(memberships).toBeVisible();
     await expect(memberships.getByRole('button')).toHaveCount(0);
     await memberships.getByRole('link', { name: ORGANIZATION, exact: true }).click();
+    await expect(page).toHaveURL(/\/organizations\/\d+\/portal$/);
     await expect(heading(page, ORGANIZATION)).toBeVisible();
 });
 

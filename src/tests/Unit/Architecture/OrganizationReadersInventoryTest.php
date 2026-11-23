@@ -121,7 +121,10 @@ function orgReadersInventory(): array
         'Http/Controllers/DashboardController.php' => 'DECIDES: the "With portal access" count',
 
         // ── DISPLAY: decides nothing a Directory-only row could widen ──
-        'Http/Controllers/Organization/OrganizationController.php' => 'DISPLAY: the operator-only (manageDirectory) System list and detail; the list is filtered to ever-enabled Organizations through PortalState, the detail draws only the controls the state allows, and the services decide every act',
+        'Http/Controllers/Organization/OrganizationController.php' => 'DISPLAY: the Directory list and writes, operator-only (manageDirectory); every write is OrganizationDirectory under lock, and initial enablement is its enablePortalAccess',
+        'Http/Controllers/Organization/OrganizationAccessController.php' => 'DISPLAY: the operator-only (manageDirectory) System list, filtered to ever-enabled Organizations through PortalState; the state drawn is the row\'s own',
+        'Http/Controllers/Organization/OrganizationWorkspaceController.php' => 'DISPLAY: the operator-only (manageDirectory) workspace pages (Overview, People, Portal access); each builds only the data its ability allows and draws only the controls the state allows, and the services decide every act',
+        'Http/Presenters/OrganizationWorkspacePresenter.php' => 'DISPLAY: the workspace header (name, Classification, the row\'s PortalState, tabs); partner facts only through OrganizationListFacts for an actor who may manage relationships',
         'Services/OrganizationListFacts.php' => 'DISPLAY: the operator list facts (partner names, customer counts), built only for an actor who may manage relationships; the portal state of a row is drawn from the row (PortalState), not built here (ORG-3a)',
         'Http/Controllers/Organization/OrganizationRelationshipController.php' => 'DISPLAY: operator-only lookup by id; every rule is decided by OrganizationRelationships under lock',
         'Http/Controllers/Organization/OrganizationSupportController.php' => 'DISPLAY: operator-only lookup by id; every rule is decided by PartnerSupportGrants and OrganizationRelationships',
@@ -133,7 +136,6 @@ function orgReadersInventory(): array
         'Models/CrmContact.php' => 'DISPLAY: declares the Person\'s affiliation with an Organization (descriptive, never authority); the Person is operator-only (DirectoryOperatorScope)',
         'Models/Project.php' => 'DISPLAY: declares the project link to Organizations (metadata; it widens no one\'s visibility); written only by ProjectService',
         'Services/CrmService.php' => 'DISPLAY: a Person\'s affiliation write takes the Organization row SHARED and proves it exists; the affiliation is descriptive, never authority',
-        'Http/Controllers/Crm/CompanyController.php' => 'DISPLAY: the transitional Directory pages, operator-only (manageDirectory); every write is OrganizationDirectory under lock',
         'Http/Controllers/Crm/ContactController.php' => 'DISPLAY: the Directory People pages, operator-only (manageDirectory); the organization option list for an affiliation',
         'Http/Presenters/ProjectPresenter.php' => 'DISPLAY: the Organization options a project form offers, through the membership scope; a link is metadata',
         'Rules/AccessibleOrganization.php' => 'DISPLAY: validates that an id names an Organization the actor can see; an unknown and a hidden id fail alike',

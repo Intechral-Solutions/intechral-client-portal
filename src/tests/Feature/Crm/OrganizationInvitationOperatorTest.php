@@ -141,7 +141,7 @@ function opInvFootprint(): array
 
 describe('the Invitations card', function () {
     it('is shown to an operator, with the form, an empty state and no credential', function () {
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))
             ->assertOk()
             ->assertSee('Invitations')
             ->assertSee(route('organizations.invitations.store', $this->org), false)
@@ -156,7 +156,7 @@ describe('the Invitations card', function () {
         regInvOpen('mine-new@example.test', $this->org, $this->operator);
         regInvOpen('theirs@example.test', $other, $this->operator);
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertOk()->getContent();
 
         expect($html)->toContain('mine-new@example.test')->and($html)->toContain('mine-old@example.test')->and($html)->not->toContain('theirs@example.test')
             ->and(strpos($html, 'mine-new@example.test'))->toBeLessThan(strpos($html, 'mine-old@example.test'))
@@ -171,7 +171,7 @@ describe('the Invitations card', function () {
         $this->operator->forceFill(['name' => $name])->save();
         regInvOpen('named@example.test', $this->org, $this->operator);
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertOk()->getContent();
 
         expect($html)->toContain('Invited by '.e($name));
 
@@ -192,7 +192,7 @@ describe('the Invitations card', function () {
         [$revoked, $revokedToken] = regInvOpen('revoked@example.test', $this->org, $this->operator, ['live_email' => null, 'revoked_at' => now(), 'revoked_by' => $this->operator->id, 'revoked_reason' => 'operator']);
         [$expired, $expiredToken] = regInvOpen('expired@example.test', $this->org, $this->operator, ['expires_at' => now()->subDay()]);
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertOk()->getContent();
 
         foreach ([$open, $revoked, $expired] as $row) {
             expect($html)->not->toContain($row->token_hash);
@@ -224,7 +224,7 @@ describe('the Invitations card', function () {
         $member = User::factory()->create(['name' => 'Joined Person']);
         regInvOpen('joined@example.test', $this->org, $this->operator, ['live_email' => null, 'accepted_at' => now(), 'accepted_user_id' => $member->id]);
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertOk()->getContent();
 
         expect(OrganizationInvitationList::REASON_LABELS)->toBe($reasons);
 
@@ -271,7 +271,7 @@ describe('the Invitations card', function () {
             ->and($rowsB->first()->canResend)->toBeTrue();
 
         // The same on the rendered card: the Resend control is present for the older organization's row.
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))
             ->assertOk()->assertSee('aria-label="Resend the invitation to shared@example.test"', false);
 
         // Within ONE organization the rule still holds (the control for the rule above): an older row of the address is not offered
@@ -298,7 +298,7 @@ describe('the Invitations card', function () {
             ->and($rows['fine@example.test']->unusable)->toBeNull()
             ->and($rows['taken@example.test']->state)->toBe('pending');
 
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))
             ->assertSee(OrganizationInvitationList::UNUSABLE_ACCOUNT_EXISTS)
             ->assertSee(OrganizationInvitationList::UNUSABLE_ISSUER);
     });
@@ -315,7 +315,7 @@ describe('the Invitations card', function () {
         expect($list['rows'])->toHaveCount($limit)->and($list['total'])->toBe($limit + 3)->and($list['truncated'])->toBeTrue()
             ->and($list['rows']->first()->email)->toBe('bulk-'.($limit + 3).'@example.test');
 
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertSee('Showing the '.$limit.' most recent of '.($limit + 3).' invitations.');
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertSee('Showing the '.$limit.' most recent of '.($limit + 3).' invitations.');
     });
 
     it('names the accepted person, linking to them only for a viewer who may open user pages', function () {
@@ -323,14 +323,14 @@ describe('the Invitations card', function () {
         regInvOpen('joined@example.test', $this->org, $this->operator, ['live_email' => null, 'accepted_at' => now(), 'accepted_user_id' => $member->id]);
 
         // The test operator holds only portal.operator and crm.manage: no users.view, so a name and no link.
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))
             ->assertSee('Joined Person')->assertDontSee(route('users.show', $member), false);
 
         $viewer = opInvOperator();
         $viewer->givePermissionTo('users.view');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $this->actingAs($viewer)->get(route('organizations.show', $this->org))->assertSee(route('users.show', $member), false);
+        $this->actingAs($viewer)->get(route('organizations.portal', $this->org))->assertSee(route('users.show', $member), false);
     });
 
     it('is absent for an account that cannot manage membership, and for a customer\'s own organization page', function () {
@@ -339,7 +339,7 @@ describe('the Invitations card', function () {
         // A customer holding a stray crm.manage is refused the page of an organization they belong to (ORG-3a: `manageDirectory`; until then they could open it and the
         // card was merely not built). Neither the card nor an address reaches them.
         $stray = opInvCustomer($this->org, ['crm.manage']);
-        $this->actingAs($stray)->get(route('organizations.show', $this->org))
+        $this->actingAs($stray)->get(route('organizations.portal', $this->org))
             ->assertForbidden()->assertDontSee('Invitations')->assertDontSee('private@example.test')
             ->assertDontSee(route('organizations.invitations.store', $this->org), false);
 
@@ -347,7 +347,7 @@ describe('the Invitations card', function () {
         $half = User::factory()->create();
         $half->givePermissionTo('portal.operator');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $this->actingAs($half)->get(route('organizations.show', $this->org))->assertForbidden();
+        $this->actingAs($half)->get(route('organizations.portal', $this->org))->assertForbidden();
     });
 });
 
@@ -435,7 +435,7 @@ describe('authority', function () {
         expect(file_get_contents(base_path('bootstrap/app.php')))->not->toMatch('/csrf|forgery/i');
 
         regInvOpen('pending@example.test', $this->org, $this->operator);
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->getContent();
         preg_match_all('#<form[^>]*action="[^"]*/invitations[^"]*"[^>]*>(.*?)</form>#s', $html, $forms);
 
         expect($forms[1])->toHaveCount(3);
@@ -462,7 +462,7 @@ describe('issuing an invitation', function () {
     it('creates one open, organization-bound invitation, audits it, queues one mail after the commit and says what happened', function () {
         $response = opInvIssue($this, $this->operator, $this->org, '  New.Person@Example.TEST ');
 
-        $response->assertRedirect(route('organizations.show', $this->org));
+        $response->assertRedirect(route('organizations.portal', $this->org));
         $row = opInvRows()->sole();
 
         expect($row->organization_id)->toBe($this->org->id)
@@ -473,7 +473,7 @@ describe('issuing an invitation', function () {
             ->and(Carbon::parse($row->expires_at)->isSameDay(now()->addDays(OrganizationInvitations::LIFETIME_DAYS)))->toBeTrue()
             ->and(DB::table('jobs')->count())->toBe(1);
 
-        $this->get(route('organizations.show', $this->org))->assertSee('Invitation sent to new.person@example.test.')
+        $this->get(route('organizations.portal', $this->org))->assertSee('Invitation sent to new.person@example.test.')
             ->assertSee('It expires in '.OrganizationInvitations::LIFETIME_DAYS.' days');
 
         $audit = DB::table('activity_log')->where('description', OrganizationInvitations::ISSUED)->sole();
@@ -501,9 +501,9 @@ describe('issuing an invitation', function () {
     it('refuses an invalid address, writing nothing and queueing nothing', function (mixed $email) {
         $before = opInvFootprint();
 
-        $this->actingAs($this->operator)->from(route('organizations.show', $this->org))
+        $this->actingAs($this->operator)->from(route('organizations.portal', $this->org))
             ->post(route('organizations.invitations.store', $this->org), ['email' => $email])
-            ->assertRedirect(route('organizations.show', $this->org))->assertSessionHasErrors('email');
+            ->assertRedirect(route('organizations.portal', $this->org))->assertSessionHasErrors('email');
 
         expect(opInvFootprint())->toBe($before);
     })->with([
@@ -512,7 +512,7 @@ describe('issuing an invitation', function () {
     ]);
 
     it('shows the error beside the field, with the attempted address kept, and the field named by its label', function () {
-        $html = $this->actingAs($this->operator)->followingRedirects()->from(route('organizations.show', $this->org))
+        $html = $this->actingAs($this->operator)->followingRedirects()->from(route('organizations.portal', $this->org))
             ->post(route('organizations.invitations.store', $this->org), ['email' => 'nonsense'])->getContent();
 
         expect($html)->toContain('id="invitation-email-error"')->and($html)->toContain('aria-invalid="true"')
@@ -526,7 +526,7 @@ describe('issuing an invitation', function () {
 
         // A redirect back to the page with the refusal in the session (not a 500 page that happens to quote the message).
         $this->actingAs($this->operator)->post(route('organizations.invitations.store', $this->org), ['email' => 'existing@example.test'])
-            ->assertRedirect(route('organizations.show', $this->org))
+            ->assertRedirect(route('organizations.portal', $this->org))
             ->assertSessionHasErrors(['email' => 'That address already belongs to an account. Use Add member on the organization page instead of an invitation.']);
 
         expect(opInvFootprint())->toBe($before);
@@ -551,7 +551,7 @@ describe('issuing an invitation', function () {
         $before = opInvFootprint();
 
         $this->actingAs($this->operator)->post(route('organizations.invitations.store', $this->org), ['email' => 'race@example.test'])
-            ->assertRedirect(route('organizations.show', $this->org))
+            ->assertRedirect(route('organizations.portal', $this->org))
             ->assertSessionHasErrors(['email' => 'Another invitation for this address was issued at the same moment. Check the invitations list and try again.']);
 
         expect($racing)->toBeTrue()->and(opInvFootprint())->toBe($before);
@@ -609,7 +609,7 @@ describe('issuing an invitation', function () {
     it('resends from the card: the Resend button posts the row\'s address to the same route', function () {
         regInvOpen('resend-me@example.test', $this->org, $this->operator, ['expires_at' => now()->subHour()]);
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->getContent();
 
         expect($html)->toContain('aria-label="Resend the invitation to resend-me@example.test"')
             ->and($html)->toContain('<input type="hidden" name="email" value="resend-me@example.test">');
@@ -754,7 +754,7 @@ describe('revoking an invitation', function () {
         [$invitation, $token] = regInvOpen('pending@example.test', $this->org, $this->operator);
 
         $this->actingAs($this->operator)->delete(route('organizations.invitations.destroy', [$this->org, $invitation->id]))
-            ->assertRedirect(route('organizations.show', $this->org));
+            ->assertRedirect(route('organizations.portal', $this->org));
 
         $row = opInvRows()->sole();
         expect($row->revoked_at)->not->toBeNull()->and($row->revoked_reason)->toBe(OrganizationInvitations::REASON_OPERATOR)
@@ -763,7 +763,7 @@ describe('revoking an invitation', function () {
         $audit = DB::table('activity_log')->where('description', OrganizationInvitations::REVOKED)->sole();
         expect($audit->subject_id)->toBe($this->org->id)->and($audit->causer_id)->toBe($this->operator->id);
 
-        $this->get(route('organizations.show', $this->org))->assertSee('Invitation revoked. Its link no longer works.')->assertSee('Revoked by an operator');
+        $this->get(route('organizations.portal', $this->org))->assertSee('Invitation revoked. Its link no longer works.')->assertSee('Revoked by an operator');
         auth()->logout();
 
         // Dead by GET and by POST, with the one uniform page and nothing written.
@@ -796,7 +796,7 @@ describe('revoking an invitation', function () {
 
         foreach ([$open, $accepted, $expired, $superseded] as $row) {
             $this->actingAs($this->operator)->delete(route('organizations.invitations.destroy', [$this->org, $row->id]))
-                ->assertRedirect(route('organizations.show', $this->org))
+                ->assertRedirect(route('organizations.portal', $this->org))
                 ->assertSessionHas('success', fn (string $message) => str_contains($message, 'no longer pending'));
         }
 
@@ -854,7 +854,7 @@ describe('issuance throttling', function () {
 
     it('allows 30 attempts an hour and answers the 31st with 429, creating, changing, auditing and mailing nothing', function () {
         for ($i = 1; $i <= InvitationIssueThrottle::ATTEMPTS_PER_HOUR; $i++) {
-            opInvIssue($this, $this->operator, $this->org, "person{$i}@example.test")->assertRedirect(route('organizations.show', $this->org));
+            opInvIssue($this, $this->operator, $this->org, "person{$i}@example.test")->assertRedirect(route('organizations.portal', $this->org));
         }
 
         expect(opInvRows())->toHaveCount(30)->and(DB::table('jobs')->count())->toBe(30);
@@ -893,7 +893,7 @@ describe('issuance throttling', function () {
 
         opInvIssue($this, $this->operator, $this->org, 'first@example.test')->assertStatus(429);
         // The other operator is untouched, from the same client address.
-        opInvIssue($this, $second, $this->org, 'second@example.test')->assertRedirect(route('organizations.show', $this->org));
+        opInvIssue($this, $second, $this->org, 'second@example.test')->assertRedirect(route('organizations.portal', $this->org));
 
         expect(opInvRows()->pluck('invited_by')->all())->toBe([$second->id]);
     });
@@ -906,7 +906,7 @@ describe('issuance throttling', function () {
             $this->actingAs($customer)->post(route('organizations.invitations.store', $this->org), ['email' => 'x@example.test'])->assertForbidden();
         }
 
-        opInvIssue($this, $this->operator, $this->org, 'operator-still-can@example.test')->assertRedirect(route('organizations.show', $this->org));
+        opInvIssue($this, $this->operator, $this->org, 'operator-still-can@example.test')->assertRedirect(route('organizations.portal', $this->org));
         expect(opInvRows())->toHaveCount(1);
 
         // ...and below the limit every refusal is exactly the one it always was (not a 429 standing in for it).
@@ -921,11 +921,11 @@ describe('issuance throttling', function () {
         opInvIssue($this, $this->operator, $this->org, 'blocked@example.test')->assertStatus(429);
 
         $this->actingAs($this->operator)->delete(route('organizations.invitations.destroy', [$this->org, $invitation->id]))
-            ->assertRedirect(route('organizations.show', $this->org));
+            ->assertRedirect(route('organizations.portal', $this->org));
 
         expect(opInvRows()->sole()->revoked_at)->not->toBeNull();
         // The page that carries the card is not throttled either.
-        $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->assertOk()->assertSee('Revoked by an operator');
+        $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->assertOk()->assertSee('Revoked by an operator');
         auth()->logout();
         $this->get(route('invitation.show', $token))->assertOk()->assertInertia(fn (Assert $page) => $page->component('auth/invitation-invalid'));
     });
@@ -947,7 +947,7 @@ describe('issuance throttling', function () {
         opInvIssue($this, $this->operator, $this->org, 'still-blocked@example.test')->assertStatus(429);
 
         InvitationIssueThrottle::clearFor($this->operator->id);
-        opInvIssue($this, $this->operator, $this->org, 'unblocked@example.test')->assertRedirect(route('organizations.show', $this->org));
+        opInvIssue($this, $this->operator, $this->org, 'unblocked@example.test')->assertRedirect(route('organizations.portal', $this->org));
         expect(opInvRows()->pluck('email')->all())->toBe(['unblocked@example.test']);
     });
 });
@@ -1043,7 +1043,7 @@ describe('the operator-to-recipient journey', function () {
             ->and(DB::table('organization_members')->where('organization_id', $this->org->id)->count())->toBe(2)
             ->and($existingMember->exists)->toBeTrue();
 
-        $html = $this->actingAs($this->operator)->get(route('organizations.show', $this->org))->getContent();
+        $html = $this->actingAs($this->operator)->get(route('organizations.portal', $this->org))->getContent();
         expect($html)->toContain('Accepted')->and($html)->toContain('Nina Newcomer')->and($html)->toContain('newcomer@example.test')
             ->and($html)->not->toContain('aria-label="Revoke the invitation to newcomer@example.test"');
     });

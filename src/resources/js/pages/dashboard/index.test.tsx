@@ -199,7 +199,7 @@ describe('Home', () => {
                 companies: 4,
                 contacts: 9,
                 orgs: 2,
-                href: '/crm/companies',
+                href: '/organizations',
                 visit: 'document',
             },
         });

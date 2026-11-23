@@ -23,7 +23,7 @@ beforeEach(function () {
 const ELIGIBILITY_ROUTES = [
     '/billing/invoices' => 'billing.manage',
     '/operator/tickets' => 'tickets.assign',
-    '/crm/companies' => 'crm.manage',
+    '/organizations' => 'crm.manage',
     '/admin/users' => 'users.view',
     '/admin/roles' => 'roles.view',
     '/operator/cms' => 'cms.edit',

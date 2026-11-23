@@ -340,7 +340,7 @@ final class NavigationBuilder
             key: 'directory',
             label: 'Directory',
             icon: 'contact',
-            patterns: ['crm.*'],
+            patterns: ['crm.*', 'organizations.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, [
                 $this->item('directory.people', 'People', route('crm.contacts.index'), 'document', [
@@ -349,11 +349,15 @@ final class NavigationBuilder
                     'crm.contacts.create',
                     'crm.contacts.edit',
                 ]),
-                $this->item('directory.organizations', 'Organizations', route('crm.companies.index'), 'document', [
-                    'crm.companies.index',
-                    'crm.companies.show',
-                    'crm.companies.create',
-                    'crm.companies.edit',
+                // ORG-3b: one Organization workspace under Directory. Its three pages (Overview, People, Portal access), the list and the create and edit
+                // forms are all this one item; the administrative act routes (`organizations.members.*` and the rest) redirect and render nothing.
+                $this->item('directory.organizations', 'Organizations', route('organizations.index'), 'document', [
+                    'organizations.index',
+                    'organizations.create',
+                    'organizations.show',
+                    'organizations.people',
+                    'organizations.portal',
+                    'organizations.edit',
                 ]),
             ])],
         );
@@ -419,15 +423,14 @@ final class NavigationBuilder
             ]);
         }
 
-        // Release 1.0 (DIR-1): the administrative index of portal organizations. `organizations.show` (and the organization administration
-        // actions that return to it) stays inside this item until ORG-3b moves the Organization workspace under Directory. Since ORG-3a the
-        // item is drawn under the ability the PAGES ask, `manageDirectory` (`portal.operator` AND `crm.manage`, active account), so that
-        // an account holding a stray `crm.manage` does not get a link that ends in a 403. An actor who may manage the Directory and holds
-        // nothing else in System still reaches it, because this workspace appears whenever any one of its views survives.
+        // Release 1.0 (DIR-1): the administrative index of portal organizations. Since ORG-3a the item is drawn under the ability the PAGES ask,
+        // `manageDirectory` (`portal.operator` AND `crm.manage`, active account), so that an account holding a stray `crm.manage` does not get a link that
+        // ends in a 403. Since ORG-3b the item is ONLY the filtered list (`organizations.access`); each row opens the Portal access page of the
+        // Organization workspace, which belongs to Directory → Organizations. An actor who may manage the Directory and holds nothing else in System
+        // still reaches it, because this workspace appears whenever any one of its views survives.
         if ($user->can('manageDirectory', Organization::class)) {
-            $views[] = $this->item('system.organization-access', 'Organization access', route('organizations.index'), 'document', [
-                'organizations.index',
-                'organizations.show',
+            $views[] = $this->item('system.organization-access', 'Organization access', route('organizations.access'), 'document', [
+                'organizations.access',
             ]);
         }
 
@@ -447,7 +450,7 @@ final class NavigationBuilder
             key: 'system',
             label: 'System',
             icon: 'settings',
-            patterns: ['users.*', 'roles.*', 'organizations.*', 'operator.cms.*'],
+            patterns: ['users.*', 'roles.*', 'organizations.access', 'operator.cms.*'],
             panel: PanelDefault::Open,
             sections: [$this->section('views', 'Views', ContextKind::Views, $views)],
         );

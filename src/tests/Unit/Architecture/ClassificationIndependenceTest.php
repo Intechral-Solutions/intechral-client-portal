@@ -25,6 +25,7 @@ function classificationAllowlist(): array
         'Services/OrganizationPreflight.php' => 'the read-only check that every stored value is in the catalogue',
         'Console/Commands/OrganizationPreflightCommand.php' => 'prints that check',
         'Support/Rehearsal/IntegritySnapshot.php' => 'the integrity check that every stored value is in the catalogue',
+        'Http/Presenters/OrganizationWorkspacePresenter.php' => 'the workspace header shows the Classification label as an overline (ORG-3b): a description for an actor who already passed manageDirectory, read by no decision',
     ];
 }
 

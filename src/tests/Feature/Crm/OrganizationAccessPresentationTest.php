@@ -189,12 +189,12 @@ function oa_landscape(User $operator): array
 it('lists on System → Organization access only Organizations whose portal access has been enabled, Directory-only ones never', function () {
     $world = oa_landscape($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
 
     // The Directory-only Organization is not on the list at all (the fixture the earlier "never Not enabled" test did not exclude): not by name, not by link.
     $page->assertSee('Alpha Enabled')->assertSee('Bravo Disabled')
         ->assertDontSee('Charlie Directory Only')
-        ->assertDontSee(route('organizations.show', $world['directory']), false);
+        ->assertDontSee(route('organizations.portal', $world['directory']), false);
 
     expect(oa_rowStates($page->getContent()))->toBe(['Alpha Enabled' => 'enabled', 'Bravo Disabled' => 'disabled'])
         ->and($page->viewData('organizations')->total())->toBe(2);
@@ -203,7 +203,7 @@ it('lists on System → Organization access only Organizations whose portal acce
 it('does not draw a Directory-only Organization as Enabled anywhere on the System list, even when it is the only Organization', function () {
     $directory = Organization::factory()->directoryOnly()->create(['name' => 'Only Directory', 'created_by' => $this->operator->id]);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
 
     $page->assertSee('No organization has portal access yet.')->assertDontSee('Only Directory')
         ->assertDontSee('data-portal-state="enabled"', false);
@@ -213,7 +213,7 @@ it('does not draw a Directory-only Organization as Enabled anywhere on the Syste
 it('draws all three states on the Directory Organizations list, each from the row itself', function () {
     oa_landscape($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('crm.companies.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
 
     expect(oa_rowStates($page->getContent()))->toBe([
         'Alpha Enabled' => 'enabled',
@@ -225,11 +225,11 @@ it('draws all three states on the Directory Organizations list, each from the ro
 it('keeps the Directory list free of an access link for a Directory-only Organization, and gives every other row one', function () {
     $world = oa_landscape($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('crm.companies.index'))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
 
-    $page->assertSee(route('organizations.show', $world['enabled']), false)
-        ->assertSee(route('organizations.show', $world['disabled']), false)
-        ->assertDontSee(route('organizations.show', $world['directory']), false);
+    $page->assertSee(route('organizations.portal', $world['enabled']), false)
+        ->assertSee(route('organizations.portal', $world['disabled']), false)
+        ->assertDontSee(route('organizations.portal', $world['directory']), false);
 });
 
 it('paginates the System list over the filtered set, not over every Organization', function () {
@@ -240,8 +240,8 @@ it('paginates the System list over the filtered set, not over every Organization
         Organization::factory()->directoryOnly()->create(['name' => sprintf('Directory %02d', $n), 'created_by' => $this->operator->id]);
     }
 
-    $first = $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
-    $second = $this->actingAs($this->operator)->get(route('organizations.index', ['page' => 2]))->assertOk();
+    $first = $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
+    $second = $this->actingAs($this->operator)->get(route('organizations.access', ['page' => 2]))->assertOk();
 
     expect($first->viewData('organizations')->total())->toBe(26)
         ->and(count(oa_rowStates($first->getContent())))->toBe(25)
@@ -253,13 +253,13 @@ it('paginates the System list over the filtered set, not over every Organization
 it('offers an Enabled partner every control, and nothing the state forbids is missing', function () {
     $w = oa_world($this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk();
 
     expect(oa_controls($page->getContent()))->toBe(oa_enabledControls());
     $page->assertSee('data-portal-state="enabled"', false)
         ->assertDontSee('Members can be added only while portal access is enabled.')
         ->assertDontSee('Invitations can be sent only while portal access is enabled.')
-        ->assertDontSee('Enable organization');
+        ->assertDontSee('Re-enable portal access');
 });
 
 it('offers a Disabled partner only what takes authority away, and says why the rest is absent', function () {
@@ -268,7 +268,7 @@ it('offers a Disabled partner only what takes authority away, and says why the r
     // An invitation row that is still open (the disable sweep revoked the real one): the service lets an operator revoke it in any state, so the control stays.
     OrganizationInvitation::factory()->create(['organization_id' => $w['partner']->id, 'invited_by' => $this->operator->id, 'email' => 'left.open@example.test', 'live_email' => 'left.open@example.test']);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk();
 
     expect(oa_controls($page->getContent()))->toBe([
         'DELETE /organizations/#/invitations/#',     // revoke an open invitation
@@ -282,7 +282,7 @@ it('offers a Disabled partner only what takes authority away, and says why the r
 
     $text = oa_text($page->getContent());
     $page->assertSee('data-portal-state="disabled"', false)
-        ->assertDontSee('Disable organization')
+        ->assertDontSee('Disable portal access')
         ->assertDontSee('Send invitation')
         ->assertDontSee('Approve administrator')
         ->assertDontSee('Grant support access')
@@ -301,24 +301,25 @@ it('offers an Organization that has never had portal access nothing to change it
     DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $member->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now()]);
     User::factory()->create()->assignRole('user');   // an account that could be added, were adding offered
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $organization))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $organization))->assertOk();
 
     expect(oa_controls($page->getContent()))->toBe([
         'DELETE /organizations/#/members/#',             // remove
+        'POST /organizations/#/promote',                 // initial enablement, the only state change (ORG-3b: from the Portal access page)
         'PUT /organizations/#/members/#/role [member]',  // demote
     ]);
 
     $page->assertSee('data-portal-state="not_enabled"', false)
         ->assertSee('has never had portal access')
-        ->assertSee(route('crm.companies.show', $organization), false)
-        ->assertDontSee('Enable organization')->assertDontSee('Disable organization')
+        ->assertSee(route('organizations.show', $organization), false)   // the Overview tab
+        ->assertSee('Enable portal access')
+        ->assertDontSee('Re-enable portal access')->assertDontSee('Disable portal access')
         ->assertDontSee('Send invitation')->assertDontSee('Add</button>', false);
-    expect(oa_text($page->getContent()))->toContain('Portal access has never been enabled. It is enabled once, from the Directory profile.');
 });
 
 it('offers a managed customer only an unlink when it is Disabled, and the link controls when it is Enabled', function () {
     $w = oa_world($this->operator);
-    $url = route('organizations.show', $w['customer']);
+    $url = route('organizations.portal', $w['customer']);
 
     $enabled = $this->actingAs($this->operator)->get($url)->assertOk();
     expect(oa_controls($enabled->getContent()))->toContain('DELETE /organizations/#/manager', 'PUT /organizations/#/manager', 'POST /organizations/#/disable');
@@ -335,7 +336,7 @@ it('offers a Disabled organization that has no partner relationship no relations
     $w = oa_world($this->operator);
     app(OrganizationRelationships::class)->disable($w['spare'], $this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $w['spare']))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $w['spare']))->assertOk();
 
     expect(oa_controls($page->getContent()))->toBe(['POST /organizations/#/enable']);
     $page->assertDontSee('Designate as partner')->assertDontSee('Link to partner')->assertDontSee('No partner is available yet.');
@@ -346,7 +347,7 @@ it('lets a Disabled partner without customers still have its partner designation
     app(OrganizationRelationships::class)->unlinkCustomer($w['customer'], $this->operator);
     app(OrganizationRelationships::class)->disable($w['partner'], $this->operator);
 
-    $page = $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk();
+    $page = $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk();
 
     expect(oa_controls($page->getContent()))->toContain('DELETE /organizations/#/partner')
         ->not->toContain('POST /organizations/#/customers');
@@ -356,7 +357,7 @@ it('asks for confirmation before re-enabling and says previously revoked invitat
     $w = oa_world($this->operator);
     app(OrganizationRelationships::class)->disable($w['partner'], $this->operator);
 
-    $html = $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk()->getContent();
+    $html = $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk()->getContent();
 
     $dom = new DOMDocument;
     @$dom->loadHTML($html);
@@ -373,7 +374,7 @@ it('draws the Disable confirmation with the consequence it really has: the open 
     $relationships = app(OrganizationRelationships::class);
     $open = fn () => OrganizationInvitation::query()->where('organization_id', $w['partner']->id)->whereNull('revoked_at')->whereNull('accepted_at')->count();
 
-    $html = $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk()->getContent();
+    $html = $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk()->getContent();
 
     $dom = new DOMDocument;
     @$dom->loadHTML($html);
@@ -399,7 +400,7 @@ it('does not say a Disabled Organization loses nothing: the Disabled alert names
     $w = oa_world($this->operator);
     app(OrganizationRelationships::class)->disable($w['partner'], $this->operator);
 
-    $text = oa_text($this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk()->getContent());
+    $text = oa_text($this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk()->getContent());
 
     expect($text)->not->toContain('Nothing else is removed')
         ->and($text)->toContain('Its open invitations were permanently revoked when it was disabled and do not return if portal access is enabled again')
@@ -411,11 +412,11 @@ it('does not take any action by being viewed: opening the detail in every state 
     $before = fn () => [DB::table('organizations')->orderBy('id')->get()->all(), DB::table('organization_members')->get()->all(), DB::table('organization_invitations')->get()->all(), DB::table('activity_log')->count()];
 
     $snapshot = $before();
-    $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk();
+    $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk();
     app(OrganizationRelationships::class)->disable($w['partner'], $this->operator);
     $afterDisable = $before();
-    $this->actingAs($this->operator)->get(route('organizations.show', $w['partner']))->assertOk();
-    $this->actingAs($this->operator)->get(route('organizations.index'))->assertOk();
+    $this->actingAs($this->operator)->get(route('organizations.portal', $w['partner']))->assertOk();
+    $this->actingAs($this->operator)->get(route('organizations.access'))->assertOk();
 
     expect($before())->toEqual($afterDisable)->and($snapshot)->not->toEqual($afterDisable);
 });
@@ -438,8 +439,8 @@ it('refuses a customer with a stray crm.manage the System list and the detail of
     $w = oa_world($this->operator);
     $stray = oa_stray($w['partner']);
 
-    $this->actingAs($stray)->get(route('organizations.index'))->assertForbidden();
-    $response = $this->actingAs($stray)->get(route('organizations.show', $w['partner']))->assertForbidden();
+    $this->actingAs($stray)->get(route('organizations.access'))->assertForbidden();
+    $response = $this->actingAs($stray)->get(route('organizations.portal', $w['partner']))->assertForbidden();
 
     // Nothing of the administration leaks into the refusal.
     foreach (['Person member', 'Person pending', 'new.person@example.test', 'Acme Partner', 'Managed Customer', 'Approved administrator'] as $secret) {
@@ -452,9 +453,9 @@ it('keeps the three answers apart for that customer: 403 for what they can see, 
     $w = oa_world($this->operator);
     $stray = oa_stray($w['partner']);
 
-    $this->actingAs($stray)->get(route('organizations.show', $w['partner']))->assertForbidden();       // theirs: visible, not permitted
-    $this->actingAs($stray)->get(route('organizations.show', $w['customer']))->assertNotFound();       // not theirs: hidden
-    $this->actingAs($stray)->get(route('organizations.show', 999999))->assertNotFound();                // unknown
+    $this->actingAs($stray)->get(route('organizations.portal', $w['partner']))->assertForbidden();       // theirs: visible, not permitted
+    $this->actingAs($stray)->get(route('organizations.portal', $w['customer']))->assertNotFound();       // not theirs: hidden
+    $this->actingAs($stray)->get(route('organizations.portal', 999999))->assertNotFound();                // unknown
 });
 
 it('refuses the operator-side abilities separately: portal.operator without crm.manage never reaches the pages, crm.manage without portal.operator is refused them', function () {
@@ -462,11 +463,11 @@ it('refuses the operator-side abilities separately: portal.operator without crm.
     $w = oa_world($this->operator);
 
     $operatorOnly = oa_stray($w['partner'], ['portal.operator']);
-    $this->actingAs($operatorOnly)->get(route('organizations.index'))->assertForbidden();           // the route's own `can:crm.manage`
-    $this->actingAs($operatorOnly)->get(route('organizations.show', $w['partner']))->assertForbidden();
+    $this->actingAs($operatorOnly)->get(route('organizations.access'))->assertForbidden();           // the route's own `can:crm.manage`
+    $this->actingAs($operatorOnly)->get(route('organizations.portal', $w['partner']))->assertForbidden();
 
     $directoryOnly = oa_stray($w['partner'], ['crm.manage']);
-    $this->actingAs($directoryOnly)->get(route('organizations.index'))->assertForbidden();           // `manageDirectory` (new in ORG-3a)
+    $this->actingAs($directoryOnly)->get(route('organizations.access'))->assertForbidden();           // `manageDirectory` (new in ORG-3a)
 });
 
 it('lets an active operator with both capabilities through, on a custom role as well as the operator role', function () {
@@ -477,8 +478,8 @@ it('lets an active operator with both capabilities through, on a custom role as 
     $custom = User::factory()->create()->assignRole($role);
 
     foreach ([$this->operator, $custom] as $actor) {
-        $this->actingAs($actor)->get(route('organizations.index'))->assertOk()->assertSee('Acme Partner');
-        $this->actingAs($actor)->get(route('organizations.show', $w['partner']))->assertOk()->assertSee('Person member');
+        $this->actingAs($actor)->get(route('organizations.access'))->assertOk()->assertSee('Acme Partner');
+        $this->actingAs($actor)->get(route('organizations.portal', $w['partner']))->assertOk()->assertSee('Person member');
     }
 });
 
@@ -487,9 +488,9 @@ it('answers a customer with a stray crm.manage 404, as before, in the closed and
     $w = oa_world($this->operator);
     $stray = oa_stray($w['partner']);
 
+    $this->actingAs($stray)->get(route('organizations.access'))->assertNotFound();
+    $this->actingAs($stray)->get(route('organizations.portal', $w['partner']))->assertNotFound();
     $this->actingAs($stray)->get(route('organizations.index'))->assertNotFound();
-    $this->actingAs($stray)->get(route('organizations.show', $w['partner']))->assertNotFound();
-    $this->actingAs($stray)->get(route('crm.companies.index'))->assertNotFound();
 })->with(['closed', 'pilot']);
 
 it('builds no administrative data for a refused actor: the member rows, the invitation list and the relationship facts are never read', function () {
@@ -499,8 +500,8 @@ it('builds no administrative data for a refused actor: the member rows, the invi
 
     DB::flushQueryLog();
     DB::enableQueryLog();
-    $this->actingAs($stray)->get(route('organizations.show', $w['partner']))->assertForbidden();
-    $this->actingAs($stray)->get(route('organizations.index'))->assertForbidden();
+    $this->actingAs($stray)->get(route('organizations.portal', $w['partner']))->assertForbidden();
+    $this->actingAs($stray)->get(route('organizations.access'))->assertForbidden();
     $queries = collect(DB::getQueryLog())->pluck('query')->implode("\n");
     DB::disableQueryLog();
 

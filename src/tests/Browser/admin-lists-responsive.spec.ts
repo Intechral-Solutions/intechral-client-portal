@@ -36,21 +36,21 @@ type ListCase = {
 const CASES: ListCase[] = [
     {
         label: 'Directory → Organizations',
-        path: `/crm/companies?search=${encodeURIComponent(COMPANY)}`,
+        path: `/organizations?search=${encodeURIComponent(COMPANY)}`,
         region: 'Organizations list',
         row: (page) => page.getByRole('row').filter({ hasText: COMPANY }),
         first: (row) => row.getByRole('link', { name: COMPANY, exact: true }),
         action: (row) => row.getByRole('link', { name: 'Edit', exact: true }),
-        destination: /\/crm\/companies\/\d+\/edit$/,
+        destination: /\/organizations\/\d+\/edit$/,
     },
     {
         label: 'System → Organization access',
-        path: '/organizations',
+        path: '/organizations/access',
         region: 'Organizations with portal access',
         row: (page) => page.getByRole('row').filter({ hasText: 'E2E Customer Org' }),
         first: (row) => row.getByRole('link', { name: 'E2E Customer Org', exact: true }),
         action: (row) => row.getByRole('link', { name: 'Manage E2E Customer Org', exact: true }),
-        destination: /\/organizations\/\d+$/,
+        destination: /\/organizations\/\d+\/portal$/,
     },
     {
         label: 'System → Users',
@@ -80,10 +80,10 @@ const scrolls = (region: Locator) =>
     region.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
 
 async function createCompany(page: Page) {
-    await page.goto('/crm/companies/create');
+    await page.goto('/organizations/create');
     await page.getByLabel('Organization name').fill(COMPANY);
     await page.getByRole('button', { name: 'Create Organization' }).click();
-    await expect(page).toHaveURL(/\/crm\/companies\/\d+$/);
+    await expect(page).toHaveURL(/\/organizations\/\d+$/);
 
     return new URL(page.url()).pathname;
 }
@@ -92,7 +92,7 @@ async function deleteCompany(page: Page, path: string) {
     await page.goto(`${path}/edit`);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Delete Organization' }).click();
-    await expect(page).toHaveURL(/\/crm\/companies$/);
+    await expect(page).toHaveURL(/\/organizations$/);
 }
 
 test('the expanded administration lists stay usable at 390px and unchanged at desktop width', async ({

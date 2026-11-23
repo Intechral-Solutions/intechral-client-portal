@@ -52,9 +52,9 @@ it('refuses a browser deletion of an Organization projects still reference, and 
     $world = organizationWorld($organization);
 
     $this->actingAs($this->operator)
-        ->from(route('crm.companies.edit', $organization))
-        ->delete(route('crm.companies.destroy', $organization))
-        ->assertRedirect(route('crm.companies.edit', $organization))
+        ->from(route('organizations.edit', $organization))
+        ->delete(route('organizations.destroy', $organization))
+        ->assertRedirect(route('organizations.edit', $organization))
         ->assertSessionHasErrors(['company' => 'Cannot delete "Linked Co": 2 project(s) still refer to it. Remove the Organization from those projects first.']);
 
     expect(organizationWorld($organization))->toBe($world)
@@ -66,7 +66,7 @@ it('answers a JSON caller with 409 and the same message', function () {
     $world = organizationWorld($organization);
 
     $this->actingAs($this->operator)
-        ->deleteJson(route('crm.companies.destroy', $organization))
+        ->deleteJson(route('organizations.destroy', $organization))
         ->assertStatus(409)
         ->assertJson(['message' => 'Cannot delete "Linked Co": 1 project(s) still refer to it. Remove the Organization from those projects first.']);
 
@@ -78,21 +78,21 @@ it('shows the refusal on the edit page the operator is sent back to', function (
 
     $this->actingAs($this->operator)
         ->withSession(['errors' => ['default' => ['format' => ':message', 'messages' => ['company' => [OrganizationDirectoryException::hasProjects('Linked Co', 1)->getMessage()]]]], '_flash' => ['old' => [], 'new' => ['errors']]])
-        ->get(route('crm.companies.edit', $organization))
+        ->get(route('organizations.edit', $organization))
         ->assertOk()
         ->assertSee('Cannot delete "Linked Co"');
 });
 
 it('lets the deletion through once the last project is unlinked, clearing the Person affiliation and recording it', function () {
     [$organization, $projects, $contact] = linkedDirectoryOrganization(2);
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $organization))->assertSessionHasErrors('company');
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $organization))->assertSessionHasErrors('company');
 
     $organization->projects()->detach($projects->first()->id);
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $organization))->assertSessionHasErrors('company');
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $organization))->assertSessionHasErrors('company');
 
     $organization->projects()->detach();
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $organization))
-        ->assertRedirect(route('crm.companies.index'))
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $organization))
+        ->assertRedirect(route('organizations.index'))
         ->assertSessionHas('success', 'Organization deleted.');
 
     expect(Organization::withoutGlobalScopes()->find($organization->id))->toBeNull()
@@ -112,7 +112,7 @@ it('refuses an Enabled and a Disabled Organization, and clears nothing', functio
     $contact = CrmContact::factory()->create(['organization_id' => $organization->id]);
     $world = organizationWorld($organization);
 
-    $this->actingAs($this->operator)->delete(route('crm.companies.destroy', $organization))
+    $this->actingAs($this->operator)->delete(route('organizations.destroy', $organization))
         ->assertSessionHasErrors(['company' => 'Cannot delete "Had Access": it has (or had) portal access. Only an Organization that never had portal access can be deleted; disable it instead.']);
 
     expect(organizationWorld($organization))->toBe($world)
@@ -124,7 +124,7 @@ it('refuses an Organization that members, invitations, requests or a relationshi
     $arrange($organization);
     $world = organizationWorld($organization);
 
-    $response = $this->actingAs($this->operator)->deleteJson(route('crm.companies.destroy', $organization));
+    $response = $this->actingAs($this->operator)->deleteJson(route('organizations.destroy', $organization));
 
     $response->assertStatus(409);
     expect($response->json('message'))->toContain('Cannot delete "Odd Co": it still has')->toContain($fragment)
@@ -144,9 +144,9 @@ it('keeps the authorization: guests and users without crm.manage are refused bef
     [$organization] = linkedDirectoryOrganization();
     $world = organizationWorld($organization);
 
-    $this->delete(route('crm.companies.destroy', $organization))->assertRedirect('/login');
-    $customer = $this->actingAs(User::factory()->create()->assignRole('user'))->deleteJson(route('crm.companies.destroy', $organization));
-    $viewer = $this->actingAs(User::factory()->create()->givePermissionTo('crm.view'))->deleteJson(route('crm.companies.destroy', $organization));
+    $this->delete(route('organizations.destroy', $organization))->assertRedirect('/login');
+    $customer = $this->actingAs(User::factory()->create()->assignRole('user'))->deleteJson(route('organizations.destroy', $organization));
+    $viewer = $this->actingAs(User::factory()->create()->givePermissionTo('crm.view'))->deleteJson(route('organizations.destroy', $organization));
 
     expect($customer->status())->toBe(404, $mode)
         ->and($viewer->status())->toBe(404, $mode)
@@ -161,7 +161,7 @@ it('refuses a customer who can SEE the Organization but does not hold crm.manage
     DB::table('organization_members')->insert(['organization_id' => $organization->id, 'user_id' => $member->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);   // reaches the middleware
     $world = organizationWorld($organization);
 
-    expect($this->actingAs($member)->deleteJson(route('crm.companies.destroy', $organization))->status())->toBe($status, $mode)
+    expect($this->actingAs($member)->deleteJson(route('organizations.destroy', $organization))->status())->toBe($status, $mode)
         ->and(organizationWorld($organization))->toBe($world);
 })->with([['closed', 404], ['pilot', 404], ['legacy', 403]]);
 

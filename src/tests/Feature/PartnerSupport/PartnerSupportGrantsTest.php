@@ -217,24 +217,24 @@ it('refuses a NEW request for a disabled organization, and leaves the requester\
 it('shows the controls to an operator on a partner page only, and never to anyone else', function () {
     $w = psWorld();
 
-    $page = $this->actingAs($w['operator'])->get(route('organizations.show', $w['partner']))->assertOk();
-    $page->assertSee('Revoke support access')->assertSee('Support access: in effect')->assertSee('Disable organization');
+    $page = $this->actingAs($w['operator'])->get(route('organizations.portal', $w['partner']))->assertOk();
+    $page->assertSee('Revoke support access')->assertSee('Support access: in effect')->assertSee('Disable portal access');
 
     // A non-partner organization carries no support controls.
-    $this->actingAs($w['operator'])->get(route('organizations.show', $w['customer']))->assertOk()->assertDontSee('Grant support access')->assertDontSee('Revoke support access')->assertSee('Disable organization');
+    $this->actingAs($w['operator'])->get(route('organizations.portal', $w['customer']))->assertOk()->assertDontSee('Grant support access')->assertDontSee('Revoke support access')->assertSee('Disable portal access');
 
     // A customer holding a stray crm.manage who is a member sees neither the controls nor the status.
     $stray = pilotCustomer();
     $stray->givePermissionTo('crm.manage');
     psJoin($stray, $w['partner']);
-    $this->actingAs($stray)->get(route('organizations.show', $w['partner']))->assertDontSee('Revoke support access')->assertDontSee('Grant support access')->assertDontSee('Disable organization');
+    $this->actingAs($stray)->get(route('organizations.portal', $w['partner']))->assertDontSee('Revoke support access')->assertDontSee('Grant support access')->assertDontSee('Disable portal access');
 });
 
 it('says why a designation is not in effect', function () {
     $w = psWorld();
     app(OrganizationRelationships::class)->disable($w['partner'], $w['operator']);
 
-    $this->actingAs($w['operator'])->get(route('organizations.show', $w['partner']))
+    $this->actingAs($w['operator'])->get(route('organizations.portal', $w['partner']))
         ->assertSee('granted, not in effect')->assertSee('the organization is disabled');
 });
 

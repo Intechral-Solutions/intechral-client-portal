@@ -258,7 +258,7 @@ async function expectControlContract(page: Page, tokens: Tokens) {
 const created: string[] = [];
 
 async function csrf(page: Page) {
-    await page.goto('/crm/companies');
+    await page.goto('/organizations');
 
     return (await page.locator('meta[name="csrf-token"]').getAttribute('content')) ?? '';
 }
@@ -308,11 +308,11 @@ test.afterEach(async ({ page }) => {
     }
 
     // Drain the flash bag the deletions just wrote, so the next test's banners are its own.
-    await page.goto('/crm/companies');
+    await page.goto('/organizations');
     expect(failures, 'spec fixture cleanup').toEqual([]);
 });
 
-/** `/crm/companies/12` from an absolute or relative Location header. */
+/** `/organizations/12` from an absolute or relative Location header. */
 const pathOf = (location: string) => new URL(location, 'http://localhost').pathname;
 
 // ═══ Helpdesk ═════════════════════════════════════════════════════════════════════
@@ -457,19 +457,19 @@ test.describe('Directory', () => {
             await expectSecondary(inMain(page).getByRole('link', { name: 'Cancel' }), tokens);
             await expectControlContract(page, tokens);
 
-            tokens = await visit(page, '/crm/companies', theme, viewport);
+            tokens = await visit(page, '/organizations', theme, viewport);
             await expectInk(inMain(page).getByRole('link', { name: '+ New Organization' }), tokens);
             await expectHeaderActionIntact(inMain(page).getByRole('link', { name: '+ New Organization' }), viewport);
             await expectControlContract(page, tokens);
 
-            tokens = await visit(page, '/crm/companies/create', theme, viewport);
+            tokens = await visit(page, '/organizations/create', theme, viewport);
             for (const name of ['Organization name', 'Website', 'Phone', 'Address', 'Notes']) {
                 await expect(inMain(page).getByLabel(name)).toBeVisible();
             }
             await expectInk(inMain(page).getByRole('button', { name: 'Create Organization' }), tokens);
             await expectControlContract(page, tokens);
 
-            tokens = await visit(page, '/organizations', theme, viewport);
+            tokens = await visit(page, '/organizations/access', theme, viewport);
             await expectSecondary(inMain(page).getByRole('link', { name: 'View Organizations' }), tokens);
             expect(await hasHorizontalOverflow(page)).toBe(false);
         }
@@ -479,7 +479,7 @@ test.describe('Directory', () => {
         test.setTimeout(180_000);
 
         const token = await csrf(page);
-        const location = await createViaForm(page, '/crm/companies', token, { name: 'E2E WP1 Company' });
+        const location = await createViaForm(page, '/organizations', token, { name: 'E2E WP1 Company' });
         const companyPath = pathOf(location);
         created.push(companyPath);
 
@@ -710,13 +710,13 @@ test.describe('Pagination', () => {
 
         // 26 rows page at 25 per page; creating through the application's own form route keeps the data legitimate.
         for (let number = 1; number <= 26; number++) {
-            const location = await createViaForm(page, '/crm/companies', token, {
+            const location = await createViaForm(page, '/organizations', token, {
                 name: `${prefix} ${String(number).padStart(2, '0')}`,
             });
             created.push(pathOf(location));
         }
 
-        const list = `/crm/companies?search=${encodeURIComponent(prefix)}`;
+        const list = `/organizations?search=${encodeURIComponent(prefix)}`;
 
         for (const { theme, viewport } of MODES) {
             const tokens = await visit(page, list, theme, viewport);
@@ -1541,7 +1541,7 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
         test.setTimeout(420_000);
 
         const token = await csrf(page);
-        const company = pathOf(await createViaForm(page, '/crm/companies', token, { name: 'E2E WP3 Company' }));
+        const company = pathOf(await createViaForm(page, '/organizations', token, { name: 'E2E WP3 Company' }));
         const contact = pathOf(await createViaForm(page, '/crm/contacts', token, { first_name: 'E2E', last_name: 'WP3 Contact' }));
         created.push(company, contact);
 
@@ -1558,10 +1558,12 @@ test.describe('Theme normalization: Helpdesk, Finance, System as an operator', (
             ['contacts', '/crm/contacts'],
             ['contact', contact],
             ['contact form', `${contact}/edit`],
-            ['companies', '/crm/companies'],
-            ['company', company],
-            ['company form', `${company}/edit`],
             ['organizations', '/organizations'],
+            ['organization overview', company],
+            ['organization people', `${company}/people`],
+            ['organization portal access', `${company}/portal`],
+            ['organization form', `${company}/edit`],
+            ['organization access', '/organizations/access'],
             ['invoice', invoice],
             ['invoice edit', `${invoice}/edit`],
         ] as const) {

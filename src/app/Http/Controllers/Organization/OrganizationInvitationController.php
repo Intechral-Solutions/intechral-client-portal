@@ -53,7 +53,7 @@ class OrganizationInvitationController extends Controller
                 abort(404);
             }
 
-            return redirect()->route('organizations.show', $organization)->withInput()->withErrors(['email' => $exception->getMessage()]);
+            return redirect()->route('organizations.portal', $organization)->withInput()->withErrors(['email' => $exception->getMessage()]);
         }
 
         return $this->back($organization, sprintf(
@@ -81,6 +81,6 @@ class OrganizationInvitationController extends Controller
 
     private function back(Organization $organization, string $message): RedirectResponse
     {
-        return redirect()->route('organizations.show', $organization)->with('success', $message);
+        return redirect()->route('organizations.portal', $organization)->with('success', $message);
     }
 }
